@@ -1,28 +1,18 @@
 import { Tabs } from "expo-router";
 import { useColorScheme, View, Text } from "react-native";
-import { useAnnouncementsStore } from "@/store/announcements.store";
 
 function TabIcon({
   focused,
   label,
   emoji,
-  badge,
 }: {
   focused: boolean;
   label: string;
   emoji: string;
-  badge?: number;
 }) {
   return (
     <View className="items-center justify-center pt-1">
-      <View>
-        <Text style={{ fontSize: 22 }}>{emoji}</Text>
-        {badge != null && badge > 0 && (
-          <View className="absolute -top-1 -right-2 bg-red-500 rounded-full w-4 h-4 items-center justify-center">
-            <Text className="text-white text-xs font-bold">{badge}</Text>
-          </View>
-        )}
-      </View>
+      <Text style={{ fontSize: 22 }}>{emoji}</Text>
       <Text
         className={`text-xs mt-0.5 ${focused ? "text-green-600 font-semibold" : "text-gray-500"}`}
       >
@@ -34,11 +24,11 @@ function TabIcon({
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { unreadCount } = useAnnouncementsStore();
   const isDark = colorScheme === "dark";
 
   return (
     <Tabs
+      initialRouteName="club"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
@@ -51,45 +41,39 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="club"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Home" emoji="🏠" />
+            <TabIcon focused={focused} label="Club" emoji="🏟️" />
           ),
         }}
       />
       <Tabs.Screen
-        name="live"
+        name="play"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Live" emoji="🎾" />
+            <TabIcon focused={focused} label="Play" emoji="🏓" />
           ),
         }}
       />
       <Tabs.Screen
-        name="standings"
+        name="sign-ups"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Standings" emoji="🏆" />
+            <TabIcon focused={focused} label="Sign-Ups" emoji="📋" />
           ),
         }}
       />
       <Tabs.Screen
-        name="inbox"
+        name="members"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Inbox" emoji="📬" badge={unreadCount} />
+            <TabIcon focused={focused} label="Members" emoji="👥" />
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} label="Profile" emoji="👤" />
-          ),
-        }}
-      />
+      {/* Redirect index → club */}
+      <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );
 }
