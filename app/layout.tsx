@@ -3,8 +3,8 @@ import { SupabaseProvider } from "@/components/providers/supabase-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Athens Pickleball",
-  description: "Pickleball ladder league platform — Athens, TN",
+  title: "PaddleUp Pickleball",
+  description: "Pickleball ladder league platform",
 };
 
 export default function RootLayout({

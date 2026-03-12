@@ -38,8 +38,9 @@ export function AppNav({ profile }: { profile: Profile }) {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="text-lg font-bold text-gray-900">
-            Athens Pickleball
+          <Link href="/" className="flex items-center gap-2">
+            <img src="/PaddleUpPickleballLogo.jpg" alt="PaddleUp Pickleball" className="h-10 w-auto rounded" />
+            <span className="text-lg font-bold text-gray-900">PaddleUp Pickleball</span>
           </Link>
 
           {/* Navigation */}

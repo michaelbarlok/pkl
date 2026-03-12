@@ -32,7 +32,7 @@ export default async function DashboardPage() {
           Welcome back, {profile?.display_name}
         </h1>
         <p className="mt-1 text-gray-600">
-          Here&apos;s what&apos;s happening in Athens, TN pickleball.
+          Here&apos;s what&apos;s happening in PaddleUp Pickleball.
         </p>
       </div>
 
