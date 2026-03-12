@@ -7,7 +7,7 @@ interface Props {
 
 export default function MemberInvite({ displayName }: Props) {
   return (
-    <BaseEmail preview="You've been invited!" heading="Welcome to Athens Pickleball!">
+    <BaseEmail preview="You've been invited!" heading="Welcome to Athens Pickleball — Athens, TN!">
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
         Hi {displayName ?? "there"},
       </Text>

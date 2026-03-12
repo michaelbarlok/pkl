@@ -31,7 +31,7 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
           <Section>{children}</Section>
           <Hr style={hr} />
           <Text style={footer}>
-            Athens Pickleball Ladder League
+            Athens Pickleball Ladder League — Athens, TN
           </Text>
         </Container>
       </Body>

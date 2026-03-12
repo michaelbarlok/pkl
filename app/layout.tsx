@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Athens Pickleball",
-  description: "Pickleball ladder league platform",
+  description: "Pickleball ladder league platform — Athens, TN",
 };
 
 export default function RootLayout({
