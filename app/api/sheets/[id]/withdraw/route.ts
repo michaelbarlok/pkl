@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -40,8 +41,12 @@ export async function POST(
     );
 
     if (rpcError) {
+      console.error("withdraw_from_sheet RPC error:", rpcError);
       return NextResponse.json({ error: rpcError.message }, { status: 400 });
     }
+
+    revalidatePath(`/sheets/${sheetId}`);
+    revalidatePath("/sheets");
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (err) {

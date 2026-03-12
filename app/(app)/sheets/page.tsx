@@ -4,6 +4,8 @@ import { formatDate, formatShortDate } from "@/lib/utils";
 import type { SignupSheet } from "@/types/database";
 import { QuickSignUp } from "./quick-signup";
 
+export const dynamic = "force-dynamic";
+
 const statusBadge: Record<string, { className: string; label: string }> = {
   open: { className: "badge-green", label: "Open" },
   closed: { className: "badge-yellow", label: "Closed" },

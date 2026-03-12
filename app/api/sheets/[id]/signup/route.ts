@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -40,8 +41,13 @@ export async function POST(
     );
 
     if (rpcError) {
+      console.error("sign_up_for_sheet RPC error:", rpcError);
       return NextResponse.json({ error: rpcError.message }, { status: 400 });
     }
+
+    // Bust Next.js cache so the page re-renders with fresh data
+    revalidatePath(`/sheets/${sheetId}`);
+    revalidatePath("/sheets");
 
     return NextResponse.json({ registration: data }, { status: 200 });
   } catch (err) {
