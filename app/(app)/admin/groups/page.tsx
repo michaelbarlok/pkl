@@ -48,12 +48,22 @@ export default async function AdminGroupsPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile) return;
+
     const { data: newGroup, error } = await supabase
       .from("shootout_groups")
       .insert({
         name: name.trim(),
         slug,
-        created_by: user!.id,
+        created_by: profile.id,
         is_active: true,
       })
       .select("id")
