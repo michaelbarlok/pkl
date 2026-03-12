@@ -121,7 +121,7 @@ async function sendEmail({
   }
 
   await resend.emails.send({
-    from: "PickleScore <noreply@athenspickleball.com>",
+    from: "PKL <noreply@athenspickleball.com>",
     to,
     subject,
     react: emailComponent(data),

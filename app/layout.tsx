@@ -3,7 +3,7 @@ import { SupabaseProvider } from "@/components/providers/supabase-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PickleScore",
+  title: "PKL",
   description: "Pickleball ladder league platform",
 };
 
