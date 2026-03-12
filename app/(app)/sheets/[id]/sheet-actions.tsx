@@ -1,6 +1,5 @@
 "use client";
 
-import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { RegistrationStatus } from "@/types/database";
@@ -22,7 +21,6 @@ export function SheetActions({
   withdrawClosed,
   isFull,
 }: SheetActionsProps) {
-  const { supabase } = useSupabase();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +29,13 @@ export function SheetActions({
     setLoading(true);
     setError(null);
     try {
-      const { error: rpcError } = await supabase.rpc("sign_up_for_sheet", {
-        p_sheet_id: sheetId,
-        p_player_id: profileId,
+      const res = await fetch(`/api/sheets/${sheetId}/signup`, {
+        method: "POST",
       });
-      if (rpcError) throw rpcError;
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to sign up.");
+      }
       router.refresh();
     } catch (err: unknown) {
       const message =
@@ -50,11 +50,13 @@ export function SheetActions({
     setLoading(true);
     setError(null);
     try {
-      const { error: rpcError } = await supabase.rpc("withdraw_from_sheet", {
-        p_sheet_id: sheetId,
-        p_player_id: profileId,
+      const res = await fetch(`/api/sheets/${sheetId}/withdraw`, {
+        method: "POST",
       });
-      if (rpcError) throw rpcError;
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to withdraw.");
+      }
       router.refresh();
     } catch (err: unknown) {
       const message =
