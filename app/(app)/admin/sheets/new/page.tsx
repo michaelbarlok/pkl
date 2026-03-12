@@ -121,7 +121,7 @@ export default function NewSheetPage() {
         .insert({
           group_id: groupId,
           event_date: eventDate,
-          event_time: eventTime,
+          event_time: new Date(`${eventDate}T${eventTime}`).toISOString(),
           location: location.trim(),
           player_limit: playerLimit,
           signup_closes_at: signupClosesAt,
