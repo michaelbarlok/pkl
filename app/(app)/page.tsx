@@ -32,7 +32,7 @@ export default async function DashboardPage() {
           Welcome back, {profile?.display_name}
         </h1>
         <p className="mt-1 text-gray-600">
-          Here&apos;s what&apos;s happening in PickleTrack.
+          Here&apos;s what&apos;s happening in PickleScore.
         </p>
       </div>
 
