@@ -39,8 +39,8 @@ export function AppNav({ profile }: { profile: Profile }) {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img src="/pickletrack-logo.svg" alt="PickleTrack" className="h-10 w-auto" />
-            <span className="text-lg font-bold text-dark-600">PickleTrack</span>
+            <img src="/pkl-logo.png" alt="PKL" className="h-10 w-auto" />
+            <span className="text-lg font-bold text-dark-600">PKL</span>
           </Link>
 
           {/* Navigation */}
