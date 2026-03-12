@@ -81,7 +81,7 @@ export function AppNav({ profile }: { profile: Profile }) {
           </nav>
 
           {/* Right side: notification bell + profile */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <NotificationBell profileId={profile.id} />
             <Link
               href={`/players/${profile.id}`}
@@ -102,7 +102,7 @@ export function AppNav({ profile }: { profile: Profile }) {
             </Link>
             <button
               onClick={handleSignOut}
-              className="text-sm text-dark-300 hover:text-dark-500"
+              className="hidden md:block text-sm text-dark-300 hover:text-dark-500"
             >
               Sign out
             </button>
