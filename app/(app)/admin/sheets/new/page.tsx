@@ -10,6 +10,7 @@ export default function NewSheetPage() {
   const router = useRouter();
 
   const [groups, setGroups] = useState<ShootoutGroup[]>([]);
+  const [savedLocations, setSavedLocations] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -47,23 +48,54 @@ export default function NewSheetPage() {
   function computeCloseTime(hoursStr: string): string | null {
     if (!hoursStr || !eventDate || !eventTime) return null;
     const hours = parseInt(hoursStr, 10);
-    const dt = new Date(`${eventDate}T${eventTime}`);
-    dt.setHours(dt.getHours() - hours);
-    return dt.toISOString();
+    // Parse time components directly to avoid timezone conversion
+    const [hStr, mStr] = eventTime.split(":");
+    let h = parseInt(hStr, 10) - hours;
+    let m = parseInt(mStr, 10);
+    let date = eventDate;
+    // Handle day rollback if hours go negative
+    while (h < 0) {
+      h += 24;
+      const d = new Date(date + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() - 1);
+      date = d.toISOString().split("T")[0];
+    }
+    const hh = h.toString().padStart(2, "0");
+    const mm = m.toString().padStart(2, "0");
+    return `${date}T${hh}:${mm}:00`;
   }
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("shootout_groups")
-        .select("*")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
+      const [groupsRes, sheetsRes] = await Promise.all([
+        supabase
+          .from("shootout_groups")
+          .select("*")
+          .eq("is_active", true)
+          .order("name", { ascending: true }),
+        supabase
+          .from("signup_sheets")
+          .select("location"),
+      ]);
 
-      setGroups(data ?? []);
-      if (data && data.length > 0) {
-        setGroupId(data[0].id);
+      setGroups(groupsRes.data ?? []);
+      if (groupsRes.data && groupsRes.data.length > 0) {
+        setGroupId(groupsRes.data[0].id);
       }
+
+      // Extract unique locations, sorted alphabetically
+      const locations = Array.from(
+        new Set(
+          (sheetsRes.data ?? [])
+            .map((s: { location: string }) => s.location?.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b));
+      setSavedLocations(locations);
+      if (locations.length > 0) {
+        setLocation(locations[0]);
+      }
+
       setLoading(false);
     }
     load();
@@ -121,7 +153,7 @@ export default function NewSheetPage() {
         .insert({
           group_id: groupId,
           event_date: eventDate,
-          event_time: new Date(`${eventDate}T${eventTime}`).toISOString(),
+          event_time: `${eventDate}T${eventTime}:00`,
           location: location.trim(),
           player_limit: playerLimit,
           signup_closes_at: signupClosesAt,
@@ -250,15 +282,49 @@ export default function NewSheetPage() {
           <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
             Location
           </label>
-          <input
-            id="location"
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="input w-full"
-            placeholder="e.g. Athens Community Center"
-            required
-          />
+          {savedLocations.length > 0 ? (
+            <div className="space-y-2">
+              <select
+                id="location"
+                value={savedLocations.includes(location) ? location : "__custom__"}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setLocation("");
+                  } else {
+                    setLocation(e.target.value);
+                  }
+                }}
+                className="input w-full"
+              >
+                {savedLocations.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {loc}
+                  </option>
+                ))}
+                <option value="__custom__">+ Add new location</option>
+              </select>
+              {!savedLocations.includes(location) && (
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="input w-full"
+                  placeholder="Enter new location name"
+                  required
+                />
+              )}
+            </div>
+          ) : (
+            <input
+              id="location"
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="input w-full"
+              placeholder="e.g. Athens Community Center"
+              required
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

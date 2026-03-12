@@ -34,13 +34,13 @@ export function AppNav({ profile }: { profile: Profile }) {
   }
 
   return (
-    <header className="border-b border-gray-200 bg-white">
+    <header className="border-b border-cream-300 bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <img src="/PaddleUpPickleballLogo.jpg" alt="PaddleUp Pickleball" className="h-10 w-auto rounded" />
-            <span className="text-lg font-bold text-gray-900">PaddleUp Pickleball</span>
+            <span className="text-lg font-bold text-dark-600">PaddleUp Pickleball</span>
           </Link>
 
           {/* Navigation */}
@@ -53,7 +53,7 @@ export function AppNav({ profile }: { profile: Profile }) {
                   "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   pathname === item.href
                     ? "bg-brand-50 text-brand-700"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    : "text-dark-400 hover:bg-cream-100 hover:text-dark-600"
                 )}
               >
                 {item.name}
@@ -61,7 +61,7 @@ export function AppNav({ profile }: { profile: Profile }) {
             ))}
             {isAdmin && (
               <>
-                <span className="mx-2 h-5 w-px bg-gray-300" />
+                <span className="mx-2 h-5 w-px bg-cream-400" />
                 {adminNav.map((item) => (
                   <Link
                     key={item.href}
@@ -70,7 +70,7 @@ export function AppNav({ profile }: { profile: Profile }) {
                       "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                       pathname.startsWith(item.href)
                         ? "bg-brand-50 text-brand-700"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        : "text-dark-400 hover:bg-cream-100 hover:text-dark-600"
                     )}
                   >
                     {item.name}
@@ -85,7 +85,7 @@ export function AppNav({ profile }: { profile: Profile }) {
             <NotificationBell profileId={profile.id} />
             <Link
               href={`/players/${profile.id}`}
-              className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
+              className="flex items-center gap-2 text-sm text-dark-400 hover:text-dark-600"
             >
               {profile.avatar_url ? (
                 <img
@@ -102,7 +102,7 @@ export function AppNav({ profile }: { profile: Profile }) {
             </Link>
             <button
               onClick={handleSignOut}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-dark-300 hover:text-dark-500"
             >
               Sign out
             </button>

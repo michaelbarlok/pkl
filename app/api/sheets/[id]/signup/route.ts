@@ -1,4 +1,4 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -8,7 +8,6 @@ export async function POST(
   try {
     const { id: sheetId } = await params;
 
-    // Verify the caller is authenticated
     const supabase = await createClient();
     const {
       data: { user },
@@ -31,10 +30,8 @@ export async function POST(
       );
     }
 
-    // Use service client to call RPC (bypasses any client-side issues)
-    const serviceClient = await createServiceClient();
-
-    const { data, error: rpcError } = await serviceClient.rpc(
+    // Call RPC — function is SECURITY DEFINER so it bypasses RLS internally
+    const { data, error: rpcError } = await supabase.rpc(
       "sign_up_for_sheet",
       {
         p_sheet_id: sheetId,
