@@ -38,13 +38,42 @@ export default async function SheetDetailPage({
 
   if (error || !sheet) notFound();
 
-  // Fetch registrations with player profiles
-  const { data: registrations } = await supabase
-    .from("registrations")
-    .select("*, player:profiles(*)")
-    .eq("sheet_id", id)
-    .in("status", ["confirmed", "waitlist"])
-    .order("signed_up_at", { ascending: true });
+  // Fetch registrations — try with player join, fall back to plain query
+  let registrations: (Registration & { player?: Profile })[] | null = null;
+  {
+    const { data, error: regError } = await supabase
+      .from("registrations")
+      .select("*, player:profiles!registrations_player_id_fkey(*)")
+      .eq("sheet_id", id)
+      .in("status", ["confirmed", "waitlist"]);
+
+    if (regError) {
+      // Fallback: query without join, then fetch profiles separately
+      console.error("Registration join query failed:", regError.message);
+      const { data: plainRegs } = await supabase
+        .from("registrations")
+        .select("*")
+        .eq("sheet_id", id)
+        .in("status", ["confirmed", "waitlist"]);
+
+      if (plainRegs && plainRegs.length > 0) {
+        const playerIds = plainRegs.map((r) => r.player_id);
+        const { data: players } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", playerIds);
+        const playerMap = new Map((players ?? []).map((p) => [p.id, p]));
+        registrations = plainRegs.map((r) => ({
+          ...r,
+          player: playerMap.get(r.player_id) ?? undefined,
+        }));
+      } else {
+        registrations = [];
+      }
+    } else {
+      registrations = data;
+    }
+  }
 
   const confirmed = (registrations ?? []).filter(
     (r: Registration) => r.status === "confirmed"

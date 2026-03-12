@@ -40,7 +40,7 @@ export default async function RosterPage({
   // Fetch registrations with player profiles
   const { data: registrations } = await supabase
     .from("registrations")
-    .select("*, player:profiles(*)")
+    .select("*, player:profiles!registrations_player_id_fkey(*)")
     .eq("sheet_id", id)
     .in("status", ["confirmed", "waitlist"])
     .order("signed_up_at", { ascending: true });

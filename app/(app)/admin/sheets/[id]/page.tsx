@@ -77,7 +77,7 @@ export default function AdminSheetDetailPage() {
 
       const { data: regData } = await supabase
         .from("registrations")
-        .select("*, player:profiles(*)")
+        .select("*, player:profiles!registrations_player_id_fkey(*)")
         .eq("sheet_id", sheetId)
         .in("status", ["confirmed", "waitlist"])
         .order("signed_up_at", { ascending: true });
