@@ -488,7 +488,7 @@ export default function AdminGroupDetailPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Game Limit (4 players)
+                Four Player Score Limit
               </label>
               <input
                 type="number"
@@ -498,13 +498,13 @@ export default function AdminGroupDetailPage() {
                 className="input mt-1 w-full"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Number of games played in a 4-player pool.
+                Games to {preferences.game_limit_4p} in a 4-player pool.
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Game Limit (5 players)
+                Five Player Score Limit
               </label>
               <input
                 type="number"
@@ -514,7 +514,7 @@ export default function AdminGroupDetailPage() {
                 className="input mt-1 w-full"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Number of games played in a 5-player pool.
+                Games to {preferences.game_limit_5p} in a 5-player pool.
               </p>
             </div>
 
