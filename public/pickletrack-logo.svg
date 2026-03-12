@@ -1,39 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 360" width="500" height="360">
-  <!-- Motion trail lines -->
-  <line x1="150" y1="230" x2="190" y2="170" stroke="#564154" stroke-width="6" stroke-linecap="round"/>
-  <line x1="165" y1="240" x2="200" y2="190" stroke="#FF6542" stroke-width="5" stroke-linecap="round"/>
-  <line x1="180" y1="247" x2="208" y2="207" stroke="#564154" stroke-width="4" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 380" width="500" height="380">
+  <!-- Motion trail streaks (short diagonal dashes, lower-left of ball) -->
+  <line x1="148" y1="240" x2="192" y2="190" stroke="#564154" stroke-width="8" stroke-linecap="round"/>
+  <line x1="164" y1="252" x2="202" y2="208" stroke="#FF6542" stroke-width="7" stroke-linecap="round"/>
+  <line x1="178" y1="260" x2="210" y2="222" stroke="#564154" stroke-width="5" stroke-linecap="round"/>
 
   <!-- Pickleball - outer ring (plum border) -->
-  <circle cx="290" cy="125" r="88" fill="#88498F"/>
+  <circle cx="285" cy="118" r="95" fill="#88498F"/>
   <!-- Pickleball - inner orange fill -->
-  <circle cx="290" cy="125" r="80" fill="#FF6542"/>
+  <circle cx="285" cy="118" r="84" fill="#FF6542"/>
 
-  <!-- Pickleball holes -->
-  <ellipse cx="273" cy="63" rx="8" ry="7" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="310" cy="70" rx="7" ry="6.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="293" cy="80" rx="6" ry="5.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
+  <!-- Pickleball holes (dark oval indentations, randomly scattered) -->
+  <!-- These are darker ovals that look like shadow/depth holes on the orange surface -->
+  <ellipse cx="252" cy="62" rx="7" ry="5.5" fill="#E04A2A" transform="rotate(-15 252 62)"/>
+  <ellipse cx="285" cy="55" rx="8" ry="6" fill="#E04A2A" transform="rotate(10 285 55)"/>
+  <ellipse cx="315" cy="65" rx="6.5" ry="5" fill="#E04A2A" transform="rotate(-5 315 65)"/>
 
-  <ellipse cx="240" cy="95" rx="8" ry="7.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="270" cy="100" rx="9" ry="8" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="305" cy="95" rx="8" ry="7" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="335" cy="100" rx="7" ry="6.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
+  <ellipse cx="232" cy="85" rx="7.5" ry="5.5" fill="#E04A2A" transform="rotate(20 232 85)"/>
+  <ellipse cx="262" cy="80" rx="8.5" ry="6.5" fill="#E04A2A" transform="rotate(-10 262 80)"/>
+  <ellipse cx="300" cy="78" rx="8" ry="6" fill="#E04A2A" transform="rotate(15 300 78)"/>
+  <ellipse cx="335" cy="85" rx="7" ry="5" fill="#E04A2A" transform="rotate(-20 335 85)"/>
 
-  <ellipse cx="230" cy="125" rx="7" ry="7" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="260" cy="130" rx="9" ry="8.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="295" cy="125" rx="10" ry="9" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="328" cy="127" rx="8" ry="7.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="353" cy="120" rx="6" ry="6" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
+  <ellipse cx="218" cy="110" rx="7" ry="5" fill="#E04A2A" transform="rotate(5 218 110)"/>
+  <ellipse cx="248" cy="105" rx="9" ry="7" fill="#E04A2A" transform="rotate(-12 248 105)"/>
+  <ellipse cx="282" cy="102" rx="9.5" ry="7" fill="#E04A2A" transform="rotate(8 282 102)"/>
+  <ellipse cx="318" cy="105" rx="8.5" ry="6.5" fill="#E04A2A" transform="rotate(-18 318 105)"/>
+  <ellipse cx="348" cy="112" rx="6.5" ry="5" fill="#E04A2A" transform="rotate(12 348 112)"/>
 
-  <ellipse cx="245" cy="155" rx="8" ry="7" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="280" cy="157" rx="9" ry="8" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="313" cy="153" rx="8" ry="7.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="343" cy="150" rx="7" ry="6.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
+  <ellipse cx="225" cy="135" rx="7.5" ry="5.5" fill="#E04A2A" transform="rotate(-8 225 135)"/>
+  <ellipse cx="258" cy="130" rx="9" ry="6.5" fill="#E04A2A" transform="rotate(14 258 130)"/>
+  <ellipse cx="295" cy="128" rx="9" ry="7" fill="#E04A2A" transform="rotate(-6 295 128)"/>
+  <ellipse cx="328" cy="132" rx="8" ry="6" fill="#E04A2A" transform="rotate(10 328 132)"/>
+  <ellipse cx="352" cy="128" rx="6" ry="4.5" fill="#E04A2A" transform="rotate(-15 352 128)"/>
 
-  <ellipse cx="265" cy="183" rx="7" ry="6.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="300" cy="180" rx="8" ry="7" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
-  <ellipse cx="285" cy="195" rx="6" ry="5.5" fill="#E8522E" stroke="#D4461F" stroke-width="1"/>
+  <ellipse cx="238" cy="155" rx="8" ry="6" fill="#E04A2A" transform="rotate(18 238 155)"/>
+  <ellipse cx="270" cy="152" rx="8.5" ry="6.5" fill="#E04A2A" transform="rotate(-10 270 152)"/>
+  <ellipse cx="305" cy="150" rx="8" ry="6" fill="#E04A2A" transform="rotate(5 305 150)"/>
+  <ellipse cx="338" cy="155" rx="7" ry="5" fill="#E04A2A" transform="rotate(-12 338 155)"/>
 
-  <!-- "PickleTrack" text centered -->
-  <text x="250" y="325" text-anchor="middle" font-family="'Trebuchet MS', 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="68" fill="#88498F" letter-spacing="-1">Pickle<tspan fill="#564154">Track</tspan></text>
+  <ellipse cx="255" cy="172" rx="7" ry="5" fill="#E04A2A" transform="rotate(8 255 172)"/>
+  <ellipse cx="288" cy="170" rx="7.5" ry="5.5" fill="#E04A2A" transform="rotate(-14 288 170)"/>
+  <ellipse cx="318" cy="174" rx="6.5" ry="5" fill="#E04A2A" transform="rotate(10 318 174)"/>
+
+  <ellipse cx="275" cy="190" rx="6" ry="4.5" fill="#E04A2A" transform="rotate(-5 275 190)"/>
+  <ellipse cx="300" cy="188" rx="6.5" ry="5" fill="#E04A2A" transform="rotate(12 300 188)"/>
+
+  <!-- PickleTrack text -->
+  <text x="250" y="345" text-anchor="middle" font-family="'Trebuchet MS', 'Segoe UI', Arial, sans-serif" font-weight="800" font-size="72" letter-spacing="-1">
+    <tspan fill="#88498F">Pickle</tspan><tspan fill="#564154">Track</tspan>
+  </text>
 </svg>
