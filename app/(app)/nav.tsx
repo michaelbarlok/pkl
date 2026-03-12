@@ -39,7 +39,7 @@ export function AppNav({ profile }: { profile: Profile }) {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img src="/PaddleUpPickleballLogo.jpg" alt="PickleTrack" className="h-10 w-auto rounded" />
+            <img src="/pickletrack-logo.svg" alt="PickleTrack" className="h-10 w-auto" />
             <span className="text-lg font-bold text-dark-600">PickleTrack</span>
           </Link>
 

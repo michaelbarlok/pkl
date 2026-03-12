@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <clipPath id="circle-clip">
+      <circle cx="200" cy="175" r="140"/>
+    </clipPath>
+    <linearGradient id="top-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#88498F"/>
+      <stop offset="100%" stop-color="#7a3f80"/>
+    </linearGradient>
+    <linearGradient id="mid-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FF6542"/>
+      <stop offset="100%" stop-color="#e8522e"/>
+    </linearGradient>
+    <linearGradient id="bot-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#779FA1"/>
+      <stop offset="100%" stop-color="#628789"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark background circle outline -->
+  <circle cx="200" cy="175" r="144" fill="#564154"/>
+
+  <!-- Main circle with retro stripes -->
+  <g clip-path="url(#circle-clip)">
+    <!-- Top section - Plum/Purple -->
+    <rect x="60" y="35" width="280" height="56" fill="#88498F"/>
+    <!-- Gap stripe -->
+    <rect x="60" y="91" width="280" height="5" fill="#564154"/>
+    <!-- Upper mid - Plum lighter -->
+    <rect x="60" y="96" width="280" height="28" fill="#a876ad"/>
+    <!-- Gap stripe -->
+    <rect x="60" y="124" width="280" height="5" fill="#564154"/>
+    <!-- Mid section - Orange/Accent -->
+    <rect x="60" y="129" width="280" height="28" fill="#FF6542"/>
+    <!-- Gap stripe -->
+    <rect x="60" y="157" width="280" height="5" fill="#564154"/>
+    <!-- Cream band -->
+    <rect x="60" y="162" width="280" height="28" fill="#E0CBA8"/>
+    <!-- Gap stripe -->
+    <rect x="60" y="190" width="280" height="5" fill="#564154"/>
+    <!-- Lower cream -->
+    <rect x="60" y="195" width="280" height="28" fill="#d4ba8e"/>
+    <!-- Gap stripe -->
+    <rect x="60" y="223" width="280" height="5" fill="#564154"/>
+    <!-- Teal section -->
+    <rect x="60" y="228" width="280" height="28" fill="#779FA1"/>
+    <!-- Gap stripe -->
+    <rect x="60" y="256" width="280" height="5" fill="#564154"/>
+    <!-- Bottom teal -->
+    <rect x="60" y="261" width="280" height="56" fill="#628789"/>
+
+    <!-- Pickleball holes (circular cutouts showing dark background) -->
+    <!-- Classic pickleball hole pattern -->
+    <!-- Top row -->
+    <circle cx="165" cy="100" r="8" fill="#564154"/>
+    <circle cx="200" cy="88" r="8" fill="#564154"/>
+    <circle cx="235" cy="100" r="8" fill="#564154"/>
+    <!-- Middle rows -->
+    <circle cx="145" cy="135" r="9" fill="#564154"/>
+    <circle cx="182" cy="128" r="9" fill="#564154"/>
+    <circle cx="218" cy="128" r="9" fill="#564154"/>
+    <circle cx="255" cy="135" r="9" fill="#564154"/>
+    <!-- Center area -->
+    <circle cx="160" cy="168" r="10" fill="#564154"/>
+    <circle cx="200" cy="162" r="10" fill="#564154"/>
+    <circle cx="240" cy="168" r="10" fill="#564154"/>
+    <!-- Lower middle -->
+    <circle cx="145" cy="205" r="9" fill="#564154"/>
+    <circle cx="182" cy="198" r="9" fill="#564154"/>
+    <circle cx="218" cy="198" r="9" fill="#564154"/>
+    <circle cx="255" cy="205" r="9" fill="#564154"/>
+    <!-- Bottom rows -->
+    <circle cx="165" cy="240" r="8" fill="#564154"/>
+    <circle cx="200" cy="232" r="8" fill="#564154"/>
+    <circle cx="235" cy="240" r="8" fill="#564154"/>
+    <!-- Extra scattered holes -->
+    <circle cx="130" cy="168" r="7" fill="#564154"/>
+    <circle cx="270" cy="168" r="7" fill="#564154"/>
+    <circle cx="175" cy="262" r="7" fill="#564154"/>
+    <circle cx="225" cy="262" r="7" fill="#564154"/>
+    <circle cx="200" cy="58" r="7" fill="#564154"/>
+    <circle cx="170" cy="65" r="6" fill="#564154"/>
+    <circle cx="230" cy="65" r="6" fill="#564154"/>
+  </g>
+
+  <!-- Thin circle border -->
+  <circle cx="200" cy="175" r="140" fill="none" stroke="#564154" stroke-width="4"/>
+
+  <!-- PickleTrack text -->
+  <text x="200" y="355" text-anchor="middle" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="42" fill="#564154" letter-spacing="2">
+    PICKLETRACK
+  </text>
+</svg>
