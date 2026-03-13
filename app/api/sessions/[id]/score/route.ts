@@ -60,9 +60,15 @@ export async function POST(
     .single();
 
   if (prefs) {
-    // Determine game limit based on pool size
-    const poolPlayers = [team_a_p1, team_a_p2, team_b_p1, team_b_p2].filter(Boolean);
-    const gameLimit = poolPlayers.length <= 4 ? prefs.game_limit_4p : prefs.game_limit_5p;
+    // Determine game limit based on how many players are on the court (not in the game)
+    const { count: poolSize } = await supabase
+      .from("session_participants")
+      .select("*", { count: "exact", head: true })
+      .eq("session_id", params.id)
+      .eq("court_number", pool_number)
+      .eq("checked_in", true);
+
+    const gameLimit = (poolSize ?? 4) >= 5 ? prefs.game_limit_5p : prefs.game_limit_4p;
 
     // At least one team must reach the game limit
     if (score_a < gameLimit && score_b < gameLimit) {

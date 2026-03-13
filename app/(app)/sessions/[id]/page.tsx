@@ -404,24 +404,26 @@ export default function PlayerSessionPage() {
             {matchSchedule.map((match) => {
               const matchContent = (
                 <>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-medium text-surface-muted w-8 shrink-0">
-                      G{match.gameNumber}
-                    </span>
-                    <span className="text-sm text-dark-100">
-                      {formatTeam(match.team1, playerNames)}
-                    </span>
-                    <span className="text-xs text-surface-muted">vs</span>
-                    <span className="text-sm text-dark-100">
-                      {formatTeam(match.team2, playerNames)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {match.bye && (
-                      <span className="text-xs text-accent-300">
-                        Bye: {playerNames.get(match.bye) ?? "?"}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-surface-muted w-8 shrink-0">
+                        G{match.gameNumber}
                       </span>
+                      <span className="text-sm text-dark-100">
+                        {formatTeam(match.team1, playerNames)}
+                      </span>
+                      <span className="text-xs text-surface-muted">vs</span>
+                      <span className="text-sm text-dark-100">
+                        {formatTeam(match.team2, playerNames)}
+                      </span>
+                    </div>
+                    {match.bye && (
+                      <p className="text-[11px] text-accent-300/80 mt-0.5 ml-8">
+                        Bye: {playerNames.get(match.bye) ?? "?"}
+                      </p>
                     )}
+                  </div>
+                  <div className="flex items-center shrink-0">
                     {match.result ? (
                       <span className="font-mono text-sm font-semibold text-dark-200">
                         {match.result.scoreA} – {match.result.scoreB}
