@@ -30,7 +30,7 @@ export default async function GroupPage({
   const sheets = await getGroupSheets(group.id);
   const isMember = profile ? await isGroupMember(group.id, profile.id) : false;
 
-  const top10 = members.slice(0, 10);
+  // Show all members in a scrollable list
 
   return (
     <div className="space-y-8">
@@ -115,86 +115,80 @@ export default async function GroupPage({
         </section>
       )}
 
-      {/* Top Members */}
+      {/* Members */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-dark-100">
-            Top Members
-          </h2>
-          <Link
-            href={`/groups/${slug}/ladder`}
-            className="text-sm text-brand-600 hover:text-brand-500"
-          >
-            View full ladder
-          </Link>
-        </div>
+        <h2 className="mb-4 text-lg font-semibold text-dark-100">
+          Members ({members.length})
+        </h2>
         <div className="card overflow-hidden p-0">
-          <table className="min-w-full divide-y divide-surface-border">
-            <thead className="bg-surface-overlay">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  #
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Player
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Step
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Win %
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-border bg-surface-raised">
-              {top10.map((member, index) => (
-                <tr
-                  key={member.player_id}
-                  className={cn(
-                    member.player_id === profile?.id && "bg-brand-900/40"
-                  )}
-                >
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
-                    {index + 1}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {member.player?.avatar_url ? (
-                        <img
-                          src={member.player.avatar_url}
-                          alt=""
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
-                          {member.player?.display_name?.charAt(0) ?? "?"}
-                        </div>
-                      )}
-                      <span className="text-sm font-medium text-dark-100">
-                        {member.player?.display_name}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                    {member.current_step}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                    {member.win_pct}%
-                  </td>
-                </tr>
-              ))}
-              {top10.length === 0 && (
+          <div className="max-h-[32rem] overflow-y-auto">
+            <table className="min-w-full divide-y divide-surface-border">
+              <thead className="bg-surface-overlay sticky top-0 z-10">
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-8 text-center text-sm text-surface-muted"
-                  >
-                    No members yet.
-                  </td>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    #
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    Player
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    Step
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    Win %
+                  </th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-surface-border bg-surface-raised">
+                {members.map((member, index) => (
+                  <tr
+                    key={member.player_id}
+                    className={cn(
+                      member.player_id === profile?.id && "bg-brand-900/40"
+                    )}
+                  >
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
+                      {index + 1}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {member.player?.avatar_url ? (
+                          <img
+                            src={member.player.avatar_url}
+                            alt=""
+                            className="h-8 w-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
+                            {member.player?.display_name?.charAt(0) ?? "?"}
+                          </div>
+                        )}
+                        <span className="text-sm font-medium text-dark-100">
+                          {member.player?.display_name}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
+                      {member.current_step}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
+                      {member.win_pct}%
+                    </td>
+                  </tr>
+                ))}
+                {members.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-4 py-8 text-center text-sm text-surface-muted"
+                    >
+                      No members yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     </div>

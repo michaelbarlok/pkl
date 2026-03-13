@@ -61,27 +61,37 @@ export interface PoolResult {
 
 /**
  * Distribute players across courts.
- * Higher-numbered courts get 5 players first; lower courts get 4.
- * Each court must have 4 or 5 players.
+ * Courts fill from court 1 (highest seeded) first.
+ * If fewer players than max capacity, only fill as many courts as needed.
+ * Each active court must have 4 or 5 players.
  */
 export function distributeCourts(
   playerCount: number,
   numCourts: number
 ): CourtDistribution[] {
-  const base = Math.floor(playerCount / numCourts);
-  const extras = playerCount % numCourts;
+  // Calculate how many courts we actually need (4-5 players each)
+  const activeCourts = Math.min(numCourts, Math.floor(playerCount / 4));
 
-  if (base < 4 || (base === 4 && extras > numCourts) || base > 5) {
+  if (activeCourts === 0 || playerCount < 4) {
     throw new Error(
-      `Invalid distribution: ${playerCount} players across ${numCourts} courts requires 4-5 per court`
+      `Need at least 4 players to fill a court (got ${playerCount})`
     );
   }
 
-  // extras courts get (base+1) players — assigned to HIGHEST court numbers
-  return Array.from({ length: numCourts }, (_, i) => {
+  const base = Math.floor(playerCount / activeCourts);
+  const extras = playerCount % activeCourts;
+
+  if (base > 5) {
+    throw new Error(
+      `Too many players (${playerCount}) for ${activeCourts} courts — max 5 per court`
+    );
+  }
+
+  // Fill court 1 first: lower-numbered courts get extras (5 players)
+  return Array.from({ length: activeCourts }, (_, i) => {
     const courtNum = i + 1;
-    const isHighCourt = courtNum > numCourts - extras;
-    return { court: courtNum, size: isHighCourt ? base + 1 : base };
+    const isExtraCourt = i < extras;
+    return { court: courtNum, size: isExtraCourt ? base + 1 : base };
   });
 }
 
