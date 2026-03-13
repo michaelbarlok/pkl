@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthPage = path.startsWith("/login") || path.startsWith("/register");
   const isApiRoute = path.startsWith("/api");
-  const isPublicPage = path === "/" || path.startsWith("/groups/") || path.startsWith("/ratings") || path.startsWith("/ladder");
+  const isPublicPage = path === "/" || path === "/groups" || path.startsWith("/groups/") || path.startsWith("/ratings") || path.startsWith("/ladder");
 
   if (!user && !isAuthPage && !isApiRoute && !isPublicPage) {
     const url = request.nextUrl.clone();
@@ -44,7 +44,7 @@ export async function updateSession(request: NextRequest) {
   // Redirect authenticated users away from auth pages
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 

@@ -106,7 +106,7 @@ export default function EditProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-surface-muted">Loading...</p>
       </div>
     );
   }
@@ -114,13 +114,13 @@ export default function EditProfilePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Edit Profile</h1>
-        <p className="mt-1 text-gray-600">Update your photo and personal info.</p>
+        <h1 className="text-2xl font-bold text-dark-100">Edit Profile</h1>
+        <p className="mt-1 text-surface-muted">Update your photo and personal info.</p>
       </div>
 
       <div className="card">
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+          <label className="block text-sm font-medium text-dark-200 mb-3">
             Profile Photo
           </label>
           <AvatarUpload
@@ -132,7 +132,7 @@ export default function EditProfilePage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="displayName" className="block text-sm font-medium text-dark-200 mb-1">
               Display Name
             </label>
             <input
@@ -146,7 +146,7 @@ export default function EditProfilePage() {
           </div>
 
           <div>
-            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="fullName" className="block text-sm font-medium text-dark-200 mb-1">
               Full Name
             </label>
             <input
@@ -160,7 +160,7 @@ export default function EditProfilePage() {
           </div>
 
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="phone" className="block text-sm font-medium text-dark-200 mb-1">
               Phone
             </label>
             <input
@@ -174,7 +174,7 @@ export default function EditProfilePage() {
           </div>
 
           <div>
-            <label htmlFor="homeCourt" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="homeCourt" className="block text-sm font-medium text-dark-200 mb-1">
               Home Court
             </label>
             <input
@@ -188,7 +188,7 @@ export default function EditProfilePage() {
           </div>
 
           <div>
-            <label htmlFor="skillLevel" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="skillLevel" className="block text-sm font-medium text-dark-200 mb-1">
               Self-Rating
             </label>
             <select
@@ -210,7 +210,7 @@ export default function EditProfilePage() {
           </div>
 
           <div>
-            <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="bio" className="block text-sm font-medium text-dark-200 mb-1">
               Bio
             </label>
             <textarea
@@ -223,8 +223,8 @@ export default function EditProfilePage() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {success && <p className="text-sm text-green-600">{success}</p>}
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          {success && <p className="text-sm text-teal-300">{success}</p>}
 
           <div className="flex gap-3">
             <button type="submit" className="btn-primary" disabled={saving}>

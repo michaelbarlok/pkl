@@ -75,7 +75,7 @@ export function SheetActions({
   return (
     <div className="card">
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="mb-4 rounded-md bg-red-900/30 p-3 text-sm text-red-400">
           {error}
         </div>
       )}
@@ -83,12 +83,12 @@ export function SheetActions({
       {isRegistered ? (
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium text-gray-900">
+            <p className="font-medium text-dark-100">
               You are{" "}
               {myRegistration.status === "confirmed" ? (
-                <span className="text-green-700">confirmed</span>
+                <span className="text-teal-300">confirmed</span>
               ) : (
-                <span className="text-yellow-700">on the waitlist</span>
+                <span className="text-accent-300">on the waitlist</span>
               )}
               .
             </p>
@@ -107,7 +107,7 @@ export function SheetActions({
       ) : (
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium text-gray-900">
+            <p className="font-medium text-dark-100">
               {signupClosed
                 ? "Sign-up is closed for this event."
                 : isFull
@@ -130,7 +130,7 @@ export function SheetActions({
       )}
 
       {withdrawClosed && isRegistered && (
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-surface-muted">
           The withdraw deadline has passed. Contact an admin to withdraw.
         </p>
       )}

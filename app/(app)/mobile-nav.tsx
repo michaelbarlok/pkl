@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const mainTabs = [
   {
     name: "Home",
-    href: "/",
+    href: "/dashboard",
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
@@ -158,27 +158,27 @@ export function MobileNav({ profile }: { profile: Profile }) {
           moreOpen ? "translate-y-0" : "translate-y-full"
         )}
       >
-        <div className="mx-2 mb-1 rounded-xl bg-white shadow-lg ring-1 ring-cream-300 overflow-hidden">
+        <div className="mx-2 mb-1 rounded-xl bg-surface-raised shadow-2xl ring-1 ring-surface-border overflow-hidden">
           {/* Profile header */}
-          <div className="flex items-center gap-3 border-b border-cream-200 px-4 py-3">
+          <div className="flex items-center gap-3 border-b border-surface-border px-4 py-3">
             {profile.avatar_url ? (
               <img
                 src={profile.avatar_url}
                 alt=""
-                className="h-9 w-9 rounded-full object-cover"
+                className="h-9 w-9 rounded-full object-cover ring-2 ring-brand-500/30"
               />
             ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-sm font-medium">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-sm font-medium">
                 {profile.display_name?.charAt(0).toUpperCase()}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-dark-600 truncate">
+              <p className="text-sm font-semibold text-dark-100 truncate">
                 {profile.display_name}
               </p>
               <Link
                 href={`/players/${profile.id}`}
-                className="text-xs text-brand-600"
+                className="text-xs text-brand-400"
                 onClick={() => setMoreOpen(false)}
               >
                 View profile
@@ -195,8 +195,8 @@ export function MobileNav({ profile }: { profile: Profile }) {
                 className={cn(
                   "flex items-center gap-3 px-4 py-2.5 text-sm font-medium",
                   pathname.startsWith(item.href)
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-dark-500 active:bg-cream-100"
+                    ? "bg-brand-900/40 text-brand-300"
+                    : "text-dark-200 active:bg-surface-overlay"
                 )}
               >
                 {item.icon}
@@ -208,8 +208,8 @@ export function MobileNav({ profile }: { profile: Profile }) {
           {/* Admin section */}
           {isAdmin && (
             <>
-              <div className="border-t border-cream-200">
-                <p className="px-4 pt-2.5 pb-1 text-xs font-semibold uppercase tracking-wider text-dark-300">
+              <div className="border-t border-surface-border">
+                <p className="px-4 pt-2.5 pb-1 text-xs font-semibold uppercase tracking-wider text-surface-muted">
                   Admin
                 </p>
                 {adminLinks.map((item) => (
@@ -219,8 +219,8 @@ export function MobileNav({ profile }: { profile: Profile }) {
                     className={cn(
                       "flex items-center gap-3 px-4 py-2.5 text-sm font-medium",
                       pathname.startsWith(item.href)
-                        ? "bg-brand-50 text-brand-700"
-                        : "text-dark-500 active:bg-cream-100"
+                        ? "bg-brand-900/40 text-brand-300"
+                        : "text-dark-200 active:bg-surface-overlay"
                     )}
                   >
                     {item.icon}
@@ -232,10 +232,10 @@ export function MobileNav({ profile }: { profile: Profile }) {
           )}
 
           {/* Sign out */}
-          <div className="border-t border-cream-200 py-1">
+          <div className="border-t border-surface-border py-1">
             <button
               onClick={handleSignOut}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-dark-400 active:bg-cream-100"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-surface-muted active:bg-surface-overlay"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
@@ -247,7 +247,7 @@ export function MobileNav({ profile }: { profile: Profile }) {
       </div>
 
       {/* Bottom tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-cream-300 bg-white md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-surface-border bg-surface md:hidden">
         <div className="flex items-center justify-around">
           {mainTabs.map((tab) => {
             const active =
@@ -261,8 +261,8 @@ export function MobileNav({ profile }: { profile: Profile }) {
                 className={cn(
                   "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
                   active
-                    ? "text-brand-600"
-                    : "text-dark-300 active:text-dark-500"
+                    ? "text-brand-400"
+                    : "text-surface-muted active:text-dark-200"
                 )}
               >
                 {tab.icon}
@@ -276,8 +276,8 @@ export function MobileNav({ profile }: { profile: Profile }) {
             className={cn(
               "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
               moreOpen || isMoreActive
-                ? "text-brand-600"
-                : "text-dark-300 active:text-dark-500"
+                ? "text-brand-400"
+                : "text-surface-muted active:text-dark-200"
             )}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
@@ -287,7 +287,7 @@ export function MobileNav({ profile }: { profile: Profile }) {
           </button>
         </div>
         {/* Safe area for phones with home indicator */}
-        <div className="h-[env(safe-area-inset-bottom)]" />
+        <div className="h-[env(safe-area-inset-bottom)] bg-surface" />
       </nav>
     </>
   );

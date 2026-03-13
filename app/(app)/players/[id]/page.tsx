@@ -117,14 +117,14 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
               className="h-24 w-24 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-3xl font-bold">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-3xl font-bold">
               {profile.display_name?.charAt(0).toUpperCase()}
             </div>
           )}
 
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-dark-100">
                 {profile.display_name}
               </h1>
               {profile.is_active ? (
@@ -135,10 +135,10 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
             </div>
 
             {profile.bio && (
-              <p className="mt-2 text-gray-600">{profile.bio}</p>
+              <p className="mt-2 text-surface-muted">{profile.bio}</p>
             )}
 
-            <div className="mt-3 flex flex-wrap gap-4 text-sm text-gray-500">
+            <div className="mt-3 flex flex-wrap gap-4 text-sm text-surface-muted">
               {profile.home_court && (
                 <span>Home Court: {profile.home_court}</span>
               )}
@@ -169,24 +169,24 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="card">
-          <p className="text-sm text-gray-600">Total Sessions</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
+          <p className="text-sm text-surface-muted">Total Sessions</p>
+          <p className="mt-1 text-2xl font-bold text-dark-100">
             {totalSessions}
           </p>
         </div>
         <div className="card">
-          <p className="text-sm text-gray-600">Overall Win %</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
+          <p className="text-sm text-surface-muted">Overall Win %</p>
+          <p className="mt-1 text-2xl font-bold text-dark-100">
             {formatWinPct(overallWins, overallLosses)}
           </p>
         </div>
         <div className="card">
-          <p className="text-sm text-gray-600">Rating</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
+          <p className="text-sm text-surface-muted">Rating</p>
+          <p className="mt-1 text-2xl font-bold text-dark-100">
             {rating ? rating.display_rating : "Unrated"}
           </p>
           {rating && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-surface-muted">
               {rating.games_played} games played
             </p>
           )}
@@ -195,7 +195,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
 
       {/* Group Memberships */}
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+        <h2 className="mb-4 text-lg font-semibold text-dark-100">
           Group Memberships
         </h2>
         {memberships && memberships.length > 0 ? (
@@ -204,33 +204,33 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
               <Link
                 key={m.group_id}
                 href={`/groups/${m.group.slug}`}
-                className="card hover:ring-brand-300 transition-shadow"
+                className="card hover:ring-brand-500/30 transition-shadow"
               >
-                <h3 className="font-semibold text-gray-900">
+                <h3 className="font-semibold text-dark-100">
                   {m.group.name}
                 </h3>
-                <div className="mt-2 space-y-1 text-sm text-gray-600">
+                <div className="mt-2 space-y-1 text-sm text-surface-muted">
                   <div className="flex justify-between">
                     <span>Step</span>
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-dark-100">
                       {m.current_step}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Win %</span>
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-dark-100">
                       {m.win_pct}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Sessions</span>
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-dark-100">
                       {m.total_sessions}
                     </span>
                   </div>
                 </div>
                 {m.last_played_at && (
-                  <p className="mt-2 text-xs text-gray-400">
+                  <p className="mt-2 text-xs text-surface-muted">
                     Last played {formatShortDate(m.last_played_at)}
                   </p>
                 )}
@@ -238,7 +238,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
             ))}
           </div>
         ) : (
-          <div className="card text-center text-gray-500">
+          <div className="card text-center text-surface-muted">
             No group memberships yet.
           </div>
         )}
@@ -246,7 +246,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
 
       {/* Recent Activity */}
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+        <h2 className="mb-4 text-lg font-semibold text-dark-100">
           Recent Activity
         </h2>
         {recentActivity.length > 0 ? (
@@ -271,15 +271,15 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
                         >
                           {won ? "Win" : "Loss"}
                         </span>
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-dark-100">
                           Round {game.round_number}, Pool {game.pool_number}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="mt-1 text-sm text-surface-muted">
                         Score: {game.score_a} - {game.score_b}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-surface-muted">
                       {formatShortDate(game.created_at)}
                     </span>
                   </div>
@@ -292,11 +292,11 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="badge-blue">Signup</span>
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-dark-100">
                         {reg.sheet?.group?.name ?? "Event"}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-gray-600">
+                    <p className="mt-1 text-sm text-surface-muted">
                       {reg.sheet?.event_date
                         ? formatShortDate(reg.sheet.event_date)
                         : ""}{" "}
@@ -319,7 +319,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
             })}
           </div>
         ) : (
-          <div className="card text-center text-gray-500">
+          <div className="card text-center text-surface-muted">
             No recent activity.
           </div>
         )}
@@ -327,10 +327,10 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
 
       {/* Head-to-Head Placeholder */}
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+        <h2 className="mb-4 text-lg font-semibold text-dark-100">
           Head-to-Head
         </h2>
-        <div className="card text-center text-gray-500 py-8">
+        <div className="card text-center text-surface-muted py-8">
           <p className="text-lg font-medium">Coming Soon</p>
           <p className="mt-1 text-sm">
             Head-to-head stats against other players will appear here.

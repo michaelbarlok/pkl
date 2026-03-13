@@ -4,56 +4,88 @@
 
 @layer base {
   body {
-    @apply bg-cream-50 text-dark-600 antialiased;
+    @apply bg-dark-950 text-dark-100 antialiased;
+  }
+
+  /* Dark-mode scrollbars */
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-surface-border;
   }
 }
 
 @layer components {
+  /* ── Buttons ── */
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
   .btn-accent {
-    @apply inline-flex items-center justify-center rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-dark-600 shadow-sm ring-1 ring-inset ring-cream-400 transition-colors hover:bg-cream-100 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-lg bg-surface-raised px-3.5 py-2 text-sm font-semibold text-dark-100 ring-1 ring-inset ring-surface-border transition-colors hover:bg-surface-overlay disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
+  /* ── Inputs ── */
   .input {
-    @apply block w-full rounded-lg border-0 py-2.5 px-3 text-dark-600 shadow-sm ring-1 ring-inset ring-cream-400 placeholder:text-dark-300 focus:ring-2 focus:ring-inset focus:ring-brand-500 sm:text-sm;
+    @apply block w-full rounded-lg border-0 bg-surface-raised py-2 px-3 text-dark-100 ring-1 ring-inset ring-surface-border placeholder:text-surface-muted focus:ring-2 focus:ring-inset focus:ring-brand-500 sm:text-sm;
   }
 
+  /* ── Cards ── */
   .card {
-    @apply rounded-xl bg-white p-6 shadow-sm ring-1 ring-cream-300;
+    @apply rounded-xl bg-surface-raised p-4 ring-1 ring-surface-border;
   }
 
+  /* ── Badges ── */
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold;
   }
 
   .badge-green {
-    @apply badge bg-teal-100 text-teal-700;
+    @apply badge bg-teal-900/60 text-teal-300;
   }
 
   .badge-yellow {
-    @apply badge bg-accent-100 text-accent-700;
+    @apply badge bg-accent-900/60 text-accent-300;
   }
 
   .badge-red {
-    @apply badge bg-red-100 text-red-700;
+    @apply badge bg-red-900/60 text-red-300;
   }
 
   .badge-blue {
-    @apply badge bg-brand-100 text-brand-700;
+    @apply badge bg-brand-900/60 text-brand-300;
   }
 
   .badge-gray {
-    @apply badge bg-cream-200 text-dark-500;
+    @apply badge bg-surface-overlay text-surface-muted;
+  }
+
+  /* ── Tables on dark ── */
+  table {
+    @apply text-dark-100;
+  }
+  thead {
+    @apply bg-surface-overlay;
+  }
+  thead th {
+    @apply text-surface-muted;
+  }
+  tbody {
+    @apply bg-surface-raised;
+  }
+  tbody tr {
+    @apply border-surface-border;
   }
 }

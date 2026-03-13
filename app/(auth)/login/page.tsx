@@ -29,17 +29,17 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    router.push("/dashboard");
     router.refresh();
   }
 
   return (
     <div className="card">
-      <h2 className="text-xl font-semibold text-gray-900 mb-6">Sign in</h2>
+      <h2 className="text-xl font-semibold text-dark-100 mb-6">Sign in</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="email" className="block text-sm font-medium text-dark-200 mb-1">
             Email
           </label>
           <input
@@ -53,7 +53,7 @@ export default function LoginPage() {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="password" className="block text-sm font-medium text-dark-200 mb-1">
             Password
           </label>
           <input
@@ -75,7 +75,7 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-gray-600">
+      <p className="mt-4 text-center text-sm text-surface-muted">
         Don&apos;t have an account?{" "}
         <Link href="/register" className="font-medium text-brand-600 hover:text-brand-500">
           Register

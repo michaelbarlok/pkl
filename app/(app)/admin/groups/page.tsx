@@ -128,15 +128,15 @@ export default async function AdminGroupsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Manage Groups</h1>
-        <p className="mt-1 text-gray-600">
+        <h1 className="text-2xl font-bold text-dark-100">Manage Groups</h1>
+        <p className="mt-1 text-surface-muted">
           Create and manage shootout groups.
         </p>
       </div>
 
       {/* Create Group */}
       <div className="card">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+        <h2 className="mb-4 text-lg font-semibold text-dark-100">
           Create New Group
         </h2>
         <form action={createGroup} className="flex gap-3">
@@ -156,30 +156,30 @@ export default async function AdminGroupsPage() {
       {/* Groups Table */}
       <div className="card overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-surface-border">
+            <thead className="bg-surface-overlay">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Name
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Slug
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Members
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Last Session
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Active
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="divide-y divide-surface-border bg-surface-raised">
               {groups?.map((group) => {
                 const memberCount =
                   (
@@ -191,16 +191,16 @@ export default async function AdminGroupsPage() {
 
                 return (
                   <tr key={group.id}>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-dark-100">
                       {group.name}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
                       {group.slug}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900">
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
                       {memberCount}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-500">
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-surface-muted">
                       {lastSession
                         ? new Date(lastSession).toLocaleDateString("en-US", {
                             month: "short",
@@ -238,8 +238,8 @@ export default async function AdminGroupsPage() {
                             type="submit"
                             className={
                               group.is_active
-                                ? "text-red-600 hover:text-red-500"
-                                : "text-green-600 hover:text-green-500"
+                                ? "text-red-400 hover:text-red-500"
+                                : "text-teal-300 hover:text-green-500"
                             }
                           >
                             {group.is_active ? "Deactivate" : "Activate"}
@@ -255,7 +255,7 @@ export default async function AdminGroupsPage() {
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-8 text-center text-sm text-gray-500"
+                    className="px-4 py-8 text-center text-sm text-surface-muted"
                   >
                     No groups created yet.
                   </td>
@@ -284,10 +284,10 @@ function RenameForm({
 }) {
   return (
     <details className="relative inline-block">
-      <summary className="cursor-pointer text-gray-600 hover:text-gray-500">
+      <summary className="cursor-pointer text-surface-muted hover:text-surface-muted">
         Rename
       </summary>
-      <div className="absolute right-0 top-6 z-10 w-64 rounded-lg border bg-white p-3 shadow-lg">
+      <div className="absolute right-0 top-6 z-10 w-64 rounded-lg border bg-surface-raised p-3 shadow-lg">
         <form action={action} className="flex flex-col gap-2">
           <input type="hidden" name="groupId" value={groupId} />
           <input

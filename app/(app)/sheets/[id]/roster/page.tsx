@@ -76,8 +76,8 @@ export default async function RosterPage({
     const isGuest = reg.registered_by && reg.registered_by !== reg.player_id;
 
     return (
-      <tr key={reg.id} className="border-t border-gray-100">
-        <td className="py-3 pl-4 pr-2 text-sm text-gray-500 w-10">
+      <tr key={reg.id} className="border-t border-surface-border">
+        <td className="py-3 pl-4 pr-2 text-sm text-surface-muted w-10">
           {showWaitlistNumber ? `W${index + 1}` : index + 1}
         </td>
         <td className="py-3 px-2">
@@ -89,12 +89,12 @@ export default async function RosterPage({
                 className="h-8 w-8 rounded-full object-cover"
               />
             ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-sm font-medium text-surface-muted">
                 {reg.player?.display_name?.charAt(0) ?? "?"}
               </div>
             )}
             <div>
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-dark-100">
                 {reg.player?.display_name ?? "Unknown"}
               </span>
               {isGuest && sheet.allow_member_guests && (
@@ -103,15 +103,15 @@ export default async function RosterPage({
             </div>
           </div>
         </td>
-        <td className="py-3 px-2 text-sm text-gray-600">
+        <td className="py-3 px-2 text-sm text-surface-muted">
           {reg.player?.skill_level ?? "---"}
         </td>
-        <td className="py-3 px-2 text-sm text-gray-600">
+        <td className="py-3 px-2 text-sm text-surface-muted">
           {membership ? `Step ${membership.current_step}` : "---"}
         </td>
         {isAdmin && (
           <>
-            <td className="py-3 px-2 text-sm text-gray-500">
+            <td className="py-3 px-2 text-sm text-surface-muted">
               {reg.registered_by && reg.registered_by !== reg.player_id
                 ? "Admin"
                 : "Self"}
@@ -138,24 +138,24 @@ export default async function RosterPage({
         >
           &larr; Back to sheet
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900">
+        <h1 className="mt-2 text-2xl font-bold text-dark-100">
           Roster: {sheet.group?.name ?? "Event"}
         </h1>
-        <p className="mt-1 text-gray-600">
+        <p className="mt-1 text-surface-muted">
           {formatDate(sheet.event_date)} &middot; {sheet.location}
         </p>
       </div>
 
       {/* Main Roster */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">
+        <h2 className="text-lg font-semibold text-dark-100 mb-3">
           Main Roster ({confirmed.length}/{sheet.player_limit})
         </h2>
         {confirmed.length > 0 ? (
           <div className="card overflow-hidden p-0">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-gray-50 text-xs font-medium uppercase text-gray-500">
+                <tr className="bg-surface-overlay text-xs font-medium uppercase text-surface-muted">
                   <th className="py-2 pl-4 pr-2">#</th>
                   <th className="py-2 px-2">Player</th>
                   <th className="py-2 px-2">Skill</th>
@@ -173,7 +173,7 @@ export default async function RosterPage({
             </table>
           </div>
         ) : (
-          <div className="card text-center text-gray-500">
+          <div className="card text-center text-surface-muted">
             No confirmed players yet.
           </div>
         )}
@@ -181,14 +181,14 @@ export default async function RosterPage({
 
       {/* Waitlist */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">
+        <h2 className="text-lg font-semibold text-dark-100 mb-3">
           Waitlist ({waitlisted.length})
         </h2>
         {waitlisted.length > 0 ? (
           <div className="card overflow-hidden p-0">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-gray-50 text-xs font-medium uppercase text-gray-500">
+                <tr className="bg-surface-overlay text-xs font-medium uppercase text-surface-muted">
                   <th className="py-2 pl-4 pr-2">#</th>
                   <th className="py-2 px-2">Player</th>
                   <th className="py-2 px-2">Skill</th>
@@ -206,7 +206,7 @@ export default async function RosterPage({
             </table>
           </div>
         ) : (
-          <div className="card text-center text-gray-500">
+          <div className="card text-center text-surface-muted">
             No one on the waitlist.
           </div>
         )}

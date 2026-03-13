@@ -36,23 +36,23 @@ export default async function LadderPage({
         <div className="flex items-center gap-2">
           <Link
             href="/groups"
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-surface-muted hover:text-dark-200"
           >
             Groups
           </Link>
-          <span className="text-sm text-gray-400">/</span>
+          <span className="text-sm text-surface-muted">/</span>
           <Link
             href={`/groups/${slug}`}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-surface-muted hover:text-dark-200"
           >
             {group.name}
           </Link>
-          <span className="text-sm text-gray-400">/</span>
+          <span className="text-sm text-surface-muted">/</span>
         </div>
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">
+        <h1 className="mt-1 text-2xl font-bold text-dark-100">
           {group.name} Ladder
         </h1>
-        <p className="mt-1 text-gray-600">
+        <p className="mt-1 text-surface-muted">
           Rankings sorted by Step, Win %, Last Played, and Sessions.
         </p>
       </div>
@@ -60,39 +60,39 @@ export default async function LadderPage({
       {/* Ladder Table */}
       <div className="card overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-surface-border">
+            <thead className="bg-surface-overlay">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Rank
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Player
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Step
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Win %
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Sessions
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Last Played
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="divide-y divide-surface-border bg-surface-raised">
               {members.map((member, index) => (
                 <tr
                   key={member.player_id}
                   className={cn(
                     member.player_id === profile?.id &&
-                      "bg-brand-50 font-medium"
+                      "bg-brand-900/40 font-medium"
                   )}
                 >
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
                     {index + 1}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
@@ -104,25 +104,25 @@ export default async function LadderPage({
                           className="h-8 w-8 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
                           {member.player?.display_name?.charAt(0) ?? "?"}
                         </div>
                       )}
-                      <span className="text-sm text-gray-900">
+                      <span className="text-sm text-dark-100">
                         {member.player?.display_name}
                       </span>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
                     {member.current_step}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
                     {member.win_pct}%
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
                     {member.total_sessions}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-500">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-surface-muted">
                     {member.last_played_at
                       ? formatShortDate(member.last_played_at)
                       : "Never"}
@@ -133,7 +133,7 @@ export default async function LadderPage({
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-8 text-center text-sm text-gray-500"
+                    className="px-4 py-8 text-center text-sm text-surface-muted"
                   >
                     No members in this group yet.
                   </td>

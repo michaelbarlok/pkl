@@ -265,13 +265,25 @@ export default function AdminSheetDetailPage() {
 
       if (sessionErr) throw sessionErr;
 
-      // Add confirmed players as participants
+      // Fetch current steps from group_memberships for confirmed players
+      const playerIds = confirmed.map((reg) => reg.player_id);
+      const { data: memberships } = await supabase
+        .from("group_memberships")
+        .select("player_id, current_step")
+        .eq("group_id", sheet.group_id)
+        .in("player_id", playerIds);
+
+      const stepMap = new Map(
+        (memberships ?? []).map((m: any) => [m.player_id, m.current_step])
+      );
+
+      // Add confirmed players as participants with their actual step
       const participants = confirmed.map((reg) => ({
         session_id: session.id,
         group_id: sheet.group_id,
         player_id: reg.player_id,
         checked_in: false,
-        step_before: 0,
+        step_before: stepMap.get(reg.player_id) ?? 1,
       }));
 
       if (participants.length > 0) {
@@ -292,14 +304,14 @@ export default function AdminSheetDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading sheet...</div>
+        <div className="text-surface-muted">Loading sheet...</div>
       </div>
     );
   }
 
   if (!sheet) {
     return (
-      <div className="card text-center text-red-600">
+      <div className="card text-center text-red-400">
         Sheet not found.{" "}
         <Link href="/admin/sheets" className="text-brand-600 hover:text-brand-500">
           Back to sheets
@@ -318,7 +330,7 @@ export default function AdminSheetDetailPage() {
           >
             &larr; All Sheets
           </Link>
-          <h1 className="mt-2 text-2xl font-bold text-gray-900">
+          <h1 className="mt-2 text-2xl font-bold text-dark-100">
             Edit Sheet: {sheet.group?.name ?? "Event"}
           </h1>
         </div>
@@ -344,31 +356,31 @@ export default function AdminSheetDetailPage() {
       </div>
 
       {sheet.status === "cancelled" && (
-        <div className="rounded-md bg-red-50 p-4 text-red-800 font-medium">
+        <div className="rounded-md bg-red-900/30 p-4 text-red-300 font-medium">
           This event has been cancelled.
         </div>
       )}
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-md bg-red-900/30 p-3 text-sm text-red-400">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+        <div className="rounded-md bg-teal-900/30 p-3 text-sm text-teal-300">
           {success}
         </div>
       )}
 
       {/* Edit Form */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <h2 className="text-lg font-semibold text-dark-100 mb-4">
           Sheet Details
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-dark-200 mb-1">
               Event Date
             </label>
             <input
@@ -379,7 +391,7 @@ export default function AdminSheetDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-dark-200 mb-1">
               Event Time
             </label>
             <input
@@ -390,7 +402,7 @@ export default function AdminSheetDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-dark-200 mb-1">
               Player Limit
             </label>
             <input
@@ -402,7 +414,7 @@ export default function AdminSheetDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-dark-200 mb-1">
               Location
             </label>
             <input
@@ -413,7 +425,7 @@ export default function AdminSheetDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-dark-200 mb-1">
               Sign-Up Closes At
             </label>
             <input
@@ -424,7 +436,7 @@ export default function AdminSheetDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-dark-200 mb-1">
               Withdraw Closes At
             </label>
             <input
@@ -448,13 +460,13 @@ export default function AdminSheetDetailPage() {
 
       {/* Admin Roster Overrides */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <h2 className="text-lg font-semibold text-dark-100 mb-4">
           Roster Management
         </h2>
 
         {/* Add Player Search */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-dark-200 mb-1">
             Add Player
           </label>
           <div className="flex gap-2">
@@ -475,7 +487,7 @@ export default function AdminSheetDetailPage() {
             </button>
           </div>
           {searchResults.length > 0 && (
-            <div className="mt-2 border rounded-md divide-y divide-gray-100">
+            <div className="mt-2 border rounded-md divide-y divide-surface-border">
               {searchResults.map((p) => (
                 <div
                   key={p.id}
@@ -489,11 +501,11 @@ export default function AdminSheetDetailPage() {
                         className="h-6 w-6 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
                         {p.display_name?.charAt(0) ?? "?"}
                       </div>
                     )}
-                    <span className="text-sm text-gray-900">
+                    <span className="text-sm text-dark-100">
                       {p.display_name}
                     </span>
                     {p.skill_level && (
@@ -515,11 +527,11 @@ export default function AdminSheetDetailPage() {
         </div>
 
         {/* Confirmed Players */}
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">
+        <h3 className="text-sm font-semibold text-dark-200 mb-2">
           Confirmed ({confirmed.length}/{playerLimit})
         </h3>
         {confirmed.length > 0 ? (
-          <div className="border rounded-md divide-y divide-gray-100 mb-6">
+          <div className="border rounded-md divide-y divide-surface-border mb-6">
             {confirmed.map((reg) => (
               <div
                 key={reg.id}
@@ -533,11 +545,11 @@ export default function AdminSheetDetailPage() {
                       className="h-6 w-6 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
                       {reg.player?.display_name?.charAt(0) ?? "?"}
                     </div>
                   )}
-                  <span className="text-sm text-gray-900">
+                  <span className="text-sm text-dark-100">
                     {reg.player?.display_name ?? "Unknown"}
                   </span>
                   {reg.registered_by && reg.registered_by !== reg.player_id && (
@@ -554,17 +566,17 @@ export default function AdminSheetDetailPage() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-surface-muted mb-6">
             No confirmed players yet.
           </p>
         )}
 
         {/* Waitlist */}
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">
+        <h3 className="text-sm font-semibold text-dark-200 mb-2">
           Waitlist ({waitlisted.length})
         </h3>
         {waitlisted.length > 0 ? (
-          <div className="border rounded-md divide-y divide-gray-100">
+          <div className="border rounded-md divide-y divide-surface-border">
             {waitlisted.map((reg) => (
               <div
                 key={reg.id}
@@ -578,11 +590,11 @@ export default function AdminSheetDetailPage() {
                       className="h-6 w-6 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
                       {reg.player?.display_name?.charAt(0) ?? "?"}
                     </div>
                   )}
-                  <span className="text-sm text-gray-900">
+                  <span className="text-sm text-dark-100">
                     {reg.player?.display_name ?? "Unknown"}
                   </span>
                   <span className="badge-yellow text-xs">Waitlisted</span>
@@ -605,7 +617,7 @@ export default function AdminSheetDetailPage() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">No one on the waitlist.</p>
+          <p className="text-sm text-surface-muted">No one on the waitlist.</p>
         )}
       </div>
     </div>

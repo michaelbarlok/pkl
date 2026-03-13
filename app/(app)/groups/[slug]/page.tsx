@@ -40,17 +40,17 @@ export default async function GroupPage({
           <div className="flex items-center gap-2">
             <Link
               href="/groups"
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-surface-muted hover:text-dark-200"
             >
               Groups
             </Link>
-            <span className="text-sm text-gray-400">/</span>
+            <span className="text-sm text-surface-muted">/</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold text-gray-900">
+          <h1 className="mt-1 text-2xl font-bold text-dark-100">
             {group.name}
           </h1>
           {group.description && (
-            <p className="mt-1 text-gray-600">{group.description}</p>
+            <p className="mt-1 text-surface-muted">{group.description}</p>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -65,22 +65,22 @@ export default async function GroupPage({
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="card">
-          <p className="text-sm text-gray-600">Members</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
+          <p className="text-sm text-surface-muted">Members</p>
+          <p className="mt-1 text-2xl font-bold text-dark-100">
             {members.length}
           </p>
         </div>
         <div className="card">
-          <p className="text-sm text-gray-600">Upcoming Events</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
+          <p className="text-sm text-surface-muted">Upcoming Events</p>
+          <p className="mt-1 text-2xl font-bold text-dark-100">
             {sheets.length}
           </p>
         </div>
         <Link
           href={`/groups/${slug}/ladder`}
-          className="card hover:ring-brand-300 transition-shadow"
+          className="card hover:ring-brand-500/30 transition-shadow"
         >
-          <p className="text-sm text-gray-600">Ladder</p>
+          <p className="text-sm text-surface-muted">Ladder</p>
           <p className="mt-1 text-sm font-medium text-brand-600">
             View full rankings &rarr;
           </p>
@@ -90,7 +90,7 @@ export default async function GroupPage({
       {/* Upcoming Sheets */}
       {sheets.length > 0 && (
         <section>
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <h2 className="mb-4 text-lg font-semibold text-dark-100">
             Upcoming Events
           </h2>
           <div className="space-y-3">
@@ -98,13 +98,13 @@ export default async function GroupPage({
               <Link
                 key={sheet.id}
                 href={`/sheets/${sheet.id}`}
-                className="card flex items-center justify-between hover:ring-brand-300 transition-shadow"
+                className="card flex items-center justify-between hover:ring-brand-500/30 transition-shadow"
               >
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-dark-100">
                     {formatDate(sheet.event_date)}
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-surface-muted">
                     {sheet.event_time} at {sheet.location}
                   </p>
                 </div>
@@ -118,7 +118,7 @@ export default async function GroupPage({
       {/* Top Members */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-dark-100">
             Top Members
           </h2>
           <Link
@@ -129,32 +129,32 @@ export default async function GroupPage({
           </Link>
         </div>
         <div className="card overflow-hidden p-0">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-surface-border">
+            <thead className="bg-surface-overlay">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                   #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Player
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Step
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Win %
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="divide-y divide-surface-border bg-surface-raised">
               {top10.map((member, index) => (
                 <tr
                   key={member.player_id}
                   className={cn(
-                    member.player_id === profile?.id && "bg-brand-50"
+                    member.player_id === profile?.id && "bg-brand-900/40"
                   )}
                 >
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
                     {index + 1}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
@@ -166,19 +166,19 @@ export default async function GroupPage({
                           className="h-8 w-8 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
                           {member.player?.display_name?.charAt(0) ?? "?"}
                         </div>
                       )}
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-dark-100">
                         {member.player?.display_name}
                       </span>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
                     {member.current_step}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
                     {member.win_pct}%
                   </td>
                 </tr>
@@ -187,7 +187,7 @@ export default async function GroupPage({
                 <tr>
                   <td
                     colSpan={4}
-                    className="px-4 py-8 text-center text-sm text-gray-500"
+                    className="px-4 py-8 text-center text-sm text-surface-muted"
                   >
                     No members yet.
                   </td>

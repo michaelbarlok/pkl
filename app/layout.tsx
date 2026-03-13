@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "Pickleball ladder league platform",
   icons: {
     icon: "/pb-logo.webp",
-    apple: "/pkl-logo.png",
+    apple: "/pkl-icon-512.png",
   },
   manifest: "/manifest.json",
 };

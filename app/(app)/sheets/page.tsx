@@ -34,7 +34,7 @@ export default async function SheetsPage() {
 
   if (error) {
     return (
-      <div className="card text-center text-red-600">
+      <div className="card text-center text-red-400">
         Failed to load sign-up sheets. Please try again later.
       </div>
     );
@@ -72,11 +72,11 @@ export default async function SheetsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Sign-Up Sheets</h1>
+        <h1 className="text-2xl font-bold text-dark-100">Sign-Up Sheets</h1>
       </div>
 
       {!sheets || sheets.length === 0 ? (
-        <div className="card text-center text-gray-500">
+        <div className="card text-center text-surface-muted">
           No sign-up sheets available yet.
         </div>
       ) : (
@@ -91,26 +91,26 @@ export default async function SheetsPage() {
             return (
               <div
                 key={sheet.id}
-                className="card flex items-center justify-between hover:ring-brand-300 transition-shadow"
+                className="card flex items-center justify-between hover:ring-brand-500/30 transition-shadow"
               >
                 <Link
                   href={`/sheets/${sheet.id}`}
                   className="min-w-0 flex-1"
                 >
                   <div className="flex items-center gap-3">
-                    <p className="font-semibold text-gray-900">
+                    <p className="font-semibold text-dark-100">
                       {sheet.group?.name ?? "Event"}
                     </p>
                     <span className={badge.className}>{badge.label}</span>
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-surface-muted">
                     <span>{formatDate(sheet.event_date)}</span>
                     <span>{sheet.location}</span>
                   </div>
                 </Link>
                 <div className="ml-4 flex items-center gap-3 shrink-0">
-                  <div className="text-right text-sm text-gray-600">
-                    <span className="font-medium text-gray-900">
+                  <div className="text-right text-sm text-surface-muted">
+                    <span className="font-medium text-dark-100">
                       {registered}
                     </span>
                     /{sheet.player_limit} players

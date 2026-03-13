@@ -173,6 +173,15 @@ export default function NewSheetPage() {
         return;
       }
 
+      // Send notifications to group members if enabled
+      if (notifyOnCreate) {
+        await fetch("/api/sheets/notify-create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sheetId: sheet.id }),
+        });
+      }
+
       router.push(`/admin/sheets/${sheet.id}`);
       router.refresh();
     } catch (err) {
@@ -185,14 +194,14 @@ export default function NewSheetPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-surface-muted">Loading...</p>
       </div>
     );
   }
 
   if (groups.length === 0) {
     return (
-      <div className="card text-center text-gray-500">
+      <div className="card text-center text-surface-muted">
         <p>No active groups found. Create a group first before creating a sign-up sheet.</p>
         <button
           onClick={() => router.push("/admin/groups")}
@@ -213,20 +222,20 @@ export default function NewSheetPage() {
         >
           &larr; All Sheets
         </button>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900">
+        <h1 className="mt-2 text-2xl font-bold text-dark-100">
           Create Sign-Up Sheet
         </h1>
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-md bg-red-900/30 p-3 text-sm text-red-400">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="card space-y-4">
         <div>
-          <label htmlFor="group" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="group" className="block text-sm font-medium text-dark-200 mb-1">
             Group
           </label>
           <select
@@ -246,7 +255,7 @@ export default function NewSheetPage() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="eventDate" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="eventDate" className="block text-sm font-medium text-dark-200 mb-1">
               Event Date
             </label>
             <input
@@ -259,7 +268,7 @@ export default function NewSheetPage() {
             />
           </div>
           <div>
-            <label htmlFor="eventTime" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="eventTime" className="block text-sm font-medium text-dark-200 mb-1">
               Event Time
             </label>
             <select
@@ -279,7 +288,7 @@ export default function NewSheetPage() {
         </div>
 
         <div>
-          <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="location" className="block text-sm font-medium text-dark-200 mb-1">
             Location
           </label>
           {savedLocations.length > 0 ? (
@@ -329,7 +338,7 @@ export default function NewSheetPage() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="playerLimit" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="playerLimit" className="block text-sm font-medium text-dark-200 mb-1">
               Player Limit
             </label>
             <input
@@ -343,7 +352,7 @@ export default function NewSheetPage() {
             />
           </div>
           <div>
-            <label htmlFor="signupClosesAt" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="signupClosesAt" className="block text-sm font-medium text-dark-200 mb-1">
               Sign-Up Closes
             </label>
             <select
@@ -363,7 +372,7 @@ export default function NewSheetPage() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="withdrawClosesAt" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="withdrawClosesAt" className="block text-sm font-medium text-dark-200 mb-1">
               Withdraw Closes
             </label>
             <select
@@ -382,7 +391,7 @@ export default function NewSheetPage() {
         </div>
 
         <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="notes" className="block text-sm font-medium text-dark-200 mb-1">
             Notes (optional)
           </label>
           <textarea
@@ -402,9 +411,9 @@ export default function NewSheetPage() {
               id="allowMemberGuests"
               checked={allowMemberGuests}
               onChange={(e) => setAllowMemberGuests(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+              className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
             />
-            <label htmlFor="allowMemberGuests" className="text-sm font-medium text-gray-700">
+            <label htmlFor="allowMemberGuests" className="text-sm font-medium text-dark-200">
               Allow members to add other members
             </label>
           </div>
@@ -414,9 +423,9 @@ export default function NewSheetPage() {
               id="notifyOnCreate"
               checked={notifyOnCreate}
               onChange={(e) => setNotifyOnCreate(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+              className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
             />
-            <label htmlFor="notifyOnCreate" className="text-sm font-medium text-gray-700">
+            <label htmlFor="notifyOnCreate" className="text-sm font-medium text-dark-200">
               Notify group members on creation
             </label>
           </div>

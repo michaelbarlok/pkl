@@ -57,11 +57,11 @@ export default function NewThreadPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">New Thread</h1>
+      <h1 className="text-2xl font-bold text-dark-100">New Thread</h1>
 
       <form onSubmit={handleSubmit} className="card space-y-4">
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="title" className="block text-sm font-medium text-dark-200 mb-1">
             Title
           </label>
           <input
@@ -73,11 +73,11 @@ export default function NewThreadPage() {
             maxLength={120}
             required
           />
-          <p className="mt-1 text-xs text-gray-400">{title.length}/120</p>
+          <p className="mt-1 text-xs text-surface-muted">{title.length}/120</p>
         </div>
 
         <div>
-          <label htmlFor="body" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="body" className="block text-sm font-medium text-dark-200 mb-1">
             Body
           </label>
           <textarea
@@ -88,10 +88,10 @@ export default function NewThreadPage() {
             maxLength={5000}
             required
           />
-          <p className="mt-1 text-xs text-gray-400">{body.length}/5000</p>
+          <p className="mt-1 text-xs text-surface-muted">{body.length}/5000</p>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-400">{error}</p>}
 
         <div className="flex gap-3">
           <button type="submit" className="btn-primary" disabled={submitting}>

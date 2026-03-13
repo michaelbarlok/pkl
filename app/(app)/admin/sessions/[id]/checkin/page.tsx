@@ -211,8 +211,8 @@ export default function CheckInPage() {
     router.push(`/admin/sessions/${sessionId}`);
   }
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
-  if (!session) return <div className="text-center py-12 text-gray-500">Session not found.</div>;
+  if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
+  if (!session) return <div className="text-center py-12 text-surface-muted">Session not found.</div>;
 
   const checkedInCount = participants.filter((p) => p.checked_in).length;
   const hasEmptyCourts = participants.some((p) => p.checked_in && p.court_number == null);
@@ -221,8 +221,8 @@ export default function CheckInPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Check-In</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-dark-100">Check-In</h1>
+          <p className="text-sm text-surface-muted">
             {session.group?.name} — {checkedInCount} / {participants.length} checked in
           </p>
         </div>
@@ -246,7 +246,7 @@ export default function CheckInPage() {
       {/* Court Distribution Preview */}
       {checkedInCount > 0 && (
         <div className="card">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Court Distribution</h3>
+          <h3 className="text-sm font-semibold text-dark-200 mb-2">Court Distribution</h3>
           <div className="flex gap-3 flex-wrap">
             {(() => {
               try {
@@ -257,7 +257,7 @@ export default function CheckInPage() {
                   </span>
                 ));
               } catch {
-                return <span className="text-sm text-red-600">Cannot distribute {checkedInCount} players across {session.num_courts} courts (need 4-5 per court)</span>;
+                return <span className="text-sm text-red-400">Cannot distribute {checkedInCount} players across {session.num_courts} courts (need 4-5 per court)</span>;
               }
             })()}
           </div>
@@ -266,17 +266,17 @@ export default function CheckInPage() {
 
       {/* Check-in Table */}
       <div className="card overflow-hidden p-0">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-surface-border">
+          <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 w-12">Check-in</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Step</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Win %</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 w-24">Court</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted w-12">Check-in</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Name</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Step</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Win %</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted w-24">Court</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-surface-border bg-surface-raised">
             {participants.map((p) => (
               <tr key={p.id} className={!p.checked_in ? "opacity-50" : ""}>
                 <td className="px-4 py-3">
@@ -284,7 +284,7 @@ export default function CheckInPage() {
                     type="checkbox"
                     checked={p.checked_in}
                     onChange={() => toggleCheckIn(p.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-600"
+                    className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-600"
                   />
                 </td>
                 <td className="px-4 py-3">
@@ -292,15 +292,15 @@ export default function CheckInPage() {
                     {p.avatar_url ? (
                       <img src={p.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover" />
                     ) : (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs font-medium">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs font-medium">
                         {p.display_name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <span className="text-sm font-medium text-gray-900">{p.display_name}</span>
+                    <span className="text-sm font-medium text-dark-100">{p.display_name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-700">{p.current_step}</td>
-                <td className="px-4 py-3 text-sm text-gray-700">{p.win_pct.toFixed(1)}%</td>
+                <td className="px-4 py-3 text-sm text-dark-200">{p.current_step}</td>
+                <td className="px-4 py-3 text-sm text-dark-200">{p.win_pct.toFixed(1)}%</td>
                 <td className="px-4 py-3">
                   <input
                     type="number"
@@ -313,7 +313,7 @@ export default function CheckInPage() {
                         e.target.value ? parseInt(e.target.value) : null
                       )
                     }
-                    className="w-16 rounded border-gray-300 text-sm py-1 px-2 text-center"
+                    className="w-16 rounded border-surface-border text-sm py-1 px-2 text-center"
                     placeholder="—"
                   />
                 </td>

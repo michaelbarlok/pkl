@@ -8,7 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const playerNav = [
-  { name: "Dashboard", href: "/" },
+  { name: "Dashboard", href: "/dashboard" },
   { name: "Groups", href: "/groups" },
   { name: "Sheets", href: "/sheets" },
   { name: "Rankings", href: "/ratings" },
@@ -34,26 +34,25 @@ export function AppNav({ profile }: { profile: Profile }) {
   }
 
   return (
-    <header className="border-b border-cream-300 bg-white">
+    <header className="border-b border-surface-border bg-surface">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-14 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img src="/pkl-logo.png" alt="PKL" className="h-10 w-auto" />
-            <span className="text-lg font-bold text-dark-600">PKL</span>
+            <img src="/pkl-logo.png" alt="PKL" className="h-8 w-auto" />
           </Link>
 
           {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-0.5">
             {playerNav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   pathname === item.href
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-dark-400 hover:bg-cream-100 hover:text-dark-600"
+                    ? "bg-brand-900/40 text-brand-300"
+                    : "text-surface-muted hover:bg-surface-overlay hover:text-dark-100"
                 )}
               >
                 {item.name}
@@ -61,16 +60,16 @@ export function AppNav({ profile }: { profile: Profile }) {
             ))}
             {isAdmin && (
               <>
-                <span className="mx-2 h-5 w-px bg-cream-400" />
+                <span className="mx-2 h-4 w-px bg-surface-border" />
                 {adminNav.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                       pathname.startsWith(item.href)
-                        ? "bg-brand-50 text-brand-700"
-                        : "text-dark-400 hover:bg-cream-100 hover:text-dark-600"
+                        ? "bg-brand-900/40 text-brand-300"
+                        : "text-surface-muted hover:bg-surface-overlay hover:text-dark-100"
                     )}
                   >
                     {item.name}
@@ -85,16 +84,16 @@ export function AppNav({ profile }: { profile: Profile }) {
             <NotificationBell profileId={profile.id} />
             <Link
               href={`/players/${profile.id}`}
-              className="flex items-center gap-2 text-sm text-dark-400 hover:text-dark-600"
+              className="flex items-center gap-2 text-sm text-surface-muted hover:text-dark-100"
             >
               {profile.avatar_url ? (
                 <img
                   src={profile.avatar_url}
                   alt=""
-                  className="h-8 w-8 rounded-full object-cover"
+                  className="h-8 w-8 rounded-full object-cover ring-2 ring-brand-500/20"
                 />
               ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-sm font-medium">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-sm font-medium">
                   {profile.display_name?.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -102,7 +101,7 @@ export function AppNav({ profile }: { profile: Profile }) {
             </Link>
             <button
               onClick={handleSignOut}
-              className="hidden md:block text-sm text-dark-300 hover:text-dark-500"
+              className="hidden md:block text-sm text-surface-muted hover:text-dark-200"
             >
               Sign out
             </button>

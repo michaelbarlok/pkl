@@ -89,8 +89,8 @@ export default function ThreadPage() {
     setSubmitting(false);
   }
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
-  if (!thread) return <div className="text-center py-12 text-gray-500">Thread not found.</div>;
+  if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
+  if (!thread) return <div className="text-center py-12 text-surface-muted">Thread not found.</div>;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -98,13 +98,13 @@ export default function ThreadPage() {
       <div className="card">
         <div className="flex items-center gap-2 mb-2">
           {thread.pinned && <span className="badge-blue text-xs">Pinned</span>}
-          <h1 className="text-xl font-bold text-gray-900">{thread.title}</h1>
+          <h1 className="text-xl font-bold text-dark-100">{thread.title}</h1>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+        <div className="flex items-center gap-2 text-sm text-surface-muted mb-4">
           {thread.author?.avatar_url ? (
             <img src={thread.author.avatar_url} alt="" className="h-6 w-6 rounded-full" />
           ) : (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs">
               {thread.author?.display_name?.charAt(0).toUpperCase()}
             </div>
           )}
@@ -118,27 +118,27 @@ export default function ThreadPage() {
             })}
           </span>
         </div>
-        <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
+        <div className="prose prose-sm max-w-none text-dark-200 whitespace-pre-wrap">
           {thread.body}
         </div>
       </div>
 
       {/* Replies */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-700">
+        <h2 className="text-sm font-semibold text-dark-200">
           {replies.length} {replies.length === 1 ? "Reply" : "Replies"}
         </h2>
         {replies.map((reply) => (
           <div key={reply.id} className="card">
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <div className="flex items-center gap-2 text-sm text-surface-muted mb-2">
               {reply.author?.avatar_url ? (
                 <img src={reply.author.avatar_url} alt="" className="h-5 w-5 rounded-full" />
               ) : (
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-overlay text-surface-muted text-xs">
                   {reply.author?.display_name?.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="font-medium text-gray-700">{reply.author?.display_name}</span>
+              <span className="font-medium text-dark-200">{reply.author?.display_name}</span>
               <span>·</span>
               <span>
                 {new Date(reply.created_at).toLocaleDateString("en-US", {
@@ -149,7 +149,7 @@ export default function ThreadPage() {
                 })}
               </span>
             </div>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{reply.body}</p>
+            <p className="text-sm text-dark-200 whitespace-pre-wrap">{reply.body}</p>
           </div>
         ))}
       </div>

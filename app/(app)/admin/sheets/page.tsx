@@ -35,7 +35,7 @@ export default async function AdminSheetsPage() {
 
   if (error) {
     return (
-      <div className="card text-center text-red-600">
+      <div className="card text-center text-red-400">
         Failed to load sheets.
       </div>
     );
@@ -61,7 +61,7 @@ export default async function AdminSheetsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-dark-100">
           Manage Sign-Up Sheets
         </h1>
         <Link href="/admin/sheets/new" className="btn-primary">
@@ -70,14 +70,14 @@ export default async function AdminSheetsPage() {
       </div>
 
       {!sheets || sheets.length === 0 ? (
-        <div className="card text-center text-gray-500">
+        <div className="card text-center text-surface-muted">
           No sign-up sheets created yet.
         </div>
       ) : (
-        <div className="card overflow-hidden p-0">
-          <table className="w-full text-left">
+        <div className="card overflow-x-auto p-0">
+          <table className="min-w-full text-left">
             <thead>
-              <tr className="bg-gray-50 text-xs font-medium uppercase text-gray-500">
+              <tr className="bg-surface-overlay text-xs font-medium uppercase text-surface-muted">
                 <th className="py-3 pl-4 pr-2">Date</th>
                 <th className="py-3 px-2">Status</th>
                 <th className="py-3 px-2">Group</th>
@@ -103,14 +103,14 @@ export default async function AdminSheetsPage() {
                   return (
                     <tr
                       key={sheet.id}
-                      className={`border-t border-gray-100 ${
-                        sheet.status === "cancelled" ? "bg-red-50" : ""
+                      className={`border-t border-surface-border ${
+                        sheet.status === "cancelled" ? "bg-red-900/30" : ""
                       }`}
                     >
-                      <td className="py-3 pl-4 pr-2 text-sm font-medium text-gray-900">
+                      <td className="py-3 pl-4 pr-2 text-sm font-medium text-dark-100">
                         {formatShortDate(sheet.event_date)}
                         {sheet.status === "cancelled" && (
-                          <span className="ml-2 text-xs font-bold text-red-600 uppercase">
+                          <span className="ml-2 text-xs font-bold text-red-400 uppercase">
                             Cancelled
                           </span>
                         )}
@@ -118,13 +118,13 @@ export default async function AdminSheetsPage() {
                       <td className="py-3 px-2">
                         <span className={badge.className}>{badge.label}</span>
                       </td>
-                      <td className="py-3 px-2 text-sm text-gray-700">
+                      <td className="py-3 px-2 text-sm text-dark-200">
                         {sheet.group?.name ?? "---"}
                       </td>
-                      <td className="py-3 px-2 text-sm text-gray-700">
+                      <td className="py-3 px-2 text-sm text-dark-200">
                         {counts.confirmed}/{sheet.player_limit}
                       </td>
-                      <td className="py-3 px-2 text-sm text-gray-700">
+                      <td className="py-3 px-2 text-sm text-dark-200">
                         {counts.waitlisted}
                       </td>
                       <td className="py-3 pl-2 pr-4 text-right">
@@ -144,7 +144,7 @@ export default async function AdminSheetsPage() {
                           {sheet.status !== "cancelled" && (
                             <Link
                               href={`/admin/sheets/${sheet.id}?action=cancel`}
-                              className="text-sm text-red-600 hover:text-red-500"
+                              className="text-sm text-red-400 hover:text-red-500"
                             >
                               Cancel
                             </Link>

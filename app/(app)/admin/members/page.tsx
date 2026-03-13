@@ -48,8 +48,8 @@ export default async function AdminMembersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Member Management</h1>
-          <p className="mt-1 text-gray-600">
+          <h1 className="text-2xl font-bold text-dark-100">Member Management</h1>
+          <p className="mt-1 text-surface-muted">
             {profiles?.length ?? 0} total members
           </p>
         </div>

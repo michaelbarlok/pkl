@@ -76,12 +76,45 @@ export default function AdminSessionDetailPage() {
       .update({ status: nextStatus })
       .eq("id", id);
 
+    // Re-fetch participants to pick up step_after changes
+    const { data: refreshed } = await supabase
+      .from("session_participants")
+      .select("*, player:profiles(id, display_name, avatar_url)")
+      .eq("session_id", id)
+      .order("court_number", { ascending: true });
+    if (refreshed) setParticipants(refreshed);
+
     setSession({ ...session, status: nextStatus });
     setUpdating(false);
   }
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
-  if (!session) return <div className="text-center py-12 text-gray-500">Session not found.</div>;
+  // Realtime: re-fetch participants when session_participants change (e.g. step updates)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`admin-session-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "session_participants", filter: `session_id=eq.${id}` },
+        () => {
+          supabase
+            .from("session_participants")
+            .select("*, player:profiles(id, display_name, avatar_url)")
+            .eq("session_id", id)
+            .order("court_number", { ascending: true })
+            .then(({ data }) => {
+              if (data) setParticipants(data);
+            });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, supabase]);
+
+  if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
+  if (!session) return <div className="text-center py-12 text-surface-muted">Session not found.</div>;
 
   const currentIdx = LIFECYCLE_ORDER.indexOf(session.status as typeof LIFECYCLE_ORDER[number]);
   const checkedInCount = participants.filter((p) => p.checked_in).length;
@@ -90,10 +123,10 @@ export default function AdminSessionDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-dark-100">
             Session — {session.group?.name}
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-surface-muted">
             {session.sheet?.event_date &&
               new Date(session.sheet.event_date).toLocaleDateString("en-US", {
                 weekday: "long",
@@ -108,23 +141,23 @@ export default function AdminSessionDetailPage() {
 
       {/* Lifecycle Progress */}
       <div className="card">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Session Lifecycle</h2>
+        <h2 className="text-sm font-semibold text-dark-200 mb-4">Session Lifecycle</h2>
         <div className="flex items-center gap-2 overflow-x-auto">
           {LIFECYCLE_ORDER.map((status, idx) => (
             <div key={status} className="flex items-center">
               <div
                 className={`rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${
                   idx < currentIdx
-                    ? "bg-green-100 text-green-700"
+                    ? "bg-teal-900/30 text-teal-300"
                     : idx === currentIdx
-                    ? "bg-brand-100 text-brand-700 ring-2 ring-brand-500"
-                    : "bg-gray-100 text-gray-400"
+                    ? "bg-brand-900/50 text-brand-300 ring-2 ring-brand-500"
+                    : "bg-surface-overlay text-surface-muted"
                 }`}
               >
                 {STATUS_LABELS[status]}
               </div>
               {idx < LIFECYCLE_ORDER.length - 1 && (
-                <svg className="mx-1 h-4 w-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="mx-1 h-4 w-4 text-surface-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               )}
@@ -136,26 +169,26 @@ export default function AdminSessionDetailPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="card">
-          <p className="text-sm text-gray-600">Players</p>
+          <p className="text-sm text-surface-muted">Players</p>
           <p className="text-2xl font-bold">{participants.length}</p>
         </div>
         <div className="card">
-          <p className="text-sm text-gray-600">Checked In</p>
+          <p className="text-sm text-surface-muted">Checked In</p>
           <p className="text-2xl font-bold">{checkedInCount}</p>
         </div>
         <div className="card">
-          <p className="text-sm text-gray-600">Courts</p>
+          <p className="text-sm text-surface-muted">Courts</p>
           <p className="text-2xl font-bold">{session.num_courts}</p>
         </div>
         <div className="card">
-          <p className="text-sm text-gray-600">Round</p>
+          <p className="text-sm text-surface-muted">Round</p>
           <p className="text-2xl font-bold">{session.current_round}</p>
         </div>
       </div>
 
       {/* Quick Actions */}
       <div className="card">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Actions</h2>
+        <h2 className="text-sm font-semibold text-dark-200 mb-4">Actions</h2>
         <div className="flex flex-wrap gap-3">
           {session.status === "created" && (
             <Link href={`/admin/sessions/${id}/checkin`} className="btn-primary">
@@ -180,24 +213,24 @@ export default function AdminSessionDetailPage() {
 
       {/* Participants Table */}
       <div className="card overflow-hidden p-0">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-700">Participants</h2>
+        <div className="px-6 py-4 border-b border-surface-border">
+          <h2 className="text-sm font-semibold text-dark-200">Participants</h2>
         </div>
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-surface-border">
+          <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Player</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Checked In</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Court</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Step Before</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Step After</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Finish</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Checked In</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Court</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Step Before</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Step After</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Finish</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-surface-border bg-surface-raised">
             {participants.map((p) => (
               <tr key={p.id}>
-                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-dark-100">
                   {(p as any).player?.display_name ?? "Unknown"}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4">
@@ -207,15 +240,15 @@ export default function AdminSessionDetailPage() {
                     <span className="badge-gray">No</span>
                   )}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
                   {p.court_number ?? "—"}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
                   {p.step_before}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
                   {p.step_after != null ? (
-                    <span className={p.step_after < p.step_before ? "text-green-600 font-medium" : p.step_after > p.step_before ? "text-red-600 font-medium" : ""}>
+                    <span className={p.step_after < p.step_before ? "text-teal-300 font-medium" : p.step_after > p.step_before ? "text-red-400 font-medium" : ""}>
                       {p.step_after}
                       {p.step_after < p.step_before && " ↑"}
                       {p.step_after > p.step_before && " ↓"}
@@ -224,7 +257,7 @@ export default function AdminSessionDetailPage() {
                     "—"
                   )}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
                   {p.pool_finish != null ? `${p.pool_finish}${["st","nd","rd"][p.pool_finish-1] ?? "th"}` : "—"}
                 </td>
               </tr>

@@ -29,7 +29,7 @@ export default async function ForumPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Forum</h1>
+        <h1 className="text-2xl font-bold text-dark-100">Forum</h1>
         <Link href="/forum/new" className="btn-primary">
           New Thread
         </Link>
@@ -40,7 +40,7 @@ export default async function ForumPage() {
           <Link
             key={thread.id}
             href={`/forum/${thread.id}`}
-            className="card block hover:ring-brand-300 transition-shadow"
+            className="card block hover:ring-brand-500/30 transition-shadow"
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -48,14 +48,14 @@ export default async function ForumPage() {
                   {thread.pinned && (
                     <span className="badge-blue text-xs">Pinned</span>
                   )}
-                  <h2 className="text-sm font-semibold text-gray-900">
+                  <h2 className="text-sm font-semibold text-dark-100">
                     {thread.title}
                   </h2>
                 </div>
-                <p className="mt-1 text-sm text-gray-600 line-clamp-2">
+                <p className="mt-1 text-sm text-surface-muted line-clamp-2">
                   {thread.body}
                 </p>
-                <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
+                <div className="mt-2 flex items-center gap-3 text-xs text-surface-muted">
                   <span>{thread.author?.display_name}</span>
                   <span>
                     {new Date(thread.created_at).toLocaleDateString("en-US", {
@@ -71,7 +71,7 @@ export default async function ForumPage() {
         ))}
 
         {(!threads || threads.length === 0) && (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-surface-muted">
             No threads yet. Start the conversation!
           </div>
         )}

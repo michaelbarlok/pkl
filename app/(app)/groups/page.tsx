@@ -8,12 +8,16 @@ export default async function GroupsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Get current player's profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user!.id)
-    .single();
+  // Get current player's profile (may be null for unauthenticated visitors)
+  let profile: { id: string } | null = null;
+  if (user) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+    profile = data;
+  }
 
   // Fetch all active groups with member counts
   const { data: groups } = await supabase
@@ -23,18 +27,20 @@ export default async function GroupsPage() {
     .order("name", { ascending: true });
 
   // Fetch current user's memberships to mark joined groups
-  const { data: myMemberships } = await supabase
-    .from("group_memberships")
-    .select("group_id")
-    .eq("player_id", profile!.id);
-
-  const joinedGroupIds = new Set(myMemberships?.map((m) => m.group_id) ?? []);
+  let joinedGroupIds = new Set<string>();
+  if (profile) {
+    const { data: myMemberships } = await supabase
+      .from("group_memberships")
+      .select("group_id")
+      .eq("player_id", profile.id);
+    joinedGroupIds = new Set(myMemberships?.map((m) => m.group_id) ?? []);
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Browse Groups</h1>
-        <p className="mt-1 text-gray-600">
+        <h1 className="text-2xl font-bold text-dark-100">Browse Groups</h1>
+        <p className="mt-1 text-surface-muted">
           Find a shootout group to join and start competing.
         </p>
       </div>
@@ -52,20 +58,20 @@ export default async function GroupsPage() {
                 key={group.id}
                 href={`/groups/${group.slug}`}
                 className={cn(
-                  "card hover:ring-brand-300 transition-shadow",
+                  "card hover:ring-brand-500/30 transition-shadow",
                   isJoined && "ring-2 ring-brand-200"
                 )}
               >
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-gray-900">{group.name}</h3>
+                  <h3 className="font-semibold text-dark-100">{group.name}</h3>
                   {isJoined && <span className="badge-green">Joined</span>}
                 </div>
                 {group.description && (
-                  <p className="mt-1 text-sm text-gray-600 line-clamp-2">
+                  <p className="mt-1 text-sm text-surface-muted line-clamp-2">
                     {group.description}
                   </p>
                 )}
-                <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
+                <div className="mt-3 flex items-center gap-2 text-sm text-surface-muted">
                   <svg
                     className="h-4 w-4"
                     fill="none"
@@ -88,7 +94,7 @@ export default async function GroupsPage() {
           })}
         </div>
       ) : (
-        <div className="card text-center text-gray-500">
+        <div className="card text-center text-surface-muted">
           No active groups available.
         </div>
       )}

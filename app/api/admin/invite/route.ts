@@ -1,4 +1,5 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { sendInviteEmail } from "./send-email";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -44,52 +45,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use service role client to invite the user
-    const serviceClient = await createServiceClient();
+    // Send invite email via Resend — recipient registers via /register
+    await sendInviteEmail(email, displayName);
 
-    const { data: inviteData, error: inviteError } =
-      await serviceClient.auth.admin.inviteUserByEmail(email);
-
-    if (inviteError) {
-      return NextResponse.json(
-        { error: inviteError.message },
-        { status: 400 }
-      );
-    }
-
-    const invitedUserId = inviteData.user?.id;
-
-    if (!invitedUserId) {
-      return NextResponse.json(
-        { error: "Invite succeeded but no user ID was returned" },
-        { status: 500 }
-      );
-    }
-
-    // Create a profile row in pending/inactive state
-    const { data: profile, error: profileError } = await serviceClient
-      .from("profiles")
-      .insert({
-        user_id: invitedUserId,
-        full_name: displayName,
-        display_name: displayName,
-        email,
-        is_active: false,
-        role: "player",
-        member_since: new Date().toISOString(),
-        preferred_notify: ["email"],
-      })
-      .select("*")
-      .single();
-
-    if (profileError) {
-      return NextResponse.json(
-        { error: profileError.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ profile }, { status: 201 });
+    return NextResponse.json(
+      { message: `Invite sent to ${email}` },
+      { status: 200 }
+    );
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Internal server error";

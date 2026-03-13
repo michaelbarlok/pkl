@@ -26,25 +26,25 @@ export default async function AdminSessionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Shootout Sessions</h1>
+        <h1 className="text-2xl font-bold text-dark-100">Shootout Sessions</h1>
       </div>
 
       <div className="card overflow-hidden p-0">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-surface-border">
+          <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Group</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Courts</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Round</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Date</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Group</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Courts</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Round</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-surface-border bg-surface-raised">
             {sessions?.map((session) => (
               <tr key={session.id}>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-100">
                   {session.sheet?.event_date
                     ? new Date(session.sheet.event_date).toLocaleDateString("en-US", {
                         month: "short",
@@ -53,7 +53,7 @@ export default async function AdminSessionsPage() {
                       })
                     : "—"}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
                   {session.group?.name ?? "—"}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4">
@@ -61,10 +61,10 @@ export default async function AdminSessionsPage() {
                     {session.status.replace("_", " ")}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
                   {session.num_courts}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
                   {session.current_round}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-sm">
@@ -79,7 +79,7 @@ export default async function AdminSessionsPage() {
             ))}
             {(!sessions || sessions.length === 0) && (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-surface-muted">
                   No sessions yet. Start a shootout from a sign-up sheet.
                 </td>
               </tr>

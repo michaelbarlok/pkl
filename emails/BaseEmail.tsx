@@ -5,6 +5,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Preview,
   Section,
   Text,
@@ -23,7 +24,13 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
       <Preview>{preview}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>PKL</Heading>
+          <Img
+            src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/pkl-logo.png`}
+            width="140"
+            height="auto"
+            alt="PKL"
+            style={logo}
+          />
           <Hr style={hr} />
           <Heading as="h2" style={h2}>
             {heading}
@@ -52,10 +59,7 @@ const container = {
   borderRadius: "8px",
 };
 
-const h1 = {
-  color: "#1e40af",
-  fontSize: "24px",
-  fontWeight: "700" as const,
+const logo = {
   margin: "0 0 16px",
 };
 

@@ -164,43 +164,43 @@ export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
       </div>
 
       {/* Results count */}
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-surface-muted">
         Showing {filtered.length} of {profiles.length} members
       </p>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto rounded-lg border border-surface-border">
+        <table className="min-w-full divide-y divide-surface-border">
+          <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Member
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Email
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Skill
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Step
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Role
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-surface-border bg-surface-raised">
             {filtered.map((profile) => {
               const memberships = membershipMap[profile.id] ?? [];
               return (
-                <tr key={profile.id} className="hover:bg-gray-50">
+                <tr key={profile.id} className="hover:bg-surface-overlay">
                   {/* Avatar + Name */}
                   <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -211,13 +211,13 @@ export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
                           className="h-8 w-8 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-sm font-medium">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-sm font-medium">
                           {profile.display_name.charAt(0).toUpperCase()}
                         </div>
                       )}
                       <Link
                         href={`/players/${profile.id}`}
-                        className="text-sm font-medium text-gray-900 hover:text-brand-600"
+                        className="text-sm font-medium text-dark-100 hover:text-brand-600"
                       >
                         {profile.display_name}
                       </Link>
@@ -225,17 +225,17 @@ export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
                   </td>
 
                   {/* Email */}
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
                     {profile.email}
                   </td>
 
                   {/* Skill Level */}
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
                     {profile.skill_level ?? "—"}
                   </td>
 
                   {/* Step (from group memberships) */}
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-sm text-surface-muted">
                     {memberships.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {memberships.map((m, i) => (
@@ -289,8 +289,8 @@ export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
                         className={cn(
                           "text-sm",
                           profile.is_active
-                            ? "text-red-600 hover:text-red-500"
-                            : "text-green-600 hover:text-green-500",
+                            ? "text-red-400 hover:text-red-500"
+                            : "text-teal-300 hover:text-green-500",
                           suspending === profile.id && "opacity-50"
                         )}
                       >
@@ -310,7 +310,7 @@ export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
               <tr>
                 <td
                   colSpan={7}
-                  className="px-4 py-8 text-center text-sm text-gray-500"
+                  className="px-4 py-8 text-center text-sm text-surface-muted"
                 >
                   No members found matching your filters.
                 </td>

@@ -63,7 +63,7 @@ export default function NotificationsPage() {
     );
   }
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
 
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
@@ -71,9 +71,9 @@ export default function NotificationsPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
+          <h1 className="text-2xl font-bold text-dark-100">Notifications</h1>
           {unreadCount > 0 && (
-            <p className="text-sm text-gray-600">{unreadCount} unread</p>
+            <p className="text-sm text-surface-muted">{unreadCount} unread</p>
           )}
         </div>
         {unreadCount > 0 && (
@@ -89,15 +89,15 @@ export default function NotificationsPage() {
             key={n.id}
             onClick={() => !n.read_at && markRead(n.id)}
             className={`card cursor-pointer transition-colors ${
-              !n.read_at ? "border-l-4 border-l-brand-500 bg-brand-50/30" : ""
+              !n.read_at ? "border-l-4 border-l-brand-500 bg-brand-900/40/30" : ""
             }`}
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                <p className="mt-1 text-sm text-gray-600">{n.body}</p>
+                <p className="text-sm font-medium text-dark-100">{n.title}</p>
+                <p className="mt-1 text-sm text-surface-muted">{n.body}</p>
               </div>
-              <span className="text-xs text-gray-400 whitespace-nowrap ml-4">
+              <span className="text-xs text-surface-muted whitespace-nowrap ml-4">
                 {new Date(n.created_at).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -119,7 +119,7 @@ export default function NotificationsPage() {
         ))}
 
         {notifications.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-surface-muted">
             No notifications yet.
           </div>
         )}

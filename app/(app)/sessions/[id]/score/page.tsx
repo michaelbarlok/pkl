@@ -114,14 +114,14 @@ export default function ScoreEntryPage() {
   }
 
   if (!session) {
-    return <div className="text-center py-12 text-gray-500">Loading...</div>;
+    return <div className="text-center py-12 text-surface-muted">Loading...</div>;
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Enter Score</h1>
-        <p className="text-sm text-gray-600">
+        <h1 className="text-2xl font-bold text-dark-100">Enter Score</h1>
+        <p className="text-sm text-surface-muted">
           {session.group?.name} — Round {session.current_round}
           {myCourt && ` — Court ${myCourt}`}
         </p>
@@ -131,7 +131,7 @@ export default function ScoreEntryPage() {
         <div className="grid grid-cols-2 gap-4">
           {/* Team A */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Team A</h3>
+            <h3 className="text-sm font-semibold text-dark-200 mb-2">Team A</h3>
             <select
               value={teamAP1}
               onChange={(e) => setTeamAP1(e.target.value)}
@@ -170,7 +170,7 @@ export default function ScoreEntryPage() {
 
           {/* Team B */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Team B</h3>
+            <h3 className="text-sm font-semibold text-dark-200 mb-2">Team B</h3>
             <select
               value={teamBP1}
               onChange={(e) => setTeamBP1(e.target.value)}
@@ -209,7 +209,7 @@ export default function ScoreEntryPage() {
         </div>
 
         {message && (
-          <p className={`text-sm ${message.includes("success") ? "text-green-600" : "text-red-600"}`}>
+          <p className={`text-sm ${message.includes("success") ? "text-teal-300" : "text-red-400"}`}>
             {message}
           </p>
         )}
@@ -222,10 +222,10 @@ export default function ScoreEntryPage() {
       {/* Existing Scores */}
       {existingScores.length > 0 && (
         <div className="card">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Submitted Scores</h2>
+          <h2 className="text-sm font-semibold text-dark-200 mb-3">Submitted Scores</h2>
           <div className="space-y-2">
             {existingScores.map((s) => (
-              <div key={s.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-2">
+              <div key={s.id} className="flex items-center justify-between rounded-lg bg-surface-overlay px-4 py-2">
                 <span className="text-sm">
                   Court {s.pool_number} — Round {s.round_number}
                 </span>

@@ -51,16 +51,16 @@ export function AdminAddMember({
 
   return (
     <div className="card">
-      <h3 className="text-sm font-semibold text-gray-900 mb-3">
+      <h3 className="text-sm font-semibold text-dark-100 mb-3">
         Add a Member
       </h3>
       {error && (
-        <div className="mb-3 rounded-md bg-red-50 p-2 text-sm text-red-700">
+        <div className="mb-3 rounded-md bg-red-900/30 p-2 text-sm text-red-400">
           {error}
         </div>
       )}
       {success && (
-        <div className="mb-3 rounded-md bg-green-50 p-2 text-sm text-green-700">
+        <div className="mb-3 rounded-md bg-teal-900/30 p-2 text-sm text-teal-300">
           {success}
         </div>
       )}
