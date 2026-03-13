@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   }
   const serviceClient = await createServiceClient();
 
-  // Find the sheet — use provided sheetId or fall back to first open sheet
+  // Find the sheet
   let sheet: { id: string; player_limit: number; group_id: string } | null = null;
 
   if (sheetId) {
@@ -66,55 +66,57 @@ export async function POST(request: Request) {
   }
 
   if (!sheet) {
-    // Debug: list all sheets to understand why lookup failed
-    const { data: allSheets, error: debugErr } = await serviceClient
-      .from("signup_sheets")
-      .select("id, status, player_limit, group_id")
-      .limit(5);
-    return NextResponse.json({
-      error: "Sheet not found",
-      version: "v4",
-      sheetIdUsed: sheetId || null,
-      debug: { allSheets, debugErr: debugErr?.message },
-    }, { status: 404 });
+    return NextResponse.json({ error: "Sheet not found" }, { status: 404 });
   }
 
-  // Create 39 test profiles
-  const testProfiles: {
-    user_id: string;
-    full_name: string;
-    display_name: string;
-    email: string;
-    role: "player";
-    is_active: boolean;
-    member_since: string;
-    preferred_notify: string[];
-    _step: number;
-    _pct: number;
-  }[] = [];
+  // Create 39 test auth users and profiles
+  const createdUserIds: string[] = [];
+  const metadata: { step: number; pct: number }[] = [];
+
   for (let i = 0; i < 39; i++) {
     const firstName = FIRST_NAMES[i];
     const lastName = LAST_NAMES[i];
-    const displayName = `${firstName} ${lastName}`;
-    const step = Math.floor(Math.random() * 6) + 1; // 1-6
-    const pct = Math.round((Math.random() * 40 + 50) * 10) / 10; // 50-90%
+    const email = `test-${firstName.toLowerCase()}-${lastName.toLowerCase()}@test.local`;
+    const step = Math.floor(Math.random() * 6) + 1;
+    const pct = Math.round((Math.random() * 40 + 50) * 10) / 10;
 
-    testProfiles.push({
-      user_id: crypto.randomUUID(),
-      full_name: displayName,
-      display_name: `[TEST] ${displayName}`,
+    // Create auth user via admin API
+    const { data: authUser, error: authErr } = await serviceClient.auth.admin.createUser({
+      email,
+      password: "testpassword123",
+      email_confirm: true,
+      user_metadata: { full_name: `${firstName} ${lastName}` },
+    });
+
+    if (authErr || !authUser.user) {
+      console.error(`Failed to create auth user ${email}:`, authErr?.message);
+      continue;
+    }
+
+    createdUserIds.push(authUser.user.id);
+    metadata.push({ step, pct });
+  }
+
+  if (createdUserIds.length === 0) {
+    return NextResponse.json({ error: "Failed to create any auth users" }, { status: 500 });
+  }
+
+  // Create profiles for each auth user
+  const profileInserts = createdUserIds.map((userId, i) => {
+    const firstName = FIRST_NAMES[i];
+    const lastName = LAST_NAMES[i];
+    return {
+      user_id: userId,
+      full_name: `${firstName} ${lastName}`,
+      display_name: `[TEST] ${firstName} ${lastName}`,
       email: `test-${firstName.toLowerCase()}-${lastName.toLowerCase()}@test.local`,
       role: "player" as const,
       is_active: true,
       member_since: new Date().toISOString(),
       preferred_notify: ["email"],
-      _step: step,
-      _pct: pct,
-    });
-  }
+    };
+  });
 
-  // Insert profiles (without _step and _pct)
-  const profileInserts = testProfiles.map(({ _step, _pct, ...rest }) => rest);
   const { data: inserted, error: insertErr } = await serviceClient
     .from("profiles")
     .insert(profileInserts)
@@ -128,22 +130,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No profiles created" }, { status: 500 });
   }
 
-  // Create group memberships with random steps and percentages
-  const memberships = inserted.map((p, i) => ({
-    player_id: p.id,
-    group_id: sheet.group_id,
-    current_step: testProfiles[i]._step,
-    win_pct: testProfiles[i]._pct,
-    total_sessions: Math.floor(Math.random() * 20) + 1,
-    last_played_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-  }));
+  // Create group memberships
+  if (sheet.group_id) {
+    const memberships = inserted.map((p, i) => ({
+      player_id: p.id,
+      group_id: sheet.group_id,
+      current_step: metadata[i].step,
+      win_pct: metadata[i].pct,
+      total_sessions: Math.floor(Math.random() * 20) + 1,
+      last_played_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+    }));
 
-  const { error: memberErr } = await serviceClient
-    .from("group_memberships")
-    .insert(memberships);
+    const { error: memberErr } = await serviceClient
+      .from("group_memberships")
+      .insert(memberships);
 
-  if (memberErr) {
-    console.error("Membership insert error:", memberErr);
+    if (memberErr) {
+      console.error("Membership insert error:", memberErr);
+    }
   }
 
   // Count existing confirmed registrations

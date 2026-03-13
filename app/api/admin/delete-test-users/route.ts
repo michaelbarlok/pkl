@@ -24,10 +24,10 @@ export async function POST() {
   }
   const serviceClient = await createServiceClient();
 
-  // Find all test profiles
+  // Find all test profiles (with user_id for auth cleanup)
   const { data: testProfiles } = await serviceClient
     .from("profiles")
-    .select("id")
+    .select("id, user_id")
     .like("display_name", "[TEST]%");
 
   if (!testProfiles || testProfiles.length === 0) {
@@ -35,6 +35,7 @@ export async function POST() {
   }
 
   const ids = testProfiles.map((p) => p.id);
+  const authUserIds = testProfiles.map((p) => p.user_id).filter(Boolean);
 
   // Delete registrations
   await serviceClient
@@ -56,6 +57,11 @@ export async function POST() {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Delete auth users
+  for (const authId of authUserIds) {
+    await serviceClient.auth.admin.deleteUser(authId);
   }
 
   return NextResponse.json({ success: true, deleted: ids.length });
