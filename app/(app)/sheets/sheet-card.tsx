@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { QuickSignUp } from "./quick-signup";
 
 const statusBadge: Record<string, { className: string; label: string }> = {
   open: { className: "badge-green", label: "Open" },
@@ -22,6 +22,8 @@ interface SheetCardProps {
   players: { name: string; status: string }[];
   myStatus: string | null;
   signupClosed: boolean;
+  withdrawClosed: boolean;
+  isFull: boolean;
 }
 
 export function SheetCard({
@@ -36,13 +38,54 @@ export function SheetCard({
   players,
   myStatus,
   signupClosed,
+  withdrawClosed,
+  isFull,
 }: SheetCardProps) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
   const badge = statusBadge[status] ?? statusBadge.closed;
   const isOpen = status === "open";
+  const isRegistered = myStatus === "confirmed" || myStatus === "waitlist";
 
   const confirmedPlayers = players.filter((p) => p.status === "confirmed");
   const waitlistedPlayers = players.filter((p) => p.status === "waitlist");
+
+  async function handleSignUp(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/sheets/${sheetId}/signup`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to sign up.");
+      }
+      router.refresh();
+    } catch {
+      alert("Failed to sign up.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleWithdraw(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/sheets/${sheetId}/withdraw`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to withdraw.");
+      }
+      router.refresh();
+    } catch {
+      alert("Failed to withdraw.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="card hover:ring-brand-500/30 transition-shadow">
@@ -67,16 +110,29 @@ export function SheetCard({
               </span>
             )}
           </div>
-          {myStatus ? (
-            <span
-              className={
-                myStatus === "confirmed" ? "badge-green" : "badge-yellow"
-              }
-            >
-              {myStatus === "confirmed" ? "Signed Up" : "Waitlisted"}
-            </span>
+          {isRegistered ? (
+            <>
+              <span className={myStatus === "confirmed" ? "badge-green" : "badge-yellow"}>
+                {myStatus === "confirmed" ? "Signed Up" : "Waitlisted"}
+              </span>
+              {!withdrawClosed && (
+                <button
+                  onClick={handleWithdraw}
+                  disabled={loading}
+                  className="btn-danger text-xs px-3 py-1.5"
+                >
+                  {loading ? "..." : "Withdraw"}
+                </button>
+              )}
+            </>
           ) : isOpen && !signupClosed ? (
-            <QuickSignUp sheetId={sheetId} />
+            <button
+              onClick={handleSignUp}
+              disabled={loading}
+              className="btn-primary text-xs px-3 py-1.5"
+            >
+              {loading ? "..." : isFull ? "Join Waitlist" : "Sign Up"}
+            </button>
           ) : null}
           {players.length > 0 && (
             <button

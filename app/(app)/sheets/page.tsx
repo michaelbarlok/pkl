@@ -41,22 +41,52 @@ export default async function SheetsPage() {
     return new Date(b.event_date).getTime() - new Date(a.event_date).getTime();
   });
 
-  // Fetch registrations with player names per sheet
+  // Fetch registrations per sheet
   const sheetIds = (sheets ?? []).map((s: SignupSheet) => s.id);
-  const { data: registrations } = await supabase
-    .from("registrations")
-    .select("sheet_id, status, priority, signed_up_at, player:profiles!registrations_player_id_fkey(display_name)")
-    .in("sheet_id", sheetIds.length > 0 ? sheetIds : ["__none__"])
-    .in("status", ["confirmed", "waitlist"])
-    .order("signed_up_at", { ascending: true });
+  const safeSheetIds = sheetIds.length > 0 ? sheetIds : ["__none__"];
+
+  // Try with player join first, fall back to plain + separate profiles query
+  let registrations: { sheet_id: string; status: string; player_id: string; player?: { display_name: string } | null }[] = [];
+  {
+    const { data, error: regError } = await supabase
+      .from("registrations")
+      .select("sheet_id, status, player_id, player:profiles!registrations_player_id_fkey(display_name)")
+      .in("sheet_id", safeSheetIds)
+      .in("status", ["confirmed", "waitlist"])
+      .order("signed_up_at", { ascending: true });
+
+    if (regError || !data) {
+      // Fallback: plain query + separate profiles fetch
+      const { data: plainRegs } = await supabase
+        .from("registrations")
+        .select("sheet_id, status, player_id")
+        .in("sheet_id", safeSheetIds)
+        .in("status", ["confirmed", "waitlist"])
+        .order("signed_up_at", { ascending: true });
+
+      if (plainRegs && plainRegs.length > 0) {
+        const playerIds = [...new Set(plainRegs.map((r) => r.player_id))];
+        const { data: players } = await supabase
+          .from("profiles")
+          .select("id, display_name")
+          .in("id", playerIds);
+        const playerMap = new Map((players ?? []).map((p) => [p.id, p.display_name]));
+        registrations = plainRegs.map((r) => ({
+          ...r,
+          player: { display_name: playerMap.get(r.player_id) ?? "Unknown" },
+        }));
+      }
+    } else {
+      registrations = data;
+    }
+  }
 
   // Build per-sheet data: confirmed count, waitlist count, player list
   const confirmedCountMap: Record<string, number> = {};
   const waitlistCountMap: Record<string, number> = {};
   const playersMap: Record<string, { name: string; status: string }[]> = {};
 
-  const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
-  (registrations ?? []).forEach((r: any) => {
+  registrations.forEach((r) => {
     if (r.status === "confirmed") {
       confirmedCountMap[r.sheet_id] = (confirmedCountMap[r.sheet_id] ?? 0) + 1;
     } else {
@@ -69,7 +99,7 @@ export default async function SheetsPage() {
     });
   });
 
-  // Sort players: confirmed first (by priority then signup time), then waitlisted
+  // Sort players: confirmed first, then waitlisted
   for (const sheetId of Object.keys(playersMap)) {
     playersMap[sheetId].sort((a, b) => {
       if (a.status !== b.status) return a.status === "confirmed" ? -1 : 1;
@@ -100,6 +130,9 @@ export default async function SheetsPage() {
     const players = playersMap[sheet.id] ?? [];
     const myStatus = myRegMap[sheet.id] ?? null;
     const signupClosed = new Date(sheet.signup_closes_at) < new Date();
+    const withdrawClosed = sheet.withdraw_closes_at
+      ? new Date(sheet.withdraw_closes_at) < new Date()
+      : false;
 
     return (
       <SheetCard
@@ -115,6 +148,8 @@ export default async function SheetsPage() {
         players={players}
         myStatus={myStatus}
         signupClosed={signupClosed}
+        withdrawClosed={withdrawClosed}
+        isFull={confirmed >= sheet.player_limit}
       />
     );
   };
