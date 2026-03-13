@@ -402,9 +402,51 @@ export default function PlayerSessionPage() {
           <h2 className="text-lg font-semibold text-dark-100 mb-3">Match Schedule</h2>
           <div className="space-y-2">
             {matchSchedule.map((match) => {
-              const matchContent = (
-                <>
-                  <div className="min-w-0 flex-1">
+              const hasResult = !!match.result;
+              const team1Won = hasResult && match.result!.scoreA > match.result!.scoreB;
+              const team2Won = hasResult && match.result!.scoreB > match.result!.scoreA;
+
+              if (hasResult) {
+                return (
+                  <div
+                    key={match.gameNumber}
+                    className="rounded-lg px-4 py-3 bg-surface-overlay"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-surface-muted w-8 shrink-0">G{match.gameNumber}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-semibold ${team1Won ? "text-teal-300" : "text-red-400"}`}>
+                        {formatTeam(match.team1, playerNames)}
+                      </span>
+                      <span className={`font-mono text-sm font-bold ${team1Won ? "text-teal-300" : "text-red-400"}`}>
+                        {match.result!.scoreA}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-semibold ${team2Won ? "text-teal-300" : "text-red-400"}`}>
+                        {formatTeam(match.team2, playerNames)}
+                      </span>
+                      <span className={`font-mono text-sm font-bold ${team2Won ? "text-teal-300" : "text-red-400"}`}>
+                        {match.result!.scoreB}
+                      </span>
+                    </div>
+                    {match.bye && (
+                      <p className="text-[11px] text-accent-300/80 mt-1">
+                        Bye: {playerNames.get(match.bye) ?? "?"}
+                      </p>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <Link
+                  key={match.gameNumber}
+                  href={`/sessions/${sessionId}/score?game=${match.gameNumber}`}
+                  className="block rounded-lg px-4 py-3 bg-surface-raised border border-surface-border hover:border-brand-500/50 hover:bg-brand-900/20 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium text-surface-muted w-8 shrink-0">
                         G{match.gameNumber}
@@ -417,42 +459,13 @@ export default function PlayerSessionPage() {
                         {formatTeam(match.team2, playerNames)}
                       </span>
                     </div>
-                    {match.bye && (
-                      <p className="text-[11px] text-accent-300/80 mt-0.5 ml-8">
-                        Bye: {playerNames.get(match.bye) ?? "?"}
-                      </p>
-                    )}
+                    <span className="text-xs text-brand-300 font-medium">Enter score &rarr;</span>
                   </div>
-                  <div className="flex items-center shrink-0">
-                    {match.result ? (
-                      <span className="font-mono text-sm font-semibold text-dark-200">
-                        {match.result.scoreA} – {match.result.scoreB}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-brand-300 font-medium">Enter score &rarr;</span>
-                    )}
-                  </div>
-                </>
-              );
-
-              if (match.result) {
-                return (
-                  <div
-                    key={match.gameNumber}
-                    className="flex items-center justify-between rounded-lg px-4 py-3 bg-surface-overlay"
-                  >
-                    {matchContent}
-                  </div>
-                );
-              }
-
-              return (
-                <Link
-                  key={match.gameNumber}
-                  href={`/sessions/${sessionId}/score?game=${match.gameNumber}`}
-                  className="flex items-center justify-between rounded-lg px-4 py-3 bg-surface-raised border border-surface-border hover:border-brand-500/50 hover:bg-brand-900/20 transition-colors"
-                >
-                  {matchContent}
+                  {match.bye && (
+                    <p className="text-[11px] text-accent-300/80 mt-0.5 ml-8">
+                      Bye: {playerNames.get(match.bye) ?? "?"}
+                    </p>
+                  )}
                 </Link>
               );
             })}
