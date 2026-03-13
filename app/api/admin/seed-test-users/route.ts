@@ -66,7 +66,17 @@ export async function POST(request: Request) {
   }
 
   if (!sheet) {
-    return NextResponse.json({ error: "Sheet not found", version: "v3", sheetIdUsed: sheetId || null }, { status: 404 });
+    // Debug: list all sheets to understand why lookup failed
+    const { data: allSheets, error: debugErr } = await serviceClient
+      .from("signup_sheets")
+      .select("id, status, player_limit, group_id")
+      .limit(5);
+    return NextResponse.json({
+      error: "Sheet not found",
+      version: "v4",
+      sheetIdUsed: sheetId || null,
+      debug: { allSheets, debugErr: debugErr?.message },
+    }, { status: 404 });
   }
 
   // Create 39 test profiles
