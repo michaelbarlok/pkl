@@ -1,7 +1,7 @@
 "use client";
 
 import { useSupabase } from "@/components/providers/supabase-provider";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 
 interface PoolPlayer {
@@ -47,7 +47,6 @@ export default function ScoreEntryPage() {
   const { id: sessionId } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const gameParam = searchParams.get("game");
-  const router = useRouter();
   const { supabase } = useSupabase();
   const [session, setSession] = useState<any>(null);
   const [players, setPlayers] = useState<PoolPlayer[]>([]);
@@ -162,8 +161,8 @@ export default function ScoreEntryPage() {
       setMessage(data.error ?? "Failed to submit score");
       setSubmitting(false);
     } else {
-      router.push(`/sessions/${sessionId}`);
-      router.refresh();
+      // Full page navigation to guarantee fresh data fetch
+      window.location.href = `/sessions/${sessionId}`;
     }
   }
 
