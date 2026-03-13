@@ -98,6 +98,8 @@ function generateMatchSchedule(
   playerNames: Map<string, string>,
   scores: GameResult[]
 ): ScheduledMatch[] {
+  // Sort player IDs for deterministic schedule regardless of query order
+  playerIds = [...playerIds].sort();
   const n = playerIds.length;
   if (n < 4) return [];
 
@@ -202,6 +204,7 @@ export default function PlayerSessionPage() {
       .from("session_participants")
       .select("*, player:profiles(display_name, avatar_url)")
       .eq("session_id", sessionId)
+      .eq("checked_in", true)
       .order("court_number", { ascending: true });
 
     if (parts) {
@@ -258,6 +261,7 @@ export default function PlayerSessionPage() {
             .from("session_participants")
             .select("*, player:profiles(display_name, avatar_url)")
             .eq("session_id", sessionId)
+            .eq("checked_in", true)
             .order("court_number", { ascending: true })
             .then(({ data }) => {
               if (data) {

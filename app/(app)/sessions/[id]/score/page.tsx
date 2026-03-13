@@ -17,6 +17,8 @@ interface ScheduledMatch {
 }
 
 function generateSchedule(playerIds: string[]): ScheduledMatch[] {
+  // Sort player IDs for deterministic schedule regardless of query order
+  playerIds = [...playerIds].sort();
   const n = playerIds.length;
   if (n < 4) return [];
 
