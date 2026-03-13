@@ -83,12 +83,15 @@ export interface SignupSheet {
   group?: ShootoutGroup;
 }
 
+export type RegistrationPriority = "high" | "normal" | "low";
+
 export interface Registration {
   id: string;
   sheet_id: string;
   player_id: string;
   signed_up_at: string;
   status: RegistrationStatus;
+  priority: RegistrationPriority;
   waitlist_position?: number | null;
   registered_by?: string | null;
   // Relations

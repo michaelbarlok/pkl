@@ -17,11 +17,15 @@ export async function POST(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Optionally accept a player_id in the body (admin signing up another member)
+    // Optionally accept a player_id and priority in the body
     let targetPlayerId: string | null = null;
+    let priority: string = "normal";
     try {
       const body = await request.json();
       targetPlayerId = body?.player_id ?? null;
+      if (body?.priority && ["high", "normal", "low"].includes(body.priority)) {
+        priority = body.priority;
+      }
     } catch {
       // No body or invalid JSON — signing up self
     }
@@ -123,6 +127,7 @@ export async function POST(
         .from("registrations")
         .update({
           status,
+          priority,
           waitlist_position: waitlistPosition,
           signed_up_at: new Date().toISOString(),
         })
@@ -143,6 +148,7 @@ export async function POST(
           sheet_id: sheetId,
           player_id: playerId,
           status,
+          priority,
           waitlist_position: waitlistPosition,
           registered_by: targetPlayerId ? callerProfile.id : null,
         })

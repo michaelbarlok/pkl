@@ -45,8 +45,15 @@ export default function AdminSheetDetailPage() {
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
 
-  const confirmed = registrations.filter((r) => r.status === "confirmed");
-  const waitlisted = registrations.filter((r) => r.status === "waitlist");
+  const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
+  const sortByPriority = (a: any, b: any) => {
+    const aPri = priorityOrder[(a as any).priority ?? "normal"] ?? 1;
+    const bPri = priorityOrder[(b as any).priority ?? "normal"] ?? 1;
+    if (aPri !== bPri) return aPri - bPri;
+    return new Date(a.signed_up_at).getTime() - new Date(b.signed_up_at).getTime();
+  };
+  const confirmed = registrations.filter((r) => r.status === "confirmed").sort(sortByPriority);
+  const waitlisted = registrations.filter((r) => r.status === "waitlist").sort(sortByPriority);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -239,6 +246,26 @@ export default function AdminSheetDetailPage() {
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to promote player.";
+      setError(message);
+    }
+  }
+
+  async function handleSetPriority(registrationId: string, priority: string) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/sheets/registrations/${registrationId}/priority`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priority }),
+      });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error ?? "Failed to update priority.");
+      }
+      await fetchData();
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update priority.";
       setError(message);
     }
   }
@@ -598,12 +625,23 @@ export default function AdminSheetDetailPage() {
                     <span className="badge-gray text-xs">Admin added</span>
                   )}
                 </div>
-                <button
-                  onClick={() => handleRemovePlayer(reg.id)}
-                  className="btn-danger text-xs"
-                >
-                  Remove
-                </button>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={(reg as any).priority ?? "normal"}
+                    onChange={(e) => handleSetPriority(reg.id, e.target.value)}
+                    className="input py-0.5 px-1.5 text-xs w-24"
+                  >
+                    <option value="high">High</option>
+                    <option value="normal">Normal</option>
+                    <option value="low">Low</option>
+                  </select>
+                  <button
+                    onClick={() => handleRemovePlayer(reg.id)}
+                    className="btn-danger text-xs"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -641,7 +679,16 @@ export default function AdminSheetDetailPage() {
                   </span>
                   <span className="badge-yellow text-xs">Waitlisted</span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={(reg as any).priority ?? "normal"}
+                    onChange={(e) => handleSetPriority(reg.id, e.target.value)}
+                    className="input py-0.5 px-1.5 text-xs w-24"
+                  >
+                    <option value="high">High</option>
+                    <option value="normal">Normal</option>
+                    <option value="low">Low</option>
+                  </select>
                   <button
                     onClick={() => handlePromotePlayer(reg.id)}
                     className="btn-secondary text-xs"

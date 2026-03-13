@@ -56,16 +56,24 @@ export async function POST(
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
 
-  // If confirmed player removed, promote first waitlisted
+  // If confirmed player removed, promote highest-priority waitlisted player
   if (wasConfirmed) {
-    const { data: nextWaitlist } = await supabase
+    // Priority order: high (first) → normal → low, then by waitlist_position
+    const { data: waitlisted } = await supabase
       .from("registrations")
-      .select("id, waitlist_position")
+      .select("id, waitlist_position, priority")
       .eq("sheet_id", sheetId)
       .eq("status", "waitlist")
-      .order("waitlist_position", { ascending: true })
-      .limit(1)
-      .single();
+      .order("waitlist_position", { ascending: true });
+
+    const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
+    const sorted = (waitlisted ?? []).sort((a: any, b: any) => {
+      const aPri = priorityOrder[a.priority ?? "normal"] ?? 1;
+      const bPri = priorityOrder[b.priority ?? "normal"] ?? 1;
+      if (aPri !== bPri) return aPri - bPri;
+      return (a.waitlist_position ?? 999) - (b.waitlist_position ?? 999);
+    });
+    const nextWaitlist = sorted[0] ?? null;
 
     if (nextWaitlist) {
       await supabase
