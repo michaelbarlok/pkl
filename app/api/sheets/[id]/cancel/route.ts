@@ -91,15 +91,18 @@ export async function POST(
       month: "long",
       day: "numeric",
     });
+    const eventTime = sheet.event_time
+      ? new Date(sheet.event_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      : null;
 
     await notifyMany(playerIds, {
       type: "sheet_cancelled",
       title: `${groupName} Cancelled`,
-      body: `The ${groupName} event on ${eventDate} has been cancelled.`,
+      body: `The ${groupName} event on ${eventDate}${eventTime ? ` at ${eventTime}` : ""} has been cancelled.`,
       link: `/sheets/${id}`,
       groupId: sheet.group_id,
       emailTemplate: "SheetCancelled",
-      emailData: { groupName, eventDate },
+      emailData: { groupName, eventDate, eventTime: sheet.event_time },
     });
   }
 

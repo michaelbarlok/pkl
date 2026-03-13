@@ -4,11 +4,16 @@ import BaseEmail from "./BaseEmail";
 interface Props {
   groupName?: string;
   eventDate?: string;
+  eventTime?: string;
   location?: string;
   sheetId?: string;
 }
 
-export default function NewSheet({ groupName, eventDate, location, sheetId }: Props) {
+export default function NewSheet({ groupName, eventDate, eventTime, location, sheetId }: Props) {
+  const formattedTime = eventTime
+    ? new Date(eventTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    : null;
+
   return (
     <BaseEmail preview="New event posted!" heading="New Sign-Up Sheet">
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
@@ -16,6 +21,7 @@ export default function NewSheet({ groupName, eventDate, location, sheetId }: Pr
       </Text>
       <Text style={{ color: "#374151", fontSize: "14px" }}>
         Date: {eventDate ? new Date(eventDate).toLocaleDateString() : "TBD"}
+        {formattedTime ? ` at ${formattedTime}` : ""}
       </Text>
       {location && (
         <Text style={{ color: "#374151", fontSize: "14px" }}>

@@ -71,17 +71,21 @@ export async function POST(request: NextRequest) {
       month: "long",
       day: "numeric",
     });
+    const eventTime = sheet.event_time
+      ? new Date(sheet.event_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      : null;
 
     await notifyMany(playerIds, {
       type: "new_sheet",
       title: `New ${groupName} Event`,
-      body: `A new event has been posted for ${eventDate} at ${sheet.location}.`,
+      body: `A new event has been posted for ${eventDate}${eventTime ? ` at ${eventTime}` : ""} at ${sheet.location}.`,
       link: `/sheets/${sheetId}`,
       groupId: sheet.group_id,
       emailTemplate: "NewSheet",
       emailData: {
         groupName,
         eventDate: sheet.event_date,
+        eventTime: sheet.event_time,
         location: sheet.location,
         sheetId,
       },
