@@ -35,7 +35,18 @@ export type NotificationType =
   | "step_changed"
   | "rating_updated"
   | "forum_reply"
-  | "invite_sent";
+  | "invite_sent"
+  | "tournament_registration"
+  | "tournament_reminder"
+  | "tournament_cancelled";
+
+export type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
+export type TournamentType = "singles" | "doubles";
+export type TournamentSkillLevel = "open" | "beginner" | "intermediate" | "advanced";
+export type TournamentStatus = "draft" | "registration_open" | "registration_closed" | "in_progress" | "completed" | "cancelled";
+export type TournamentRegistrationStatus = "confirmed" | "waitlist" | "withdrawn";
+export type TournamentMatchStatus = "pending" | "in_progress" | "completed" | "bye";
+export type TournamentBracket = "winners" | "losers" | "grand_final";
 
 // ============================================================
 // Core Tables
@@ -257,6 +268,72 @@ export interface Notification {
   link?: string | null;
   read_at?: string | null;
   created_at: string;
+}
+
+// ============================================================
+// Tournaments
+// ============================================================
+
+export interface Tournament {
+  id: string;
+  title: string;
+  description?: string | null;
+  format: TournamentFormat;
+  type: TournamentType;
+  skill_level: TournamentSkillLevel;
+  start_date: string;
+  end_date: string;
+  start_time?: string | null;
+  location: string;
+  player_cap?: number | null;
+  entry_fee?: string | null;
+  registration_opens_at?: string | null;
+  registration_closes_at?: string | null;
+  status: TournamentStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // Relations
+  creator?: Profile;
+  registrations?: TournamentRegistration[];
+}
+
+export interface TournamentRegistration {
+  id: string;
+  tournament_id: string;
+  player_id: string;
+  partner_id?: string | null;
+  status: TournamentRegistrationStatus;
+  waitlist_position?: number | null;
+  seed?: number | null;
+  registered_at: string;
+  // Relations
+  player?: Profile;
+  partner?: Profile;
+  tournament?: Tournament;
+}
+
+export interface TournamentMatch {
+  id: string;
+  tournament_id: string;
+  round: number;
+  match_number: number;
+  bracket: TournamentBracket;
+  court?: string | null;
+  player1_id?: string | null;
+  player2_id?: string | null;
+  score1: number[];
+  score2: number[];
+  winner_id?: string | null;
+  status: TournamentMatchStatus;
+  scheduled_time?: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relations
+  player1?: Profile;
+  player2?: Profile;
+  winner?: Profile;
+  tournament?: Tournament;
 }
 
 // ============================================================
