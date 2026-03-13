@@ -8,7 +8,7 @@ const PCT_WINDOW_SESSIONS = 14;
  * Per session: total points scored / max possible points (winning score per game).
  * Averaged over the last 14 sessions.
  */
-async function getPlayerPercentages(supabase: ReturnType<Awaited<ReturnType<typeof createClient>>["constructor"]>) {
+async function getPlayerPercentages(supabase: Awaited<ReturnType<typeof createClient>>) {
   // Get all completed sessions ordered by date
   const { data: sessions } = await supabase
     .from("shootout_sessions")
@@ -103,7 +103,7 @@ export default async function RatingsPage() {
     .order("current_step", { ascending: true });
 
   // Calculate point percentages
-  const percentages = await getPlayerPercentages(supabase as any);
+  const percentages = await getPlayerPercentages(supabase);
 
   // Deduplicate players: use their best (lowest) step across groups
   const playerMap = new Map<

@@ -265,13 +265,25 @@ export default function AdminSheetDetailPage() {
 
       if (sessionErr) throw sessionErr;
 
-      // Add confirmed players as participants
+      // Fetch current steps from group_memberships for confirmed players
+      const playerIds = confirmed.map((reg) => reg.player_id);
+      const { data: memberships } = await supabase
+        .from("group_memberships")
+        .select("player_id, current_step")
+        .eq("group_id", sheet.group_id)
+        .in("player_id", playerIds);
+
+      const stepMap = new Map(
+        (memberships ?? []).map((m: any) => [m.player_id, m.current_step])
+      );
+
+      // Add confirmed players as participants with their actual step
       const participants = confirmed.map((reg) => ({
         session_id: session.id,
         group_id: sheet.group_id,
         player_id: reg.player_id,
         checked_in: false,
-        step_before: 0,
+        step_before: stepMap.get(reg.player_id) ?? 1,
       }));
 
       if (participants.length > 0) {

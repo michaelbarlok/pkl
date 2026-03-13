@@ -4,7 +4,7 @@ import { useSupabase } from "@/components/providers/supabase-provider";
 import type { ShootoutSession, SessionParticipant, GameResult } from "@/types/database";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 const STATUS_LABELS: Record<string, string> = {
   created: "Created",
@@ -23,6 +23,149 @@ const STATUS_COLORS: Record<string, string> = {
   round_complete: "bg-purple-100 text-purple-700",
   session_complete: "bg-gray-100 text-gray-700",
 };
+
+// ============================================================
+// Standings Calculation
+// ============================================================
+
+interface Standing {
+  playerId: string;
+  displayName: string;
+  wins: number;
+  losses: number;
+  pointDiff: number;
+}
+
+function computeStandings(
+  courtPlayers: { player_id: string; player?: { display_name: string } }[],
+  courtScores: GameResult[]
+): Standing[] {
+  const standings = new Map<string, Standing>();
+
+  for (const p of courtPlayers) {
+    standings.set(p.player_id, {
+      playerId: p.player_id,
+      displayName: p.player?.display_name ?? "Unknown",
+      wins: 0,
+      losses: 0,
+      pointDiff: 0,
+    });
+  }
+
+  for (const game of courtScores) {
+    const teamAIds = [game.team_a_p1, game.team_a_p2].filter(Boolean);
+    const teamBIds = [game.team_b_p1, game.team_b_p2].filter(Boolean);
+    const aWon = game.score_a > game.score_b;
+
+    for (const pid of teamAIds) {
+      const s = standings.get(pid!);
+      if (!s) continue;
+      if (aWon) s.wins++;
+      else s.losses++;
+      s.pointDiff += game.score_a - game.score_b;
+    }
+
+    for (const pid of teamBIds) {
+      const s = standings.get(pid!);
+      if (!s) continue;
+      if (!aWon) s.wins++;
+      else s.losses++;
+      s.pointDiff += game.score_b - game.score_a;
+    }
+  }
+
+  // Sort: wins DESC, then point differential DESC
+  return Array.from(standings.values()).sort((a, b) => {
+    if (a.wins !== b.wins) return b.wins - a.wins;
+    return b.pointDiff - a.pointDiff;
+  });
+}
+
+// ============================================================
+// Match Schedule Generation
+// ============================================================
+
+interface ScheduledMatch {
+  gameNumber: number;
+  team1: string[];
+  team2: string[];
+  result?: { scoreA: number; scoreB: number };
+}
+
+function generateMatchSchedule(
+  playerIds: string[],
+  playerNames: Map<string, string>,
+  scores: GameResult[]
+): ScheduledMatch[] {
+  const n = playerIds.length;
+  if (n < 4) return [];
+
+  const matches: ScheduledMatch[] = [];
+
+  if (n === 4) {
+    // Standard 4-player doubles round robin: 3 games
+    const [a, b, c, d] = playerIds;
+    matches.push(
+      { gameNumber: 1, team1: [a, b], team2: [c, d] },
+      { gameNumber: 2, team1: [a, c], team2: [b, d] },
+      { gameNumber: 3, team1: [a, d], team2: [b, c] }
+    );
+  } else if (n === 5) {
+    // 5-player round robin: 5 games, each player sits out once
+    const [a, b, c, d, e] = playerIds;
+    matches.push(
+      { gameNumber: 1, team1: [a, b], team2: [c, d] },   // e sits
+      { gameNumber: 2, team1: [a, c], team2: [b, e] },   // d sits
+      { gameNumber: 3, team1: [b, d], team2: [a, e] },   // c sits
+      { gameNumber: 4, team1: [c, e], team2: [a, d] },   // b sits
+      { gameNumber: 5, team1: [d, e], team2: [b, c] }    // a sits
+    );
+  }
+
+  // Match submitted scores to scheduled matches
+  for (const match of matches) {
+    const team1Set = new Set(match.team1);
+    const team2Set = new Set(match.team2);
+
+    const found = scores.find((s) => {
+      const sTeamA = new Set([s.team_a_p1, s.team_a_p2].filter(Boolean));
+      const sTeamB = new Set([s.team_b_p1, s.team_b_p2].filter(Boolean));
+
+      // Check both orientations
+      const match1 =
+        setsEqual(sTeamA, team1Set) && setsEqual(sTeamB, team2Set);
+      const match2 =
+        setsEqual(sTeamA, team2Set) && setsEqual(sTeamB, team1Set);
+
+      return match1 || match2;
+    });
+
+    if (found) {
+      const sTeamA = new Set([found.team_a_p1, found.team_a_p2].filter(Boolean));
+      const isTeam1AsA = setsEqual(sTeamA, team1Set);
+      match.result = {
+        scoreA: isTeam1AsA ? found.score_a : found.score_b,
+        scoreB: isTeam1AsA ? found.score_b : found.score_a,
+      };
+    }
+  }
+
+  return matches;
+}
+
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const v of a) if (!b.has(v)) return false;
+  return true;
+}
+
+function formatTeam(ids: string[], names: Map<string, string>): string {
+  return ids.map((id) => names.get(id) ?? "?").join(" & ");
+}
+
+// ============================================================
+// Component
+// ============================================================
 
 export default function PlayerSessionPage() {
   const { id: sessionId } = useParams<{ id: string }>();
@@ -70,8 +213,7 @@ export default function PlayerSessionPage() {
         .from("game_results")
         .select("*")
         .eq("session_id", sessionId)
-        .order("round_number")
-        .order("pool_number");
+        .order("created_at");
       setScores(gameScores ?? []);
 
       setLoading(false);
@@ -94,7 +236,6 @@ export default function PlayerSessionPage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` },
         () => {
-          // Re-fetch participants on any change
           supabase
             .from("session_participants")
             .select("*, player:profiles(display_name, avatar_url)")
@@ -116,6 +257,15 @@ export default function PlayerSessionPage() {
           setScores((prev) => [...prev, payload.new as GameResult]);
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "game_results", filter: `session_id=eq.${sessionId}` },
+        (payload) => {
+          setScores((prev) =>
+            prev.map((s) => (s.id === (payload.new as GameResult).id ? (payload.new as GameResult) : s))
+          );
+        }
+      )
       .subscribe();
 
     return () => {
@@ -123,20 +273,46 @@ export default function PlayerSessionPage() {
     };
   }, [sessionId, supabase, myPlayerId]);
 
+  // Derived data
+  const myCourtPlayers = useMemo(
+    () => participants.filter((p) => p.court_number === myCourt),
+    [participants, myCourt]
+  );
+
+  const myCourtScores = useMemo(
+    () => scores.filter((s) => s.pool_number === myCourt),
+    [scores, myCourt]
+  );
+
+  const standings = useMemo(
+    () => computeStandings(myCourtPlayers as any, myCourtScores),
+    [myCourtPlayers, myCourtScores]
+  );
+
+  const playerNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of participants) {
+      map.set(p.player_id, p.player?.display_name ?? "Unknown");
+    }
+    return map;
+  }, [participants]);
+
+  const matchSchedule = useMemo(
+    () =>
+      myCourt != null
+        ? generateMatchSchedule(
+            myCourtPlayers.map((p) => p.player_id),
+            playerNames,
+            myCourtScores
+          )
+        : [],
+    [myCourtPlayers, playerNames, myCourtScores, myCourt]
+  );
+
   if (loading) return <div className="text-center py-12 text-gray-500">Loading session...</div>;
   if (!session) return <div className="text-center py-12 text-gray-500">Session not found.</div>;
 
-  // Group participants by court
-  const courts = new Map<number, typeof participants>();
-  for (const p of participants) {
-    if (p.court_number == null) continue;
-    const list = courts.get(p.court_number) ?? [];
-    list.push(p);
-    courts.set(p.court_number, list);
-  }
-  const sortedCourts = Array.from(courts.entries()).sort(([a], [b]) => a - b);
-
-  const myCourtScores = scores.filter((s) => s.pool_number === myCourt);
+  const isActive = session.status === "round_active" || session.status === "round_complete";
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -159,7 +335,6 @@ export default function PlayerSessionPage() {
         <span className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${STATUS_COLORS[session.status] ?? "bg-gray-100 text-gray-700"}`}>
           {STATUS_LABELS[session.status] ?? session.status}
         </span>
-        <span className="text-sm text-gray-600">Round {session.current_round}</span>
         {session.num_courts > 0 && (
           <span className="text-sm text-gray-600">{session.num_courts} courts</span>
         )}
@@ -170,80 +345,94 @@ export default function PlayerSessionPage() {
         <div className="card bg-brand-50 border border-brand-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-brand-700">Your Court Assignment</p>
+              <p className="text-sm font-medium text-brand-700">Your Court</p>
               <p className="text-3xl font-bold text-brand-900">Court {myCourt}</p>
             </div>
-            {(session.status === "round_active" || session.status === "round_complete") && (
+            {isActive && (
               <Link href={`/sessions/${sessionId}/score`} className="btn-primary">
                 Enter Score
               </Link>
             )}
           </div>
-          {/* Court mates */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {participants
-              .filter((p) => p.court_number === myCourt && p.player_id !== myPlayerId)
-              .map((p) => (
-                <span key={p.id} className="inline-flex items-center rounded-full bg-white px-3 py-1 text-sm text-gray-700 shadow-sm">
-                  {p.player?.display_name}
-                </span>
-              ))}
-          </div>
         </div>
       )}
 
-      {/* All Courts */}
-      {sortedCourts.length > 0 && (
+      {/* Live Standings Table */}
+      {myCourt != null && standings.length > 0 && myCourtScores.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Court Assignments</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {sortedCourts.map(([courtNum, courtPlayers]) => (
-              <div
-                key={courtNum}
-                className={`card ${courtNum === myCourt ? "ring-2 ring-brand-500" : ""}`}
-              >
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Court {courtNum}</h3>
-                <ul className="space-y-1">
-                  {courtPlayers.map((p) => (
-                    <li
-                      key={p.id}
-                      className={`text-sm ${p.player_id === myPlayerId ? "font-semibold text-brand-700" : "text-gray-600"}`}
-                    >
-                      {p.player?.display_name}
-                      {p.pool_finish != null && (
-                        <span className="ml-2 text-xs text-gray-400">
-                          {p.pool_finish === 1 ? "1st" : p.pool_finish === 2 ? "2nd" : p.pool_finish === 3 ? "3rd" : `${p.pool_finish}th`}
-                        </span>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Standings — Court {myCourt}</h2>
+          <div className="card overflow-hidden p-0">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500 w-10">#</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Player</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium uppercase text-gray-500">W</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium uppercase text-gray-500">L</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium uppercase text-gray-500">+/-</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {standings.map((s, i) => (
+                  <tr
+                    key={s.playerId}
+                    className={s.playerId === myPlayerId ? "bg-brand-50" : ""}
+                  >
+                    <td className="px-4 py-2 text-sm font-medium text-gray-500">{i + 1}</td>
+                    <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                      {s.displayName}
+                      {s.playerId === myPlayerId && (
+                        <span className="ml-1 text-xs text-brand-600">(you)</span>
                       )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-4 py-2 text-center text-sm font-semibold text-green-700">{s.wins}</td>
+                    <td className="px-4 py-2 text-center text-sm font-semibold text-red-600">{s.losses}</td>
+                    <td className="px-4 py-2 text-center text-sm font-semibold">
+                      <span className={s.pointDiff > 0 ? "text-green-700" : s.pointDiff < 0 ? "text-red-600" : "text-gray-500"}>
+                        {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* Scores for my court */}
-      {myCourtScores.length > 0 && (
+      {/* Match Schedule */}
+      {myCourt != null && matchSchedule.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Scores — Court {myCourt}</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Match Schedule</h2>
           <div className="space-y-2">
-            {myCourtScores.map((s) => (
-              <div key={s.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
-                <span className="text-sm text-gray-600">Round {s.round_number}</span>
-                <span className="font-mono text-lg font-semibold">
-                  {s.score_a} – {s.score_b}
-                </span>
-                <span>
-                  {s.is_confirmed ? (
-                    <span className="badge-green">Confirmed</span>
-                  ) : s.is_disputed ? (
-                    <span className="badge-red">Disputed</span>
+            {matchSchedule.map((match) => (
+              <div
+                key={match.gameNumber}
+                className={`flex items-center justify-between rounded-lg px-4 py-3 ${
+                  match.result ? "bg-gray-50" : "bg-white border border-gray-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-400 w-8">
+                    G{match.gameNumber}
+                  </span>
+                  <span className="text-sm text-gray-900">
+                    {formatTeam(match.team1, playerNames)}
+                  </span>
+                  <span className="text-xs text-gray-400">vs</span>
+                  <span className="text-sm text-gray-900">
+                    {formatTeam(match.team2, playerNames)}
+                  </span>
+                </div>
+                <div>
+                  {match.result ? (
+                    <span className="font-mono text-sm font-semibold text-gray-700">
+                      {match.result.scoreA} – {match.result.scoreB}
+                    </span>
                   ) : (
-                    <span className="badge-yellow">Pending</span>
+                    <span className="text-xs text-gray-400">Pending</span>
                   )}
-                </span>
+                </div>
               </div>
             ))}
           </div>
@@ -276,8 +465,8 @@ export default function PlayerSessionPage() {
             return (
               <p className="mt-2 text-sm text-gray-600">
                 Your step: {me.step_before} → {me.step_after}
-                {diff > 0 && <span className="text-green-600 font-medium"> (↑ moved up {diff})</span>}
-                {diff < 0 && <span className="text-red-600 font-medium"> (↓ moved down {Math.abs(diff)})</span>}
+                {diff > 0 && <span className="text-green-600 font-medium"> (moved up {diff})</span>}
+                {diff < 0 && <span className="text-red-600 font-medium"> (moved down {Math.abs(diff)})</span>}
                 {diff === 0 && <span className="text-gray-500"> (no change)</span>}
               </p>
             );
