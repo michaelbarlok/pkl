@@ -12,6 +12,7 @@ const playerNav = [
   { name: "Play", href: "/sessions/active" },
   { name: "Groups", href: "/groups" },
   { name: "Sheets", href: "/sheets" },
+  { name: "Tournaments", href: "/tournaments" },
   { name: "Rankings", href: "/ratings" },
   { name: "Forum", href: "/forum" },
 ];
@@ -21,6 +22,7 @@ const adminNav = [
   { name: "Sheets", href: "/admin/sheets" },
   { name: "Groups", href: "/admin/groups" },
   { name: "Sessions", href: "/admin/sessions" },
+  { name: "Tournaments", href: "/admin/tournaments" },
 ];
 
 export function AppNav({ profile, isGroupAdmin = false }: { profile: Profile; isGroupAdmin?: boolean }) {
@@ -52,7 +54,7 @@ export function AppNav({ profile, isGroupAdmin = false }: { profile: Profile; is
                 href={item.href}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  pathname === item.href || (item.href === "/sessions/active" && pathname.startsWith("/sessions/"))
+                  pathname === item.href || (item.href === "/sessions/active" && pathname.startsWith("/sessions/")) || (item.href === "/tournaments" && pathname.startsWith("/tournaments"))
                     ? "bg-brand-900/40 text-brand-300"
                     : "text-surface-muted hover:bg-surface-overlay hover:text-dark-100"
                 )}
