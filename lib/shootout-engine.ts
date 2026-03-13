@@ -61,7 +61,8 @@ export interface PoolResult {
 
 /**
  * Distribute players across courts.
- * Higher-numbered courts get 5 players first; lower courts get 4.
+ * Lower-numbered courts (best players) get 5 players first;
+ * higher-numbered courts (weaker players) get 4.
  * Each court must have 4 or 5 players.
  */
 export function distributeCourts(
@@ -77,11 +78,11 @@ export function distributeCourts(
     );
   }
 
-  // extras courts get (base+1) players — assigned to HIGHEST court numbers
+  // extras courts get (base+1) players — assigned to LOWEST court numbers
   return Array.from({ length: numCourts }, (_, i) => {
     const courtNum = i + 1;
-    const isHighCourt = courtNum > numCourts - extras;
-    return { court: courtNum, size: isHighCourt ? base + 1 : base };
+    const isTopCourt = courtNum <= extras;
+    return { court: courtNum, size: isTopCourt ? base + 1 : base };
   });
 }
 

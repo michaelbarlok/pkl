@@ -37,6 +37,9 @@ export default function AdminSheetDetailPage() {
   const [signupClosesAt, setSignupClosesAt] = useState("");
   const [withdrawClosesAt, setWithdrawClosesAt] = useState("");
 
+  // Court selection for shootout
+  const [numCourts, setNumCourts] = useState<number | null>(null);
+
   // Player search
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
@@ -242,9 +245,21 @@ export default function AdminSheetDetailPage() {
 
   async function handleStartShootout() {
     if (!sheet) return;
+    if (!numCourts || numCourts < 1) {
+      setError("Please select the number of courts before starting.");
+      return;
+    }
+    // Validate court count produces valid distribution (4-5 per court)
+    const perCourt = confirmed.length / numCourts;
+    if (perCourt < 4 || perCourt > 5) {
+      setError(
+        `${confirmed.length} players across ${numCourts} courts doesn't work (need 4-5 per court).`
+      );
+      return;
+    }
     if (
       !confirm(
-        "Create a shootout session from this sheet? Confirmed players will be added as participants."
+        `Create a shootout session with ${numCourts} court${numCourts > 1 ? "s" : ""} for ${confirmed.length} players?`
       )
     )
       return;
@@ -256,7 +271,7 @@ export default function AdminSheetDetailPage() {
           sheet_id: sheetId,
           group_id: sheet.group_id,
           status: "created",
-          num_courts: Math.floor(confirmed.length / 4) || 1,
+          num_courts: numCourts,
           current_round: 0,
           is_same_day_continuation: false,
         })
@@ -340,13 +355,40 @@ export default function AdminSheetDetailPage() {
               Cancel Event
             </button>
           )}
+          {confirmed.length >= 4 && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-dark-200">Courts:</label>
+              <select
+                value={numCourts ?? ""}
+                onChange={(e) => setNumCourts(e.target.value ? Number(e.target.value) : null)}
+                className="input w-20 py-1"
+              >
+                <option value="">—</option>
+                {Array.from(
+                  { length: Math.floor(confirmed.length / 4) },
+                  (_, i) => i + 1
+                )
+                  .filter((n) => {
+                    const perCourt = confirmed.length / n;
+                    return perCourt >= 4 && perCourt <= 5;
+                  })
+                  .map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
           <button
             onClick={handleStartShootout}
             className="btn-primary"
-            disabled={confirmed.length < 4}
+            disabled={confirmed.length < 4 || !numCourts}
             title={
               confirmed.length < 4
                 ? "Need at least 4 confirmed players"
+                : !numCourts
+                ? "Select number of courts"
                 : undefined
             }
           >
