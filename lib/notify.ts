@@ -1,3 +1,4 @@
+import type React from "react";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { NotificationType } from "@/types/database";
 
@@ -33,7 +34,7 @@ export async function notify({
   const supabase = await createServiceClient();
 
   // 1. Always write in-app notification
-  await supabase.from("notifications").insert({
+  const { error: insertErr } = await supabase.from("notifications").insert({
     user_id: userId,
     type,
     title,
@@ -41,6 +42,9 @@ export async function notify({
     link,
     group_id: groupId ?? null,
   });
+  if (insertErr) {
+    console.error("Failed to insert notification:", insertErr.message);
+  }
 
   // 2. Fetch user preferences
   const { data: profile } = await supabase
@@ -96,6 +100,23 @@ export async function notifyMany(
 // Email (Resend)
 // ============================================================
 
+// Static template map — dynamic import(`@/emails/${name}`) doesn't work
+// with Next.js path aliases at runtime, so we map templates explicitly.
+const EMAIL_TEMPLATES: Record<string, () => Promise<{ default: (props: any) => React.ReactElement }>> = {
+  NewSheet: () => import("@/emails/NewSheet"),
+  SheetCancelled: () => import("@/emails/SheetCancelled"),
+  SheetUpdated: () => import("@/emails/SheetUpdated"),
+  WaitlistPromoted: () => import("@/emails/WaitlistPromoted"),
+  SignupReminder: () => import("@/emails/SignupReminder"),
+  WithdrawReminder: () => import("@/emails/WithdrawReminder"),
+  SessionStarting: () => import("@/emails/SessionStarting"),
+  ContactGroupAdmins: () => import("@/emails/ContactGroupAdmins"),
+  MemberInvite: () => import("@/emails/MemberInvite"),
+  ForumReply: () => import("@/emails/ForumReply"),
+  PoolAssigned: () => import("@/emails/PoolAssigned"),
+  StepChanged: () => import("@/emails/StepChanged"),
+};
+
 async function sendEmail({
   to,
   subject,
@@ -113,14 +134,13 @@ async function sendEmail({
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
 
-  // Dynamic import of React Email template
-  let emailComponent;
-  try {
-    emailComponent = (await import(`@/emails/${template}`)).default;
-  } catch {
+  const loader = EMAIL_TEMPLATES[template];
+  if (!loader) {
     console.warn(`Email template not found: ${template}`);
     return;
   }
+
+  const emailComponent = (await loader()).default;
 
   await resend.emails.send({
     from: "PKL <info@pkl-ball.app>",
