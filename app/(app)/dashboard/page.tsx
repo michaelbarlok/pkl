@@ -30,6 +30,19 @@ export default async function DashboardPage() {
     .order("event_date", { ascending: true })
     .limit(5);
 
+  // Fetch active session (player is checked in, session is not complete)
+  const { data: activeParticipant } = await supabase
+    .from("session_participants")
+    .select("session_id, court_number, session:shootout_sessions(id, status, num_courts, group:shootout_groups(name), sheet:signup_sheets(event_date, location))")
+    .eq("player_id", profile.id)
+    .eq("checked_in", true)
+    .limit(10);
+
+  const activeSession = activeParticipant?.find((p: any) => {
+    const status = p.session?.status;
+    return status && !["session_complete", "created"].includes(status);
+  }) as any;
+
   return (
     <div className="space-y-8">
       <div>
@@ -40,6 +53,31 @@ export default async function DashboardPage() {
           Here&apos;s what&apos;s happening in PKL.
         </p>
       </div>
+
+      {/* Active Session Banner */}
+      {activeSession?.session && (
+        <Link
+          href={`/sessions/${activeSession.session_id}`}
+          className="card flex items-center justify-between bg-teal-900/30 border border-teal-500/30 hover:border-teal-500/50 transition-colors"
+        >
+          <div>
+            <p className="text-sm font-semibold text-teal-300">Active Session</p>
+            <p className="text-lg font-bold text-dark-100">
+              {activeSession.session.group?.name ?? "Shootout"}
+              {activeSession.court_number && ` — Court ${activeSession.court_number}`}
+            </p>
+            <p className="text-xs text-surface-muted">
+              {activeSession.session.sheet?.location ?? ""}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-teal-300">
+            <span className="text-sm font-medium">Go to session</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+              <path fillRule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clipRule="evenodd" />
+            </svg>
+          </div>
+        </Link>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

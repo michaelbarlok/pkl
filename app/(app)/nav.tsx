@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 const playerNav = [
   { name: "Dashboard", href: "/dashboard" },
+  { name: "Play", href: "/sessions/active" },
   { name: "Groups", href: "/groups" },
   { name: "Sheets", href: "/sheets" },
   { name: "Rankings", href: "/ratings" },
@@ -51,7 +52,7 @@ export function AppNav({ profile, isGroupAdmin = false }: { profile: Profile; is
                 href={item.href}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  pathname === item.href
+                  pathname === item.href || (item.href === "/sessions/active" && pathname.startsWith("/sessions/"))
                     ? "bg-brand-900/40 text-brand-300"
                     : "text-surface-muted hover:bg-surface-overlay hover:text-dark-100"
                 )}
