@@ -13,7 +13,7 @@ export async function sendInviteEmail(
   await resend.emails.send({
     from: "PKL <info@pkl-ball.app>",
     to: email,
-    subject: "You've been invited to PKL!",
+    subject: "Your PKL account is ready to set up",
     react: MemberInvite({ displayName }),
   });
 }
