@@ -74,8 +74,8 @@ export default async function AdminSheetsPage() {
           No sign-up sheets created yet.
         </div>
       ) : (
-        <div className="card overflow-hidden p-0">
-          <table className="w-full text-left">
+        <div className="card overflow-x-auto p-0">
+          <table className="min-w-full text-left">
             <thead>
               <tr className="bg-gray-50 text-xs font-medium uppercase text-gray-500">
                 <th className="py-3 pl-4 pr-2">Date</th>

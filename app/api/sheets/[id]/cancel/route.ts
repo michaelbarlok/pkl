@@ -84,6 +84,8 @@ export async function POST(
       body: `The ${groupName} event on ${eventDate} has been cancelled.`,
       link: `/sheets/${id}`,
       groupId: sheet.group_id,
+      emailTemplate: "SheetCancelled",
+      emailData: { groupName, eventDate },
     });
   }
 
