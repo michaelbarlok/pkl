@@ -127,19 +127,14 @@ export default function CheckInPage() {
   async function seedPlayers() {
     if (!session) return;
     setSeeding(true);
+    setSeedError(null);
 
     const checkedIn = participants.filter((p) => p.checked_in);
-    // Only seed players with empty court fields
-    const needsSeeding = checkedIn.filter((p) => p.court_number == null);
-    const alreadySeeded = checkedIn.filter((p) => p.court_number != null);
 
-    if (needsSeeding.length === 0) {
+    if (checkedIn.length === 0) {
       setSeeding(false);
       return;
     }
-
-    // Calculate court distribution for ALL checked-in players
-    const totalPlayers = checkedIn.length;
 
     try {
       let positions;
@@ -157,7 +152,7 @@ export default function CheckInPage() {
         }));
         positions = seedSameDaySession(seedablePlayers, session.num_courts);
       } else {
-        // Session 1: standard ranking sheet sort
+        // Session 1: standard ranking sheet sort (Step ASC → Win% DESC → ...)
         const rankedPlayers: RankedPlayer[] = checkedIn.map((p) => ({
           id: p.player_id,
           currentStep: p.current_step,
@@ -168,12 +163,8 @@ export default function CheckInPage() {
         positions = seedSession1(rankedPlayers, session.num_courts);
       }
 
-      // Only apply court numbers for players that didn't already have one
+      // Apply court numbers for all checked-in players
       const updates = positions
-        .filter((pos) => {
-          const already = alreadySeeded.find((p) => p.player_id === pos.playerId);
-          return !already; // Only update if not already seeded
-        })
         .map((pos) => {
           const participant = participants.find((p) => p.player_id === pos.playerId);
           return participant
@@ -191,7 +182,6 @@ export default function CheckInPage() {
       const posMap = new Map(positions.map((p) => [p.playerId, p.courtNumber]));
       setParticipants((prev) => {
         const updated = prev.map((p) => {
-          if (p.court_number != null) return p; // Don't overwrite existing
           const court = posMap.get(p.player_id);
           return court != null ? { ...p, court_number: court } : p;
         });
@@ -223,7 +213,6 @@ export default function CheckInPage() {
   if (!session) return <div className="text-center py-12 text-surface-muted">Session not found.</div>;
 
   const checkedInCount = participants.filter((p) => p.checked_in).length;
-  const hasEmptyCourts = participants.some((p) => p.checked_in && p.court_number == null);
 
   return (
     <div className="space-y-6">
@@ -241,7 +230,7 @@ export default function CheckInPage() {
           <button
             onClick={seedPlayers}
             className="btn-primary"
-            disabled={seeding || !hasEmptyCourts}
+            disabled={seeding || checkedInCount === 0}
           >
             {seeding ? "Seeding..." : "Seed Players"}
           </button>
