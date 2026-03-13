@@ -37,6 +37,7 @@ export default function AdminSessionDetailPage() {
   const [participants, setParticipants] = useState<SessionParticipant[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function fetch() {
@@ -112,6 +113,35 @@ export default function AdminSessionDetailPage() {
       supabase.removeChannel(channel);
     };
   }, [id, supabase]);
+
+  async function deleteSession() {
+    if (!session) return;
+    if (!confirm("Delete this session? All participant data will be lost. You can start a new session from the sign up sheet.")) return;
+
+    setDeleting(true);
+    try {
+      // Delete participants first, then the session
+      await supabase
+        .from("session_participants")
+        .delete()
+        .eq("session_id", id);
+
+      await supabase
+        .from("shootout_sessions")
+        .delete()
+        .eq("id", id);
+
+      // Redirect back to the sheet
+      if (session.sheet_id) {
+        router.push(`/sheets/${session.sheet_id}`);
+      } else {
+        router.push("/admin/sessions");
+      }
+    } catch {
+      setDeleting(false);
+      alert("Failed to delete session.");
+    }
+  }
 
   if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
   if (!session) return <div className="text-center py-12 text-surface-muted">Session not found.</div>;
@@ -208,6 +238,13 @@ export default function AdminSessionDetailPage() {
           {session.status === "session_complete" && (
             <span className="badge-green text-sm">Session Complete</span>
           )}
+          <button
+            onClick={deleteSession}
+            disabled={deleting}
+            className="btn-secondary !border-red-500/50 !text-red-400 hover:!bg-red-900/20"
+          >
+            {deleting ? "Deleting..." : "Delete Session"}
+          </button>
         </div>
       </div>
 

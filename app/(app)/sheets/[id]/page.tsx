@@ -238,6 +238,7 @@ export default async function SheetDetailPage({
                 sheetId={sheet.id}
                 groupId={sheet.group_id}
                 confirmedPlayerIds={confirmed.map((r: Registration) => r.player_id)}
+                numCourts={sheet.num_courts}
               />
             )}
             <AdminDeleteSheet sheetId={sheet.id} />

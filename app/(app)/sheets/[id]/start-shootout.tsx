@@ -8,12 +8,14 @@ interface StartShootoutProps {
   sheetId: string;
   groupId: string;
   confirmedPlayerIds: string[];
+  numCourts?: number;
 }
 
 export function StartShootout({
   sheetId,
   groupId,
   confirmedPlayerIds,
+  numCourts: numCourtsProp,
 }: StartShootoutProps) {
   const { supabase } = useSupabase();
   const router = useRouter();
@@ -32,7 +34,11 @@ export function StartShootout({
     setError(null);
 
     try {
-      const numCourts = Math.floor(confirmedPlayerIds.length / 4) || 1;
+      // Use sheet's configured courts, or calculate from player count
+      const playerCount = confirmedPlayerIds.length;
+      const numCourts = numCourtsProp
+        ? Math.min(numCourtsProp, Math.floor(playerCount / 4) || 1)
+        : Math.floor(playerCount / 4) || 1;
 
       const { data: session, error: sessionErr } = await supabase
         .from("shootout_sessions")

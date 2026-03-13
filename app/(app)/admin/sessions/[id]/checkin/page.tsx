@@ -28,6 +28,7 @@ export default function CheckInPage() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [seedError, setSeedError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -196,7 +197,8 @@ export default function CheckInPage() {
         })
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Seeding failed");
+      const msg = err instanceof Error ? err.message : "Seeding failed";
+      setSeedError(msg);
     }
 
     setSeeding(false);
@@ -264,6 +266,12 @@ export default function CheckInPage() {
         </div>
       )}
 
+      {seedError && (
+        <div className="rounded-md bg-red-900/30 border border-red-500/30 p-4 text-red-300 text-sm">
+          <strong>Seeding error:</strong> {seedError}
+        </div>
+      )}
+
       {/* Check-in Table */}
       <div className="card overflow-hidden p-0">
         <table className="min-w-full divide-y divide-surface-border">
@@ -313,7 +321,7 @@ export default function CheckInPage() {
                         e.target.value ? parseInt(e.target.value) : null
                       )
                     }
-                    className="w-16 rounded border-surface-border text-sm py-1 px-2 text-center"
+                    className="w-16 rounded border border-surface-border bg-surface-overlay text-dark-100 text-sm py-1 px-2 text-center focus:ring-1 focus:ring-brand-600 focus:outline-none"
                     placeholder="—"
                   />
                 </td>
