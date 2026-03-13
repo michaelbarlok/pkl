@@ -44,6 +44,11 @@ export default function AdminSessionDetailPage() {
   const [editScoreA, setEditScoreA] = useState("");
   const [editScoreB, setEditScoreB] = useState("");
   const [savingScore, setSavingScore] = useState(false);
+  const [enteringGame, setEnteringGame] = useState<string | null>(null);
+  const [newScoreA, setNewScoreA] = useState("");
+  const [newScoreB, setNewScoreB] = useState("");
+  const [submittingNewScore, setSubmittingNewScore] = useState(false);
+  const [newScoreError, setNewScoreError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetch() {
@@ -65,7 +70,7 @@ export default function AdminSessionDetailPage() {
         .from("game_results")
         .select("*")
         .eq("session_id", id)
-        .order("created_at");
+        .order("id");
       setScores(gameScores ?? []);
 
       setLoading(false);
@@ -197,6 +202,39 @@ export default function AdminSessionDetailPage() {
       .eq("id", gameId);
     setEditingScore(null);
     setSavingScore(false);
+  }
+
+  async function submitNewScore(match: { team1: string[]; team2: string[] }) {
+    setSubmittingNewScore(true);
+    setNewScoreError(null);
+    const a = parseInt(newScoreA);
+    const b = parseInt(newScoreB);
+    if (isNaN(a) || isNaN(b) || a < 0 || b < 0) {
+      setNewScoreError("Invalid scores");
+      setSubmittingNewScore(false);
+      return;
+    }
+    const res = await fetch(`/api/sessions/${id}/score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        round_number: session?.current_round || 1,
+        pool_number: selectedCourt,
+        team_a_p1: match.team1[0],
+        team_a_p2: match.team1[1] || null,
+        team_b_p1: match.team2[0],
+        team_b_p2: match.team2[1] || null,
+        score_a: a,
+        score_b: b,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setNewScoreError(data.error ?? "Failed to submit");
+    } else {
+      setEnteringGame(null);
+    }
+    setSubmittingNewScore(false);
   }
 
   // Derived data for live court view
@@ -434,25 +472,25 @@ export default function AdminSessionDetailPage() {
 
           {/* Standings */}
           {courtStandings.length > 0 && (
-            <div className="card overflow-hidden p-0">
+            <div className="card overflow-x-auto p-0">
               <table className="min-w-full divide-y divide-surface-border">
                 <thead className="bg-surface-overlay">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted w-10">#</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">W</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">L</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">+/-</th>
+                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted w-8">#</th>
+                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
+                    <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">W</th>
+                    <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">L</th>
+                    <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">+/-</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-border bg-surface-raised">
                   {courtStandings.map((s, i) => (
                     <tr key={s.playerId}>
-                      <td className="px-4 py-2 text-sm font-medium text-surface-muted">{i + 1}</td>
-                      <td className="px-4 py-2 text-sm font-medium text-dark-100">{s.name}</td>
-                      <td className="px-4 py-2 text-center text-sm font-semibold text-teal-300">{s.wins}</td>
-                      <td className="px-4 py-2 text-center text-sm font-semibold text-red-400">{s.losses}</td>
-                      <td className="px-4 py-2 text-center text-sm font-semibold">
+                      <td className="px-2 sm:px-4 py-2 text-sm font-medium text-surface-muted">{i + 1}</td>
+                      <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">{s.name}</td>
+                      <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-teal-300">{s.wins}</td>
+                      <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-red-400">{s.losses}</td>
+                      <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold">
                         <span className={s.pointDiff > 0 ? "text-teal-300" : s.pointDiff < 0 ? "text-red-400" : "text-surface-muted"}>
                           {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
                         </span>
@@ -467,129 +505,191 @@ export default function AdminSessionDetailPage() {
           {/* Match Schedule with edit */}
           {courtMatchSchedule.length > 0 && (
             <div className="space-y-2">
-              {courtMatchSchedule.map((match) => (
+              {courtMatchSchedule.map((match) => {
+                const matchKey = `${selectedCourt}-${match.gameNumber}`;
+                return (
                 <div
                   key={match.gameNumber}
                   className={`rounded-lg px-4 py-3 ${match.result ? "bg-surface-overlay" : "bg-surface-raised border border-surface-border"}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-surface-muted w-8 shrink-0">G{match.gameNumber}</span>
-                        <span className="text-sm text-dark-100">
-                          {match.team1.map((id) => playerNameMap.get(id) ?? "?").join(" & ")}
-                        </span>
-                        <span className="text-xs text-surface-muted">vs</span>
-                        <span className="text-sm text-dark-100">
-                          {match.team2.map((id) => playerNameMap.get(id) ?? "?").join(" & ")}
-                        </span>
+                  {match.result ? (
+                    <>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-surface-muted">G{match.gameNumber}</span>
+                        {editingScore !== match.result.id ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-semibold text-dark-200">
+                              {match.result.scoreA} – {match.result.scoreB}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setEditingScore(match.result!.id);
+                                setEditScoreA(String(match.result!.scoreA));
+                                setEditScoreB(String(match.result!.scoreB));
+                              }}
+                              className="text-xs text-surface-muted hover:text-brand-300"
+                              title="Edit score"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                                <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+                                <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              value={editScoreA}
+                              onChange={(e) => setEditScoreA(e.target.value)}
+                              className="input w-14 py-1 text-center text-sm"
+                            />
+                            <span className="text-surface-muted">–</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editScoreB}
+                              onChange={(e) => setEditScoreB(e.target.value)}
+                              className="input w-14 py-1 text-center text-sm"
+                            />
+                            <button
+                              onClick={() => saveEditedScore(match.result!.id)}
+                              disabled={savingScore}
+                              className="text-xs text-teal-300 hover:text-teal-200 font-medium ml-1"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingScore(null)}
+                              className="text-xs text-surface-muted hover:text-dark-200 ml-1"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      {match.bye && (
-                        <p className="text-[11px] text-accent-300/80 mt-0.5 ml-8">
-                          Bye: {playerNameMap.get(match.bye) ?? "?"}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {match.result && editingScore !== match.result.id ? (
-                        <>
-                          <span className="font-mono text-sm font-semibold text-dark-200">
-                            {match.result.scoreA} – {match.result.scoreB}
-                          </span>
+                      <div className="text-sm text-dark-100">
+                        {match.team1.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
+                      </div>
+                      <div className="text-xs text-surface-muted my-0.5">vs</div>
+                      <div className="text-sm text-dark-100">
+                        {match.team2.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-surface-muted">G{match.gameNumber}</span>
+                        {enteringGame !== matchKey && (
                           <button
                             onClick={() => {
-                              setEditingScore(match.result!.id);
-                              setEditScoreA(String(match.result!.scoreA));
-                              setEditScoreB(String(match.result!.scoreB));
+                              setEnteringGame(matchKey);
+                              setNewScoreA("");
+                              setNewScoreB("");
                             }}
-                            className="text-xs text-surface-muted hover:text-brand-300"
-                            title="Edit score"
+                            className="text-xs text-brand-300 font-medium hover:text-brand-200"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                              <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
-                              <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
-                            </svg>
+                            Enter score &rarr;
                           </button>
-                        </>
-                      ) : match.result && editingScore === match.result.id ? (
-                        <div className="flex items-center gap-1">
+                        )}
+                      </div>
+                      <div className="text-sm text-dark-100">
+                        {match.team1.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
+                      </div>
+                      <div className="text-xs text-surface-muted my-0.5">vs</div>
+                      <div className="text-sm text-dark-100">
+                        {match.team2.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
+                      </div>
+                      {enteringGame === matchKey && (
+                        <div className="flex items-center gap-1 mt-2">
                           <input
                             type="number"
                             min={0}
-                            value={editScoreA}
-                            onChange={(e) => setEditScoreA(e.target.value)}
+                            value={newScoreA}
+                            onChange={(e) => setNewScoreA(e.target.value)}
                             className="input w-14 py-1 text-center text-sm"
+                            placeholder="0"
+                            autoFocus
                           />
                           <span className="text-surface-muted">–</span>
                           <input
                             type="number"
                             min={0}
-                            value={editScoreB}
-                            onChange={(e) => setEditScoreB(e.target.value)}
+                            value={newScoreB}
+                            onChange={(e) => setNewScoreB(e.target.value)}
                             className="input w-14 py-1 text-center text-sm"
+                            placeholder="0"
                           />
                           <button
-                            onClick={() => saveEditedScore(match.result!.id)}
-                            disabled={savingScore}
+                            onClick={() => submitNewScore(match)}
+                            disabled={submittingNewScore}
                             className="text-xs text-teal-300 hover:text-teal-200 font-medium ml-1"
                           >
-                            Save
+                            {submittingNewScore ? "..." : "Submit"}
                           </button>
                           <button
-                            onClick={() => setEditingScore(null)}
+                            onClick={() => setEnteringGame(null)}
                             className="text-xs text-surface-muted hover:text-dark-200 ml-1"
                           >
                             Cancel
                           </button>
+                          {newScoreError && (
+                            <span className="text-xs text-red-400 ml-1">{newScoreError}</span>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-xs text-surface-muted">Pending</span>
                       )}
-                    </div>
-                  </div>
+                    </>
+                  )}
+                  {match.bye && (
+                    <p className="text-[11px] text-accent-300/80 mt-1">
+                      Bye: {playerNameMap.get(match.bye) ?? "?"}
+                    </p>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
       {/* Participants Table */}
-      <div className="card overflow-hidden p-0">
-        <div className="px-6 py-4 border-b border-surface-border">
+      <div className="card overflow-x-auto p-0">
+        <div className="px-2 sm:px-4 py-3 border-b border-surface-border">
           <h2 className="text-sm font-semibold text-dark-200">Participants</h2>
         </div>
         <table className="min-w-full divide-y divide-surface-border">
           <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Checked In</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Court</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Step Before</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Step After</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-surface-muted">Finish</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Checked In</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Court</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Step Before</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Step After</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Finish</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">
             {participants.map((p) => (
               <tr key={p.id}>
-                <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-dark-100">
+                <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm font-medium text-dark-100">
                   {(p as any).player?.display_name ?? "Unknown"}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4">
+                <td className="whitespace-nowrap px-2 sm:px-4 py-3">
                   {p.checked_in ? (
                     <span className="badge-green">Yes</span>
                   ) : (
                     <span className="badge-gray">No</span>
                   )}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
+                <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
                   {p.court_number ?? "—"}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
+                <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
                   {p.step_before}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
+                <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
                   {p.step_after != null ? (
                     <span className={p.step_after < p.step_before ? "text-teal-300 font-medium" : p.step_after > p.step_before ? "text-red-400 font-medium" : ""}>
                       {p.step_after}
@@ -600,7 +700,7 @@ export default function AdminSessionDetailPage() {
                     "—"
                   )}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-dark-200">
+                <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
                   {p.pool_finish != null ? `${p.pool_finish}${["st","nd","rd"][p.pool_finish-1] ?? "th"}` : "—"}
                 </td>
               </tr>
