@@ -158,7 +158,7 @@ export function SheetCard({
       </div>
 
       {/* Row 2: Actions (sign up / withdraw) */}
-      {(isRegistered || (isOpen && !signupClosed)) && (
+      {(isRegistered || isOpen) && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
           {isRegistered ? (
             <>
@@ -175,6 +175,8 @@ export function SheetCard({
                 </button>
               )}
             </>
+          ) : signupClosed ? (
+            <span className="text-xs text-surface-muted">Sign-up closed</span>
           ) : (
             <button
               onClick={handleSignUp}

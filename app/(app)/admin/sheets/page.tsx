@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { formatShortDate } from "@/lib/utils";
 import type { SignupSheet } from "@/types/database";
+import { DeleteSheetButton } from "./delete-sheet-button";
 
 const statusBadge: Record<string, { className: string; label: string }> = {
   open: { className: "badge-green", label: "Open" },
@@ -140,6 +141,7 @@ export default async function AdminSheetsPage() {
                                   Cancel
                                 </Link>
                               )}
+                              <DeleteSheetButton sheetId={sheet.id} />
                             </div>
                           </td>
                         </tr>
