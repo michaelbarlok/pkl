@@ -88,53 +88,75 @@ export default async function SheetsPage() {
           No sign-up sheets available yet.
         </div>
       ) : (
-        <div className="space-y-3">
-          {sortedSheets.map((sheet: SignupSheet & { group?: { id: string; name: string; slug: string } }) => {
-            const badge = statusBadge[sheet.status] ?? statusBadge.closed;
-            const registered = countMap[sheet.id] ?? 0;
-            const myStatus = myRegMap[sheet.id];
-            const isOpen = sheet.status === "open";
-            const signupClosed = new Date(sheet.signup_closes_at) < new Date();
+        <>
+          {(() => {
+            const activeSheets = sortedSheets.filter((s) => s.status !== "cancelled");
+            const cancelledSheets = sortedSheets.filter((s) => s.status === "cancelled");
+
+            const renderCard = (sheet: SignupSheet & { group?: { id: string; name: string; slug: string } }) => {
+              const badge = statusBadge[sheet.status] ?? statusBadge.closed;
+              const registered = countMap[sheet.id] ?? 0;
+              const myStatus = myRegMap[sheet.id];
+              const isOpen = sheet.status === "open";
+              const signupClosed = new Date(sheet.signup_closes_at) < new Date();
+
+              return (
+                <div
+                  key={sheet.id}
+                  className="card flex items-center justify-between hover:ring-brand-500/30 transition-shadow"
+                >
+                  <Link
+                    href={`/sheets/${sheet.id}`}
+                    className="min-w-0 flex-1"
+                  >
+                    <div className="flex items-center gap-3">
+                      <p className="font-semibold text-dark-100">
+                        {sheet.group?.name ?? "Event"}
+                      </p>
+                      <span className={badge.className}>{badge.label}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-surface-muted">
+                      <span>{formatDate(sheet.event_date)}</span>
+                      <span>{sheet.location}</span>
+                    </div>
+                  </Link>
+                  <div className="ml-4 flex items-center gap-3 shrink-0">
+                    <div className="text-right text-sm text-surface-muted">
+                      <span className="font-medium text-dark-100">
+                        {registered}
+                      </span>
+                      /{sheet.player_limit} players
+                    </div>
+                    {myStatus ? (
+                      <span className={myStatus === "confirmed" ? "badge-green" : "badge-yellow"}>
+                        {myStatus === "confirmed" ? "Signed Up" : "Waitlisted"}
+                      </span>
+                    ) : isOpen && !signupClosed ? (
+                      <QuickSignUp sheetId={sheet.id} />
+                    ) : null}
+                  </div>
+                </div>
+              );
+            };
 
             return (
-              <div
-                key={sheet.id}
-                className="card flex items-center justify-between hover:ring-brand-500/30 transition-shadow"
-              >
-                <Link
-                  href={`/sheets/${sheet.id}`}
-                  className="min-w-0 flex-1"
-                >
-                  <div className="flex items-center gap-3">
-                    <p className="font-semibold text-dark-100">
-                      {sheet.group?.name ?? "Event"}
-                    </p>
-                    <span className={badge.className}>{badge.label}</span>
+              <div className="space-y-6">
+                {activeSheets.length > 0 && (
+                  <div className="space-y-3">
+                    <h2 className="text-lg font-semibold text-dark-100">Active</h2>
+                    {activeSheets.map(renderCard)}
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-surface-muted">
-                    <span>{formatDate(sheet.event_date)}</span>
-                    <span>{sheet.location}</span>
+                )}
+                {cancelledSheets.length > 0 && (
+                  <div className="space-y-3">
+                    <h2 className="text-lg font-semibold text-surface-muted">Cancelled</h2>
+                    {cancelledSheets.map(renderCard)}
                   </div>
-                </Link>
-                <div className="ml-4 flex items-center gap-3 shrink-0">
-                  <div className="text-right text-sm text-surface-muted">
-                    <span className="font-medium text-dark-100">
-                      {registered}
-                    </span>
-                    /{sheet.player_limit} players
-                  </div>
-                  {myStatus ? (
-                    <span className={myStatus === "confirmed" ? "badge-green" : "badge-yellow"}>
-                      {myStatus === "confirmed" ? "Signed Up" : "Waitlisted"}
-                    </span>
-                  ) : isOpen && !signupClosed ? (
-                    <QuickSignUp sheetId={sheet.id} />
-                  ) : null}
-                </div>
+                )}
               </div>
             );
-          })}
-        </div>
+          })()}
+        </>
       )}
     </div>
   );
