@@ -40,7 +40,6 @@ export function AppNav({ profile }: { profile: Profile }) {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <img src="/pkl-logo.png" alt="PKL" className="h-10 w-auto" />
-            <span className="text-lg font-bold text-dark-600">PKL</span>
           </Link>
 
           {/* Navigation */}

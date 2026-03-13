@@ -228,21 +228,18 @@ export default async function SheetDetailPage({
         <AdminAddMember sheetId={sheet.id} members={availableMembers} />
       )}
 
-      {/* Confirmed Players */}
+      {/* Players */}
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Confirmed Players ({confirmed.length})
-          </h2>
-          <Link
-            href={`/sheets/${id}/roster`}
-            className="text-sm text-brand-600 hover:text-brand-500"
-          >
-            View full roster
-          </Link>
-        </div>
-        {confirmed.length > 0 ? (
-          <div className="card divide-y divide-gray-100">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">
+          Players ({confirmed.length}/{sheet.player_limit})
+          {waitlisted.length > 0 && (
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              +{waitlisted.length} waitlisted
+            </span>
+          )}
+        </h2>
+        {confirmed.length > 0 || waitlisted.length > 0 ? (
+          <div className="card divide-y divide-gray-100 max-h-[32rem] overflow-y-auto">
             {confirmed.map((reg: Registration & { player?: Profile }) => (
               <div
                 key={reg.id}
@@ -269,51 +266,49 @@ export default async function SheetDetailPage({
                 )}
               </div>
             ))}
+            {waitlisted.length > 0 && (
+              <>
+                <div className="py-2">
+                  <span className="text-xs font-medium uppercase text-gray-400">
+                    Waitlist
+                  </span>
+                </div>
+                {waitlisted.map(
+                  (reg: Registration & { player?: Profile }, idx: number) => (
+                    <div
+                      key={reg.id}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <span className="text-sm font-medium text-gray-400 w-6 text-right">
+                        {idx + 1}.
+                      </span>
+                      {reg.player?.avatar_url ? (
+                        <img
+                          src={reg.player.avatar_url}
+                          alt=""
+                          className="h-8 w-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600">
+                          {reg.player?.display_name?.charAt(0) ?? "?"}
+                        </div>
+                      )}
+                      <span className="text-gray-900">
+                        {reg.player?.display_name ?? "Unknown"}
+                      </span>
+                      <span className="badge-yellow text-xs">Waitlisted</span>
+                    </div>
+                  )
+                )}
+              </>
+            )}
           </div>
         ) : (
           <div className="card text-center text-gray-500">
-            No confirmed players yet.
+            No players signed up yet.
           </div>
         )}
       </section>
-
-      {/* Waitlist */}
-      {waitlisted.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">
-            Waitlist ({waitlisted.length})
-          </h2>
-          <div className="card divide-y divide-gray-100">
-            {waitlisted.map(
-              (reg: Registration & { player?: Profile }, idx: number) => (
-                <div
-                  key={reg.id}
-                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                >
-                  <span className="text-sm font-medium text-gray-400 w-6 text-right">
-                    {idx + 1}.
-                  </span>
-                  {reg.player?.avatar_url ? (
-                    <img
-                      src={reg.player.avatar_url}
-                      alt=""
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600">
-                      {reg.player?.display_name?.charAt(0) ?? "?"}
-                    </div>
-                  )}
-                  <span className="text-gray-900">
-                    {reg.player?.display_name ?? "Unknown"}
-                  </span>
-                  <span className="badge-yellow text-xs">Waitlisted</span>
-                </div>
-              )
-            )}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { sendInviteEmail } from "./send-email";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -87,6 +88,13 @@ export async function POST(request: NextRequest) {
         { error: profileError.message },
         { status: 500 }
       );
+    }
+
+    // Send invite email via Resend
+    try {
+      await sendInviteEmail(email, displayName);
+    } catch (err) {
+      console.error("Failed to send invite email:", err);
     }
 
     return NextResponse.json({ profile }, { status: 201 });

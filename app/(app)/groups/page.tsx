@@ -8,12 +8,16 @@ export default async function GroupsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Get current player's profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user!.id)
-    .single();
+  // Get current player's profile (may be null for unauthenticated visitors)
+  let profile: { id: string } | null = null;
+  if (user) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+    profile = data;
+  }
 
   // Fetch all active groups with member counts
   const { data: groups } = await supabase
@@ -23,12 +27,14 @@ export default async function GroupsPage() {
     .order("name", { ascending: true });
 
   // Fetch current user's memberships to mark joined groups
-  const { data: myMemberships } = await supabase
-    .from("group_memberships")
-    .select("group_id")
-    .eq("player_id", profile!.id);
-
-  const joinedGroupIds = new Set(myMemberships?.map((m) => m.group_id) ?? []);
+  let joinedGroupIds = new Set<string>();
+  if (profile) {
+    const { data: myMemberships } = await supabase
+      .from("group_memberships")
+      .select("group_id")
+      .eq("player_id", profile.id);
+    joinedGroupIds = new Set(myMemberships?.map((m) => m.group_id) ?? []);
+  }
 
   return (
     <div className="space-y-6">
