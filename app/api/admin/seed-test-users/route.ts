@@ -17,7 +17,11 @@ const LAST_NAMES = [
   "Perez", "Roberts", "Turner", "Phillips", "Campbell", "Parker", "Evans", "Edwards",
 ];
 
-export async function POST() {
+export async function POST(request: Request) {
+  const url = new URL(request.url);
+  const querySheetId = url.searchParams.get("sheetId");
+  const body = await request.json().catch(() => ({}));
+  const sheetId = querySheetId || body.sheetId;
   const supabase = await createClient();
 
   // Verify admin
@@ -40,17 +44,39 @@ export async function POST() {
   }
   const serviceClient = await createServiceClient();
 
-  // Find the open sheet
-  const { data: sheet } = await serviceClient
-    .from("signup_sheets")
-    .select("id, player_limit, group_id")
-    .eq("status", "open")
-    .order("event_date", { ascending: true })
-    .limit(1)
-    .single();
+  // Find the sheet — use provided sheetId or fall back to first open sheet
+  let sheet: { id: string; player_limit: number; group_id: string } | null = null;
+
+  if (sheetId) {
+    const { data } = await serviceClient
+      .from("signup_sheets")
+      .select("id, player_limit, group_id")
+      .eq("id", sheetId)
+      .single();
+    sheet = data;
+  } else {
+    const { data } = await serviceClient
+      .from("signup_sheets")
+      .select("id, player_limit, group_id")
+      .eq("status", "open")
+      .order("event_date", { ascending: true })
+      .limit(1)
+      .single();
+    sheet = data;
+  }
 
   if (!sheet) {
-    return NextResponse.json({ error: "No open sheet found" }, { status: 404 });
+    // Debug: list all sheets to understand why lookup failed
+    const { data: allSheets, error: debugErr } = await serviceClient
+      .from("signup_sheets")
+      .select("id, status, player_limit, group_id")
+      .limit(5);
+    return NextResponse.json({
+      error: "Sheet not found",
+      version: "v4",
+      sheetIdUsed: sheetId || null,
+      debug: { allSheets, debugErr: debugErr?.message },
+    }, { status: 404 });
   }
 
   // Create 39 test profiles
