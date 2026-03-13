@@ -69,6 +69,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sheet not found" }, { status: 404 });
   }
 
+  // Clean up any existing test users first (makes this idempotent)
+  const { data: existingTest } = await serviceClient
+    .from("profiles")
+    .select("id, user_id")
+    .like("display_name", "[TEST]%");
+
+  if (existingTest && existingTest.length > 0) {
+    const existingIds = existingTest.map((p) => p.id);
+    const existingAuthIds = existingTest.map((p) => p.user_id).filter(Boolean);
+
+    await serviceClient.from("registrations").delete().in("player_id", existingIds);
+    await serviceClient.from("group_memberships").delete().in("player_id", existingIds);
+    await serviceClient.from("profiles").delete().in("id", existingIds);
+
+    for (const authId of existingAuthIds) {
+      await serviceClient.auth.admin.deleteUser(authId);
+    }
+  }
+
+  // Also clean up any orphaned test auth users (created but no profile)
+  const { data: authUsers } = await serviceClient.auth.admin.listUsers({ perPage: 1000 });
+  if (authUsers?.users) {
+    for (const u of authUsers.users) {
+      if (u.email?.endsWith("@test.local")) {
+        await serviceClient.auth.admin.deleteUser(u.id);
+      }
+    }
+  }
+
   // Create 39 test auth users and profiles
   const createdUserIds: string[] = [];
   const metadata: { step: number; pct: number }[] = [];
