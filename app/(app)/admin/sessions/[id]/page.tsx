@@ -59,6 +59,8 @@ export default function AdminSessionDetailPage() {
     fetch();
   }, [id, supabase]);
 
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
+
   async function advanceStatus() {
     if (!session) return;
     const currentIdx = LIFECYCLE_ORDER.indexOf(session.status as typeof LIFECYCLE_ORDER[number]);
@@ -66,18 +68,26 @@ export default function AdminSessionDetailPage() {
     const nextStatus = LIFECYCLE_ORDER[currentIdx + 1];
 
     setUpdating(true);
+    setAdvanceError(null);
 
-    // On round_complete → call step update function
+    // round_active → round_complete: use complete-round API
+    // (validates all scores, computes pool_finish, updates win_pct/steps/target_courts)
     if (nextStatus === "round_complete") {
-      await supabase.rpc("update_steps_on_round_complete", { p_session_id: id });
+      const res = await fetch(`/api/sessions/${id}/complete-round`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setAdvanceError(data.error ?? "Failed to complete round");
+        setUpdating(false);
+        return;
+      }
+    } else {
+      await supabase
+        .from("shootout_sessions")
+        .update({ status: nextStatus })
+        .eq("id", id);
     }
 
-    await supabase
-      .from("shootout_sessions")
-      .update({ status: nextStatus })
-      .eq("id", id);
-
-    // Re-fetch participants to pick up step_after changes
+    // Re-fetch participants to pick up step_after / pool_finish changes
     const { data: refreshed } = await supabase
       .from("session_participants")
       .select("*, player:profiles(id, display_name, avatar_url)")
@@ -237,6 +247,9 @@ export default function AdminSessionDetailPage() {
           )}
           {session.status === "session_complete" && (
             <span className="badge-green text-sm">Session Complete</span>
+          )}
+          {advanceError && (
+            <span className="text-sm text-red-400">{advanceError}</span>
           )}
           <button
             onClick={deleteSession}

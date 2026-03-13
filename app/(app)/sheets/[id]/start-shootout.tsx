@@ -46,6 +46,33 @@ export function StartShootout({
     setError(null);
 
     try {
+      // Check for a previous completed session on the same sheet
+      const { data: prevSessions } = await supabase
+        .from("shootout_sessions")
+        .select("id")
+        .eq("sheet_id", sheetId)
+        .eq("group_id", groupId)
+        .in("status", ["session_complete", "round_complete"])
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const prevSessionId = prevSessions?.[0]?.id ?? null;
+      const isContinuation = prevSessionId != null;
+
+      // If continuing, fetch target_court_next from previous session
+      let targetCourtMap = new Map<string, number>();
+      if (isContinuation) {
+        const { data: prevParticipants } = await supabase
+          .from("session_participants")
+          .select("player_id, target_court_next")
+          .eq("session_id", prevSessionId)
+          .not("target_court_next", "is", null);
+
+        for (const pp of prevParticipants ?? []) {
+          targetCourtMap.set(pp.player_id, pp.target_court_next!);
+        }
+      }
+
       const { data: session, error: sessionErr } = await supabase
         .from("shootout_sessions")
         .insert({
@@ -54,7 +81,8 @@ export function StartShootout({
           status: "created",
           num_courts: numCourts,
           current_round: 0,
-          is_same_day_continuation: false,
+          is_same_day_continuation: isContinuation,
+          prev_session_id: prevSessionId,
         })
         .select()
         .single();
@@ -81,6 +109,7 @@ export function StartShootout({
         player_id: playerId,
         checked_in: false,
         step_before: stepMap.get(playerId) ?? 1,
+        target_court_next: targetCourtMap.get(playerId) ?? null,
       }));
 
       if (participants.length > 0) {

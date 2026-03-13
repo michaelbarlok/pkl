@@ -130,6 +130,7 @@ export default function CheckInPage() {
     setSeedError(null);
 
     const checkedIn = participants.filter((p) => p.checked_in);
+    const unchecked = participants.filter((p) => !p.checked_in);
 
     if (checkedIn.length === 0) {
       setSeeding(false);
@@ -137,6 +138,19 @@ export default function CheckInPage() {
     }
 
     try {
+      // Remove unchecked players from the session
+      if (unchecked.length > 0) {
+        await Promise.all(
+          unchecked.map((p) =>
+            supabase
+              .from("session_participants")
+              .delete()
+              .eq("id", p.id)
+          )
+        );
+        setParticipants((prev) => prev.filter((p) => p.checked_in));
+      }
+
       let positions;
 
       const isSessionContinuation = session.is_same_day_continuation && session.prev_session_id;
