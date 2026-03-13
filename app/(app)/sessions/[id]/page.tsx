@@ -178,48 +178,65 @@ export default function PlayerSessionPage() {
   const [myCourt, setMyCourt] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  // Refetch all data — called on mount and when returning to this page
+  async function refetchAll() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
 
-      if (profile) setMyPlayerId(profile.id);
+    if (profile) setMyPlayerId(profile.id);
 
-      const { data: sess } = await supabase
-        .from("shootout_sessions")
-        .select("*, group:shootout_groups(name), sheet:signup_sheets(event_date, location)")
-        .eq("id", sessionId)
-        .single();
-      setSession(sess as any);
+    const { data: sess } = await supabase
+      .from("shootout_sessions")
+      .select("*, group:shootout_groups(name), sheet:signup_sheets(event_date, location)")
+      .eq("id", sessionId)
+      .single();
+    setSession(sess as any);
 
-      const { data: parts } = await supabase
-        .from("session_participants")
-        .select("*, player:profiles(display_name, avatar_url)")
-        .eq("session_id", sessionId)
-        .order("court_number", { ascending: true });
+    const { data: parts } = await supabase
+      .from("session_participants")
+      .select("*, player:profiles(display_name, avatar_url)")
+      .eq("session_id", sessionId)
+      .order("court_number", { ascending: true });
 
-      if (parts) {
-        setParticipants(parts as any);
-        const me = parts.find((p: any) => p.player_id === profile?.id);
-        if (me) setMyCourt((me as any).court_number);
-      }
-
-      const { data: gameScores } = await supabase
-        .from("game_results")
-        .select("*")
-        .eq("session_id", sessionId)
-        .order("created_at");
-      setScores(gameScores ?? []);
-
-      setLoading(false);
+    if (parts) {
+      setParticipants(parts as any);
+      const me = parts.find((p: any) => p.player_id === profile?.id);
+      if (me) setMyCourt((me as any).court_number);
     }
-    fetchData();
+
+    const { data: gameScores } = await supabase
+      .from("game_results")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("created_at");
+    setScores(gameScores ?? []);
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    refetchAll();
+  }, [sessionId, supabase]);
+
+  // Refetch when returning to this page (back navigation, tab switch)
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === "visible") {
+        refetchAll();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", refetchAll);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", refetchAll);
+    };
   }, [sessionId, supabase]);
 
   // Realtime subscriptions

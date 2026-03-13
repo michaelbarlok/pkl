@@ -163,6 +163,7 @@ export default function ScoreEntryPage() {
       setSubmitting(false);
     } else {
       router.push(`/sessions/${sessionId}`);
+      router.refresh();
     }
   }
 
