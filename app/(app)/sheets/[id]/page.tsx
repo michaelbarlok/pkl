@@ -48,7 +48,8 @@ export default async function SheetDetailPage({
       .from("registrations")
       .select("*, player:profiles!registrations_player_id_fkey(*)")
       .eq("sheet_id", id)
-      .in("status", ["confirmed", "waitlist"]);
+      .in("status", ["confirmed", "waitlist"])
+      .order("signed_up_at", { ascending: true });
 
     if (regError) {
       // Fallback: query without join, then fetch profiles separately
@@ -57,7 +58,8 @@ export default async function SheetDetailPage({
         .from("registrations")
         .select("*")
         .eq("sheet_id", id)
-        .in("status", ["confirmed", "waitlist"]);
+        .in("status", ["confirmed", "waitlist"])
+        .order("signed_up_at", { ascending: true });
 
       if (plainRegs && plainRegs.length > 0) {
         const playerIds = plainRegs.map((r) => r.player_id);
