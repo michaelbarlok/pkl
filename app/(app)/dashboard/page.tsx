@@ -30,6 +30,17 @@ export default async function DashboardPage() {
     .order("event_date", { ascending: true })
     .limit(5);
 
+  // Fetch tournaments the player is registered for (upcoming, not completed/cancelled)
+  const { data: myTournamentRegs } = await supabase
+    .from("tournament_registrations")
+    .select("tournament_id, division, status, tournament:tournaments(id, title, start_date, start_time, location, status)")
+    .eq("player_id", profile.id)
+    .neq("status", "withdrawn");
+
+  const upcomingTournaments = (myTournamentRegs ?? [])
+    .filter((r: any) => r.tournament && !["completed", "cancelled"].includes(r.tournament.status))
+    .sort((a: any, b: any) => a.tournament.start_date.localeCompare(b.tournament.start_date));
+
   // Fetch active session (player is checked in, session is not complete)
   const { data: activeParticipant } = await supabase
     .from("session_participants")
@@ -90,7 +101,7 @@ export default async function DashboardPage() {
         <div className="card">
           <p className="text-sm text-surface-muted">Upcoming Events</p>
           <p className="mt-1 text-2xl font-bold text-dark-100">
-            {sheets?.length ?? 0}
+            {(sheets?.length ?? 0) + upcomingTournaments.length}
           </p>
         </div>
         <div className="card">
@@ -141,7 +152,7 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {/* Upcoming Sign-Up Sheets */}
+      {/* Upcoming Events */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-dark-100">Upcoming Events</h2>
@@ -149,9 +160,38 @@ export default async function DashboardPage() {
             View all sheets
           </Link>
         </div>
-        {sheets && sheets.length > 0 ? (
+        {((sheets && sheets.length > 0) || upcomingTournaments.length > 0) ? (
           <div className="space-y-3">
-            {sheets.map((sheet) => (
+            {/* Tournaments I'm registered for */}
+            {upcomingTournaments.map((reg: any) => (
+              <Link
+                key={reg.tournament_id}
+                href={`/tournaments/${reg.tournament_id}`}
+                className="card flex items-center justify-between hover:ring-brand-500/30 transition-shadow"
+              >
+                <div>
+                  <p className="font-medium text-dark-100">
+                    {reg.tournament.title}
+                  </p>
+                  <p className="text-sm text-surface-muted">
+                    {new Date(reg.tournament.start_date + "T00:00:00").toLocaleDateString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                    {reg.tournament.start_time && ` at ${reg.tournament.start_time.slice(0, 5)}`}
+                    {" — "}
+                    {reg.tournament.location}
+                  </p>
+                </div>
+                <span className={reg.status === "confirmed" ? "badge-green" : "badge-yellow"}>
+                  {reg.status === "confirmed" ? "Registered" : "Waitlist"}
+                </span>
+              </Link>
+            ))}
+
+            {/* Signup sheets */}
+            {sheets?.map((sheet) => (
               <Link
                 key={sheet.id}
                 href={`/sheets/${sheet.id}`}
