@@ -1,0 +1,70 @@
+import Link from "next/link";
+
+export function LandingFooter() {
+  return (
+    <footer className="border-t border-surface-border bg-dark-950">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
+          {/* Brand */}
+          <div className="space-y-3">
+            <img src="/pkl-logo.png" alt="PKL" className="h-8 w-auto" />
+            <p className="text-sm text-dark-300">
+              Your pickleball community, all in one place.
+            </p>
+          </div>
+
+          {/* Product */}
+          <div>
+            <h3 className="text-sm font-semibold text-dark-100">Product</h3>
+            <ul className="mt-3 space-y-2">
+              <li>
+                <a href="#features" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                  Features
+                </a>
+              </li>
+              <li>
+                <a href="#signup-sheets" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                  Sign-Up Sheets
+                </a>
+              </li>
+              <li>
+                <a href="#rankings" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                  Rankings
+                </a>
+              </li>
+              <li>
+                <a href="#tournaments" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                  Tournaments
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Company */}
+          <div>
+            <h3 className="text-sm font-semibold text-dark-100">Company</h3>
+            <ul className="mt-3 space-y-2">
+              <li>
+                <Link href="/contact" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                  Contact Us
+                </Link>
+              </li>
+              <li>
+                <a href="mailto:info@pkl-ball.app" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                  info@pkl-ball.app
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="mt-10 border-t border-surface-border/50 pt-6">
+          <p className="text-xs text-dark-400 text-center">
+            &copy; {new Date().getFullYear()} PKL. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+}

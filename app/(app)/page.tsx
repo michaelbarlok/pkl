@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { LandingFooter } from "./landing-footer";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -40,9 +41,18 @@ export default async function HomePage() {
       </section>
 
       {/* ── Feature Showcase ── */}
-      <section className="space-y-12 max-w-4xl mx-auto">
+      <section id="features" className="space-y-12 max-w-4xl mx-auto scroll-mt-24">
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold text-dark-100 sm:text-3xl tracking-tight">
+            Everything you need to run your pickleball community
+          </h2>
+          <p className="text-dark-300 max-w-2xl mx-auto">
+            From casual shootouts to competitive tournaments — all managed in one place.
+          </p>
+        </div>
+
         {/* Signup Sheets */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+        <div id="signup-sheets" className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center scroll-mt-24">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-900/50">
@@ -87,7 +97,7 @@ export default async function HomePage() {
         </div>
 
         {/* Rankings */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+        <div id="rankings" className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center scroll-mt-24">
           <div className="order-2 sm:order-1 card p-0 overflow-hidden">
             <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
               <p className="text-xs font-medium uppercase text-surface-muted">Rankings</p>
@@ -172,7 +182,7 @@ export default async function HomePage() {
         </div>
 
         {/* Tournaments */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+        <div id="tournaments" className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center scroll-mt-24">
           <div className="order-2 sm:order-1 card p-0 overflow-hidden">
             <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
               <p className="text-xs font-medium uppercase text-surface-muted">Upcoming Tournaments</p>
@@ -290,6 +300,9 @@ export default async function HomePage() {
           )}
         </div>
       </section>
+
+      {/* ── Footer (always visible, even for authenticated users) ── */}
+      <LandingFooter />
     </div>
   );
 }

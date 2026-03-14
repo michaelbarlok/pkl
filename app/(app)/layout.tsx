@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppNav } from "./nav";
 import { MobileNav } from "./mobile-nav";
 import { MissingProfile } from "./missing-profile";
+import { LandingNav } from "./landing-nav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -13,8 +14,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // individual pages handle the no-user case (e.g. landing page at /).
   if (!user) {
     return (
-      <div className="min-h-screen bg-dark-950">
-        <main className="mx-auto max-w-7xl px-3 py-4 pb-20 sm:px-6 md:pb-6 lg:px-8">
+      <div className="min-h-screen bg-dark-950 flex flex-col">
+        <LandingNav />
+        <main className="flex-1 mx-auto w-full max-w-7xl px-3 pt-20 pb-8 sm:px-6 lg:px-8">
           {children}
         </main>
       </div>
