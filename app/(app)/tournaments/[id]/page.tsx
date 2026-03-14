@@ -2,7 +2,8 @@ import { getTournament, getTournamentRegistrations, getTournamentMatches, getMyR
 import { createClient } from "@/lib/supabase/server";
 import { TournamentRegistrationButton } from "@/components/tournament-registration";
 import { TournamentBracketView } from "@/components/tournament-bracket";
-import { groupDivisionsByGender, getDivisionLabel } from "@/lib/divisions";
+import { DivisionReview } from "@/components/division-review";
+import { getDivisionLabel } from "@/lib/divisions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -57,6 +58,24 @@ export default async function TournamentDetailPage({
 
   const confirmedRegistrations = registrations.filter((r) => r.status === "confirmed");
   const waitlistRegistrations = registrations.filter((r) => r.status === "waitlist");
+
+  // Compute per-division player counts for the review panel
+  const divisionCounts = (tournament.divisions ?? []).map((code: string) => {
+    const divRegs = confirmedRegistrations.filter((r: any) => r.division === code);
+    return {
+      division: code,
+      count: divRegs.length,
+      playerNames: divRegs.map((r: any) => r.player?.display_name ?? "Unknown"),
+    };
+  }).filter((d) => d.count > 0);
+
+  // Group matches by division for display
+  const divisionMatches = new Map<string, typeof matches>();
+  for (const m of matches) {
+    const div = (m as any).division ?? "__none__";
+    if (!divisionMatches.has(div)) divisionMatches.set(div, []);
+    divisionMatches.get(div)!.push(m);
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -172,23 +191,57 @@ export default async function TournamentDetailPage({
 
       {/* Organizer Controls */}
       {canManage && tournament.status !== "cancelled" && (
-        <OrganizerControls
-          tournamentId={id}
-          status={tournament.status}
-          registrationCount={confirmedRegistrations.length}
-        />
+        <>
+          {/* Division Review (shown when registration is closed, before bracket generation) */}
+          {tournament.status === "registration_closed" && (
+            <DivisionReview
+              tournamentId={id}
+              divisions={divisionCounts}
+            />
+          )}
+
+          {/* Simple status controls for non-bracket transitions */}
+          <OrganizerControls
+            tournamentId={id}
+            status={tournament.status}
+          />
+        </>
       )}
 
-      {/* Bracket / Matches */}
+      {/* Brackets by Division */}
       {matches.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold text-dark-100 mb-3">Bracket</h2>
-          <TournamentBracketView
-            matches={matches}
-            format={tournament.format}
-            canManage={canManage}
-            tournamentId={id}
-          />
+        <div className="space-y-8">
+          {/* Division jump nav */}
+          {divisionMatches.size > 1 && (
+            <div>
+              <h2 className="text-lg font-semibold text-dark-100 mb-3">Brackets</h2>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(divisionMatches.keys()).map((div) => (
+                  <a
+                    key={div}
+                    href={`#division-${div}`}
+                    className="rounded-full px-3 py-1 text-xs font-medium bg-surface-overlay text-surface-muted hover:text-dark-200 hover:bg-surface-raised transition-colors"
+                  >
+                    {div === "__none__" ? "All" : getDivisionLabel(div)}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {Array.from(divisionMatches.entries()).map(([div, divMatches]) => (
+            <div key={div} id={`division-${div}`}>
+              <h2 className="text-lg font-semibold text-dark-100 mb-3">
+                {div === "__none__" ? "Bracket" : getDivisionLabel(div)}
+              </h2>
+              <TournamentBracketView
+                matches={divMatches}
+                format={tournament.format}
+                canManage={canManage}
+                tournamentId={id}
+              />
+            </div>
+          ))}
         </div>
       )}
 
@@ -275,40 +328,34 @@ export default async function TournamentDetailPage({
 function OrganizerControls({
   tournamentId,
   status,
-  registrationCount,
 }: {
   tournamentId: string;
   status: string;
-  registrationCount: number;
 }) {
-  const nextAction: Record<string, { label: string; next: string; generateBracket?: boolean }> = {
+  // registration_closed is handled by DivisionReview above
+  const nextAction: Record<string, { label: string; next: string }> = {
     draft: { label: "Open Registration", next: "registration_open" },
     registration_open: { label: "Close Registration", next: "registration_closed" },
-    registration_closed: { label: "Generate Bracket & Start", next: "in_progress", generateBracket: true },
     in_progress: { label: "Mark Complete", next: "completed" },
   };
 
   const action = nextAction[status];
-  if (!action) return null;
+  const showCancel = status !== "completed" && status !== "registration_closed";
+
+  if (!action && !showCancel) return null;
 
   return (
     <div className="card">
       <h2 className="text-sm font-semibold text-dark-200 mb-3">Organizer Controls</h2>
       <div className="flex flex-wrap gap-2">
-        {action.generateBracket ? (
-          <GenerateBracketButton
-            tournamentId={tournamentId}
-            label={action.label}
-            disabled={registrationCount < 2}
-          />
-        ) : (
+        {action && (
           <StatusAdvanceButton
             tournamentId={tournamentId}
             nextStatus={action.next}
             label={action.label}
           />
         )}
-        {status !== "completed" && (
+        {showCancel && (
           <StatusAdvanceButton
             tournamentId={tournamentId}
             nextStatus="cancelled"
@@ -318,118 +365,6 @@ function OrganizerControls({
         )}
       </div>
     </div>
-  );
-}
-
-function GenerateBracketButton({
-  tournamentId,
-  label,
-  disabled,
-}: {
-  tournamentId: string;
-  label: string;
-  disabled: boolean;
-}) {
-  async function generateBracket() {
-    "use server";
-    const { createClient } = await import("@/lib/supabase/server");
-    const supabase = await createClient();
-    const {
-      generateSingleElimination,
-      generateDoubleElimination,
-      generateRoundRobin,
-    } = await import("@/lib/tournament-bracket");
-
-    // Fetch tournament
-    const { data: tournament } = await supabase
-      .from("tournaments")
-      .select("format, status")
-      .eq("id", tournamentId)
-      .single();
-
-    if (!tournament || tournament.status !== "registration_closed") return;
-
-    // Fetch confirmed registrations
-    const { data: registrations } = await supabase
-      .from("tournament_registrations")
-      .select("player_id, seed")
-      .eq("tournament_id", tournamentId)
-      .eq("status", "confirmed")
-      .order("seed", { ascending: true, nullsFirst: false })
-      .order("registered_at", { ascending: true });
-
-    if (!registrations || registrations.length < 2) return;
-
-    const playerIds = registrations.map((r) => r.player_id);
-
-    // Generate bracket
-    let bracketMatches;
-    switch (tournament.format) {
-      case "single_elimination":
-        bracketMatches = generateSingleElimination(playerIds);
-        break;
-      case "double_elimination":
-        bracketMatches = generateDoubleElimination(playerIds);
-        break;
-      case "round_robin":
-        bracketMatches = generateRoundRobin(playerIds);
-        break;
-      default:
-        return;
-    }
-
-    // Delete existing matches
-    await supabase
-      .from("tournament_matches")
-      .delete()
-      .eq("tournament_id", tournamentId);
-
-    // Insert matches
-    const matchInserts = bracketMatches.map((m) => ({
-      tournament_id: tournamentId,
-      round: m.round,
-      match_number: m.match_number,
-      bracket: m.bracket,
-      player1_id: m.player1_id,
-      player2_id: m.player2_id,
-      status: m.status,
-      score1: [],
-      score2: [],
-    }));
-
-    await supabase.from("tournament_matches").insert(matchInserts);
-
-    // Auto-advance byes
-    const byeMatches = bracketMatches.filter((m) => m.status === "bye");
-    for (const bye of byeMatches) {
-      const winnerId = bye.player1_id || bye.player2_id;
-      if (winnerId) {
-        await supabase
-          .from("tournament_matches")
-          .update({ winner_id: winnerId, status: "completed" })
-          .eq("tournament_id", tournamentId)
-          .eq("round", bye.round)
-          .eq("match_number", bye.match_number)
-          .eq("bracket", bye.bracket);
-      }
-    }
-
-    // Advance status
-    await supabase
-      .from("tournaments")
-      .update({ status: "in_progress" })
-      .eq("id", tournamentId);
-
-    const { revalidatePath } = await import("next/cache");
-    revalidatePath(`/tournaments/${tournamentId}`);
-  }
-
-  return (
-    <form action={generateBracket}>
-      <button type="submit" className="btn-primary" disabled={disabled}>
-        {label}
-      </button>
-    </form>
   );
 }
 

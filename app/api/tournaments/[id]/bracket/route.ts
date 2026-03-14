@@ -201,22 +201,26 @@ export async function PUT(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  // Auto-advance winner to next match in bracket
+  // Auto-advance winner to next match in bracket (scoped to same division)
   if (match.bracket === "winners" || match.bracket === "grand_final") {
-    // Find the next match slot
     const nextRound = match.round + 1;
     const nextMatchNumber = Math.ceil(match.match_number / 2);
     const slot = match.match_number % 2 === 1 ? "player1_id" : "player2_id";
 
-    // Check if there's a next round match in the same bracket
-    const { data: nextMatch } = await supabase
+    let nextMatchQuery = supabase
       .from("tournament_matches")
       .select("id")
       .eq("tournament_id", tournamentId)
       .eq("round", nextRound)
       .eq("match_number", nextMatchNumber)
-      .eq("bracket", match.bracket)
-      .single();
+      .eq("bracket", match.bracket);
+
+    // Scope to same division if set
+    if (match.division) {
+      nextMatchQuery = nextMatchQuery.eq("division", match.division);
+    }
+
+    const { data: nextMatch } = await nextMatchQuery.single();
 
     if (nextMatch) {
       await supabase
