@@ -68,8 +68,6 @@ export async function POST(request: NextRequest) {
     );
 
     if (!member || !member.player_id) continue;
-    // Don't notify the person who wrote the mention
-    if (member.player_id === mentionerProfileId) continue;
 
     await notify({
       userId: member.player_id,
