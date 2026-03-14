@@ -194,65 +194,61 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
       </div>
 
       {/* DUPR & USA Pickleball */}
-      {(profile.dupr_id || profile.dupr_singles_rating || profile.dupr_doubles_rating || profile.usap_member_id) && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {(profile.dupr_id || profile.dupr_singles_rating || profile.dupr_doubles_rating) && (
-            <div className="card">
-              <h3 className="text-sm font-semibold text-dark-100 mb-3">DUPR</h3>
-              <div className="space-y-2 text-sm">
-                {profile.dupr_id && (
-                  <div className="flex justify-between">
-                    <span className="text-surface-muted">ID</span>
-                    <span className="font-medium text-dark-100">{profile.dupr_id}</span>
-                  </div>
-                )}
-                {profile.dupr_singles_rating && (
-                  <div className="flex justify-between">
-                    <span className="text-surface-muted">Singles</span>
-                    <span className="inline-flex items-center rounded-md bg-brand-900/40 px-2 py-0.5 text-xs font-semibold text-brand-300">
-                      {profile.dupr_singles_rating}
-                    </span>
-                  </div>
-                )}
-                {profile.dupr_doubles_rating && (
-                  <div className="flex justify-between">
-                    <span className="text-surface-muted">Doubles</span>
-                    <span className="inline-flex items-center rounded-md bg-brand-900/40 px-2 py-0.5 text-xs font-semibold text-brand-300">
-                      {profile.dupr_doubles_rating}
-                    </span>
-                  </div>
-                )}
-              </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="card">
+          <h3 className="text-sm font-semibold text-dark-100 mb-3">DUPR</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-surface-muted">ID</span>
+              <span className="font-medium text-dark-100">{profile.dupr_id || "—"}</span>
             </div>
-          )}
-          {profile.usap_member_id && (
-            <div className="card">
-              <h3 className="text-sm font-semibold text-dark-100 mb-3">USA Pickleball</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-surface-muted">Member ID</span>
-                  <span className="font-medium text-dark-100">{profile.usap_member_id}</span>
-                </div>
-                {profile.usap_tier && (
-                  <div className="flex justify-between">
-                    <span className="text-surface-muted">Tier</span>
-                    <span className="font-medium text-dark-100">{profile.usap_tier}</span>
-                  </div>
-                )}
-                {profile.usap_expiration && (
-                  <div className="flex justify-between">
-                    <span className="text-surface-muted">Expires</span>
-                    <span className={`font-medium ${new Date(profile.usap_expiration) >= new Date() ? "text-teal-300" : "text-red-400"}`}>
-                      {new Date(profile.usap_expiration).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      {new Date(profile.usap_expiration) < new Date() && " (Expired)"}
-                    </span>
-                  </div>
-                )}
-              </div>
+            <div className="flex justify-between">
+              <span className="text-surface-muted">Singles</span>
+              {profile.dupr_singles_rating ? (
+                <span className="inline-flex items-center rounded-md bg-brand-900/40 px-2 py-0.5 text-xs font-semibold text-brand-300">
+                  {profile.dupr_singles_rating}
+                </span>
+              ) : (
+                <span className="font-medium text-dark-100">—</span>
+              )}
             </div>
-          )}
+            <div className="flex justify-between">
+              <span className="text-surface-muted">Doubles</span>
+              {profile.dupr_doubles_rating ? (
+                <span className="inline-flex items-center rounded-md bg-brand-900/40 px-2 py-0.5 text-xs font-semibold text-brand-300">
+                  {profile.dupr_doubles_rating}
+                </span>
+              ) : (
+                <span className="font-medium text-dark-100">—</span>
+              )}
+            </div>
+          </div>
         </div>
-      )}
+        <div className="card">
+          <h3 className="text-sm font-semibold text-dark-100 mb-3">USA Pickleball</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-surface-muted">Member ID</span>
+              <span className="font-medium text-dark-100">{profile.usap_member_id || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-surface-muted">Tier</span>
+              <span className="font-medium text-dark-100">{profile.usap_tier || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-surface-muted">Expires</span>
+              {profile.usap_expiration ? (
+                <span className={`font-medium ${new Date(profile.usap_expiration) >= new Date() ? "text-teal-300" : "text-red-400"}`}>
+                  {new Date(profile.usap_expiration).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {new Date(profile.usap_expiration) < new Date() && " (Expired)"}
+                </span>
+              ) : (
+                <span className="font-medium text-dark-100">—</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Group Memberships */}
       <section>

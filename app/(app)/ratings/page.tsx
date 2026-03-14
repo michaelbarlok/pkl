@@ -161,7 +161,7 @@ export default async function RatingsPage() {
               <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
               <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Step</th>
               <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Pct</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Last Active</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Last Played</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">
@@ -192,7 +192,7 @@ export default async function RatingsPage() {
                 <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4 text-sm text-dark-200">
                   {r.percentage > 0 ? `${r.percentage.toFixed(1)}%` : "—"}
                 </td>
-                <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4 text-sm text-surface-muted">
+                <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4 text-sm text-surface-muted">
                   {r.last_played_at
                     ? new Date(r.last_played_at).toLocaleDateString("en-US", {
                         month: "short",
