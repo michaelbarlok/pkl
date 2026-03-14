@@ -407,18 +407,13 @@ function MentionTextarea({
 
   function selectMember(member: { id: string; display_name: string }) {
     const before = value.slice(0, mentionStart);
-    const after = value.slice(
-      mentionStart + value.slice(mentionStart).indexOf(" ", 1) === "-1"
-        ? value.length
-        : value.length
-    );
-    // Find cursor position relative to mention
     const textAfterAt = value.slice(mentionStart + 1);
-    const nextSpace = textAfterAt.search(/[\n]/);
-    const endPos = nextSpace === -1 ? value.length : mentionStart + 1 + nextSpace;
+    const nextNewline = textAfterAt.search(/[\n]/);
+    const endPos = nextNewline === -1 ? value.length : mentionStart + 1 + nextNewline;
     const afterText = value.slice(endPos);
 
-    const newValue = `${before}@${member.display_name}${afterText.startsWith(" ") || afterText.startsWith("\n") || afterText === "" ? "" : " "}${afterText}`;
+    const spacer = afterText.startsWith(" ") || afterText.startsWith("\n") || afterText === "" ? "" : " ";
+    const newValue = `${before}@${member.display_name}${spacer}${afterText}`;
     onChange(newValue);
     setShowSuggestions(false);
   }
