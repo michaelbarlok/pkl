@@ -5,7 +5,7 @@ import type { Tournament, TournamentRegistration, TournamentMatch } from "@/type
 // Types
 // ============================================================
 
-export interface TournamentWithCounts extends Tournament {
+export interface TournamentWithCounts extends Omit<Tournament, 'creator'> {
   creator: { id: string; display_name: string; avatar_url: string | null };
   registration_count: number;
 }
