@@ -145,6 +145,7 @@ const EMAIL_TEMPLATES: Record<string, () => Promise<{ default: (props: any) => R
   ContactGroupAdmins: () => import("@/emails/ContactGroupAdmins"),
   MemberInvite: () => import("@/emails/MemberInvite"),
   ForumReply: () => import("@/emails/ForumReply"),
+  ForumMention: () => import("@/emails/ForumMention"),
   PoolAssigned: () => import("@/emails/PoolAssigned"),
   StepChanged: () => import("@/emails/StepChanged"),
 };

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -8,7 +9,7 @@ export async function POST(request: NextRequest) {
 
   const { data: thread } = await supabase
     .from("forum_threads")
-    .select("author_id, title")
+    .select("author_id, title, group_id")
     .eq("id", threadId)
     .single();
 
@@ -30,12 +31,25 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Get group slug for proper link
+  const serviceClient = await createServiceClient();
+  const { data: group } = await serviceClient
+    .from("shootout_groups")
+    .select("slug")
+    .eq("id", thread.group_id)
+    .single();
+
+  const link = group
+    ? `/groups/${group.slug}/forum/${threadId}`
+    : `/forum/${threadId}`;
+
   await notify({
     userId: thread.author_id,
     type: "forum_reply",
     title: "New reply to your thread",
     body: `Someone replied to "${thread.title}"`,
-    link: `/forum/${threadId}`,
+    link,
+    groupId: thread.group_id,
     emailTemplate: "ForumReply",
     emailData: { threadTitle: thread.title, threadId },
   });

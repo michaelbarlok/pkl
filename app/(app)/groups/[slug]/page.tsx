@@ -61,6 +61,14 @@ export default async function GroupPage({
           )}
         </div>
         <div className="flex items-center gap-3">
+          {isMember && (
+            <Link
+              href={`/groups/${slug}/forum`}
+              className="btn-secondary"
+            >
+              Forum
+            </Link>
+          )}
           {isMember ? (
             <span className="badge-green">Member</span>
           ) : (

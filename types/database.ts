@@ -35,6 +35,7 @@ export type NotificationType =
   | "step_changed"
   | "rating_updated"
   | "forum_reply"
+  | "forum_mention"
   | "invite_sent"
   | "tournament_registration"
   | "tournament_reminder"
@@ -242,6 +243,7 @@ export interface PlayerRating {
 export interface ForumThread {
   id: string;
   author_id: string;
+  group_id: string;
   title: string;
   body: string;
   pinned: boolean;
@@ -250,7 +252,9 @@ export interface ForumThread {
   updated_at: string;
   // Relations
   author?: Profile;
+  group?: ShootoutGroup;
   reply_count?: number;
+  poll?: ForumPoll;
 }
 
 export interface ForumReply {
@@ -261,6 +265,37 @@ export interface ForumReply {
   created_at: string;
   // Relations
   author?: Profile;
+}
+
+export interface ForumPoll {
+  id: string;
+  thread_id: string;
+  question: string;
+  anonymous: boolean;
+  created_at: string;
+  // Relations
+  options?: ForumPollOption[];
+}
+
+export interface ForumPollOption {
+  id: string;
+  poll_id: string;
+  label: string;
+  sort_order: number;
+  created_at: string;
+  // Relations
+  votes?: ForumPollVote[];
+  vote_count?: number;
+}
+
+export interface ForumPollVote {
+  id: string;
+  poll_id: string;
+  option_id: string;
+  voter_id: string;
+  created_at: string;
+  // Relations
+  voter?: Profile;
 }
 
 // ============================================================
