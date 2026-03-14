@@ -366,6 +366,7 @@ export interface TournamentMatch {
   round: number;
   match_number: number;
   bracket: TournamentBracket;
+  division?: string | null;
   court?: string | null;
   player1_id?: string | null;
   player2_id?: string | null;
