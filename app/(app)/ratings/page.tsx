@@ -170,16 +170,16 @@ export default async function RatingsPage() {
                 <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4 text-sm font-medium text-surface-muted">
                   {i + 1}
                 </td>
-                <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4">
-                  <Link href={`/players/${r.player_id}`} className="flex items-center gap-2 sm:gap-3 hover:text-brand-600">
+                <td className="px-2 sm:px-4 py-3 sm:py-4">
+                  <Link href={`/players/${r.player_id}`} className="flex items-center gap-2 sm:gap-3 hover:text-brand-600 min-w-0">
                     {r.avatar_url ? (
-                      <img src={r.avatar_url} alt="" className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover" />
+                      <img src={r.avatar_url} alt="" className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover flex-shrink-0" />
                     ) : (
-                      <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs sm:text-sm font-medium">
+                      <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs sm:text-sm font-medium flex-shrink-0">
                         {r.display_name?.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <span className="text-sm font-medium text-dark-100">
+                    <span className="text-xs sm:text-sm font-medium text-dark-100 truncate">
                       {r.display_name}
                     </span>
                   </Link>

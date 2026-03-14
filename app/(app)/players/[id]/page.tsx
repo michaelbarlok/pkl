@@ -235,17 +235,19 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
               <span className="text-surface-muted">Tier</span>
               <span className="font-medium text-dark-100">{profile.usap_tier || "—"}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-surface-muted">Expires</span>
-              {profile.usap_expiration ? (
-                <span className={`font-medium ${new Date(profile.usap_expiration) >= new Date() ? "text-teal-300" : "text-red-400"}`}>
-                  {new Date(profile.usap_expiration).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                  {new Date(profile.usap_expiration) < new Date() && " (Expired)"}
-                </span>
-              ) : (
-                <span className="font-medium text-dark-100">—</span>
-              )}
-            </div>
+            {(isOwnProfile || isAdmin) && (
+              <div className="flex justify-between">
+                <span className="text-surface-muted">Expires</span>
+                {profile.usap_expiration ? (
+                  <span className={`font-medium ${new Date(profile.usap_expiration) >= new Date() ? "text-teal-300" : "text-red-400"}`}>
+                    {new Date(profile.usap_expiration).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    {new Date(profile.usap_expiration) < new Date() && " (Expired)"}
+                  </span>
+                ) : (
+                  <span className="font-medium text-dark-100">—</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
