@@ -72,9 +72,10 @@ export default async function GroupForumPage({
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="badge-blue text-xs">{group.name}</span>
                   {thread.pinned && (
-                    <span className="badge-blue text-xs">Pinned</span>
+                    <span className="badge-yellow text-xs">Pinned</span>
                   )}
                   {pollThreadIds.has(thread.id) && (
                     <span className="badge-green text-xs">Poll</span>

@@ -59,9 +59,9 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithCount
         <span className="inline-flex rounded-full bg-surface-overlay px-2 py-0.5 text-xs font-medium text-dark-200 capitalize">
           {t.type}
         </span>
-        {t.skill_level !== "open" && (
-          <span className="inline-flex rounded-full bg-surface-overlay px-2 py-0.5 text-xs font-medium text-dark-200 capitalize">
-            {t.skill_level}
+        {t.divisions && t.divisions.length > 0 && (
+          <span className="inline-flex rounded-full bg-surface-overlay px-2 py-0.5 text-xs font-medium text-dark-200">
+            {t.divisions.length} division{t.divisions.length !== 1 ? "s" : ""}
           </span>
         )}
       </div>

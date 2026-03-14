@@ -2,6 +2,7 @@ import { getTournament, getTournamentRegistrations, getTournamentMatches, getMyR
 import { createClient } from "@/lib/supabase/server";
 import { TournamentRegistrationButton } from "@/components/tournament-registration";
 import { TournamentBracketView } from "@/components/tournament-bracket";
+import { groupDivisionsByGender, getDivisionLabel } from "@/lib/divisions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -75,7 +76,7 @@ export default async function TournamentDetailPage({
           </span>
           <span className="text-xs text-surface-muted">
             {FORMAT_LABELS[tournament.format]} &middot; {tournament.type === "doubles" ? "Doubles" : "Singles"}
-            {tournament.skill_level !== "open" && ` &middot; ${tournament.skill_level}`}
+            &middot; {tournament.divisions?.length ?? 0} division{(tournament.divisions?.length ?? 0) !== 1 ? "s" : ""}
           </span>
         </div>
       </div>
@@ -140,6 +141,20 @@ export default async function TournamentDetailPage({
             <p className="text-sm text-dark-200 whitespace-pre-wrap">{tournament.description}</p>
           </div>
         )}
+
+        {/* Divisions */}
+        {tournament.divisions && tournament.divisions.length > 0 && (
+          <div className="pt-3 border-t border-surface-border">
+            <p className="text-xs text-surface-muted uppercase font-medium mb-2">Divisions</p>
+            <div className="flex flex-wrap gap-1.5">
+              {tournament.divisions.map((code: string) => (
+                <span key={code} className="badge-blue text-xs">
+                  {getDivisionLabel(code)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Registration Action */}
@@ -147,6 +162,7 @@ export default async function TournamentDetailPage({
         <TournamentRegistrationButton
           tournamentId={id}
           tournamentType={tournament.type}
+          divisions={tournament.divisions ?? []}
           myRegistration={myRegistration}
           playerCap={tournament.player_cap}
           confirmedCount={confirmedRegistrations.length}
@@ -190,6 +206,7 @@ export default async function TournamentDetailPage({
                   {tournament.type === "doubles" && (
                     <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted">Partner</th>
                   )}
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted">Division</th>
                   {canManage && (
                     <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">Seed</th>
                   )}
@@ -207,6 +224,13 @@ export default async function TournamentDetailPage({
                         {(reg as any).partner?.display_name ?? "—"}
                       </td>
                     )}
+                    <td className="px-2 sm:px-4 py-2 text-xs">
+                      {(reg as any).division ? (
+                        <span className="badge-blue">{getDivisionLabel((reg as any).division)}</span>
+                      ) : (
+                        <span className="text-surface-muted">—</span>
+                      )}
+                    </td>
                     {canManage && (
                       <td className="px-2 sm:px-4 py-2 text-center text-sm text-surface-muted">
                         {reg.seed ?? "—"}

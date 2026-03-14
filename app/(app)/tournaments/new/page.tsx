@@ -1,6 +1,7 @@
 "use client";
 
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { DivisionCheckboxes } from "@/components/division-checkboxes";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -12,7 +13,7 @@ export default function CreateTournamentPage() {
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState("single_elimination");
   const [type, setType] = useState("doubles");
-  const [skillLevel, setSkillLevel] = useState("open");
+  const [divisions, setDivisions] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -51,6 +52,12 @@ export default function CreateTournamentPage() {
       return;
     }
 
+    if (divisions.length === 0) {
+      setError("Please select at least one division");
+      setSubmitting(false);
+      return;
+    }
+
     const { data, error: insertError } = await supabase
       .from("tournaments")
       .insert({
@@ -58,7 +65,7 @@ export default function CreateTournamentPage() {
         description: description.trim() || null,
         format,
         type,
-        skill_level: skillLevel,
+        divisions,
         start_date: startDate,
         end_date: endDate || startDate,
         start_time: startTime || null,
@@ -148,21 +155,17 @@ export default function CreateTournamentPage() {
           </div>
         </div>
 
-        {/* Skill Level */}
+        {/* Divisions */}
         <div>
-          <label className="block text-sm font-medium text-dark-200 mb-1">
-            Skill Level
+          <label className="block text-sm font-medium text-dark-200 mb-2">
+            Divisions *
           </label>
-          <select
-            value={skillLevel}
-            onChange={(e) => setSkillLevel(e.target.value)}
-            className="input"
-          >
-            <option value="open">Open (All Levels)</option>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-          </select>
+          <p className="text-xs text-surface-muted mb-3">
+            Select which gender, age, and skill level divisions this tournament will offer.
+          </p>
+          <div className="rounded-lg border border-surface-border p-4">
+            <DivisionCheckboxes selected={divisions} onChange={setDivisions} />
+          </div>
         </div>
 
         {/* Dates */}

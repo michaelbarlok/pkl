@@ -1,6 +1,7 @@
 "use client";
 
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { getDivisionLabel } from "@/lib/divisions";
 import type { TournamentRegistration } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -8,6 +9,7 @@ import { useState } from "react";
 interface Props {
   tournamentId: string;
   tournamentType: string;
+  divisions: string[];
   myRegistration: TournamentRegistration | null;
   playerCap: number | null | undefined;
   confirmedCount: number;
@@ -16,6 +18,7 @@ interface Props {
 export function TournamentRegistrationButton({
   tournamentId,
   tournamentType,
+  divisions,
   myRegistration,
   playerCap,
   confirmedCount,
@@ -24,6 +27,9 @@ export function TournamentRegistrationButton({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectedDivision, setSelectedDivision] = useState(
+    divisions.length === 1 ? divisions[0] : ""
+  );
   const [partnerSearch, setPartnerSearch] = useState("");
   const [searchResults, setSearchResults] = useState<{ id: string; display_name: string }[]>([]);
   const [selectedPartner, setSelectedPartner] = useState<{ id: string; display_name: string } | null>(null);
@@ -53,11 +59,18 @@ export function TournamentRegistrationButton({
       return;
     }
 
+    if (divisions.length > 1 && !selectedDivision) {
+      setError("Please select a division");
+      setLoading(false);
+      return;
+    }
+
     const res = await fetch(`/api/tournaments/${tournamentId}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         partner_id: selectedPartner?.id || null,
+        division: selectedDivision || divisions[0] || null,
       }),
     });
 
@@ -99,6 +112,9 @@ export function TournamentRegistrationButton({
             <p className="text-sm font-medium text-teal-300">
               {myRegistration.status === "confirmed" ? "You're registered!" : "You're on the waitlist"}
             </p>
+            {myRegistration.division && (
+              <p className="text-xs text-surface-muted">Division: {getDivisionLabel(myRegistration.division)}</p>
+            )}
             {myRegistration.waitlist_position && (
               <p className="text-xs text-surface-muted">Position #{myRegistration.waitlist_position}</p>
             )}
@@ -116,6 +132,27 @@ export function TournamentRegistrationButton({
 
   return (
     <div className="card space-y-3">
+      {/* Division selector */}
+      {divisions.length > 1 && (
+        <div>
+          <label className="block text-sm font-medium text-dark-200 mb-1">Division *</label>
+          <select
+            value={selectedDivision}
+            onChange={(e) => setSelectedDivision(e.target.value)}
+            className="input"
+            required
+          >
+            <option value="">Select a division...</option>
+            {divisions.map((code) => (
+              <option key={code} value={code}>
+                {getDivisionLabel(code)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Partner search for doubles */}
       {tournamentType === "doubles" && (
         <div>
           <label className="block text-sm font-medium text-dark-200 mb-1">Partner</label>

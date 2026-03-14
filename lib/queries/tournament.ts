@@ -21,7 +21,6 @@ export interface TournamentWithCounts extends Omit<Tournament, 'creator'> {
 export async function listTournaments(filters?: {
   status?: string;
   format?: string;
-  skill_level?: string;
 }): Promise<TournamentWithCounts[]> {
   const supabase = await createClient();
 
@@ -35,9 +34,6 @@ export async function listTournaments(filters?: {
   }
   if (filters?.format) {
     query = query.eq("format", filters.format);
-  }
-  if (filters?.skill_level) {
-    query = query.eq("skill_level", filters.skill_level);
   }
 
   const { data, error } = await query;
@@ -77,7 +73,7 @@ export async function getTournamentRegistrations(
 
   const { data, error } = await supabase
     .from("tournament_registrations")
-    .select("*, player:profiles!player_id(id, display_name, avatar_url), partner:profiles!partner_id(id, display_name, avatar_url)")
+    .select("*, division, player:profiles!player_id(id, display_name, avatar_url), partner:profiles!partner_id(id, display_name, avatar_url)")
     .eq("tournament_id", tournamentId)
     .order("registered_at", { ascending: true });
 

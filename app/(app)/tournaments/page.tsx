@@ -5,13 +5,12 @@ import Link from "next/link";
 export default async function TournamentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; format?: string; skill_level?: string }>;
+  searchParams: Promise<{ status?: string; format?: string }>;
 }) {
   const params = await searchParams;
   const tournaments = await listTournaments({
     status: params.status,
     format: params.format,
-    skill_level: params.skill_level,
   });
 
   // Separate active from past
@@ -33,7 +32,7 @@ export default async function TournamentsPage({
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        <FilterPill label="All" href="/tournaments" active={!params.status && !params.format && !params.skill_level} />
+        <FilterPill label="All" href="/tournaments" active={!params.status && !params.format} />
         <FilterPill label="Open Registration" href="/tournaments?status=registration_open" active={params.status === "registration_open"} />
         <FilterPill label="In Progress" href="/tournaments?status=in_progress" active={params.status === "in_progress"} />
         <FilterPill label="Completed" href="/tournaments?status=completed" active={params.status === "completed"} />

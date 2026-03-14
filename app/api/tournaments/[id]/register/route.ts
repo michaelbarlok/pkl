@@ -24,7 +24,7 @@ export async function POST(
   }
 
   const body = await request.json();
-  const { partner_id } = body;
+  const { partner_id, division } = body;
 
   // Fetch tournament
   const { data: tournament } = await supabase
@@ -96,6 +96,7 @@ export async function POST(
       tournament_id: tournamentId,
       player_id: profile.id,
       partner_id: partner_id || null,
+      division: division || null,
       status,
       waitlist_position: waitlistPosition,
     })

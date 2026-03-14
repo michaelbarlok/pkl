@@ -1,6 +1,7 @@
 "use client";
 
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { DivisionCheckboxes } from "@/components/division-checkboxes";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -13,7 +14,7 @@ export default function EditTournamentPage() {
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState("single_elimination");
   const [type, setType] = useState("doubles");
-  const [skillLevel, setSkillLevel] = useState("open");
+  const [divisions, setDivisions] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -40,7 +41,7 @@ export default function EditTournamentPage() {
         setDescription(data.description ?? "");
         setFormat(data.format);
         setType(data.type);
-        setSkillLevel(data.skill_level);
+        setDivisions(data.divisions ?? []);
         setStartDate(data.start_date);
         setEndDate(data.end_date);
         setStartTime(data.start_time ?? "");
@@ -60,6 +61,12 @@ export default function EditTournamentPage() {
     setError("");
     setSubmitting(true);
 
+    if (divisions.length === 0) {
+      setError("Please select at least one division");
+      setSubmitting(false);
+      return;
+    }
+
     const { error: updateError } = await supabase
       .from("tournaments")
       .update({
@@ -67,7 +74,7 @@ export default function EditTournamentPage() {
         description: description.trim() || null,
         format,
         type,
-        skill_level: skillLevel,
+        divisions,
         start_date: startDate,
         end_date: endDate || startDate,
         start_time: startTime || null,
@@ -124,13 +131,10 @@ export default function EditTournamentPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-dark-200 mb-1">Skill Level</label>
-          <select value={skillLevel} onChange={(e) => setSkillLevel(e.target.value)} className="input">
-            <option value="open">Open (All Levels)</option>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-          </select>
+          <label className="block text-sm font-medium text-dark-200 mb-2">Divisions *</label>
+          <div className="rounded-lg border border-surface-border p-4">
+            <DivisionCheckboxes selected={divisions} onChange={setDivisions} />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -43,7 +43,9 @@ export type NotificationType =
 
 export type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
 export type TournamentType = "singles" | "doubles";
-export type TournamentSkillLevel = "open" | "beginner" | "intermediate" | "advanced";
+export type TournamentGender = "mens" | "womens" | "mixed";
+export type TournamentAge = "all_ages" | "senior";
+export type TournamentSkill = "3.0" | "3.5" | "4.0" | "4.5+";
 export type TournamentStatus = "draft" | "registration_open" | "registration_closed" | "in_progress" | "completed" | "cancelled";
 export type TournamentRegistrationStatus = "confirmed" | "waitlist" | "withdrawn";
 export type TournamentMatchStatus = "pending" | "in_progress" | "completed" | "bye";
@@ -324,7 +326,7 @@ export interface Tournament {
   description?: string | null;
   format: TournamentFormat;
   type: TournamentType;
-  skill_level: TournamentSkillLevel;
+  divisions: string[];
   start_date: string;
   end_date: string;
   start_time?: string | null;
@@ -349,6 +351,7 @@ export interface TournamentRegistration {
   partner_id?: string | null;
   status: TournamentRegistrationStatus;
   waitlist_position?: number | null;
+  division?: string | null;
   seed?: number | null;
   registered_at: string;
   // Relations
