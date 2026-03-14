@@ -5,7 +5,7 @@ import type { FreePlayMatch, FreePlayPlayerStats } from "@/types/database";
 // Types
 // ============================================================
 
-export interface FreePlayMatchWithPlayers extends FreePlayMatch {
+export interface FreePlayMatchWithPlayers extends Omit<FreePlayMatch, 'team_a_p1_profile' | 'team_a_p2_profile' | 'team_b_p1_profile' | 'team_b_p2_profile'> {
   team_a_p1_profile: { id: string; display_name: string; avatar_url: string | null };
   team_a_p2_profile: { id: string; display_name: string; avatar_url: string | null } | null;
   team_b_p1_profile: { id: string; display_name: string; avatar_url: string | null };
