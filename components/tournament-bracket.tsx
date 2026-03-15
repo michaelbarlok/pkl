@@ -824,21 +824,26 @@ function MatchCard({
           )}
 
           {scoring && (
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center gap-1">
+            <div className="mt-2 space-y-1.5">
+              {/* Team 1 score row */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-dark-200 truncate flex-1 min-w-0">{p1Name}</span>
                 <input
                   type="text"
                   value={score1Input}
                   onChange={(e) => setScore1Input(e.target.value)}
-                  className="input w-20 py-1 text-center text-xs"
+                  className="input w-20 py-1 text-center text-xs shrink-0"
                   autoFocus
                 />
-                <span className="text-xs text-surface-muted">vs</span>
+              </div>
+              {/* Team 2 score row */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-dark-200 truncate flex-1 min-w-0">{p2Name}</span>
                 <input
                   type="text"
                   value={score2Input}
                   onChange={(e) => setScore2Input(e.target.value)}
-                  className="input w-20 py-1 text-center text-xs"
+                  className="input w-20 py-1 text-center text-xs shrink-0"
                 />
               </div>
               <div className="flex gap-2 mt-1">
