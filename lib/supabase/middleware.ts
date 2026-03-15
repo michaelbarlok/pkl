@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthPage = path.startsWith("/login") || path.startsWith("/register");
   const isApiRoute = path.startsWith("/api");
-  const isPublicPage = path === "/" || path === "/contact" || path === "/groups" || path.startsWith("/groups/") || path.startsWith("/ratings") || path.startsWith("/ladder") || path === "/confirmed" || path.startsWith("/auth/confirm");
+  const isPublicPage = path === "/" || path === "/contact" || path === "/groups" || path.startsWith("/groups/") || path.startsWith("/ratings") || path.startsWith("/ladder") || path === "/confirmed" || path.startsWith("/auth/confirm") || path === "/reset-password";
 
   if (!user && !isAuthPage && !isApiRoute && !isPublicPage) {
     const url = request.nextUrl.clone();
