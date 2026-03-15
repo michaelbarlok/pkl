@@ -2,6 +2,7 @@ import { getTournament, getTournamentRegistrations, getTournamentMatches, getMyR
 import { createClient } from "@/lib/supabase/server";
 import { TournamentRegistrationButton } from "@/components/tournament-registration";
 import { TournamentBracketView } from "@/components/tournament-bracket";
+import type { PartnerMap } from "@/components/tournament-bracket";
 import { TournamentRealtimeSubscription } from "@/components/tournament-realtime";
 import { DivisionReview } from "@/components/division-review";
 import { DeleteTournamentButton } from "@/components/delete-tournament-button";
@@ -74,6 +75,17 @@ export default async function TournamentDetailPage({
       playerNames: divRegs.map((r: any) => r.player?.display_name ?? "Unknown"),
     };
   }).filter((d) => d.count > 0);
+
+  // Build partner lookup for doubles display
+  const partnerMap: PartnerMap = new Map();
+  if (tournament.type === "doubles") {
+    for (const reg of confirmedRegistrations) {
+      const r = reg as any;
+      if (r.player_id && r.partner?.display_name) {
+        partnerMap.set(r.player_id, r.partner.display_name);
+      }
+    }
+  }
 
   // Group matches by division for display
   const divisionMatches = new Map<string, typeof matches>();
@@ -298,6 +310,7 @@ export default async function TournamentDetailPage({
                 scoreToWinPool={tournament.score_to_win_pool ?? undefined}
                 scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
                 finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
+                partnerMap={partnerMap}
               />
             </div>
           ))}

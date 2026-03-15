@@ -4,6 +4,9 @@ import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+// Map from player_id → partner display name (for doubles)
+export type PartnerMap = Map<string, string>;
+
 interface Props {
   matches: TournamentMatch[];
   format: TournamentFormat;
@@ -13,9 +16,10 @@ interface Props {
   scoreToWinPool?: number;
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
+  partnerMap?: PartnerMap;
 }
 
-export function TournamentBracketView({ matches, format, canManage, tournamentId, division, scoreToWinPool, scoreToWinPlayoff, finalsBestOf3 }: Props) {
+export function TournamentBracketView({ matches, format, canManage, tournamentId, division, scoreToWinPool, scoreToWinPlayoff, finalsBestOf3, partnerMap }: Props) {
   if (format === "round_robin") {
     return (
       <RoundRobinView
@@ -26,10 +30,19 @@ export function TournamentBracketView({ matches, format, canManage, tournamentId
         scoreToWinPool={scoreToWinPool}
         scoreToWinPlayoff={scoreToWinPlayoff}
         finalsBestOf3={finalsBestOf3}
+        partnerMap={partnerMap}
       />
     );
   }
-  return <EliminationBracketView matches={matches} format={format} canManage={canManage} tournamentId={tournamentId} />;
+  return <EliminationBracketView matches={matches} format={format} canManage={canManage} tournamentId={tournamentId} partnerMap={partnerMap} />;
+}
+
+/** Build a team display label: "Player & Partner" for doubles, just "Player" for singles */
+function teamLabel(playerId: string | null | undefined, playerName: string, partnerMap?: PartnerMap): string {
+  if (!playerId || !partnerMap) return playerName;
+  const partnerName = partnerMap.get(playerId);
+  if (partnerName) return `${playerName} & ${partnerName}`;
+  return playerName;
 }
 
 // ============================================================
@@ -41,11 +54,13 @@ function EliminationBracketView({
   format,
   canManage,
   tournamentId,
+  partnerMap,
 }: {
   matches: TournamentMatch[];
   format: TournamentFormat;
   canManage: boolean;
   tournamentId: string;
+  partnerMap?: PartnerMap;
 }) {
   const winnersMatches = matches.filter((m) => m.bracket === "winners");
   const losersMatches = matches.filter((m) => m.bracket === "losers");
@@ -68,7 +83,7 @@ function EliminationBracketView({
                 .sort((a, b) => a.match_number - b.match_number);
 
               return (
-                <div key={round} className="flex flex-col gap-4" style={{ minWidth: 220 }}>
+                <div key={round} className="flex flex-col gap-4" style={{ minWidth: 260 }}>
                   <p className="text-xs font-medium text-surface-muted text-center">
                     {round === winnersRounds ? "Final" : `Round ${round}`}
                   </p>
@@ -78,6 +93,7 @@ function EliminationBracketView({
                       match={match}
                       canManage={canManage}
                       tournamentId={tournamentId}
+                      partnerMap={partnerMap}
                     />
                   ))}
                 </div>
@@ -105,7 +121,7 @@ function EliminationBracketView({
                     .sort((a, b) => a.match_number - b.match_number);
 
                   return (
-                    <div key={round} className="flex flex-col gap-4" style={{ minWidth: 220 }}>
+                    <div key={round} className="flex flex-col gap-4" style={{ minWidth: 260 }}>
                       <p className="text-xs font-medium text-surface-muted text-center">
                         LR {round}
                       </p>
@@ -115,6 +131,7 @@ function EliminationBracketView({
                           match={match}
                           canManage={canManage}
                           tournamentId={tournamentId}
+                          partnerMap={partnerMap}
                         />
                       ))}
                     </div>
@@ -131,11 +148,12 @@ function EliminationBracketView({
           <h3 className="text-sm font-semibold text-dark-200 mb-2 uppercase tracking-wider">
             Grand Final
           </h3>
-          <div style={{ maxWidth: 220 }}>
+          <div style={{ maxWidth: 260 }}>
             <MatchCard
               match={grandFinal}
               canManage={canManage}
               tournamentId={tournamentId}
+              partnerMap={partnerMap}
             />
           </div>
         </div>
@@ -156,6 +174,7 @@ function RoundRobinView({
   scoreToWinPool,
   scoreToWinPlayoff,
   finalsBestOf3,
+  partnerMap,
 }: {
   matches: TournamentMatch[];
   canManage: boolean;
@@ -164,6 +183,7 @@ function RoundRobinView({
   scoreToWinPool?: number;
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
+  partnerMap?: PartnerMap;
 }) {
   const router = useRouter();
   const [advancing, setAdvancing] = useState(false);
@@ -188,22 +208,22 @@ function RoundRobinView({
   const hasPlayoffs = playoffMatches.length > 0;
 
   // Determine division results from completed playoff matches
-  const divisionResults = getDivisionResults(playoffMatches);
+  const divisionResults = getDivisionResults(playoffMatches, partnerMap);
 
   function handleReviewAdvancement() {
     // Compute the proposed seeding from pool standings
     let proposed: { id: string; name: string; wins: number; losses: number; pointDiff: number }[];
 
     if (hasTwoPools) {
-      const poolAStandings = computeStandings(poolAMatches);
-      const poolBStandings = computeStandings(poolBMatches);
+      const poolAStandings = computeStandings(poolAMatches, partnerMap);
+      const poolBStandings = computeStandings(poolBMatches, partnerMap);
       const poolATop3 = poolAStandings.slice(0, 3);
       const poolBTop3 = poolBStandings.slice(0, 3);
       proposed = [...poolATop3, ...poolBTop3].sort(
         (a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff
       );
     } else {
-      const standings = computeStandings(poolAMatches);
+      const standings = computeStandings(poolAMatches, partnerMap);
       proposed = standings.slice(0, 4);
     }
 
@@ -280,6 +300,7 @@ function RoundRobinView({
             canManage={canManage}
             tournamentId={tournamentId}
             scoreToWin={scoreToWinPool}
+            partnerMap={partnerMap}
           />
           <PoolSection
             label="Pool B"
@@ -287,6 +308,7 @@ function RoundRobinView({
             canManage={canManage}
             tournamentId={tournamentId}
             scoreToWin={scoreToWinPool}
+            partnerMap={partnerMap}
           />
         </>
       ) : (
@@ -296,6 +318,7 @@ function RoundRobinView({
           canManage={canManage}
           tournamentId={tournamentId}
           scoreToWin={scoreToWinPool}
+          partnerMap={partnerMap}
         />
       )}
 
@@ -379,6 +402,7 @@ function RoundRobinView({
           tournamentId={tournamentId}
           scoreToWin={scoreToWinPlayoff}
           finalsBestOf3={finalsBestOf3}
+          partnerMap={partnerMap}
         />
       )}
     </div>
@@ -394,17 +418,19 @@ function PoolSection({
   canManage,
   tournamentId,
   scoreToWin,
+  partnerMap,
 }: {
   label: string;
   matches: TournamentMatch[];
   canManage: boolean;
   tournamentId: string;
   scoreToWin?: number;
+  partnerMap?: PartnerMap;
 }) {
   const rounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b);
 
   // Compute standings
-  const standings = computeStandings(matches);
+  const standings = computeStandings(matches, partnerMap);
 
   return (
     <div className="space-y-4">
@@ -417,7 +443,7 @@ function PoolSection({
             <thead className="bg-surface-overlay">
               <tr>
                 <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted w-8">#</th>
-                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
+                <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted">Team</th>
                 <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">W</th>
                 <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">L</th>
                 <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">+/-</th>
@@ -459,6 +485,7 @@ function PoolSection({
                   canManage={canManage}
                   tournamentId={tournamentId}
                   gameInfo={scoreToWin ? `Game to ${scoreToWin}` : undefined}
+                  partnerMap={partnerMap}
                 />
               ))}
             </div>
@@ -479,12 +506,14 @@ function PlayoffBracketView({
   tournamentId,
   scoreToWin,
   finalsBestOf3,
+  partnerMap,
 }: {
   matches: TournamentMatch[];
   canManage: boolean;
   tournamentId: string;
   scoreToWin?: number;
   finalsBestOf3?: boolean;
+  partnerMap?: PartnerMap;
 }) {
   const maxRound = Math.max(...matches.map((m) => m.round), 0);
   const rounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b);
@@ -506,7 +535,7 @@ function PlayoffBracketView({
               .sort((a, b) => a.match_number - b.match_number);
 
             return (
-              <div key={round} className="flex flex-col gap-4" style={{ minWidth: 220 }}>
+              <div key={round} className="flex flex-col gap-4" style={{ minWidth: 260 }}>
                 <p className="text-xs font-medium text-surface-muted text-center">
                   {roundLabels(round)}
                 </p>
@@ -528,6 +557,7 @@ function PlayoffBracketView({
                         canManage={canManage}
                         tournamentId={tournamentId}
                         gameInfo={!isChampionship && gameInfoText ? gameInfoText : (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
+                        partnerMap={partnerMap}
                       />
                     </div>
                   );
@@ -545,7 +575,7 @@ function PlayoffBracketView({
  * Determine 1st, 2nd, and 3rd place from completed playoff matches.
  * Returns null if playoffs aren't finished yet.
  */
-function getDivisionResults(playoffMatches: TournamentMatch[]): { first: string; second: string; third: string | null } | null {
+function getDivisionResults(playoffMatches: TournamentMatch[], partnerMap?: PartnerMap): { first: string; second: string; third: string | null } | null {
   if (playoffMatches.length === 0) return null;
 
   const maxRound = Math.max(...playoffMatches.map((m) => m.round));
@@ -562,14 +592,17 @@ function getDivisionResults(playoffMatches: TournamentMatch[]): { first: string;
 
   const getName = (id: string | null | undefined, match: TournamentMatch): string => {
     if (!id) return "Unknown";
-    if (id === match.player1_id) return (match as any).player1?.display_name ?? id.slice(0, 8);
-    if (id === match.player2_id) return (match as any).player2?.display_name ?? id.slice(0, 8);
-    // Search other matches for this player's name
-    for (const m of playoffMatches) {
-      if (m.player1_id === id) return (m as any).player1?.display_name ?? id.slice(0, 8);
-      if (m.player2_id === id) return (m as any).player2?.display_name ?? id.slice(0, 8);
+    let baseName: string | undefined;
+    if (id === match.player1_id) baseName = (match as any).player1?.display_name;
+    if (!baseName && id === match.player2_id) baseName = (match as any).player2?.display_name;
+    if (!baseName) {
+      for (const m of playoffMatches) {
+        if (m.player1_id === id) { baseName = (m as any).player1?.display_name; break; }
+        if (m.player2_id === id) { baseName = (m as any).player2?.display_name; break; }
+      }
     }
-    return id.slice(0, 8);
+    if (!baseName) return id.slice(0, 8);
+    return teamLabel(id, baseName, partnerMap);
   };
 
   const first = getName(firstId, championship);
@@ -586,21 +619,23 @@ function getDivisionResults(playoffMatches: TournamentMatch[]): { first: string;
 /**
  * Compute standings from a set of matches.
  */
-function computeStandings(matches: TournamentMatch[]) {
+function computeStandings(matches: TournamentMatch[], partnerMap?: PartnerMap) {
   const standings = new Map<string, { name: string; wins: number; losses: number; pointDiff: number }>();
 
   for (const m of matches) {
     if (m.player1_id && !standings.has(m.player1_id)) {
+      const baseName = (m as any).player1?.display_name ?? m.player1_id.slice(0, 8);
       standings.set(m.player1_id, {
-        name: (m as any).player1?.display_name ?? m.player1_id.slice(0, 8),
+        name: teamLabel(m.player1_id, baseName, partnerMap),
         wins: 0,
         losses: 0,
         pointDiff: 0,
       });
     }
     if (m.player2_id && !standings.has(m.player2_id)) {
+      const baseName = (m as any).player2?.display_name ?? m.player2_id.slice(0, 8);
       standings.set(m.player2_id, {
-        name: (m as any).player2?.display_name ?? m.player2_id.slice(0, 8),
+        name: teamLabel(m.player2_id, baseName, partnerMap),
         wins: 0,
         losses: 0,
         pointDiff: 0,
@@ -639,11 +674,13 @@ function MatchCard({
   canManage,
   tournamentId,
   gameInfo,
+  partnerMap,
 }: {
   match: TournamentMatch;
   canManage: boolean;
   tournamentId: string;
   gameInfo?: string;
+  partnerMap?: PartnerMap;
 }) {
   const router = useRouter();
   const [scoring, setScoring] = useState(false);
@@ -652,8 +689,11 @@ function MatchCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const p1Name = (match as any).player1?.display_name ?? (match.player1_id ? "TBD" : "—");
-  const p2Name = (match as any).player2?.display_name ?? (match.player2_id ? "TBD" : "—");
+  const p1BaseName = (match as any).player1?.display_name ?? (match.player1_id ? "TBD" : "\u2014");
+  const p2BaseName = (match as any).player2?.display_name ?? (match.player2_id ? "TBD" : "\u2014");
+  const p1Name = match.player1_id && p1BaseName !== "TBD" ? teamLabel(match.player1_id, p1BaseName, partnerMap) : p1BaseName;
+  const p2Name = match.player2_id && p2BaseName !== "TBD" ? teamLabel(match.player2_id, p2BaseName, partnerMap) : p2BaseName;
+
   const isCompleted = match.status === "completed";
   const isBye = match.status === "bye";
   const canScore = canManage && match.player1_id && match.player2_id && !isBye;
@@ -723,52 +763,59 @@ function MatchCard({
 
       {!isBye && (
         <>
-          {/* Player 1 */}
-          <div className="flex items-center justify-between">
-            <span className={`text-sm ${p1Won ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
-              {p1Name}
-            </span>
-            {isCompleted && match.score1.length > 0 && (
-              <span className="font-mono text-xs text-dark-200">
-                {match.score1.join("-")}
-              </span>
-            )}
-          </div>
+          <div className="flex items-start gap-3">
+            {/* Teams + Scores */}
+            <div className="flex-1 min-w-0">
+              {/* Team 1 */}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-sm truncate ${p1Won ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                  {p1Name}
+                </span>
+                {isCompleted && match.score1.length > 0 && (
+                  <span className="font-mono text-xs text-dark-200 shrink-0">
+                    {match.score1.join("-")}
+                  </span>
+                )}
+              </div>
 
-          {/* Player 2 */}
-          <div className="flex items-center justify-between">
-            <span className={`text-sm ${p2Won ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
-              {p2Name}
-            </span>
-            {isCompleted && match.score2.length > 0 && (
-              <span className="font-mono text-xs text-dark-200">
-                {match.score2.join("-")}
-              </span>
+              <div className="text-xs text-surface-muted my-0.5">vs</div>
+
+              {/* Team 2 */}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-sm truncate ${p2Won ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                  {p2Name}
+                </span>
+                {isCompleted && match.score2.length > 0 && (
+                  <span className="font-mono text-xs text-dark-200 shrink-0">
+                    {match.score2.join("-")}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Enter Score / Edit Score button — to the right */}
+            {canEnterNew && !scoring && (
+              <button
+                onClick={() => setScoring(true)}
+                className="shrink-0 self-center rounded-md bg-brand-300/20 px-3 py-2 text-xs font-semibold text-brand-300 hover:bg-brand-300/30 transition-colors"
+              >
+                Enter Score
+              </button>
+            )}
+
+            {canEdit && !scoring && (
+              <button
+                onClick={openEdit}
+                className="shrink-0 self-center rounded-md bg-surface-raised px-3 py-2 text-xs font-medium text-surface-muted hover:text-brand-300 transition-colors"
+              >
+                Edit
+              </button>
             )}
           </div>
 
           {/* Game Info */}
           {gameInfo && !isCompleted && match.player1_id && match.player2_id && (
             <p className="text-xs text-surface-muted mt-1">{gameInfo}</p>
-          )}
-
-          {/* Score Entry / Edit */}
-          {canEnterNew && !scoring && (
-            <button
-              onClick={() => setScoring(true)}
-              className="text-xs text-brand-300 font-medium mt-1 hover:text-brand-200"
-            >
-              Enter score
-            </button>
-          )}
-
-          {canEdit && !scoring && (
-            <button
-              onClick={openEdit}
-              className="text-xs text-surface-muted font-medium mt-1 hover:text-brand-300"
-            >
-              Edit score
-            </button>
           )}
 
           {scoring && (
