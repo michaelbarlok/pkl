@@ -68,6 +68,9 @@ export default async function GroupsPage() {
                     <span className={group.group_type === "free_play" ? "badge-yellow" : "badge-blue"}>
                       {group.group_type === "free_play" ? "Free Play" : "Ladder"}
                     </span>
+                    <span className={group.visibility === "private" ? "badge-gray" : "badge-green"}>
+                      {group.visibility === "private" ? "Private" : "Public"}
+                    </span>
                     {isJoined && <span className="badge-green">Joined</span>}
                   </div>
                 </div>

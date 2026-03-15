@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatDate, formatTime } from "@/lib/utils";
 import { LogMatchForm } from "./log-match";
 import { FreePlayLeaderboard } from "./leaderboard";
+import { InviteButton } from "./invite-button";
 
 export default async function GroupPage({
   params,
@@ -66,6 +67,9 @@ export default async function GroupPage({
           )}
         </div>
         <div className="flex items-center gap-3">
+          <span className={group.visibility === "private" ? "badge-gray" : "badge-green"}>
+            {group.visibility === "private" ? "Private" : "Public"}
+          </span>
           {isMember && (
             <Link
               href={`/groups/${slug}/forum`}
@@ -75,9 +79,16 @@ export default async function GroupPage({
             </Link>
           )}
           {isMember ? (
-            <span className="badge-green">Member</span>
+            <>
+              <span className="badge-green">Member</span>
+              {group.visibility === "private" && (
+                <InviteButton groupId={group.id} groupType={group.group_type} />
+              )}
+            </>
           ) : (
-            <JoinButton groupId={group.id} playerId={profile!.id} groupType={group.group_type} />
+            group.visibility === "public" && (
+              <JoinButton groupId={group.id} playerId={profile!.id} groupType={group.group_type} />
+            )
           )}
         </div>
       </div>
