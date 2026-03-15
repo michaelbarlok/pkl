@@ -52,6 +52,7 @@ export type TournamentMatchStatus = "pending" | "in_progress" | "completed" | "b
 export type TournamentBracket = "winners" | "losers" | "grand_final" | "playoff";
 
 export type GroupType = "ladder_league" | "free_play";
+export type GroupVisibility = "public" | "private";
 
 // ============================================================
 // Core Tables
@@ -130,6 +131,7 @@ export interface ShootoutGroup {
   slug: string;
   description?: string | null;
   group_type: GroupType;
+  visibility: GroupVisibility;
   city?: string | null;
   state?: string | null;
   created_by: string;

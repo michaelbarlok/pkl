@@ -62,6 +62,7 @@ export default async function AdminGroupsPage() {
     if (!profile) return;
 
     const groupType = (formData.get("group_type") as string) || "ladder_league";
+    const visibility = (formData.get("visibility") as string) || "public";
 
     const { data: newGroup, error } = await supabase
       .from("shootout_groups")
@@ -73,6 +74,7 @@ export default async function AdminGroupsPage() {
         created_by: profile.id,
         is_active: true,
         group_type: groupType,
+        visibility,
       })
       .select("id")
       .single();
@@ -184,7 +186,7 @@ export default async function AdminGroupsPage() {
               className="input"
             />
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <span className="text-sm font-medium text-dark-200">Type:</span>
             <label className="flex items-center gap-2 text-sm text-dark-100">
               <input type="radio" name="group_type" value="ladder_league" defaultChecked className="text-brand-600 focus:ring-brand-500" />
@@ -193,6 +195,15 @@ export default async function AdminGroupsPage() {
             <label className="flex items-center gap-2 text-sm text-dark-100">
               <input type="radio" name="group_type" value="free_play" className="text-brand-600 focus:ring-brand-500" />
               Free Play
+            </label>
+            <span className="text-sm font-medium text-dark-200 ml-4">Visibility:</span>
+            <label className="flex items-center gap-2 text-sm text-dark-100">
+              <input type="radio" name="visibility" value="public" defaultChecked className="text-brand-600 focus:ring-brand-500" />
+              Public
+            </label>
+            <label className="flex items-center gap-2 text-sm text-dark-100">
+              <input type="radio" name="visibility" value="private" className="text-brand-600 focus:ring-brand-500" />
+              Private
             </label>
           </div>
         </form>
@@ -209,6 +220,9 @@ export default async function AdminGroupsPage() {
                 </th>
                 <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Type
+                </th>
+                <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+                  Visibility
                 </th>
                 <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                   Slug
@@ -245,6 +259,11 @@ export default async function AdminGroupsPage() {
                     <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm">
                       <span className={group.group_type === "free_play" ? "badge-yellow" : "badge-blue"}>
                         {group.group_type === "free_play" ? "Free Play" : "Ladder"}
+                      </span>
+                    </td>
+                    <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm">
+                      <span className={group.visibility === "private" ? "badge-gray" : "badge-green"}>
+                        {group.visibility === "private" ? "Private" : "Public"}
                       </span>
                     </td>
                     <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-surface-muted">
@@ -304,7 +323,7 @@ export default async function AdminGroupsPage() {
               {(!groups || groups.length === 0) && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-8 text-center text-sm text-surface-muted"
                   >
                     No groups created yet.
