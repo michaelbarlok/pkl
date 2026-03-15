@@ -17,12 +17,13 @@ interface MembershipInfo {
 interface MembersTableProps {
   profiles: Profile[];
   membershipMap: Record<string, MembershipInfo[]>;
+  currentProfileId: string;
 }
 
 type StatusFilter = "all" | "active" | "inactive";
 type RoleFilter = "all" | "admin" | "player";
 
-export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
+export function MembersTable({ profiles, membershipMap, currentProfileId }: MembersTableProps) {
   const { supabase } = useSupabase();
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -30,6 +31,7 @@ export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [suspending, setSuspending] = useState<string | null>(null);
   const [togglingGroupRole, setTogglingGroupRole] = useState<string | null>(null);
+  const [togglingGlobalRole, setTogglingGlobalRole] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let result = profiles;
@@ -103,6 +105,30 @@ export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
       alert("Failed to update group role.");
     } finally {
       setTogglingGroupRole(null);
+    }
+  }
+
+  async function handleToggleGlobalRole(playerId: string, currentRole: string) {
+    const newRole = currentRole === "admin" ? "player" : "admin";
+    const action = newRole === "admin" ? "promote to global admin" : "remove global admin";
+    if (!confirm(`Are you sure you want to ${action} this member?`)) return;
+
+    setTogglingGlobalRole(playerId);
+    try {
+      const res = await fetch("/api/admin/global-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, role: newRole }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to update global role.");
+      }
+      router.refresh();
+    } catch {
+      alert("Failed to update global role.");
+    } finally {
+      setTogglingGlobalRole(null);
     }
   }
 
@@ -311,6 +337,27 @@ export function MembersTable({ profiles, membershipMap }: MembersTableProps) {
                   {/* Actions */}
                   <td className="px-2 sm:px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2 flex-wrap">
+                      {profile.id !== currentProfileId && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleGlobalRole(profile.id, profile.role)}
+                          disabled={togglingGlobalRole === profile.id}
+                          className={cn(
+                            "text-xs px-2 py-1 rounded",
+                            profile.role === "admin"
+                              ? "bg-red-900/30 text-red-300 hover:bg-red-900/50"
+                              : "bg-purple-900/30 text-purple-300 hover:bg-purple-900/50",
+                            togglingGlobalRole === profile.id && "opacity-50"
+                          )}
+                          title={profile.role === "admin" ? "Remove global admin" : "Make global admin"}
+                        >
+                          {togglingGlobalRole === profile.id
+                            ? "..."
+                            : profile.role === "admin"
+                              ? "Remove Global Admin"
+                              : "Make Global Admin"}
+                        </button>
+                      )}
                       {memberships.map((m) => {
                         const key = `${profile.id}-${m.groupId}`;
                         const isGroupAdmin = m.groupRole === "admin";
