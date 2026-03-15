@@ -70,14 +70,6 @@ export default async function GroupPage({
           <span className={group.visibility === "private" ? "badge-gray" : "badge-green"}>
             {group.visibility === "private" ? "Private" : "Public"}
           </span>
-          {isMember && (
-            <Link
-              href={`/groups/${slug}/forum`}
-              className="btn-secondary"
-            >
-              Forum
-            </Link>
-          )}
           {isMember ? (
             <>
               <span className="badge-green">Member</span>
@@ -89,6 +81,14 @@ export default async function GroupPage({
             group.visibility === "public" && (
               <JoinButton groupId={group.id} playerId={profile!.id} groupType={group.group_type} />
             )
+          )}
+          {isMember && (
+            <Link
+              href={`/groups/${slug}/forum`}
+              className="btn-secondary"
+            >
+              Forum
+            </Link>
           )}
         </div>
       </div>
