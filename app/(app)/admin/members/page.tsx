@@ -5,6 +5,14 @@ import { MembersTable } from "./members-table";
 export default async function AdminMembersPage() {
   const supabase = await createClient();
 
+  // Get the current user's profile ID
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: currentProfile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user!.id)
+    .single();
+
   // Fetch all profiles
   const { data: profiles } = await supabase
     .from("profiles")
@@ -48,6 +56,7 @@ export default async function AdminMembersPage() {
       <MembersTable
         profiles={profiles ?? []}
         membershipMap={membershipMap}
+        currentProfileId={currentProfile?.id ?? ""}
       />
     </div>
   );
