@@ -154,7 +154,7 @@ export default async function RatingsPage() {
         </p>
       </div>
 
-      <div className="card overflow-hidden p-0">
+      <div className="card overflow-x-auto p-0">
         <table className="min-w-full divide-y divide-surface-border">
           <thead className="bg-surface-overlay">
             <tr>
@@ -193,7 +193,7 @@ export default async function RatingsPage() {
                 <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4 text-sm text-dark-200">
                   {r.percentage > 0 ? `${r.percentage.toFixed(1)}%` : "—"}
                 </td>
-                <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4 text-sm text-surface-muted">
+                <td className="px-2 sm:px-4 py-3 sm:py-4 text-sm text-surface-muted">
                   {r.last_played_at
                     ? formatDate(r.last_played_at)
                     : "—"}
