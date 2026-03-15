@@ -758,7 +758,12 @@ function MatchCard({
   return (
     <div className={`rounded-lg px-3 py-2 ${isCompleted ? "bg-surface-overlay" : isBye ? "bg-surface-overlay/50" : "bg-surface-raised border border-surface-border"}`}>
       {isBye && (
-        <p className="text-xs text-surface-muted text-center">BYE</p>
+        <div>
+          <span className="text-sm text-dark-100">
+            {match.player1_id ? p1Name : p2Name}
+          </span>
+          <p className="text-xs text-surface-muted mt-0.5">BYE — no opponent this round</p>
+        </div>
       )}
 
       {!isBye && (
