@@ -9,6 +9,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Priority sort order: high first, then normal, then low. */
+export const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 };
+
 /** Format date as Day M-D-YYYY (e.g. "Fri 3-15-2026") */
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -34,11 +37,6 @@ export function formatTime(timeOrDateStr: string): string {
   const ampm = hours >= 12 ? "pm" : "am";
   hours = hours % 12 || 12;
   return `${hours}:${minutes.toString().padStart(2, "0")} ${ampm}`;
-}
-
-/** Format date as M-D-YYYY (alias for formatDate — kept for call-site compat) */
-export function formatShortDate(dateStr: string): string {
-  return formatDate(dateStr);
 }
 
 /** Format date and time together as M-D-YYYY H:MM am/pm */

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDate, formatTime, PRIORITY_ORDER } from "@/lib/utils";
 import type { Registration, Profile } from "@/types/database";
 import { SheetActions } from "./sheet-actions";
 import { AdminAddMember } from "./admin-add-member";
@@ -80,10 +80,9 @@ export default async function SheetDetailPage({
     }
   }
 
-  const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
   const sortByPriority = (a: Registration, b: Registration) => {
-    const aPri = priorityOrder[a.priority ?? "normal"] ?? 1;
-    const bPri = priorityOrder[b.priority ?? "normal"] ?? 1;
+    const aPri = PRIORITY_ORDER[a.priority ?? "normal"] ?? 1;
+    const bPri = PRIORITY_ORDER[b.priority ?? "normal"] ?? 1;
     if (aPri !== bPri) return aPri - bPri;
     return new Date(a.signed_up_at).getTime() - new Date(b.signed_up_at).getTime();
   };

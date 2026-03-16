@@ -5,10 +5,30 @@ import type { Tournament, TournamentRegistration, TournamentMatch } from "@/type
 // Types
 // ============================================================
 
+/** Compact profile shape returned by joined queries. */
+interface ProfileRef {
+  id: string;
+  display_name: string;
+  avatar_url?: string | null;
+}
+
 export interface TournamentWithCounts extends Omit<Tournament, 'creator'> {
-  creator: { id: string; display_name: string; avatar_url: string | null };
+  creator: ProfileRef;
   registration_count: number;
 }
+
+/** Registration row with player/partner joins populated. */
+export type TournamentRegistrationWithPlayers = TournamentRegistration & {
+  player: ProfileRef;
+  partner: ProfileRef | null;
+};
+
+/** Match row with player joins populated. */
+export type TournamentMatchWithPlayers = TournamentMatch & {
+  player1: Pick<ProfileRef, "id" | "display_name"> | null;
+  player2: Pick<ProfileRef, "id" | "display_name"> | null;
+  winner: Pick<ProfileRef, "id" | "display_name"> | null;
+};
 
 // ============================================================
 // Queries
@@ -39,7 +59,7 @@ export async function listTournaments(filters?: {
   const { data, error } = await query;
   if (error || !data) return [];
 
-  return data.map((t: any) => ({
+  return (data as unknown as (TournamentWithCounts & { registrations: { count: number }[] })[]).map((t) => ({
     ...t,
     registration_count: t.registrations?.[0]?.count ?? 0,
   }));
@@ -49,7 +69,7 @@ export async function listTournaments(filters?: {
  * Fetch a single tournament by ID with full details.
  */
 export async function getTournament(id: string): Promise<(Tournament & {
-  creator: { id: string; display_name: string; avatar_url: string | null };
+  creator: ProfileRef;
 }) | null> {
   const supabase = await createClient();
 
@@ -60,7 +80,7 @@ export async function getTournament(id: string): Promise<(Tournament & {
     .single();
 
   if (error || !data) return null;
-  return data as any;
+  return data as unknown as Tournament & { creator: ProfileRef };
 }
 
 /**
@@ -68,7 +88,7 @@ export async function getTournament(id: string): Promise<(Tournament & {
  */
 export async function getTournamentRegistrations(
   tournamentId: string
-): Promise<TournamentRegistration[]> {
+): Promise<TournamentRegistrationWithPlayers[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -78,7 +98,7 @@ export async function getTournamentRegistrations(
     .order("registered_at", { ascending: true });
 
   if (error || !data) return [];
-  return data as any;
+  return data as unknown as TournamentRegistrationWithPlayers[];
 }
 
 /**
@@ -86,7 +106,7 @@ export async function getTournamentRegistrations(
  */
 export async function getTournamentMatches(
   tournamentId: string
-): Promise<TournamentMatch[]> {
+): Promise<TournamentMatchWithPlayers[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -97,7 +117,7 @@ export async function getTournamentMatches(
     .order("match_number", { ascending: true });
 
   if (error || !data) return [];
-  return data as any;
+  return data as unknown as TournamentMatchWithPlayers[];
 }
 
 /**
@@ -129,5 +149,5 @@ export async function getMyRegistration(
     .limit(1)
     .single();
 
-  return data as TournamentRegistration | null;
+  return data as unknown as TournamentRegistration | null;
 }

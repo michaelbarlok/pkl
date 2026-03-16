@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { formatShortDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import type { SignupSheet } from "@/types/database";
 import { DeleteSheetButton } from "./delete-sheet-button";
 
@@ -105,7 +105,7 @@ export default async function AdminSheetsPage() {
                           }`}
                         >
                           <td className="py-3 pl-2 sm:pl-4 pr-2 text-sm font-medium text-dark-100">
-                            {formatShortDate(sheet.event_date)}
+                            {formatDate(sheet.event_date)}
                           </td>
                           <td className="py-3 px-2">
                             <span className={badge.className}>{badge.label}</span>

@@ -45,37 +45,17 @@ export async function notify({
     });
     if (insertErr) {
       console.error("Failed to insert notification:", insertErr.message);
-      // Try without group_id if that column doesn't exist
-      if (insertErr.message.includes("group_id")) {
-        await supabase.from("notifications").insert({
-          user_id: userId,
-          type,
-          title,
-          body,
-          link,
-        });
-      }
     }
   } catch (e) {
     console.error("Notification insert threw:", e);
   }
 
   // 2. Fetch user preferences
-  let { data: profile, error: profileErr } = await supabase
+  const { data: profile, error: profileErr } = await supabase
     .from("profiles")
     .select("email, phone, preferred_notify")
     .eq("id", userId)
     .single();
-
-  // If preferred_notify column doesn't exist, retry without it
-  if (profileErr && profileErr.message.includes("preferred_notify")) {
-    const fallback = await supabase
-      .from("profiles")
-      .select("email, phone")
-      .eq("id", userId)
-      .single();
-    profile = fallback.data ? { ...fallback.data, preferred_notify: null } : null;
-  }
 
   if (!profile) {
     console.error("Profile not found for notification:", userId, profileErr?.message);

@@ -3,8 +3,7 @@ import { getGroupBySlug, getGroupMembers } from "@/lib/queries/group";
 import { getPlayerStats } from "@/lib/queries/free-play";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { formatShortDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { FreePlayLeaderboard } from "../leaderboard";
 
 export default async function LadderPage({
@@ -136,7 +135,7 @@ export default async function LadderPage({
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-surface-muted">
                     {member.last_played_at
-                      ? formatShortDate(member.last_played_at)
+                      ? formatDate(member.last_played_at)
                       : "Never"}
                   </td>
                 </tr>

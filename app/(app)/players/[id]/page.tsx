@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { formatWinPct, formatShortDate, formatDate } from "@/lib/utils";
+import { formatWinPct, formatDate } from "@/lib/utils";
 import type { Profile, GroupMembership, PlayerRating, GameResult, Registration } from "@/types/database";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -295,7 +295,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
                 </div>
                 {m.last_played_at && (
                   <p className="mt-2 text-xs text-surface-muted">
-                    Last played {formatShortDate(m.last_played_at)}
+                    Last played {formatDate(m.last_played_at)}
                   </p>
                 )}
               </Link>
@@ -344,7 +344,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
                       </p>
                     </div>
                     <span className="text-xs text-surface-muted">
-                      {formatShortDate(game.created_at)}
+                      {formatDate(game.created_at)}
                     </span>
                   </div>
                 );
@@ -362,7 +362,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
                     </div>
                     <p className="mt-1 text-sm text-surface-muted">
                       {reg.sheet?.event_date
-                        ? formatShortDate(reg.sheet.event_date)
+                        ? formatDate(reg.sheet.event_date)
                         : ""}{" "}
                       at {reg.sheet?.location ?? "TBD"}
                     </p>

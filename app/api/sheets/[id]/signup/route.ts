@@ -156,17 +156,6 @@ export async function POST(
         .eq("status", "confirmed")
         .order("signed_up_at", { ascending: true });
 
-      // Fallback if priority column doesn't exist
-      if (!confirmed) {
-        const fallback = await admin
-          .from("registrations")
-          .select("id, player_id, signed_up_at")
-          .eq("sheet_id", sheetId)
-          .eq("status", "confirmed")
-          .order("signed_up_at", { ascending: true });
-        confirmed = fallback.data as any;
-      }
-
       // Set signed_up_at to 1 second before the earliest confirmed player
       // so this admin always appears at position #1
       if (confirmed && confirmed.length > 0) {
@@ -183,7 +172,7 @@ export async function POST(
 
         // Sort: low priority first, then normal, then high
         // Within same priority, latest signup first (they get bumped first)
-        const sorted = (confirmed ?? []).sort((a: any, b: any) => {
+        const sorted = (confirmed ?? []).sort((a, b) => {
           const aPri = priorityOrder[a.priority ?? "normal"] ?? 1;
           const bPri = priorityOrder[b.priority ?? "normal"] ?? 1;
           if (aPri !== bPri) return aPri - bPri;
@@ -246,30 +235,17 @@ export async function POST(
 
     if (existing && existing.status === "withdrawn") {
       // Re-activate withdrawn registration
-      const updatePayload: Record<string, any> = {
-        status: regStatus,
-        priority,
-        waitlist_position: waitlistPosition,
-        signed_up_at: signedUpAt,
-      };
-
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from("registrations")
-        .update(updatePayload)
+        .update({
+          status: regStatus,
+          priority,
+          waitlist_position: waitlistPosition,
+          signed_up_at: signedUpAt,
+        })
         .eq("id", existing.id)
         .select()
         .single();
-
-      // If priority column doesn't exist yet, retry without it
-      if (error && error.message.includes("priority")) {
-        const { priority: _removed, ...fallback } = updatePayload;
-        ({ data, error } = await supabase
-          .from("registrations")
-          .update(fallback)
-          .eq("id", existing.id)
-          .select()
-          .single());
-      }
 
       if (error) {
         console.error("Update registration error:", error);
@@ -278,31 +254,19 @@ export async function POST(
       registration = data;
     } else {
       // New registration
-      const insertPayload: Record<string, any> = {
-        sheet_id: sheetId,
-        player_id: playerId,
-        status: regStatus,
-        priority,
-        waitlist_position: waitlistPosition,
-        signed_up_at: signedUpAt,
-        registered_by: targetPlayerId ? callerProfile.id : null,
-      };
-
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from("registrations")
-        .insert(insertPayload)
+        .insert({
+          sheet_id: sheetId,
+          player_id: playerId,
+          status: regStatus,
+          priority,
+          waitlist_position: waitlistPosition,
+          signed_up_at: signedUpAt,
+          registered_by: targetPlayerId ? callerProfile.id : null,
+        })
         .select()
         .single();
-
-      // If priority column doesn't exist yet, retry without it
-      if (error && error.message.includes("priority")) {
-        const { priority: _removed, ...fallback } = insertPayload;
-        ({ data, error } = await supabase
-          .from("registrations")
-          .insert(fallback)
-          .select()
-          .single());
-      }
 
       if (error) {
         console.error("Insert registration error:", error);
@@ -313,7 +277,6 @@ export async function POST(
 
     // Notify the bumped player that they've been moved to the waitlist
     if (bumpedPlayerId) {
-      const groupName = sheet.group_id ? undefined : undefined;
       // Get group name for the notification
       const { data: sheetGroup } = await supabase
         .from("signup_sheets")
@@ -321,7 +284,7 @@ export async function POST(
         .eq("id", sheetId)
         .single();
 
-      const gName = (sheetGroup as any)?.group?.name ?? "the event";
+      const gName = (sheetGroup as { group?: { name?: string } })?.group?.name ?? "the event";
       const evDate = sheetGroup?.event_date ?? "";
 
       notify({

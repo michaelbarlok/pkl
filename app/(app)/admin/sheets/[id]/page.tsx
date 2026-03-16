@@ -10,6 +10,7 @@ import type {
   Profile,
   ShootoutGroup,
 } from "@/types/database";
+import { PRIORITY_ORDER } from "@/lib/utils";
 
 export default function AdminSheetDetailPage() {
   const { supabase } = useSupabase();
@@ -46,10 +47,9 @@ export default function AdminSheetDetailPage() {
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
 
-  const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
-  const sortByPriority = (a: any, b: any) => {
-    const aPri = priorityOrder[(a as any).priority ?? "normal"] ?? 1;
-    const bPri = priorityOrder[(b as any).priority ?? "normal"] ?? 1;
+  const sortByPriority = (a: Registration, b: Registration) => {
+    const aPri = PRIORITY_ORDER[a.priority ?? "normal"] ?? 1;
+    const bPri = PRIORITY_ORDER[b.priority ?? "normal"] ?? 1;
     if (aPri !== bPri) return aPri - bPri;
     return new Date(a.signed_up_at).getTime() - new Date(b.signed_up_at).getTime();
   };

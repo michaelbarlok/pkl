@@ -542,22 +542,27 @@ function PlayoffBracketView({
                 {roundMatches.map((match) => {
                   const isThirdPlace = round === maxRound && match.match_number === 2;
                   const isChampionship = round === maxRound && match.match_number === 1;
-                  const bestOf3Label = isChampionship && finalsBestOf3 ? " (Best 2 of 3)" : "";
-                  const gameInfoText = scoreToWin ? `Game to ${scoreToWin}${bestOf3Label}` : (bestOf3Label ? `Best 2 of 3` : undefined);
+                  const isBestOf3 = isChampionship && !!finalsBestOf3;
+                  const gameInfoText = scoreToWin
+                    ? `Game to ${scoreToWin}${isBestOf3 ? " (Best 2 of 3)" : ""}`
+                    : (isBestOf3 ? "Best 2 of 3" : undefined);
                   return (
                     <div key={match.id}>
                       {isThirdPlace && (
                         <p className="text-xs text-surface-muted mb-1 text-center">3rd Place</p>
                       )}
                       {isChampionship && (
-                        <p className="text-xs text-surface-muted mb-1 text-center">Championship{bestOf3Label}</p>
+                        <p className="text-xs text-surface-muted mb-1 text-center">
+                          Championship{isBestOf3 ? " (Best 2 of 3)" : ""}
+                        </p>
                       )}
                       <MatchCard
                         match={match}
                         canManage={canManage}
                         tournamentId={tournamentId}
-                        gameInfo={!isChampionship && gameInfoText ? gameInfoText : (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
+                        gameInfo={gameInfoText ?? (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
                         partnerMap={partnerMap}
+                        bestOf3={isBestOf3}
                       />
                     </div>
                   );
@@ -675,17 +680,19 @@ function MatchCard({
   tournamentId,
   gameInfo,
   partnerMap,
+  bestOf3,
 }: {
   match: TournamentMatch;
   canManage: boolean;
   tournamentId: string;
   gameInfo?: string;
   partnerMap?: PartnerMap;
+  bestOf3?: boolean;
 }) {
   const router = useRouter();
   const [scoring, setScoring] = useState(false);
-  const [score1Input, setScore1Input] = useState("");
-  const [score2Input, setScore2Input] = useState("");
+  // For best-of-3: individual game scores; for single game: just one pair
+  const [gameScores, setGameScores] = useState<{ s1: string; s2: string }[]>([{ s1: "", s2: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -704,33 +711,88 @@ function MatchCard({
   const p2Won = isCompleted && match.winner_id === match.player2_id;
 
   function openEdit() {
-    // Pre-fill with existing scores when editing
     if (isCompleted && match.score1.length > 0) {
-      setScore1Input(match.score1.join(","));
-      setScore2Input(match.score2.join(","));
+      // Populate game-by-game scores
+      const games = match.score1.map((s1Val, i) => ({
+        s1: String(s1Val),
+        s2: String(match.score2[i] ?? 0),
+      }));
+      setGameScores(games.length > 0 ? games : [{ s1: "", s2: "" }]);
     }
     setScoring(true);
+  }
+
+  function openNew() {
+    // For best-of-3 start with 2 game rows; for single game just 1
+    if (bestOf3) {
+      setGameScores([{ s1: "", s2: "" }, { s1: "", s2: "" }]);
+    } else {
+      setGameScores([{ s1: "", s2: "" }]);
+    }
+    setScoring(true);
+  }
+
+  function updateGameScore(index: number, field: "s1" | "s2", value: string) {
+    setGameScores((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  }
+
+  function addGame() {
+    if (gameScores.length < 3) {
+      setGameScores((prev) => [...prev, { s1: "", s2: "" }]);
+    }
+  }
+
+  function removeGame(index: number) {
+    if (gameScores.length > 1) {
+      setGameScores((prev) => prev.filter((_, i) => i !== index));
+    }
   }
 
   async function submitScore() {
     setSaving(true);
     setError("");
 
-    const s1 = score1Input.split(",").map((s) => parseInt(s.trim())).filter((n) => !isNaN(n));
-    const s2 = score2Input.split(",").map((s) => parseInt(s.trim())).filter((n) => !isNaN(n));
+    const s1: number[] = [];
+    const s2: number[] = [];
+    for (const game of gameScores) {
+      const v1 = parseInt(game.s1.trim());
+      const v2 = parseInt(game.s2.trim());
+      if (isNaN(v1) || isNaN(v2)) continue;
+      s1.push(v1);
+      s2.push(v2);
+    }
 
-    if (s1.length === 0 || s2.length === 0) {
-      setError("Enter scores (comma-separated for multiple games)");
+    if (s1.length === 0) {
+      setError("Enter scores for at least one game");
       setSaving(false);
       return;
     }
 
     // Determine winner by games won
     let p1Games = 0, p2Games = 0;
-    for (let i = 0; i < Math.max(s1.length, s2.length); i++) {
-      if ((s1[i] ?? 0) > (s2[i] ?? 0)) p1Games++;
-      else p2Games++;
+    for (let i = 0; i < s1.length; i++) {
+      if (s1[i] > s2[i]) p1Games++;
+      else if (s2[i] > s1[i]) p2Games++;
     }
+
+    // Best-of-3 validation: need exactly 2 wins
+    if (bestOf3) {
+      if (p1Games < 2 && p2Games < 2) {
+        setError("Best 2 of 3: a team must win 2 games. Add another game score.");
+        setSaving(false);
+        return;
+      }
+      if (s1.length > 3) {
+        setError("Best 2 of 3: maximum 3 games allowed.");
+        setSaving(false);
+        return;
+      }
+    }
+
     const winner = p1Games >= p2Games ? match.player1_id : match.player2_id;
 
     const res = await fetch(`/api/tournaments/${tournamentId}/bracket`, {
@@ -755,6 +817,22 @@ function MatchCard({
     router.refresh();
   }
 
+  // Multi-game match (best-of-3 etc)
+  const isMultiGame = isCompleted && match.score1.length > 1;
+
+  // Count game wins for each player (used for tennis-style display)
+  let p1GameWins = 0, p2GameWins = 0;
+  if (isCompleted) {
+    for (let i = 0; i < match.score1.length; i++) {
+      if (match.score1[i] > (match.score2[i] ?? 0)) p1GameWins++;
+      else if ((match.score2[i] ?? 0) > match.score1[i]) p2GameWins++;
+    }
+  }
+
+  // For best-of-3, only highlight winner name when they've won 2 games
+  const p1MatchWinner = bestOf3 ? (p1GameWins >= 2) : p1Won;
+  const p2MatchWinner = bestOf3 ? (p2GameWins >= 2) : p2Won;
+
   return (
     <div className={`rounded-lg px-3 py-2 ${isCompleted ? "bg-surface-overlay" : isBye ? "bg-surface-overlay/50" : "bg-surface-raised border border-surface-border"}`}>
       {isBye && (
@@ -768,6 +846,65 @@ function MatchCard({
 
       {!isBye && (
         <>
+          {/* Tennis-style scoreboard for multi-game matches */}
+          {isMultiGame ? (
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                {/* Scoreboard table */}
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr>
+                      <th className="text-left pb-1"></th>
+                      {match.score1.map((_, i) => (
+                        <th key={i} className="text-center pb-1 px-1.5 text-surface-muted font-medium w-8">
+                          G{i + 1}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Player 1 row */}
+                    <tr>
+                      <td className={`pr-2 text-sm truncate max-w-[120px] ${p1MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                        {p1Name}
+                      </td>
+                      {match.score1.map((s1Val, i) => {
+                        const won = s1Val > (match.score2[i] ?? 0);
+                        return (
+                          <td key={i} className={`text-center px-1.5 font-mono ${won ? "text-teal-300 font-semibold" : "text-dark-200"}`}>
+                            {s1Val}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {/* Player 2 row */}
+                    <tr>
+                      <td className={`pr-2 text-sm truncate max-w-[120px] ${p2MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                        {p2Name}
+                      </td>
+                      {match.score2.map((s2Val, i) => {
+                        const won = s2Val > (match.score1[i] ?? 0);
+                        return (
+                          <td key={i} className={`text-center px-1.5 font-mono ${won ? "text-teal-300 font-semibold" : "text-dark-200"}`}>
+                            {s2Val}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {canEdit && !scoring && (
+                <button
+                  onClick={openEdit}
+                  className="shrink-0 self-center rounded-md bg-surface-raised px-3 py-2 text-xs font-medium text-surface-muted hover:text-brand-300 transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+          ) : (
           <div className="flex items-start gap-3">
             {/* Teams + Scores */}
             <div className="flex-1 min-w-0">
@@ -801,7 +938,7 @@ function MatchCard({
             {/* Enter Score / Edit Score button — to the right */}
             {canEnterNew && !scoring && (
               <button
-                onClick={() => setScoring(true)}
+                onClick={openNew}
                 className="shrink-0 self-center rounded-md bg-brand-300/20 px-3 py-2 text-xs font-semibold text-brand-300 hover:bg-brand-300/30 transition-colors"
               >
                 Enter Score
@@ -817,6 +954,7 @@ function MatchCard({
               </button>
             )}
           </div>
+          )}
 
           {/* Game Info */}
           {gameInfo && !isCompleted && match.player1_id && match.player2_id && (
@@ -824,28 +962,55 @@ function MatchCard({
           )}
 
           {scoring && (
-            <div className="mt-2 space-y-1.5">
-              {/* Team 1 score row */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-dark-200 truncate flex-1 min-w-0">{p1Name}</span>
-                <input
-                  type="text"
-                  value={score1Input}
-                  onChange={(e) => setScore1Input(e.target.value)}
-                  className="input w-20 py-1 text-center text-xs shrink-0"
-                  autoFocus
-                />
-              </div>
-              {/* Team 2 score row */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-dark-200 truncate flex-1 min-w-0">{p2Name}</span>
-                <input
-                  type="text"
-                  value={score2Input}
-                  onChange={(e) => setScore2Input(e.target.value)}
-                  className="input w-20 py-1 text-center text-xs shrink-0"
-                />
-              </div>
+            <div className="mt-2 space-y-2">
+              {gameScores.map((game, i) => (
+                <div key={i}>
+                  {bestOf3 && (
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs font-medium text-surface-muted">Game {i + 1}</span>
+                      {gameScores.length > 1 && (
+                        <button
+                          onClick={() => removeGame(i)}
+                          className="text-xs text-red-400 hover:text-red-300"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-dark-200 truncate flex-1 min-w-0">{p1Name}</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={game.s1}
+                      onChange={(e) => updateGameScore(i, "s1", e.target.value)}
+                      className="input w-16 py-1 text-center text-xs shrink-0"
+                      autoFocus={i === 0}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-dark-200 truncate flex-1 min-w-0">{p2Name}</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={game.s2}
+                      onChange={(e) => updateGameScore(i, "s2", e.target.value)}
+                      className="input w-16 py-1 text-center text-xs shrink-0"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {bestOf3 && gameScores.length < 3 && (
+                <button
+                  onClick={addGame}
+                  className="text-xs text-brand-300 hover:text-brand-200 font-medium"
+                >
+                  + Add Game {gameScores.length + 1}
+                </button>
+              )}
+
               <div className="flex gap-2 mt-1">
                 <button onClick={submitScore} disabled={saving} className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-teal-500 disabled:opacity-50">
                   {saving ? "Saving..." : "Save Score"}
