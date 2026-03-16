@@ -274,14 +274,6 @@ export default async function TournamentDetailPage({
         />
       )}
 
-      {/* Delete — always visible to admins/organizers */}
-      {canManage && (
-        <div className="card">
-          <h2 className="text-sm font-semibold text-dark-200 mb-3">Danger Zone</h2>
-          <DeleteTournamentButton tournamentId={id} />
-        </div>
-      )}
-
       {/* Brackets by Division — tabbed UI when in_progress with multiple divisions */}
       {matches.length > 0 && (
         <DivisionBrackets
@@ -379,6 +371,24 @@ export default async function TournamentDetailPage({
           </div>
         </div>
       )}
+
+      {/* Danger Zone — at the very bottom */}
+      {canManage && tournament.status !== "cancelled" && (
+        <div className="card border border-red-500/30">
+          <h2 className="text-sm font-semibold text-red-400 mb-3">Danger Zone</h2>
+          <div className="flex flex-wrap gap-2">
+            {tournament.status !== "completed" && (
+              <StatusAdvanceButton
+                tournamentId={id}
+                nextStatus="cancelled"
+                label="Cancel Tournament"
+                variant="danger"
+              />
+            )}
+            <DeleteTournamentButton tournamentId={id} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -398,29 +408,18 @@ function OrganizerControls({
   };
 
   const action = nextAction[status];
-  const showCancel = status !== "completed" && status !== "registration_closed";
 
-  if (!action && !showCancel) return null;
+  if (!action) return null;
 
   return (
     <div className="card">
       <h2 className="text-sm font-semibold text-dark-200 mb-3">Organizer Controls</h2>
       <div className="flex flex-wrap gap-2">
-        {action && (
-          <StatusAdvanceButton
-            tournamentId={tournamentId}
-            nextStatus={action.next}
-            label={action.label}
-          />
-        )}
-        {showCancel && (
-          <StatusAdvanceButton
-            tournamentId={tournamentId}
-            nextStatus="cancelled"
-            label="Cancel Tournament"
-            variant="danger"
-          />
-        )}
+        <StatusAdvanceButton
+          tournamentId={tournamentId}
+          nextStatus={action.next}
+          label={action.label}
+        />
       </div>
     </div>
   );
