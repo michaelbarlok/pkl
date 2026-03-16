@@ -8,6 +8,7 @@ import { DivisionReview } from "@/components/division-review";
 import { DeleteTournamentButton } from "@/components/delete-tournament-button";
 import { CoOrganizerManager } from "@/components/co-organizer-manager";
 import { getDivisionLabel } from "@/lib/divisions";
+import { DivisionBrackets } from "./division-brackets";
 import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -281,77 +282,25 @@ export default async function TournamentDetailPage({
         </div>
       )}
 
-      {/* Division Rules Card — shown to registered players when tournament is active */}
-      {isInProgress && myDivision && tournament.format === "round_robin" && (
-        <div className="card border border-brand-300/20">
-          <h2 className="text-sm font-semibold text-dark-100 mb-2">
-            Your Division: {getDivisionLabel(myDivision)}
-          </h2>
-          <div className="text-xs text-dark-200 space-y-1.5">
-            <p>
-              <span className="font-medium">Format:</span> Round Robin pool play followed by a seeded playoff bracket with a 3rd place game.
-            </p>
-            <p>
-              <span className="font-medium">Pool play games to:</span> {tournament.score_to_win_pool ?? 11} &mdash;
-              <span className="font-medium"> Playoff games to:</span> {tournament.score_to_win_playoff ?? 11}
-            </p>
-            {tournament.finals_best_of_3 && (
-              <p><span className="font-medium">Championship final:</span> Best 2 out of 3 games</p>
-            )}
-            <p className="text-surface-muted">
-              Standings are determined by win-loss record, then point differential. Your bracket below updates live as scores are entered.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Brackets by Division */}
+      {/* Brackets by Division — tabbed UI when in_progress with multiple divisions */}
       {matches.length > 0 && (
-        <div className="space-y-8">
-          {/* Division jump nav */}
-          {divisionMatches.size > 1 && (
-            <div>
-              <h2 className="text-lg font-semibold text-dark-100 mb-3">Brackets</h2>
-              <div className="flex flex-wrap gap-2">
-                {Array.from(divisionMatches.keys()).map((div) => (
-                  <a
-                    key={div}
-                    href={`#division-${div}`}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                      div === myDivision
-                        ? "bg-brand-300/20 text-brand-300 hover:bg-brand-300/30"
-                        : "bg-surface-overlay text-surface-muted hover:text-dark-200 hover:bg-surface-raised"
-                    }`}
-                  >
-                    {div === "__none__" ? "All" : getDivisionLabel(div)}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {Array.from(divisionMatches.entries()).map(([div, divMatches]) => (
-            <div key={div} id={`division-${div}`} className="scroll-mt-4">
-              <h2 className="text-lg font-semibold text-dark-100 mb-3">
-                {div === "__none__" ? "Bracket" : getDivisionLabel(div)}
-                {div === myDivision && (
-                  <span className="ml-2 text-xs font-medium text-brand-300">(Your Division)</span>
-                )}
-              </h2>
-              <TournamentBracketView
-                matches={divMatches}
-                format={tournament.format}
-                canManage={canManage}
-                tournamentId={id}
-                division={div === "__none__" ? undefined : div}
-                scoreToWinPool={tournament.score_to_win_pool ?? undefined}
-                scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
-                finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
-                partnerMap={partnerMap}
-              />
-            </div>
-          ))}
-        </div>
+        <DivisionBrackets
+          divisionMatchesEntries={Array.from(divisionMatches.entries()).map(([div, divMatches]) => ({
+            division: div,
+            matches: divMatches,
+          }))}
+          tournament={{
+            format: tournament.format,
+            score_to_win_pool: tournament.score_to_win_pool ?? undefined,
+            score_to_win_playoff: tournament.score_to_win_playoff ?? undefined,
+            finals_best_of_3: tournament.finals_best_of_3 ?? undefined,
+          }}
+          canManage={canManage}
+          tournamentId={id}
+          myDivision={myDivision}
+          partnerMap={partnerMap}
+          isRoundRobin={tournament.format === "round_robin"}
+        />
       )}
 
       {/* Registrations List */}
