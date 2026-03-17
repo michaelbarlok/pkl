@@ -365,9 +365,10 @@ export default async function GroupPage({
                 {member.player?.display_name}
               </span>
               {!isFreePlay && (
-                <span className="text-xs text-surface-muted shrink-0">
-                  Step {member.current_step} &middot; {member.win_pct}%
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-medium text-dark-200">Step {member.current_step}</span>
+                  <span className="text-xs font-semibold text-brand-400">{member.win_pct}%</span>
+                </div>
               )}
             </div>
           ))}
