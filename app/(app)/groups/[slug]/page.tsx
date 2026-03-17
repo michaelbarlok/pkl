@@ -336,7 +336,50 @@ export default async function GroupPage({
         <h2 className="mb-4 text-lg font-semibold text-dark-100">
           Members ({members.length})
         </h2>
-        <div className="card overflow-hidden p-0">
+
+        {/* Mobile: card list */}
+        <div className="space-y-2 sm:hidden">
+          {members.map((member, index) => (
+            <div
+              key={member.player_id}
+              className={cn(
+                "card flex items-center gap-3",
+                member.player_id === profile?.id && "ring-2 ring-brand-500/40"
+              )}
+            >
+              <span className="text-sm font-medium text-surface-muted w-5 text-center shrink-0">
+                {index + 1}
+              </span>
+              {member.player?.avatar_url ? (
+                <img
+                  src={member.player.avatar_url}
+                  alt=""
+                  className="h-8 w-8 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted shrink-0">
+                  {member.player?.display_name?.charAt(0) ?? "?"}
+                </div>
+              )}
+              <span className="text-sm font-medium text-dark-100 truncate flex-1 min-w-0">
+                {member.player?.display_name}
+              </span>
+              {!isFreePlay && (
+                <span className="text-xs text-surface-muted shrink-0">
+                  Step {member.current_step} &middot; {member.win_pct}%
+                </span>
+              )}
+            </div>
+          ))}
+          {members.length === 0 && (
+            <div className="card py-8 text-center text-sm text-surface-muted">
+              No members yet.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop: table */}
+        <div className="card overflow-hidden p-0 hidden sm:block">
           <div className="max-h-[32rem] overflow-y-auto">
             <table className="min-w-full divide-y divide-surface-border">
               <thead className="bg-surface-overlay sticky top-0 z-10">
