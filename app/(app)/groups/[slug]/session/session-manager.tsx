@@ -71,6 +71,7 @@ export function SessionManager({
 
   return (
     <ActivePhase
+      key={activeSession.currentRound?.roundNumber ?? activeSession.id}
       group={group}
       members={members}
       session={activeSession}
