@@ -3,9 +3,17 @@
 import { useSupabase } from "@/components/providers/supabase-provider";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+function RegisterForm() {
   const { supabase } = useSupabase();
   const router = useRouter();
   const searchParams = useSearchParams();
