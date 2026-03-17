@@ -146,7 +146,7 @@ export function InviteButton({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/60"
@@ -154,7 +154,7 @@ export function InviteButton({
           />
 
           {/* Modal */}
-          <div className="relative w-full max-w-md rounded-xl bg-surface-raised shadow-2xl ring-1 ring-surface-border">
+          <div className="relative w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-surface-raised shadow-2xl ring-1 ring-surface-border">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-surface-border px-5 py-4">
               <h3 className="text-base font-semibold text-dark-100">
