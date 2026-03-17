@@ -72,12 +72,17 @@ export default function CreateGroupPage() {
 
     // Add creator as group admin
     const startStep = Number(formData.get("new_player_start_step")) || 5;
-    await supabase.from("group_memberships").insert({
-      group_id: newGroup.id,
-      player_id: profile.id,
-      current_step: startStep,
-      group_role: "admin",
-    });
+    await supabase.from("group_memberships").upsert(
+      {
+        group_id: newGroup.id,
+        player_id: profile.id,
+        current_step: startStep,
+        win_pct: 0,
+        total_sessions: 0,
+        group_role: "admin",
+      },
+      { onConflict: "group_id,player_id", ignoreDuplicates: true }
+    );
 
     revalidatePath("/groups");
     redirect(`/groups/${newGroup.slug}`);

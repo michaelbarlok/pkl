@@ -78,13 +78,16 @@ export default async function GroupsPage() {
       startStep = prefs?.new_player_start_step ?? 5;
     }
 
-    await supabase.from("group_memberships").insert({
-      group_id: groupId,
-      player_id: p.id,
-      current_step: startStep,
-      win_pct: 0,
-      total_sessions: 0,
-    });
+    await supabase.from("group_memberships").upsert(
+      {
+        group_id: groupId,
+        player_id: p.id,
+        current_step: startStep,
+        win_pct: 0,
+        total_sessions: 0,
+      },
+      { onConflict: "group_id,player_id", ignoreDuplicates: true }
+    );
 
     revalidatePath("/groups");
   }

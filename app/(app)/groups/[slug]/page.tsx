@@ -427,17 +427,22 @@ function JoinButton({
       startStep = prefs?.new_player_start_step ?? 5;
     }
 
-    await supabase.from("group_memberships").insert({
-      group_id: groupId,
-      player_id: playerId,
-      current_step: startStep,
-      win_pct: 0,
-      total_sessions: 0,
-    });
+    await supabase.from("group_memberships").upsert(
+      {
+        group_id: groupId,
+        player_id: playerId,
+        current_step: startStep,
+        win_pct: 0,
+        total_sessions: 0,
+      },
+      { onConflict: "group_id,player_id", ignoreDuplicates: true }
+    );
 
     const { revalidatePath } = await import("next/cache");
+    const { redirect } = await import("next/navigation");
     revalidatePath(`/groups/${slug}`);
     revalidatePath("/groups");
+    redirect(`/groups/${slug}`);
   }
 
   return (
