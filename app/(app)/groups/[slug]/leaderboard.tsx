@@ -2,9 +2,10 @@ import { cn } from "@/lib/utils";
 
 interface PlayerStat {
   player_id: string;
-  wins: number;
-  losses: number;
-  total_point_diff: number;
+  points_won: number;
+  points_possible: number;
+  games_played: number;
+  pct: number;
   player: {
     id: string;
     display_name: string;
@@ -32,23 +33,22 @@ export function FreePlayLeaderboard({
                 Player
               </th>
               <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                W
+                Pts Won %
               </th>
               <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                L
+                Games
               </th>
               <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Win %
+                Pts Won
               </th>
               <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Pt Diff
+                Pts Possible
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">
             {stats.map((stat, index) => {
-              const total = stat.wins + stat.losses;
-              const winPct = total > 0 ? ((stat.wins / total) * 100).toFixed(1) : "0.0";
+              const pctDisplay = stat.pct.toFixed(1);
 
               return (
                 <tr
@@ -78,20 +78,17 @@ export function FreePlayLeaderboard({
                       </span>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-right text-sm text-teal-300 font-medium">
-                    {stat.wins}
-                  </td>
-                  <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-right text-sm text-red-400 font-medium">
-                    {stat.losses}
+                  <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-right text-sm font-semibold text-brand-400">
+                    {pctDisplay}%
                   </td>
                   <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-right text-sm text-dark-100">
-                    {winPct}%
+                    {stat.games_played}
                   </td>
                   <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-right text-sm text-dark-100">
-                    <span className={stat.total_point_diff > 0 ? "text-teal-300" : stat.total_point_diff < 0 ? "text-red-400" : ""}>
-                      {stat.total_point_diff > 0 ? "+" : ""}
-                      {stat.total_point_diff}
-                    </span>
+                    {stat.points_won}
+                  </td>
+                  <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-right text-sm text-surface-muted">
+                    {stat.points_possible}
                   </td>
                 </tr>
               );

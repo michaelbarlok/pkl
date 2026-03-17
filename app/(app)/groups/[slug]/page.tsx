@@ -8,6 +8,7 @@ import { formatDate, formatTime } from "@/lib/utils";
 import { FreePlayLeaderboard } from "./leaderboard";
 import { InviteButton } from "./invite-button";
 import { ResetStatsButton } from "./reset-stats-button";
+import { RollingSessionsSetting } from "./rolling-sessions-setting";
 import type { GroupWithPreferences } from "@/lib/queries/group";
 
 export default async function GroupPage({
@@ -77,6 +78,19 @@ export default async function GroupPage({
   if (!group) notFound();
 
   const isMember = profile ? await isGroupMember(group.id, profile.id) : false;
+
+  // Check if user is a group admin
+  let isGroupAdmin = false;
+  if (isMember && profile) {
+    const { data: membership } = await supabase
+      .from("group_memberships")
+      .select("group_role")
+      .eq("group_id", group.id)
+      .eq("player_id", profile.id)
+      .maybeSingle();
+    isGroupAdmin = membership?.group_role === "admin";
+  }
+
   const members = await getGroupMembers(group.id);
   const sheets = await getGroupSheets(group.id);
   const isFreePlay = group.group_type === "free_play";
@@ -207,14 +221,22 @@ export default async function GroupPage({
 
       {/* Free Play: Session + Standings */}
       {isFreePlay && isMember && (
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href={`/groups/${slug}/session`}
-            className={activeSessionId ? "btn-primary" : "btn-primary"}
-          >
-            {activeSessionId ? "Continue Session" : "Start Session"}
-          </Link>
-          <ResetStatsButton groupId={group.id} />
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={`/groups/${slug}/session`}
+              className={activeSessionId ? "btn-primary" : "btn-primary"}
+            >
+              {activeSessionId ? "Continue Session" : "Start Session"}
+            </Link>
+            <ResetStatsButton groupId={group.id} />
+          </div>
+          {isGroupAdmin && (
+            <RollingSessionsSetting
+              groupId={group.id}
+              currentValue={group.rolling_sessions_count ?? 14}
+            />
+          )}
         </div>
       )}
 
