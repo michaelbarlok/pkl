@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { GroupList, type GroupCardData } from "./group-list";
@@ -78,7 +78,9 @@ export default async function GroupsPage() {
       startStep = prefs?.new_player_start_step ?? 5;
     }
 
-    await supabase.from("group_memberships").upsert(
+    // Use service client to bypass RLS for membership insert
+    const serviceClient = await createServiceClient();
+    await serviceClient.from("group_memberships").upsert(
       {
         group_id: groupId,
         player_id: p.id,
@@ -86,7 +88,7 @@ export default async function GroupsPage() {
         win_pct: 0,
         total_sessions: 0,
       },
-      { onConflict: "group_id,player_id", ignoreDuplicates: true }
+      { onConflict: "group_id,player_id" }
     );
 
     revalidatePath("/groups");

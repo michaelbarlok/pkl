@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
@@ -70,9 +70,10 @@ export default function CreateGroupPage() {
       });
     }
 
-    // Add creator as group admin
+    // Add creator as group admin (use service client to bypass RLS)
+    const serviceClient = await createServiceClient();
     const startStep = Number(formData.get("new_player_start_step")) || 5;
-    await supabase.from("group_memberships").upsert(
+    await serviceClient.from("group_memberships").upsert(
       {
         group_id: newGroup.id,
         player_id: profile.id,
@@ -81,7 +82,7 @@ export default function CreateGroupPage() {
         total_sessions: 0,
         group_role: "admin",
       },
-      { onConflict: "group_id,player_id", ignoreDuplicates: true }
+      { onConflict: "group_id,player_id" }
     );
 
     revalidatePath("/groups");

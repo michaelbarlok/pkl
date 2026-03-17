@@ -427,7 +427,9 @@ function JoinButton({
       startStep = prefs?.new_player_start_step ?? 5;
     }
 
-    await supabase.from("group_memberships").upsert(
+    // Use service client to bypass RLS for membership insert
+    const serviceClient = await createServiceClient();
+    await serviceClient.from("group_memberships").upsert(
       {
         group_id: groupId,
         player_id: playerId,
@@ -435,7 +437,7 @@ function JoinButton({
         win_pct: 0,
         total_sessions: 0,
       },
-      { onConflict: "group_id,player_id", ignoreDuplicates: true }
+      { onConflict: "group_id,player_id" }
     );
 
     const { revalidatePath } = await import("next/cache");
