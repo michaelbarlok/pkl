@@ -136,6 +136,7 @@ export interface ShootoutGroup {
   state?: string | null;
   created_by: string;
   is_active: boolean;
+  rolling_sessions_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -428,9 +429,10 @@ export interface FreePlayMatch {
 export interface FreePlayPlayerStats {
   group_id: string;
   player_id: string;
-  wins: number;
-  losses: number;
-  total_point_diff: number;
+  points_won: number;
+  points_possible: number;
+  games_played: number;
+  pct: number;
 }
 
 // ============================================================
