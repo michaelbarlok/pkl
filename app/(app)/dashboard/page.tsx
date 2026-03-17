@@ -73,12 +73,16 @@ export default async function DashboardPage() {
     }
   }
 
-  const upcomingTournaments = [
+  const allTournaments = [
     ...(myTournamentRegs ?? []).filter((r: any) => r.tournament && !["completed", "cancelled"].includes(r.tournament.status)),
     ...organizerTournaments,
   ].sort((a: any, b: any) => a.tournament.start_date.localeCompare(b.tournament.start_date));
 
-  // Fetch active session (player is checked in, session is not complete)
+  // Split tournaments into active (in_progress) and upcoming
+  const activeTournaments = allTournaments.filter((r: any) => r.tournament.status === "in_progress");
+  const upcomingTournaments = allTournaments.filter((r: any) => r.tournament.status !== "in_progress");
+
+  // Fetch active sessions (player is checked in, session is not complete)
   const { data: activeParticipant } = await supabase
     .from("session_participants")
     .select("session_id, court_number, session:shootout_sessions(id, status, num_courts, group:shootout_groups(name), sheet:signup_sheets(event_date, location))")
@@ -86,10 +90,12 @@ export default async function DashboardPage() {
     .eq("checked_in", true)
     .limit(10);
 
-  const activeSession = activeParticipant?.find((p: any) => {
+  const activeSessions = (activeParticipant ?? []).filter((p: any) => {
     const status = p.session?.status;
     return status && !["session_complete", "created"].includes(status);
-  }) as any;
+  });
+
+  const hasActiveSessions = activeSessions.length > 0 || activeTournaments.length > 0;
 
   return (
     <div className="space-y-8">
@@ -102,29 +108,61 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Active Session Banner */}
-      {activeSession?.session && (
-        <Link
-          href={`/sessions/${activeSession.session_id}`}
-          className="card flex items-center justify-between bg-teal-900/30 border border-teal-500/30 hover:border-teal-500/50 transition-colors"
-        >
-          <div>
-            <p className="text-sm font-semibold text-teal-300">Active Session</p>
-            <p className="text-lg font-bold text-dark-100">
-              {activeSession.session.group?.name ?? "Shootout"}
-              {activeSession.court_number && ` — Court ${activeSession.court_number}`}
-            </p>
-            <p className="text-xs text-surface-muted">
-              {activeSession.session.sheet?.location ?? ""}
-            </p>
+      {/* Active Sessions */}
+      {hasActiveSessions && (
+        <section>
+          <h2 className="text-lg font-semibold text-dark-100 mb-4">Active Sessions</h2>
+          <div className="space-y-3">
+            {activeSessions.map((ap: any) => (
+              <Link
+                key={ap.session_id}
+                href={`/sessions/${ap.session_id}`}
+                className="card flex items-center justify-between bg-teal-900/30 border border-teal-500/30 hover:border-teal-500/50 transition-colors"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-teal-300">Group Session</p>
+                  <p className="text-lg font-bold text-dark-100">
+                    {ap.session?.group?.name ?? "Shootout"}
+                    {ap.court_number && ` — Court ${ap.court_number}`}
+                  </p>
+                  <p className="text-xs text-surface-muted">
+                    {ap.session?.sheet?.location ?? ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-teal-300">
+                  <span className="text-sm font-medium">Go to session</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+                    <path fillRule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </Link>
+            ))}
+
+            {activeTournaments.map((reg: any) => (
+              <Link
+                key={reg.tournament_id}
+                href={`/tournaments/${reg.tournament_id}`}
+                className="card flex items-center justify-between bg-accent-900/30 border border-accent-500/30 hover:border-accent-500/50 transition-colors"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-accent-300">Tournament In Progress</p>
+                  <p className="text-lg font-bold text-dark-100">
+                    {reg.tournament.title}
+                  </p>
+                  <p className="text-xs text-surface-muted">
+                    {reg.tournament.location}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-accent-300">
+                  <span className="text-sm font-medium">Go to tournament</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+                    <path fillRule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </Link>
+            ))}
           </div>
-          <div className="flex items-center gap-2 text-teal-300">
-            <span className="text-sm font-medium">Go to session</span>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-              <path fillRule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clipRule="evenodd" />
-            </svg>
-          </div>
-        </Link>
+        </section>
       )}
 
       {/* Quick Stats */}
@@ -138,7 +176,7 @@ export default async function DashboardPage() {
         <div className="card">
           <p className="text-sm text-surface-muted">Upcoming Events</p>
           <p className="mt-1 text-2xl font-bold text-dark-100">
-            {(sheets?.length ?? 0) + upcomingTournaments.length}
+            {(sheets?.length ?? 0) + upcomingTournaments.length + activeTournaments.length + activeSessions.length}
           </p>
         </div>
         <div className="card">
