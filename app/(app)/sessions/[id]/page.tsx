@@ -6,24 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import { formatDate } from "@/lib/utils";
-
-const STATUS_LABELS: Record<string, string> = {
-  created: "Created",
-  checking_in: "Check-In Open",
-  seeding: "Seeding Courts",
-  round_active: "Round In Progress",
-  round_complete: "Round Complete",
-  session_complete: "Session Complete",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  created: "bg-surface-overlay text-dark-200",
-  checking_in: "bg-accent-900/40 text-accent-300",
-  seeding: "bg-brand-900/40 text-brand-300",
-  round_active: "bg-teal-900/30 text-teal-300",
-  round_complete: "bg-brand-900/40 text-brand-300",
-  session_complete: "bg-surface-overlay text-dark-200",
-};
+import { SESSION_STATUS_LABELS as STATUS_LABELS, SESSION_STATUS_COLORS as STATUS_COLORS } from "@/lib/status-colors";
 
 // ============================================================
 // Standings Calculation

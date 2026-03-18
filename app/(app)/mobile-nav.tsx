@@ -4,7 +4,7 @@ import { useSupabase } from "@/components/providers/supabase-provider";
 import type { Profile } from "@/types/database";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 const mainTabs = [
@@ -131,6 +131,45 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
   const isAdmin = profile.role === "admin";
   const showAdminNav = isAdmin || isGroupAdmin;
   const [moreOpen, setMoreOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap when menu is open
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setMoreOpen(false);
+      return;
+    }
+    if (e.key !== "Tab" || !menuRef.current) return;
+
+    const focusable = menuRef.current.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (moreOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+      // Focus first link in menu
+      setTimeout(() => {
+        menuRef.current?.querySelector<HTMLElement>("a, button")?.focus();
+      }, 100);
+    } else {
+      document.removeEventListener("keydown", handleKeyDown);
+    }
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [moreOpen, handleKeyDown]);
 
   // Close menu on route change
   useEffect(() => {
@@ -178,7 +217,7 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
           moreOpen ? "translate-y-0" : "translate-y-full"
         )}
       >
-        <div className="mx-2 mb-1 rounded-xl bg-surface-raised shadow-2xl ring-1 ring-surface-border overflow-hidden">
+        <div ref={menuRef} className="mx-2 mb-1 rounded-xl bg-surface-raised shadow-2xl ring-1 ring-surface-border overflow-hidden">
           {/* Profile header */}
           <div className="flex items-center gap-3 border-b border-surface-border px-4 py-3">
             {profile.avatar_url ? (

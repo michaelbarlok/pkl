@@ -32,6 +32,11 @@ function RegisterForm() {
   const passwordsMatch = password.length > 0 && password === confirmPassword;
   const passwordValid = hasMinLength && hasLetter && hasNumber && passwordsMatch;
 
+  // Password strength: 0-100
+  const strengthChecks = [hasMinLength, hasLetter, hasNumber, passwordsMatch];
+  const strengthPercent = password.length === 0 ? 0 : Math.round((strengthChecks.filter(Boolean).length / strengthChecks.length) * 100);
+  const strengthColor = strengthPercent <= 25 ? "bg-red-500" : strengthPercent <= 50 ? "bg-accent-500" : strengthPercent <= 75 ? "bg-amber-500" : "bg-teal-500";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!passwordValid) return;
@@ -145,6 +150,7 @@ function RegisterForm() {
           <input
             id="fullName"
             type="text"
+            autoComplete="name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             className="input"
@@ -159,6 +165,7 @@ function RegisterForm() {
           <input
             id="email"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="input"
@@ -173,23 +180,54 @@ function RegisterForm() {
           <input
             id="password"
             type="password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="input"
             required
           />
           {password.length > 0 && (
-            <ul className="mt-2 space-y-1 text-sm">
-              <li className={hasMinLength ? "text-green-400" : "text-red-400"}>
-                {hasMinLength ? "\u2713" : "\u2717"} At least 8 characters
-              </li>
-              <li className={hasLetter ? "text-green-400" : "text-red-400"}>
-                {hasLetter ? "\u2713" : "\u2717"} Contains a letter
-              </li>
-              <li className={hasNumber ? "text-green-400" : "text-red-400"}>
-                {hasNumber ? "\u2713" : "\u2717"} Contains a number
-              </li>
-            </ul>
+            <div className="mt-2 space-y-2">
+              {/* Strength bar */}
+              <div className="h-1.5 w-full rounded-full bg-surface-overlay overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${strengthColor}`}
+                  style={{ width: `${strengthPercent}%` }}
+                />
+              </div>
+              <ul role="list" aria-label="Password requirements" className="space-y-1 text-sm">
+                <li className={hasMinLength ? "text-teal-300" : "text-surface-muted"}>
+                  <span className="inline-flex items-center gap-1.5">
+                    {hasMinLength ? (
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                    ) : (
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><circle cx="12" cy="12" r="8" /></svg>
+                    )}
+                    At least 8 characters
+                  </span>
+                </li>
+                <li className={hasLetter ? "text-teal-300" : "text-surface-muted"}>
+                  <span className="inline-flex items-center gap-1.5">
+                    {hasLetter ? (
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                    ) : (
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><circle cx="12" cy="12" r="8" /></svg>
+                    )}
+                    Contains a letter
+                  </span>
+                </li>
+                <li className={hasNumber ? "text-teal-300" : "text-surface-muted"}>
+                  <span className="inline-flex items-center gap-1.5">
+                    {hasNumber ? (
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                    ) : (
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><circle cx="12" cy="12" r="8" /></svg>
+                    )}
+                    Contains a number
+                  </span>
+                </li>
+              </ul>
+            </div>
           )}
         </div>
 
@@ -200,20 +238,26 @@ function RegisterForm() {
           <input
             id="confirmPassword"
             type="password"
+            autoComplete="new-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="input"
             required
           />
           {confirmPassword.length > 0 && (
-            <p className={`mt-2 text-sm ${passwordsMatch ? "text-green-400" : "text-red-400"}`}>
-              {passwordsMatch ? "\u2713 Passwords match" : "\u2717 Passwords do not match"}
+            <p className={`mt-2 text-sm flex items-center gap-1.5 ${passwordsMatch ? "text-teal-300" : "text-red-300"}`} role="status">
+              {passwordsMatch ? (
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+              ) : (
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              )}
+              {passwordsMatch ? "Passwords match" : "Passwords do not match"}
             </p>
           )}
         </div>
 
         {error && (
-          <p className="text-sm text-red-400">{error}</p>
+          <p className="text-sm text-red-300" role="alert">{error}</p>
         )}
 
         <button type="submit" className="btn-primary w-full" disabled={loading || !passwordValid}>

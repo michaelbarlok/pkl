@@ -1,29 +1,12 @@
 import Link from "next/link";
 import type { TournamentWithCounts } from "@/lib/queries/tournament";
 import { formatDate, formatTime } from "@/lib/utils";
+import { TOURNAMENT_STATUS_COLORS, TOURNAMENT_STATUS_LABELS } from "@/lib/status-colors";
 
 const FORMAT_LABELS: Record<string, string> = {
   single_elimination: "Single Elim",
   double_elimination: "Double Elim",
   round_robin: "Round Robin",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-surface-overlay text-dark-200",
-  registration_open: "bg-teal-900/30 text-teal-300",
-  registration_closed: "bg-brand-900/40 text-brand-300",
-  in_progress: "bg-accent-900/40 text-accent-300",
-  completed: "bg-surface-overlay text-dark-200",
-  cancelled: "bg-red-900/30 text-red-400",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  registration_open: "Registration Open",
-  registration_closed: "Registration Closed",
-  in_progress: "In Progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
 };
 
 export function TournamentCard({ tournament }: { tournament: TournamentWithCounts }) {
@@ -35,8 +18,8 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithCount
       <Link href={`/tournaments/${t.id}`} className="flex-1">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="text-base font-semibold text-dark-100 line-clamp-2">{t.title}</h3>
-          <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[t.status] ?? ""}`}>
-            {STATUS_LABELS[t.status] ?? t.status}
+          <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TOURNAMENT_STATUS_COLORS[t.status] ?? ""}`}>
+            {TOURNAMENT_STATUS_LABELS[t.status] ?? t.status}
           </span>
         </div>
 

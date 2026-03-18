@@ -25,6 +25,28 @@ export function useToast() {
 
 let nextId = 0;
 
+function ToastIcon({ type }: { type: ToastType }) {
+  if (type === "success") {
+    return (
+      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+      </svg>
+    );
+  }
+  if (type === "error") {
+    return (
+      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+    </svg>
+  );
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -52,12 +74,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               role="alert"
               onClick={() => dismiss(t.id)}
               className={cn(
-                "rounded-lg px-4 py-3 text-sm font-medium shadow-lg ring-1 cursor-pointer animate-slide-up",
+                "flex items-center gap-2.5 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ring-1 cursor-pointer animate-slide-up",
                 t.type === "success" && "bg-teal-900/90 text-teal-200 ring-teal-500/30",
                 t.type === "error" && "bg-red-900/90 text-red-200 ring-red-500/30",
                 t.type === "info" && "bg-surface-raised text-dark-100 ring-surface-border"
               )}
             >
+              <ToastIcon type={t.type} />
               {t.message}
             </div>
           ))}
