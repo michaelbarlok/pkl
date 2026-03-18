@@ -120,7 +120,6 @@ export default async function RosterPage({
             <td className="py-3 pl-2 pr-4 text-right">
               <RosterRemoveButton
                 registrationId={reg.id}
-                sheetId={id}
                 playerName={reg.player?.display_name ?? "this player"}
               />
             </td>

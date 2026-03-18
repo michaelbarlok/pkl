@@ -1,21 +1,17 @@
 "use client";
 
-import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 interface RosterRemoveButtonProps {
   registrationId: string;
-  sheetId: string;
   playerName: string;
 }
 
 export function RosterRemoveButton({
   registrationId,
-  sheetId,
   playerName,
 }: RosterRemoveButtonProps) {
-  const { supabase } = useSupabase();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -24,12 +20,14 @@ export function RosterRemoveButton({
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("registrations")
-        .update({ status: "withdrawn" })
-        .eq("id", registrationId);
-
-      if (error) throw error;
+      const res = await fetch(
+        `/api/sheets/registrations/${registrationId}/remove`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to remove player");
+      }
       router.refresh();
     } catch (err) {
       console.error("Failed to remove player:", err);
