@@ -7,7 +7,7 @@ import { cn, formatDate } from "@/lib/utils";
 import type { Profile } from "@/types/database";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 
 interface MembershipInfo {
   step: number;
@@ -240,7 +240,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
           const memberships = membershipMap[profile.id] ?? [];
           return (
             <div key={profile.id} className="card space-y-3">
-              {/* Header: avatar + name + status */}
+              {/* Header: avatar + name + status + actions */}
               <div className="flex items-center gap-3">
                 {profile.avatar_url ? (
                   <img
@@ -265,6 +265,17 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                 <span className={profile.is_active ? "badge-green" : "badge-red"}>
                   {profile.is_active ? "Active" : "Inactive"}
                 </span>
+                <ActionsDropdown
+                  profile={profile}
+                  memberships={memberships}
+                  currentProfileId={currentProfileId}
+                  suspending={suspending}
+                  togglingGlobalRole={togglingGlobalRole}
+                  togglingGroupRole={togglingGroupRole}
+                  onSuspend={handleSuspend}
+                  onToggleGlobalRole={handleToggleGlobalRole}
+                  onToggleGroupRole={handleToggleGroupRole}
+                />
               </div>
 
               {/* Details row */}
@@ -276,79 +287,6 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                     {m.groupRole === "admin" ? "★ " : ""}{m.groupName}: Step {m.step}
                   </span>
                 ))}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-2 flex-wrap border-t border-surface-border pt-2">
-                {profile.id !== currentProfileId && (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleGlobalRole(profile.id, profile.role)}
-                    disabled={togglingGlobalRole === profile.id}
-                    className={cn(
-                      "text-xs px-2 py-1 rounded",
-                      profile.role === "admin"
-                        ? "bg-red-900/30 text-red-300 hover:bg-red-900/50"
-                        : "bg-purple-900/30 text-purple-300 hover:bg-purple-900/50",
-                      togglingGlobalRole === profile.id && "opacity-50"
-                    )}
-                  >
-                    {togglingGlobalRole === profile.id
-                      ? "..."
-                      : profile.role === "admin"
-                        ? "Remove Admin"
-                        : "Make Admin"}
-                  </button>
-                )}
-                {memberships.map((m) => {
-                  const key = `${profile.id}-${m.groupId}`;
-                  const isGroupAdmin = m.groupRole === "admin";
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleToggleGroupRole(profile.id, m.groupId, m.groupRole)}
-                      disabled={togglingGroupRole === key}
-                      className={cn(
-                        "text-xs px-2 py-1 rounded",
-                        isGroupAdmin
-                          ? "bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/50"
-                          : "bg-surface-overlay text-surface-muted hover:text-dark-100",
-                        togglingGroupRole === key && "opacity-50"
-                      )}
-                    >
-                      {togglingGroupRole === key
-                        ? "..."
-                        : isGroupAdmin
-                          ? `★ ${m.groupName}`
-                          : `${m.groupName} Admin`}
-                    </button>
-                  );
-                })}
-                <Link
-                  href={`/players/${profile.id}/edit`}
-                  className="text-xs text-brand-400 hover:text-brand-300"
-                >
-                  Edit
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => handleSuspend(profile.id, profile.is_active)}
-                  disabled={suspending === profile.id}
-                  className={cn(
-                    "text-xs",
-                    profile.is_active
-                      ? "text-red-400 hover:text-red-300"
-                      : "text-teal-300 hover:text-teal-200",
-                    suspending === profile.id && "opacity-50"
-                  )}
-                >
-                  {suspending === profile.id
-                    ? "..."
-                    : profile.is_active
-                      ? "Suspend"
-                      : "Activate"}
-                </button>
               </div>
             </div>
           );
@@ -385,8 +323,8 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Role
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Actions
+              <th className="w-10 px-4 py-3">
+                <span className="sr-only">Actions</span>
               </th>
             </tr>
           </thead>
@@ -465,85 +403,19 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                     </span>
                   </td>
 
-                  {/* Actions */}
+                  {/* Actions dropdown */}
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2 flex-wrap">
-                      {profile.id !== currentProfileId && (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleGlobalRole(profile.id, profile.role)}
-                          disabled={togglingGlobalRole === profile.id}
-                          className={cn(
-                            "text-xs px-2 py-1 rounded",
-                            profile.role === "admin"
-                              ? "bg-red-900/30 text-red-300 hover:bg-red-900/50"
-                              : "bg-purple-900/30 text-purple-300 hover:bg-purple-900/50",
-                            togglingGlobalRole === profile.id && "opacity-50"
-                          )}
-                          title={profile.role === "admin" ? "Remove global admin" : "Make global admin"}
-                        >
-                          {togglingGlobalRole === profile.id
-                            ? "..."
-                            : profile.role === "admin"
-                              ? "Remove Global Admin"
-                              : "Make Global Admin"}
-                        </button>
-                      )}
-                      {memberships.map((m) => {
-                        const key = `${profile.id}-${m.groupId}`;
-                        const isGroupAdmin = m.groupRole === "admin";
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() =>
-                              handleToggleGroupRole(profile.id, m.groupId, m.groupRole)
-                            }
-                            disabled={togglingGroupRole === key}
-                            className={cn(
-                              "text-xs px-2 py-1 rounded",
-                              isGroupAdmin
-                                ? "bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/50"
-                                : "bg-surface-overlay text-surface-muted hover:text-dark-100",
-                              togglingGroupRole === key && "opacity-50"
-                            )}
-                            title={isGroupAdmin ? `Remove ${m.groupName} admin` : `Make ${m.groupName} admin`}
-                          >
-                            {togglingGroupRole === key
-                              ? "..."
-                              : isGroupAdmin
-                                ? `★ ${m.groupName} Admin`
-                                : `Make ${m.groupName} Admin`}
-                          </button>
-                        );
-                      })}
-                      <Link
-                        href={`/players/${profile.id}/edit`}
-                        className="text-sm text-brand-400 hover:text-brand-300"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSuspend(profile.id, profile.is_active)
-                        }
-                        disabled={suspending === profile.id}
-                        className={cn(
-                          "text-sm",
-                          profile.is_active
-                            ? "text-red-400 hover:text-red-300"
-                            : "text-teal-300 hover:text-teal-200",
-                          suspending === profile.id && "opacity-50"
-                        )}
-                      >
-                        {suspending === profile.id
-                          ? "..."
-                          : profile.is_active
-                            ? "Suspend"
-                            : "Activate"}
-                      </button>
-                    </div>
+                    <ActionsDropdown
+                      profile={profile}
+                      memberships={memberships}
+                      currentProfileId={currentProfileId}
+                      suspending={suspending}
+                      togglingGlobalRole={togglingGlobalRole}
+                      togglingGroupRole={togglingGroupRole}
+                      onSuspend={handleSuspend}
+                      onToggleGlobalRole={handleToggleGlobalRole}
+                      onToggleGroupRole={handleToggleGroupRole}
+                    />
                   </td>
                 </tr>
               );
@@ -562,6 +434,180 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Actions Dropdown
+// ============================================================
+
+function ActionsDropdown({
+  profile,
+  memberships,
+  currentProfileId,
+  suspending,
+  togglingGlobalRole,
+  togglingGroupRole,
+  onSuspend,
+  onToggleGlobalRole,
+  onToggleGroupRole,
+}: {
+  profile: Profile;
+  memberships: MembershipInfo[];
+  currentProfileId: string;
+  suspending: string | null;
+  togglingGlobalRole: string | null;
+  togglingGroupRole: string | null;
+  onSuspend: (id: string, active: boolean) => void;
+  onToggleGlobalRole: (id: string, role: string) => void;
+  onToggleGroupRole: (id: string, groupId: string, role: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [groupAdminOpen, setGroupAdminOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setGroupAdminOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const isSelf = profile.id === currentProfileId;
+
+  return (
+    <div className="relative inline-block text-left" ref={ref}>
+      <button
+        type="button"
+        onClick={() => { setOpen(!open); setGroupAdminOpen(false); }}
+        className="rounded-md p-1.5 text-surface-muted hover:bg-surface-overlay hover:text-dark-100 transition-colors"
+        aria-label="Member actions"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+          <path d="M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM10 8.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM11.5 15.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-50 mt-1 w-52 rounded-lg bg-surface-raised shadow-xl ring-1 ring-surface-border py-1">
+          {/* Make Global Admin */}
+          {!isSelf && (
+            <button
+              type="button"
+              onClick={() => { onToggleGlobalRole(profile.id, profile.role); setOpen(false); }}
+              disabled={togglingGlobalRole === profile.id}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-dark-200 hover:bg-surface-overlay disabled:opacity-50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-purple-400">
+                <path fillRule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clipRule="evenodd" />
+              </svg>
+              {togglingGlobalRole === profile.id
+                ? "Updating..."
+                : profile.role === "admin"
+                  ? "Remove Global Admin"
+                  : "Make Global Admin"}
+            </button>
+          )}
+
+          {/* Make Group Admin (with nested submenu) */}
+          {memberships.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setGroupAdminOpen(!groupAdminOpen)}
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-sm text-dark-200 hover:bg-surface-overlay"
+              >
+                <span className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-amber-400">
+                    <path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM1.49 15.326a.78.78 0 0 1-.358-.442 3 3 0 0 1 4.308-3.516 6.484 6.484 0 0 0-1.905 3.959c-.023.222-.014.442.025.654a4.97 4.97 0 0 1-2.07-.655ZM16.44 15.98a4.97 4.97 0 0 0 2.07-.654.78.78 0 0 0 .357-.442 3 3 0 0 0-4.308-3.517 6.484 6.484 0 0 1 1.907 3.96 2.32 2.32 0 0 1-.026.654ZM18 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM5.304 16.19a.844.844 0 0 1-.277-.71 5 5 0 0 1 9.947 0 .843.843 0 0 1-.277.71A6.975 6.975 0 0 1 10 18a6.974 6.974 0 0 1-4.696-1.81Z" />
+                  </svg>
+                  Group Admin
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={cn("h-4 w-4 transition-transform", groupAdminOpen && "rotate-180")}>
+                  <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                </svg>
+              </button>
+
+              {groupAdminOpen && (
+                <div className="border-t border-surface-border bg-surface-overlay/50">
+                  {memberships.map((m) => {
+                    const key = `${profile.id}-${m.groupId}`;
+                    const isGroupAdmin = m.groupRole === "admin";
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => { onToggleGroupRole(profile.id, m.groupId, m.groupRole); setOpen(false); setGroupAdminOpen(false); }}
+                        disabled={togglingGroupRole === key}
+                        className="flex w-full items-center gap-2 px-5 py-1.5 text-sm hover:bg-surface-overlay disabled:opacity-50"
+                      >
+                        {isGroupAdmin ? (
+                          <span className="text-yellow-300">★ {m.groupName}</span>
+                        ) : (
+                          <span className="text-surface-muted">{m.groupName}</span>
+                        )}
+                        {togglingGroupRole === key && (
+                          <span className="text-xs text-surface-muted ml-auto">...</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="my-1 border-t border-surface-border" />
+
+          {/* Edit */}
+          <Link
+            href={`/players/${profile.id}/edit`}
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-dark-200 hover:bg-surface-overlay"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-brand-400">
+              <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+              <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+            </svg>
+            Edit
+          </Link>
+
+          {/* Suspend / Activate */}
+          <button
+            type="button"
+            onClick={() => { onSuspend(profile.id, profile.is_active); setOpen(false); }}
+            disabled={suspending === profile.id}
+            className={cn(
+              "flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-surface-overlay disabled:opacity-50",
+              profile.is_active ? "text-red-400" : "text-teal-300"
+            )}
+          >
+            {profile.is_active ? (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path fillRule="evenodd" d="M2 10a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm5-2.25A.75.75 0 0 1 7.75 7h.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75v-4.5Zm4 0a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75v-4.5Z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM9.555 7.168A1 1 0 0 0 8 8v4a1 1 0 0 0 1.555.832l3-2a1 1 0 0 0 0-1.664l-3-2Z" clipRule="evenodd" />
+              </svg>
+            )}
+            {suspending === profile.id
+              ? "Updating..."
+              : profile.is_active
+                ? "Suspend"
+                : "Activate"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
