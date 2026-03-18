@@ -20,7 +20,7 @@ export default async function HomePage() {
           Your pickleball community,<br className="hidden sm:block" /> all in one place.
         </h1>
         <p className="max-w-lg mx-auto text-base text-dark-200 sm:text-lg">
-          Sign up for shootouts, climb the rankings, manage your group, and never miss a match.
+          Track free play sessions, sign up for shootouts, climb the rankings, and never miss a match.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
           {isLoggedIn ? (
@@ -93,6 +93,47 @@ export default async function HomePage() {
                 <span className="badge-yellow">Waitlist</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Free Play */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+          <div className="order-2 sm:order-1 card p-0 overflow-hidden">
+            <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
+              <p className="text-xs font-medium uppercase text-surface-muted">Session Standings</p>
+            </div>
+            <div className="divide-y divide-surface-border">
+              {[
+                { rank: 1, name: "Alex M.", record: "4-1", diff: "+12", diffColor: "text-teal-300" },
+                { rank: 2, name: "Jordan T.", record: "3-1", diff: "+8", diffColor: "text-teal-300" },
+                { rank: 3, name: "Casey R.", record: "3-2", diff: "+3", diffColor: "text-teal-300" },
+                { rank: 4, name: "Morgan D.", record: "2-3", diff: "-4", diffColor: "text-red-400" },
+                { rank: 5, name: "Riley K.", record: "1-4", diff: "-9", diffColor: "text-red-400" },
+              ].map((p) => (
+                <div key={p.rank} className="flex items-center gap-3 px-4 py-2.5">
+                  <span className="text-sm font-medium text-surface-muted w-5 text-right">{p.rank}</span>
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
+                    {p.name.charAt(0)}
+                  </div>
+                  <span className="flex-1 text-sm font-medium text-dark-100">{p.name}</span>
+                  <span className="text-sm font-semibold text-dark-100">{p.record}</span>
+                  <span className={`text-sm font-semibold w-10 text-right ${p.diffColor}`}>{p.diff}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="order-1 sm:order-2 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-900/50">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-5 w-5 text-teal-300">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-dark-100">Free Play Tracking</h2>
+            </div>
+            <p className="text-dark-200">
+              Log casual games as you play and watch session standings update in real time. Track wins, losses, and point differential — no structured brackets needed. Just show up, play, and see where you stand.
+            </p>
           </div>
         </div>
 
@@ -234,7 +275,10 @@ export default async function HomePage() {
             </div>
             <div className="divide-y divide-surface-border">
               <div className="px-4 py-3">
-                <p className="text-sm font-semibold text-dark-100">Thursday Shootout</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-dark-100">Thursday Shootout</p>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-surface-muted">Ladder</span>
+                </div>
                 <div className="mt-1 flex gap-4 text-xs text-surface-muted">
                   <span>Step 2</span>
                   <span>72.5% Win</span>
@@ -242,19 +286,25 @@ export default async function HomePage() {
                 </div>
               </div>
               <div className="px-4 py-3">
-                <p className="text-sm font-semibold text-dark-100">Saturday Competitive</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-dark-100">Sunday Open Play</p>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-teal-400">Free Play</span>
+                </div>
+                <div className="mt-1 flex gap-4 text-xs text-surface-muted">
+                  <span>12-5 record</span>
+                  <span>+18 pts</span>
+                  <span>6 sessions</span>
+                </div>
+              </div>
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-dark-100">Saturday Competitive</p>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-surface-muted">Ladder</span>
+                </div>
                 <div className="mt-1 flex gap-4 text-xs text-surface-muted">
                   <span>Step 1</span>
                   <span>81.2% Win</span>
                   <span>8 sessions</span>
-                </div>
-              </div>
-              <div className="px-4 py-3">
-                <p className="text-sm font-semibold text-dark-100">Tuesday Casual</p>
-                <div className="mt-1 flex gap-4 text-xs text-surface-muted">
-                  <span>Step 3</span>
-                  <span>65.0% Win</span>
-                  <span>22 sessions</span>
                 </div>
               </div>
             </div>
@@ -269,7 +319,7 @@ export default async function HomePage() {
               <h2 className="text-xl font-bold text-dark-100">Groups &amp; Community</h2>
             </div>
             <p className="text-dark-200">
-              Join groups that match your schedule and skill level. Track your stats per group, see your win percentage, and follow along with community discussions in the forum.
+              Join groups that match your schedule and play style — ladder leagues for competitive tracking, or free play groups for casual sessions. Track your stats per group and follow along with community discussions in the forum.
             </p>
           </div>
         </div>
@@ -281,7 +331,7 @@ export default async function HomePage() {
           Ready to play?
         </h2>
         <p className="text-dark-200 max-w-md mx-auto">
-          Join the community and start competing in your first shootout.
+          Join the community and start tracking your games — casual or competitive.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
           {isLoggedIn ? (
