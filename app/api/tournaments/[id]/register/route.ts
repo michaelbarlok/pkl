@@ -1,4 +1,5 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -7,28 +8,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: tournamentId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
   const { partner_id, division } = body;
 
   // Fetch tournament
-  const { data: tournament } = await supabase
+  const { data: tournament } = await auth.supabase
     .from("tournaments")
     .select("*")
     .eq("id", tournamentId)
@@ -43,11 +31,11 @@ export async function POST(
   }
 
   // Check if player already registered (as player or partner)
-  const { data: existing } = await supabase
+  const { data: existing } = await auth.supabase
     .from("tournament_registrations")
     .select("id")
     .eq("tournament_id", tournamentId)
-    .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
+    .or(`player_id.eq.${auth.profile.id},partner_id.eq.${auth.profile.id}`)
     .neq("status", "withdrawn")
     .limit(1);
 
@@ -57,7 +45,7 @@ export async function POST(
 
   // If doubles, check partner isn't already registered
   if (partner_id) {
-    const { data: partnerExisting } = await supabase
+    const { data: partnerExisting } = await auth.supabase
       .from("tournament_registrations")
       .select("id")
       .eq("tournament_id", tournamentId)
@@ -75,7 +63,7 @@ export async function POST(
 
   // Check per-division cap
   if (tournament.max_teams_per_division && division) {
-    const { count: divisionConfirmed } = await supabase
+    const { count: divisionConfirmed } = await auth.supabase
       .from("tournament_registrations")
       .select("*", { count: "exact", head: true })
       .eq("tournament_id", tournamentId)
@@ -89,7 +77,7 @@ export async function POST(
 
   // Also check overall tournament cap
   if (!isFull && tournament.player_cap) {
-    const { count: confirmedCount } = await supabase
+    const { count: confirmedCount } = await auth.supabase
       .from("tournament_registrations")
       .select("*", { count: "exact", head: true })
       .eq("tournament_id", tournamentId)
@@ -105,7 +93,7 @@ export async function POST(
   // Compute waitlist position (per-division if division exists)
   let waitlistPosition = null;
   if (status === "waitlist") {
-    let query = supabase
+    let query = auth.supabase
       .from("tournament_registrations")
       .select("*", { count: "exact", head: true })
       .eq("tournament_id", tournamentId)
@@ -119,11 +107,11 @@ export async function POST(
     waitlistPosition = (waitlistCount ?? 0) + 1;
   }
 
-  const { data: registration, error } = await supabase
+  const { data: registration, error } = await auth.supabase
     .from("tournament_registrations")
     .insert({
       tournament_id: tournamentId,
-      player_id: profile.id,
+      player_id: auth.profile.id,
       partner_id: partner_id || null,
       division: division || null,
       status,
@@ -147,29 +135,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: tournamentId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   // Find registration (include division for waitlist promotion)
-  const { data: reg } = await supabase
+  const { data: reg } = await auth.supabase
     .from("tournament_registrations")
     .select("id, status, division")
     .eq("tournament_id", tournamentId)
-    .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
+    .or(`player_id.eq.${auth.profile.id},partner_id.eq.${auth.profile.id}`)
     .neq("status", "withdrawn")
     .single();
 
@@ -181,7 +156,7 @@ export async function DELETE(
   const division = reg.division;
 
   // Withdraw
-  await supabase
+  await auth.supabase
     .from("tournament_registrations")
     .update({ status: "withdrawn" })
     .eq("id", reg.id);
@@ -269,7 +244,7 @@ async function promoteTournamentWaitlist(
 
   if (playerProfile) {
     await notify({
-      userId: playerProfile.id,
+      profileId: playerProfile.id,
       type: "tournament_registration",
       title: "You're in!",
       body: `A spot opened up and you've been promoted from the waitlist for ${tournamentTitle}.`,
@@ -292,7 +267,7 @@ async function promoteTournamentWaitlist(
 
     if (partnerProfile) {
       await notify({
-        userId: partnerProfile.id,
+        profileId: partnerProfile.id,
         type: "tournament_registration",
         title: "You're in!",
         body: `A spot opened up and your team has been promoted from the waitlist for ${tournamentTitle}.`,

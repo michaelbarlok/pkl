@@ -1,5 +1,7 @@
 "use client";
 
+import { EmptyState } from "@/components/empty-state";
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -214,15 +216,12 @@ export default function NewSheetPage() {
 
   if (groups.length === 0) {
     return (
-      <div className="card text-center text-surface-muted">
-        <p>No active groups found. Create a group first before creating a sign-up sheet.</p>
-        <button
-          onClick={() => router.push("/admin/groups")}
-          className="btn-primary mt-4"
-        >
-          Go to Groups
-        </button>
-      </div>
+      <EmptyState
+        title="No active groups found"
+        description="Create a group first before creating a sign-up sheet."
+        actionLabel="Go to Groups"
+        actionHref="/admin/groups"
+      />
     );
   }
 
@@ -240,11 +239,7 @@ export default function NewSheetPage() {
         </h1>
       </div>
 
-      {error && (
-        <div className="rounded-md bg-red-900/30 p-3 text-sm text-red-400">
-          {error}
-        </div>
-      )}
+      <FormError message={error} />
 
       <form onSubmit={handleSubmit} className="card space-y-4">
         <div>

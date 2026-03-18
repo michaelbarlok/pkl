@@ -34,11 +34,11 @@
   }
 
   .btn-secondary {
-    @apply btn-base bg-surface-raised px-3.5 py-2 text-sm text-dark-100 ring-1 ring-inset ring-surface-border hover:bg-surface-overlay;
+    @apply btn-base bg-surface-overlay px-3.5 py-2 text-sm text-dark-100 ring-1 ring-inset ring-dark-500 hover:bg-dark-600 focus-visible:outline-brand-500;
   }
 
   .btn-danger {
-    @apply btn-base bg-red-600 px-3.5 py-2 text-sm text-white hover:bg-red-500;
+    @apply btn-base bg-red-600 px-3.5 py-2 text-sm text-white hover:bg-red-500 focus-visible:outline-red-600;
   }
 
   /* Size variants — apply after the color class */
@@ -82,7 +82,7 @@
   }
 
   .badge-gray {
-    @apply badge bg-surface-overlay text-surface-muted;
+    @apply badge bg-dark-600 text-dark-200;
   }
 
   /* ── Tables on dark ── */

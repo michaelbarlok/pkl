@@ -10,9 +10,10 @@ export function CreateGroupForm({
   createAction: (formData: FormData) => Promise<void>;
 }) {
   const [groupType, setGroupType] = useState("ladder_league");
+  const [loading, setLoading] = useState(false);
 
   return (
-    <form action={createAction} className="card space-y-4">
+    <form action={async (formData) => { setLoading(true); try { await createAction(formData); } finally { setLoading(false); } }} className="card space-y-4">
       {/* Name */}
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-dark-200 mb-1">
@@ -300,8 +301,8 @@ export function CreateGroupForm({
         <Link href="/groups" className="btn-secondary">
           Cancel
         </Link>
-        <button type="submit" className="btn-primary">
-          Create Group
+        <button type="submit" className="btn-primary" disabled={loading}>
+          {loading ? "Creating..." : "Create Group"}
         </button>
       </div>
     </form>

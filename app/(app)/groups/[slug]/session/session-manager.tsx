@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { FormError } from "@/components/form-error";
 
 interface PlayerStanding {
   playerId: string;
@@ -237,7 +238,7 @@ function CheckInPhase({
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
 
       <button
         onClick={startSession}
@@ -494,7 +495,7 @@ function ActivePhase({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
 
       {/* Actions */}
       <div className="flex flex-col gap-3 sm:flex-row">

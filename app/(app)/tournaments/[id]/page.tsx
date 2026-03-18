@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { getTournament, getTournamentRegistrations, getTournamentMatches, getMyRegistration } from "@/lib/queries/tournament";
 import { createClient } from "@/lib/supabase/server";
 import { TournamentRegistrationButton } from "@/components/tournament-registration";
@@ -370,9 +371,10 @@ export default async function TournamentDetailPage({
             </table>
           </div>
         ) : (
-          <div className="card text-center text-surface-muted">
-            <p>No registrations yet.</p>
-          </div>
+          <EmptyState
+            title="No registrations yet"
+            description="Be the first to register for this tournament."
+          />
         )}
       </div>
 

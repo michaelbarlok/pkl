@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
 import { useRouter } from "next/navigation";
@@ -426,7 +427,7 @@ export default function CreateTournamentPage() {
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        <FormError message={error} />
 
         <button type="submit" className="btn-primary w-full" disabled={submitting}>
           {submitting ? "Creating..." : "Create Tournament"}

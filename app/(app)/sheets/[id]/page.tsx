@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -365,9 +366,10 @@ export default async function SheetDetailPage({
             )}
           </div>
         ) : (
-          <div className="card text-center text-surface-muted">
-            No players signed up yet.
-          </div>
+          <EmptyState
+            title="No players signed up yet"
+            description="Be the first to sign up for this event."
+          />
         )}
       </section>
     </div>

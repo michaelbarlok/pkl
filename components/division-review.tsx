@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { getDivisionLabel } from "@/lib/divisions";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -210,7 +211,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions }: Pr
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
 
       {/* Generate button */}
       <div className="pt-2 border-t border-surface-border flex flex-wrap gap-2">

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { promoteNextWaitlistPlayer } from "@/lib/waitlist";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
@@ -10,34 +10,15 @@ export async function POST(
   try {
     const { id: sheetId } = await params;
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    // Get the caller's profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json(
-        { error: "Profile not found" },
-        { status: 404 }
-      );
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     // Find the registration
-    const { data: registration, error: regError } = await supabase
+    const { data: registration, error: regError } = await auth.supabase
       .from("registrations")
       .select("id, status")
       .eq("sheet_id", sheetId)
-      .eq("player_id", profile.id)
+      .eq("player_id", auth.profile.id)
       .in("status", ["confirmed", "waitlist"])
       .single();
 
@@ -51,7 +32,7 @@ export async function POST(
     const wasConfirmed = registration.status === "confirmed";
 
     // Mark as withdrawn
-    const { error: updateError } = await supabase
+    const { error: updateError } = await auth.supabase
       .from("registrations")
       .update({ status: "withdrawn" })
       .eq("id", registration.id);

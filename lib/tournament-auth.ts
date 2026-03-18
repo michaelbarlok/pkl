@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth";
 
 /**
  * Check if the current user can manage a tournament.
@@ -10,18 +10,10 @@ import { createClient } from "@/lib/supabase/server";
  * - a global site admin
  */
 export async function getTournamentManager(tournamentId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const auth = await getAuthUser();
+  if (!auth) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("user_id", user.id)
-    .single();
-  if (!profile) return null;
+  const { profile, supabase } = auth;
 
   // Global admin — always allowed
   if (profile.role === "admin") {

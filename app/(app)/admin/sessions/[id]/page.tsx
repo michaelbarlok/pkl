@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import type { ShootoutSession, SessionParticipant, ShootoutGroup, GameResult } from "@/types/database";
 import Link from "next/link";
@@ -434,9 +435,7 @@ export default function AdminSessionDetailPage() {
           {session.status === "session_complete" && (
             <span className="badge-green text-sm">Session Complete</span>
           )}
-          {advanceError && (
-            <span className="text-sm text-red-400">{advanceError}</span>
-          )}
+          <FormError message={advanceError} />
           <button
             onClick={deleteSession}
             disabled={deleting}
@@ -630,9 +629,7 @@ export default function AdminSessionDetailPage() {
                           >
                             Cancel
                           </button>
-                          {newScoreError && (
-                            <span className="text-xs text-red-400 ml-1">{newScoreError}</span>
-                          )}
+                          <FormError message={newScoreError} />
                         </div>
                       )}
                     </>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/empty-state";
 
 export interface GroupCardData {
   id: string;
@@ -173,11 +174,14 @@ export function GroupList({
           ))}
         </div>
       ) : (
-        <div className="card text-center text-surface-muted">
-          {search || typeFilter !== "all"
-            ? "No groups match your search."
-            : "No active groups available."}
-        </div>
+        <EmptyState
+          title={search || typeFilter !== "all"
+            ? "No groups match your search"
+            : "No active groups available"}
+          description={search || typeFilter !== "all"
+            ? "Try adjusting your search or filters."
+            : "Create a group to get started."}
+        />
       )}
     </>
   );

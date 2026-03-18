@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import type { Profile, GroupMembership, GameResult, Registration } from "@/types/database";
@@ -263,9 +264,12 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
             ))}
           </div>
         ) : (
-          <div className="card text-center text-surface-muted">
-            No group memberships yet.
-          </div>
+          <EmptyState
+            title="No group memberships yet"
+            description="Join a group to start playing."
+            actionLabel="Browse groups"
+            actionHref="/groups"
+          />
         )}
       </section>
 
@@ -344,9 +348,10 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
             })}
           </div>
         ) : (
-          <div className="card text-center text-surface-muted">
-            No recent activity.
-          </div>
+          <EmptyState
+            title="No recent activity"
+            description="Games and event sign-ups will appear here."
+          />
         )}
       </section>
 
@@ -355,12 +360,10 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
         <h2 className="mb-4 text-lg font-semibold text-dark-100">
           Head-to-Head
         </h2>
-        <div className="card text-center text-surface-muted py-8">
-          <p className="text-lg font-medium">Coming Soon</p>
-          <p className="mt-1 text-sm">
-            Head-to-head stats against other players will appear here.
-          </p>
-        </div>
+        <EmptyState
+          title="Coming Soon"
+          description="Head-to-head stats against other players will appear here."
+        />
       </section>
     </div>
   );

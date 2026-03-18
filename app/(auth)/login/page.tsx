@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -113,9 +114,7 @@ function LoginForm() {
           />
         </div>
 
-        {error && (
-          <p className="text-sm text-red-300" role="alert">{error}</p>
-        )}
+        <FormError message={error} />
 
         <button type="submit" className="btn-primary w-full" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}

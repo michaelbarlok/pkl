@@ -55,6 +55,7 @@ export function ContactOrganizersButton({ endpoint, label }: ContactOrganizersBu
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder={`Write a message to the ${label.toLowerCase().replace("contact ", "")}...`}
+        aria-label="Message"
         className="input text-sm w-full h-20 resize-none"
         maxLength={500}
       />
@@ -68,7 +69,7 @@ export function ContactOrganizersButton({ endpoint, label }: ContactOrganizersBu
         </button>
         <button
           onClick={() => { setOpen(false); setMessage(""); }}
-          className="text-xs text-surface-muted hover:text-dark-100"
+          className="text-xs text-dark-300 hover:text-dark-100"
         >
           Cancel
         </button>

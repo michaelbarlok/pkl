@@ -89,6 +89,9 @@ export function AppNav({ profile, isGroupAdmin = false }: { profile: Profile; is
                 <div className="relative" ref={adminRef}>
                   <button
                     onClick={() => setAdminOpen(!adminOpen)}
+                    aria-expanded={adminOpen}
+                    aria-haspopup="true"
+                    aria-label="Admin menu"
                     className={cn(
                       "flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                       isAdminRouteActive
@@ -150,7 +153,7 @@ export function AppNav({ profile, isGroupAdmin = false }: { profile: Profile; is
             </Link>
             <button
               onClick={handleSignOut}
-              className="hidden md:block text-sm text-surface-muted hover:text-dark-200"
+              className="hidden md:block text-sm text-dark-300 hover:text-dark-100"
             >
               Sign out
             </button>

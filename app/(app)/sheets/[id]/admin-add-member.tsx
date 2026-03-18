@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -107,8 +108,8 @@ export function AdminAddMember({
         Add Members
       </h3>
       {error && (
-        <div className="mb-3 rounded-md bg-red-900/30 p-2 text-sm text-red-400">
-          {error}
+        <div className="mb-3">
+          <FormError message={error} />
         </div>
       )}
       {success && (

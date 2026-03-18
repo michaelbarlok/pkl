@@ -1,13 +1,15 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
   const { threadId } = await request.json();
 
-  const { data: thread } = await supabase
+  const { data: thread } = await auth.supabase
     .from("forum_threads")
     .select("author_id, title, group_id")
     .eq("id", threadId)
@@ -18,17 +20,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Don't notify if the replier is the thread author
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("user_id", user.id)
-      .single();
-
-    if (profile?.id === thread.author_id) {
-      return NextResponse.json({ status: "skipped" });
-    }
+  if (auth.profile.id === thread.author_id) {
+    return NextResponse.json({ status: "skipped" });
   }
 
   // Get group slug for proper link
@@ -44,7 +37,7 @@ export async function POST(request: NextRequest) {
     : `/forum/${threadId}`;
 
   await notify({
-    userId: thread.author_id,
+    profileId: thread.author_id,
     type: "forum_reply",
     title: "New reply to your thread",
     body: `Someone replied to "${thread.title}"`,

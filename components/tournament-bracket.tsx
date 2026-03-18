@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -390,7 +391,7 @@ function RoundRobinView({
               Cancel
             </button>
           </div>
-          {advanceError && <p className="text-xs text-red-400 mt-2">{advanceError}</p>}
+          <FormError message={advanceError} />
         </div>
       )}
 
@@ -1019,7 +1020,7 @@ function MatchCard({
                   Cancel
                 </button>
               </div>
-              {error && <p className="text-xs text-red-400">{error}</p>}
+              <FormError message={error} />
             </div>
           )}
         </>

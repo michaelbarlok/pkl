@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import type { NotificationType } from "@/types/database";
 
 interface NotifyParams {
-  userId: string;
+  profileId: string;
   type: NotificationType;
   title: string;
   body: string;
@@ -20,7 +20,7 @@ interface NotifyParams {
  * 3. Sends SMS via Twilio if user prefers SMS and has a phone number.
  */
 export async function notify({
-  userId,
+  profileId,
   type,
   title,
   body,
@@ -36,7 +36,7 @@ export async function notify({
   // 1. Always write in-app notification (best-effort, don't block email)
   try {
     const { error: insertErr } = await supabase.from("notifications").insert({
-      user_id: userId,
+      user_id: profileId,
       type,
       title,
       body,
@@ -54,11 +54,11 @@ export async function notify({
   const { data: profile, error: profileErr } = await supabase
     .from("profiles")
     .select("email, phone, preferred_notify")
-    .eq("id", userId)
+    .eq("id", profileId)
     .single();
 
   if (!profile) {
-    console.error("Profile not found for notification:", userId, profileErr?.message);
+    console.error("Profile not found for notification:", profileId, profileErr?.message);
     return;
   }
 
@@ -95,11 +95,11 @@ export async function notify({
  * Send bulk notifications to multiple users.
  */
 export async function notifyMany(
-  userIds: string[],
-  params: Omit<NotifyParams, "userId">
+  profileIds: string[],
+  params: Omit<NotifyParams, "profileId">
 ): Promise<void> {
   const results = await Promise.allSettled(
-    userIds.map((userId) => notify({ ...params, userId }))
+    profileIds.map((profileId) => notify({ ...params, profileId }))
   );
   const failures = results.filter((r) => r.status === "rejected");
   if (failures.length > 0) {

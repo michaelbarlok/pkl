@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -173,9 +174,10 @@ export default async function RosterPage({
             </table>
           </div>
         ) : (
-          <div className="card text-center text-surface-muted">
-            No confirmed players yet.
-          </div>
+          <EmptyState
+            title="No confirmed players yet"
+            description="Players will appear here once they sign up."
+          />
         )}
       </section>
 
@@ -206,9 +208,10 @@ export default async function RosterPage({
             </table>
           </div>
         ) : (
-          <div className="card text-center text-surface-muted">
-            No one on the waitlist.
-          </div>
+          <EmptyState
+            title="No one on the waitlist"
+            description="The waitlist is empty."
+          />
         )}
       </section>
     </div>

@@ -1,10 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
   const { threadId, groupId, mentionedNames } = await request.json();
 
   if (!threadId || !groupId || !mentionedNames?.length) {
@@ -12,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Get thread info
-  const { data: thread } = await supabase
+  const { data: thread } = await auth.supabase
     .from("forum_threads")
     .select("title")
     .eq("id", threadId)
@@ -30,23 +32,14 @@ export async function POST(request: NextRequest) {
     .eq("id", groupId)
     .single();
 
-  // Get current user (the one doing the mentioning)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  let mentionerName = "Someone";
-  let mentionerProfileId: string | null = null;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, display_name")
-      .eq("user_id", user.id)
-      .single();
-    if (profile) {
-      mentionerName = profile.display_name;
-      mentionerProfileId = profile.id;
-    }
-  }
+  // Get mentioner's display name
+  const { data: mentionerProfile } = await auth.supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", auth.profile.id)
+    .single();
+
+  const mentionerName = mentionerProfile?.display_name ?? "Someone";
 
   // Look up profiles by display_name (case-insensitive match)
   // Only notify members of the group
@@ -70,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (!member || !member.player_id) continue;
 
     await notify({
-      userId: member.player_id,
+      profileId: member.player_id,
       type: "forum_mention",
       title: `${mentionerName} mentioned you`,
       body: `You were mentioned in "${thread.title}"`,
