@@ -89,7 +89,7 @@ function RegisterForm() {
           <button
             type="button"
             onClick={() => setRegistered(false)}
-            className="font-medium text-brand-600 hover:text-brand-500"
+            className="font-medium text-brand-400 hover:text-brand-300"
           >
             try again
           </button>.
@@ -225,7 +225,7 @@ function RegisterForm() {
         Already have an account?{" "}
         <Link
           href={next !== "/dashboard" ? `/login?next=${encodeURIComponent(next)}` : "/login"}
-          className="font-medium text-brand-600 hover:text-brand-500"
+          className="font-medium text-brand-400 hover:text-brand-300"
         >
           Sign in
         </Link>

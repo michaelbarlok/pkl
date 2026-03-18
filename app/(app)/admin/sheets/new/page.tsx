@@ -231,7 +231,7 @@ export default function NewSheetPage() {
       <div>
         <button
           onClick={() => router.push("/admin/sheets")}
-          className="text-sm text-brand-600 hover:text-brand-500"
+          className="text-sm text-brand-400 hover:text-brand-300"
         >
           &larr; All Sheets
         </button>

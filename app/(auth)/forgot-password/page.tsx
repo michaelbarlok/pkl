@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
           <span className="font-medium text-dark-200">{email}</span>. Click the
           link in the email to reset your password.
         </p>
-        <Link href="/login" className="text-sm font-medium text-brand-600 hover:text-brand-500">
+        <Link href="/login" className="text-sm font-medium text-brand-400 hover:text-brand-300">
           Back to Sign in
         </Link>
       </div>
@@ -84,7 +84,7 @@ export default function ForgotPasswordPage() {
       </form>
 
       <p className="mt-4 text-center text-sm text-surface-muted">
-        <Link href="/login" className="font-medium text-brand-600 hover:text-brand-500">
+        <Link href="/login" className="font-medium text-brand-400 hover:text-brand-300">
           Back to Sign in
         </Link>
       </p>

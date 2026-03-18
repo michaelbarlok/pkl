@@ -222,7 +222,7 @@ export function AvatarUpload({ profileId, currentUrl, onUpload }: AvatarUploadPr
         type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
-        className="text-sm text-brand-600 hover:text-brand-500 disabled:text-gray-400"
+        className="text-sm text-brand-400 hover:text-brand-300 disabled:text-gray-400"
       >
         {uploading ? "Processing..." : previewUrl ? "Change photo" : "Upload photo"}
       </button>

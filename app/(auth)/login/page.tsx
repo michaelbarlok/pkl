@@ -130,7 +130,7 @@ function LoginForm() {
         Don&apos;t have an account?{" "}
         <Link
           href={next !== "/dashboard" ? `/register?next=${encodeURIComponent(next)}` : "/register"}
-          className="font-medium text-brand-600 hover:text-brand-500"
+          className="font-medium text-brand-400 hover:text-brand-300"
         >
           Register
         </Link>

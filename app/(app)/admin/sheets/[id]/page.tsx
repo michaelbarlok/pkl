@@ -395,7 +395,7 @@ export default function AdminSheetDetailPage() {
     return (
       <div className="card text-center text-red-400">
         Sheet not found.{" "}
-        <Link href="/admin/sheets" className="text-brand-600 hover:text-brand-500">
+        <Link href="/admin/sheets" className="text-brand-400 hover:text-brand-300">
           Back to sheets
         </Link>
       </div>
@@ -408,7 +408,7 @@ export default function AdminSheetDetailPage() {
         <div>
           <Link
             href="/admin/sheets"
-            className="text-sm text-brand-600 hover:text-brand-500"
+            className="text-sm text-brand-400 hover:text-brand-300"
           >
             &larr; All Sheets
           </Link>

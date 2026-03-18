@@ -40,7 +40,7 @@ export default function InviteMemberPage() {
       <div className="space-y-6">
         <Link
           href="/admin/members"
-          className="text-sm text-brand-600 hover:text-brand-500"
+          className="text-sm text-brand-400 hover:text-brand-300"
         >
           &larr; Back to Members
         </Link>
@@ -75,7 +75,7 @@ export default function InviteMemberPage() {
       <div>
         <Link
           href="/admin/members"
-          className="text-sm text-brand-600 hover:text-brand-500"
+          className="text-sm text-brand-400 hover:text-brand-300"
         >
           &larr; Back to Members
         </Link>

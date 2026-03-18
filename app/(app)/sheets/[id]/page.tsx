@@ -142,7 +142,7 @@ export default async function SheetDetailPage({
         <div>
           <Link
             href="/sheets"
-            className="text-sm text-brand-600 hover:text-brand-500"
+            className="text-sm text-brand-400 hover:text-brand-300"
           >
             &larr; All Sheets
           </Link>

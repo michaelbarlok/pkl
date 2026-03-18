@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useToast } from "@/components/toast";
 
 const statusBadge: Record<string, { className: string; label: string }> = {
   open: { className: "badge-green", label: "Open" },
@@ -50,6 +51,70 @@ function PlayerAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | n
   );
 }
 
+function ContactAdminForm({
+  sheetId,
+  onClose,
+}: {
+  sheetId: string;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function handleSend(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!message.trim()) return;
+    setSending(true);
+    try {
+      const res = await fetch(`/api/sheets/${sheetId}/contact-admins`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: message.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast(data.error || "Failed to send message.", "error");
+      } else {
+        toast("Message sent to group admins.", "success");
+        onClose();
+      }
+    } catch {
+      toast("Failed to send message.", "error");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2" onClick={(e) => e.preventDefault()}>
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Write a message to the group admins..."
+        className="input text-sm w-full h-20 resize-none"
+        maxLength={500}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleSend}
+          disabled={sending || !message.trim()}
+          className="btn-primary btn-sm"
+        >
+          {sending ? "Sending..." : "Send"}
+        </button>
+        <button
+          onClick={(e) => { e.preventDefault(); onClose(); }}
+          className="text-xs text-surface-muted hover:text-dark-100"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SheetCard({
   sheetId,
   groupName,
@@ -67,11 +132,10 @@ export function SheetCard({
   isLoggedIn,
 }: SheetCardProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
-  const [contactMessage, setContactMessage] = useState("");
-  const [sendingMessage, setSendingMessage] = useState(false);
   const badge = statusBadge[status] ?? statusBadge.closed;
   const isOpen = status === "open";
   const isRegistered = myStatus === "confirmed" || myStatus === "waitlist";
@@ -87,11 +151,11 @@ export function SheetCard({
       const res = await fetch(`/api/sheets/${sheetId}/signup`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || "Failed to sign up.");
+        toast(data.error || "Failed to sign up.", "error");
       }
       router.refresh();
     } catch {
-      alert("Failed to sign up.");
+      toast("Failed to sign up.", "error");
     } finally {
       setLoading(false);
     }
@@ -105,39 +169,13 @@ export function SheetCard({
       const res = await fetch(`/api/sheets/${sheetId}/withdraw`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || "Failed to withdraw.");
+        toast(data.error || "Failed to withdraw.", "error");
       }
       router.refresh();
     } catch {
-      alert("Failed to withdraw.");
+      toast("Failed to withdraw.", "error");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleContactAdmins(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!contactMessage.trim()) return;
-    setSendingMessage(true);
-    try {
-      const res = await fetch(`/api/sheets/${sheetId}/contact-admins`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: contactMessage.trim() }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "Failed to send message.");
-      } else {
-        setContactMessage("");
-        setShowContactForm(false);
-        alert("Message sent to group admins.");
-      }
-    } catch {
-      alert("Failed to send message.");
-    } finally {
-      setSendingMessage(false);
     }
   }
 
@@ -200,7 +238,7 @@ export function SheetCard({
                 <button
                   onClick={handleWithdraw}
                   disabled={loading}
-                  className="btn-danger text-xs px-3 py-1.5"
+                  className="btn-danger btn-sm"
                 >
                   {loading ? "..." : "Withdraw"}
                 </button>
@@ -210,7 +248,7 @@ export function SheetCard({
             <button
               onClick={handleSignUp}
               disabled={loading}
-              className="btn-primary text-xs px-3 py-1.5"
+              className="btn-primary btn-sm"
             >
               {loading ? "..." : isFull ? "Join Waitlist" : "Sign Up"}
             </button>
@@ -224,35 +262,15 @@ export function SheetCard({
           {!showContactForm ? (
             <button
               onClick={(e) => { e.preventDefault(); setShowContactForm(true); }}
-              className="text-xs text-brand-600 hover:text-brand-500 font-medium"
+              className="text-xs text-brand-400 hover:text-brand-300 font-medium"
             >
               Message Group Admins
             </button>
           ) : (
-            <div className="space-y-2" onClick={(e) => e.preventDefault()}>
-              <textarea
-                value={contactMessage}
-                onChange={(e) => setContactMessage(e.target.value)}
-                placeholder="Write a message to the group admins..."
-                className="input text-sm w-full h-20 resize-none"
-                maxLength={500}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleContactAdmins}
-                  disabled={sendingMessage || !contactMessage.trim()}
-                  className="btn-primary text-xs px-3 py-1.5"
-                >
-                  {sendingMessage ? "Sending..." : "Send"}
-                </button>
-                <button
-                  onClick={(e) => { e.preventDefault(); setShowContactForm(false); setContactMessage(""); }}
-                  className="text-xs text-surface-muted hover:text-dark-100"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <ContactAdminForm
+              sheetId={sheetId}
+              onClose={() => setShowContactForm(false)}
+            />
           )}
         </div>
       )}
@@ -263,35 +281,15 @@ export function SheetCard({
           {!showContactForm ? (
             <button
               onClick={(e) => { e.preventDefault(); setShowContactForm(true); }}
-              className="text-xs text-brand-600 hover:text-brand-500 font-medium"
+              className="text-xs text-brand-400 hover:text-brand-300 font-medium"
             >
               Message Group Admins
             </button>
           ) : (
-            <div className="space-y-2" onClick={(e) => e.preventDefault()}>
-              <textarea
-                value={contactMessage}
-                onChange={(e) => setContactMessage(e.target.value)}
-                placeholder="Write a message to the group admins..."
-                className="input text-sm w-full h-20 resize-none"
-                maxLength={500}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleContactAdmins}
-                  disabled={sendingMessage || !contactMessage.trim()}
-                  className="btn-primary text-xs px-3 py-1.5"
-                >
-                  {sendingMessage ? "Sending..." : "Send"}
-                </button>
-                <button
-                  onClick={(e) => { e.preventDefault(); setShowContactForm(false); setContactMessage(""); }}
-                  className="text-xs text-surface-muted hover:text-dark-100"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <ContactAdminForm
+              sheetId={sheetId}
+              onClose={() => setShowContactForm(false)}
+            />
           )}
         </div>
       )}
@@ -311,7 +309,7 @@ export function SheetCard({
                       {i + 1}.
                     </span>
                     <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} />
-                    <span className="text-sm text-dark-200 truncate">{p.name}</span>
+                    <span className="text-sm text-dark-100 truncate">{p.name}</span>
                   </div>
                 ))}
               </div>

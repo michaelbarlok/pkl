@@ -193,7 +193,7 @@ export default async function DashboardPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-dark-100">My Groups</h2>
-          <Link href="/groups" className="text-sm text-brand-600 hover:text-brand-500">
+          <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300">
             Browse all groups
           </Link>
         </div>
@@ -222,7 +222,7 @@ export default async function DashboardPage() {
         ) : (
           <div className="card text-center text-surface-muted">
             <p>You haven&apos;t joined any groups yet.</p>
-            <Link href="/groups" className="mt-2 inline-block text-brand-600 hover:text-brand-500">
+            <Link href="/groups" className="mt-2 inline-block text-brand-400 hover:text-brand-300">
               Browse available groups
             </Link>
           </div>
@@ -233,7 +233,7 @@ export default async function DashboardPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-dark-100">Upcoming Events</h2>
-          <Link href="/sheets" className="text-sm text-brand-600 hover:text-brand-500">
+          <Link href="/sheets" className="text-sm text-brand-400 hover:text-brand-300">
             View all sheets
           </Link>
         </div>

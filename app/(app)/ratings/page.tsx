@@ -172,7 +172,7 @@ export default async function RatingsPage() {
                   {i + 1}
                 </td>
                 <td className="px-2 sm:px-4 py-3 sm:py-4">
-                  <Link href={`/players/${r.player_id}`} className="flex items-center gap-2 sm:gap-3 hover:text-brand-600 min-w-0">
+                  <Link href={`/players/${r.player_id}`} className="flex items-center gap-2 sm:gap-3 hover:text-brand-400 min-w-0">
                     {r.avatar_url ? (
                       <img src={r.avatar_url} alt="" className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover flex-shrink-0" />
                     ) : (

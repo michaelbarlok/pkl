@@ -1,6 +1,7 @@
 "use client";
 
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { useToast } from "@/components/toast";
 import { cn, formatDate } from "@/lib/utils";
 import type { Profile } from "@/types/database";
 import Link from "next/link";
@@ -25,6 +26,7 @@ type RoleFilter = "all" | "admin" | "player";
 
 export function MembersTable({ profiles, membershipMap, currentProfileId }: MembersTableProps) {
   const { supabase } = useSupabase();
+  const { toast } = useToast();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -98,11 +100,11 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || "Failed to update group role.");
+        toast(data.error || "Failed to update group role.", "error");
       }
       router.refresh();
     } catch {
-      alert("Failed to update group role.");
+      toast("Failed to update group role.", "error");
     } finally {
       setTogglingGroupRole(null);
     }
@@ -122,11 +124,11 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || "Failed to update global role.");
+        toast(data.error || "Failed to update global role.", "error");
       }
       router.refresh();
     } catch {
-      alert("Failed to update global role.");
+      toast("Failed to update global role.", "error");
     } finally {
       setTogglingGlobalRole(null);
     }
@@ -231,30 +233,157 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         Showing {filtered.length} of {profiles.length} members
       </p>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-surface-border">
+      {/* Mobile card layout */}
+      <div className="space-y-3 sm:hidden">
+        {filtered.map((profile) => {
+          const memberships = membershipMap[profile.id] ?? [];
+          return (
+            <div key={profile.id} className="card space-y-3">
+              {/* Header: avatar + name + status */}
+              <div className="flex items-center gap-3">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt=""
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 font-medium">
+                    {profile.display_name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <Link
+                    href={`/players/${profile.id}`}
+                    className="text-sm font-semibold text-dark-100 hover:text-brand-400 truncate block"
+                  >
+                    {profile.display_name}
+                  </Link>
+                  <p className="text-xs text-surface-muted truncate">{profile.email}</p>
+                </div>
+                <span className={profile.is_active ? "badge-green" : "badge-red"}>
+                  {profile.is_active ? "Active" : "Inactive"}
+                </span>
+              </div>
+
+              {/* Details row */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-surface-muted">
+                {profile.skill_level && <span>Skill {profile.skill_level}</span>}
+                <span className="capitalize">{profile.role}</span>
+                {memberships.map((m, i) => (
+                  <span key={i} className={cn(m.groupRole === "admin" ? "text-accent-300" : "text-brand-300")}>
+                    {m.groupRole === "admin" ? "★ " : ""}{m.groupName}: Step {m.step}
+                  </span>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-wrap border-t border-surface-border pt-2">
+                {profile.id !== currentProfileId && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleGlobalRole(profile.id, profile.role)}
+                    disabled={togglingGlobalRole === profile.id}
+                    className={cn(
+                      "text-xs px-2 py-1 rounded",
+                      profile.role === "admin"
+                        ? "bg-red-900/30 text-red-300 hover:bg-red-900/50"
+                        : "bg-purple-900/30 text-purple-300 hover:bg-purple-900/50",
+                      togglingGlobalRole === profile.id && "opacity-50"
+                    )}
+                  >
+                    {togglingGlobalRole === profile.id
+                      ? "..."
+                      : profile.role === "admin"
+                        ? "Remove Admin"
+                        : "Make Admin"}
+                  </button>
+                )}
+                {memberships.map((m) => {
+                  const key = `${profile.id}-${m.groupId}`;
+                  const isGroupAdmin = m.groupRole === "admin";
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleToggleGroupRole(profile.id, m.groupId, m.groupRole)}
+                      disabled={togglingGroupRole === key}
+                      className={cn(
+                        "text-xs px-2 py-1 rounded",
+                        isGroupAdmin
+                          ? "bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/50"
+                          : "bg-surface-overlay text-surface-muted hover:text-dark-100",
+                        togglingGroupRole === key && "opacity-50"
+                      )}
+                    >
+                      {togglingGroupRole === key
+                        ? "..."
+                        : isGroupAdmin
+                          ? `★ ${m.groupName}`
+                          : `${m.groupName} Admin`}
+                    </button>
+                  );
+                })}
+                <Link
+                  href={`/players/${profile.id}/edit`}
+                  className="text-xs text-brand-400 hover:text-brand-300"
+                >
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleSuspend(profile.id, profile.is_active)}
+                  disabled={suspending === profile.id}
+                  className={cn(
+                    "text-xs",
+                    profile.is_active
+                      ? "text-red-400 hover:text-red-300"
+                      : "text-teal-300 hover:text-teal-200",
+                    suspending === profile.id && "opacity-50"
+                  )}
+                >
+                  {suspending === profile.id
+                    ? "..."
+                    : profile.is_active
+                      ? "Suspend"
+                      : "Activate"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {filtered.length === 0 && (
+          <div className="card text-center text-sm text-surface-muted py-8">
+            No members found matching your filters.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto rounded-lg border border-surface-border">
         <table className="min-w-full divide-y divide-surface-border">
           <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Member
               </th>
-              <th className="hidden md:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+              <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Email
               </th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Skill
               </th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Step
               </th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Status
               </th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Role
               </th>
-              <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Actions
               </th>
             </tr>
@@ -265,7 +394,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
               return (
                 <tr key={profile.id} className="hover:bg-surface-overlay">
                   {/* Avatar + Name */}
-                  <td className="whitespace-nowrap px-2 sm:px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex items-center gap-3">
                       {profile.avatar_url ? (
                         <img
@@ -280,7 +409,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                       )}
                       <Link
                         href={`/players/${profile.id}`}
-                        className="text-sm font-medium text-dark-100 hover:text-brand-600"
+                        className="text-sm font-medium text-dark-100 hover:text-brand-400"
                       >
                         {profile.display_name}
                       </Link>
@@ -288,17 +417,17 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                   </td>
 
                   {/* Email */}
-                  <td className="hidden md:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-surface-muted">
+                  <td className="hidden md:table-cell whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
                     {profile.email}
                   </td>
 
                   {/* Skill Level */}
-                  <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-surface-muted">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
                     {profile.skill_level ?? "—"}
                   </td>
 
                   {/* Step (from group memberships) */}
-                  <td className="hidden sm:table-cell px-2 sm:px-4 py-3 text-sm text-surface-muted">
+                  <td className="px-4 py-3 text-sm text-surface-muted">
                     {memberships.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {memberships.map((m, i) => (
@@ -313,7 +442,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                   </td>
 
                   {/* Status */}
-                  <td className="whitespace-nowrap px-2 sm:px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3">
                     <span
                       className={
                         profile.is_active ? "badge-green" : "badge-red"
@@ -324,7 +453,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                   </td>
 
                   {/* Role */}
-                  <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3">
                     <span
                       className={
                         profile.role === "admin" ? "badge-yellow" : "badge-gray"
@@ -335,7 +464,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                   </td>
 
                   {/* Actions */}
-                  <td className="px-2 sm:px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2 flex-wrap">
                       {profile.id !== currentProfileId && (
                         <button
@@ -388,7 +517,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                       })}
                       <Link
                         href={`/players/${profile.id}/edit`}
-                        className="text-sm text-brand-600 hover:text-brand-500"
+                        className="text-sm text-brand-400 hover:text-brand-300"
                       >
                         Edit
                       </Link>
@@ -401,8 +530,8 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                         className={cn(
                           "text-sm",
                           profile.is_active
-                            ? "text-red-400 hover:text-red-500"
-                            : "text-teal-300 hover:text-green-500",
+                            ? "text-red-400 hover:text-red-300"
+                            : "text-teal-300 hover:text-teal-200",
                           suspending === profile.id && "opacity-50"
                         )}
                       >

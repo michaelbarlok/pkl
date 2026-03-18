@@ -67,7 +67,7 @@ export default async function AdminSessionsPage() {
                 <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm">
                   <Link
                     href={`/admin/sessions/${session.id}`}
-                    className="text-brand-600 hover:text-brand-500"
+                    className="text-brand-400 hover:text-brand-300"
                   >
                     Manage
                   </Link>

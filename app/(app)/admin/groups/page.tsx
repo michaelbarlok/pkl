@@ -291,7 +291,7 @@ export default async function AdminGroupsPage() {
                       <div className="flex items-center justify-end gap-2 flex-wrap">
                         <Link
                           href={`/admin/groups/${group.id}`}
-                          className="text-brand-600 hover:text-brand-500"
+                          className="text-brand-400 hover:text-brand-300"
                         >
                           Edit
                         </Link>

@@ -105,7 +105,7 @@ export default function NotificationsPage() {
             {n.link && (
               <a
                 href={n.link}
-                className="mt-2 inline-block text-sm text-brand-600 hover:text-brand-500"
+                className="mt-2 inline-block text-sm text-brand-400 hover:text-brand-300"
                 onClick={(e) => e.stopPropagation()}
               >
                 View details →

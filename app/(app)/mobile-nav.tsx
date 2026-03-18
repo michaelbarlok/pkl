@@ -279,7 +279,7 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
                 key={tab.href}
                 href={tab.href}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+                  "flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors",
                   active
                     ? "text-brand-400"
                     : "text-surface-muted active:text-dark-200"
@@ -294,7 +294,7 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
           <button
             onClick={() => setMoreOpen(!moreOpen)}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+              "flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors",
               moreOpen || isMoreActive
                 ? "text-brand-400"
                 : "text-surface-muted active:text-dark-200"

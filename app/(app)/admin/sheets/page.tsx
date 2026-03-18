@@ -123,13 +123,13 @@ export default async function AdminSheetsPage() {
                             <div className="flex items-center justify-end gap-2 flex-wrap">
                               <Link
                                 href={`/sheets/${sheet.id}`}
-                                className="text-sm text-brand-600 hover:text-brand-500"
+                                className="text-sm text-brand-400 hover:text-brand-300"
                               >
                                 View
                               </Link>
                               <Link
                                 href={`/admin/sheets/${sheet.id}`}
-                                className="text-sm text-brand-600 hover:text-brand-500"
+                                className="text-sm text-brand-400 hover:text-brand-300"
                               >
                                 Edit
                               </Link>

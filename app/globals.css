@@ -21,20 +21,33 @@
 
 @layer components {
   /* ── Buttons ── */
+  .btn-base {
+    @apply inline-flex items-center justify-center rounded-lg font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply btn-base bg-brand-500 px-3.5 py-2 text-sm text-white hover:bg-brand-400 focus-visible:outline-brand-500;
   }
 
   .btn-accent {
-    @apply inline-flex items-center justify-center rounded-lg bg-accent-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply btn-base bg-accent-500 px-3.5 py-2 text-sm text-white hover:bg-accent-400 focus-visible:outline-accent-500;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-lg bg-surface-raised px-3.5 py-2 text-sm font-semibold text-dark-100 ring-1 ring-inset ring-surface-border transition-colors hover:bg-surface-overlay disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply btn-base bg-surface-raised px-3.5 py-2 text-sm text-dark-100 ring-1 ring-inset ring-surface-border hover:bg-surface-overlay;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center rounded-lg bg-red-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply btn-base bg-red-600 px-3.5 py-2 text-sm text-white hover:bg-red-500;
+  }
+
+  /* Size variants — apply after the color class */
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-xs;
+  }
+
+  .btn-lg {
+    @apply px-6 py-2.5 text-base;
   }
 
   /* ── Inputs ── */
@@ -88,4 +101,20 @@
   tbody tr {
     @apply border-surface-border;
   }
+}
+
+/* ── Animations ── */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out;
 }

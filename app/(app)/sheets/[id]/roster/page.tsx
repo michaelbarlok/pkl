@@ -134,7 +134,7 @@ export default async function RosterPage({
       <div>
         <Link
           href={`/sheets/${id}`}
-          className="text-sm text-brand-600 hover:text-brand-500"
+          className="text-sm text-brand-400 hover:text-brand-300"
         >
           &larr; Back to sheet
         </Link>

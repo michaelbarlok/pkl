@@ -8,7 +8,7 @@ export default async function HomePage() {
   const isLoggedIn = !!user;
 
   return (
-    <div className="space-y-20 py-8 sm:py-16">
+    <div className="space-y-12 sm:space-y-20 py-8 sm:py-16">
       {/* ── Hero ── */}
       <section className="text-center space-y-6">
         <img
@@ -24,15 +24,15 @@ export default async function HomePage() {
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
           {isLoggedIn ? (
-            <Link href="/dashboard" className="btn-primary px-8 py-3 text-base">
+            <Link href="/dashboard" className="btn-primary btn-lg">
               Go to Dashboard
             </Link>
           ) : (
             <>
-              <Link href="/register" className="btn-primary px-8 py-3 text-base">
+              <Link href="/register" className="btn-primary btn-lg">
                 Get Started
               </Link>
-              <Link href="/login" className="btn-secondary px-8 py-3 text-base">
+              <Link href="/login" className="btn-secondary btn-lg">
                 Log In
               </Link>
             </>
@@ -335,15 +335,15 @@ export default async function HomePage() {
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
           {isLoggedIn ? (
-            <Link href="/dashboard" className="btn-primary px-8 py-3 text-base">
+            <Link href="/dashboard" className="btn-primary btn-lg">
               Go to Dashboard
             </Link>
           ) : (
             <>
-              <Link href="/register" className="btn-primary px-8 py-3 text-base">
+              <Link href="/register" className="btn-primary btn-lg">
                 Create Your Account
               </Link>
-              <Link href="/login" className="btn-secondary px-8 py-3 text-base">
+              <Link href="/login" className="btn-secondary btn-lg">
                 Log In
               </Link>
             </>
