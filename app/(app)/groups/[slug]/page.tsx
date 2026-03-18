@@ -394,6 +394,10 @@ function JoinButton({
       { onConflict: "group_id,player_id" }
     );
 
+    // Check community badges (non-blocking)
+    const { checkAndAwardBadges } = await import("@/lib/badges");
+    checkAndAwardBadges(playerId, ["community", "ladder"]).catch(() => {});
+
     const { revalidatePath } = await import("next/cache");
     const { redirect } = await import("next/navigation");
     revalidatePath(`/groups/${slug}`);

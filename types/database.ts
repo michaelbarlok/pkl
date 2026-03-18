@@ -39,7 +39,8 @@ export type NotificationType =
   | "invite_sent"
   | "tournament_registration"
   | "tournament_reminder"
-  | "tournament_cancelled";
+  | "tournament_cancelled"
+  | "badge_earned";
 
 export type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
 export type TournamentType = "singles" | "doubles";
@@ -436,6 +437,31 @@ export interface FreePlayPlayerStats {
   losses: number;
   point_diff: number;
   pct: number;
+}
+
+// ============================================================
+// Badges
+// ============================================================
+
+export type BadgeCategory = "play" | "winning" | "rating" | "community" | "tournament" | "ladder";
+
+export interface BadgeDefinition {
+  code: string;
+  name: string;
+  description: string;
+  category: BadgeCategory;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface PlayerBadge {
+  id: string;
+  player_id: string;
+  badge_code: string;
+  earned_at: string;
+  created_at: string;
+  // Relations
+  badge?: BadgeDefinition;
 }
 
 // ============================================================

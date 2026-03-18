@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth";
+import { checkAndAwardBadges } from "@/lib/badges";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -207,6 +208,11 @@ export async function POST(
     .from("shootout_sessions")
     .update({ status: "round_complete" })
     .eq("id", sessionId);
+
+  // Check ladder and rating badges for all participants (non-blocking)
+  for (const p of participants) {
+    checkAndAwardBadges(p.player_id, ["ladder", "rating"]).catch(() => {});
+  }
 
   return NextResponse.json({ status: "round_complete" });
 }

@@ -228,6 +228,13 @@ export default function NewForumThreadPage() {
       });
     }
 
+    // Check community badges (non-blocking)
+    fetch("/api/badges/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categories: ["community"] }),
+    }).catch(() => {});
+
     // Navigate to the thread in its group context
     const group = groups.find((g) => g.id === selectedGroupId);
     router.push(`/groups/${group?.slug}/forum/${thread.id}`);
