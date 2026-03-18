@@ -5,6 +5,9 @@ interface PlayerStat {
   points_won: number;
   points_possible: number;
   games_played: number;
+  wins: number;
+  losses: number;
+  point_diff: number;
   pct: number;
   player: {
     id: string;
@@ -59,11 +62,21 @@ export function FreePlayLeaderboard({
                 {stat.player?.display_name}
               </p>
               <p className="text-xs text-surface-muted">
-                {stat.games_played} games &middot; {stat.points_won}/{stat.points_possible} pts
+                {stat.wins}-{stat.losses}
               </p>
             </div>
-            <span className="text-sm font-semibold text-brand-400 shrink-0">
-              {stat.pct.toFixed(1)}%
+            <span
+              className={cn(
+                "text-sm font-semibold shrink-0",
+                stat.point_diff > 0
+                  ? "text-teal-300"
+                  : stat.point_diff < 0
+                    ? "text-red-400"
+                    : "text-surface-muted"
+              )}
+            >
+              {stat.point_diff > 0 ? "+" : ""}
+              {stat.point_diff}
             </span>
           </div>
         ))}
@@ -81,16 +94,13 @@ export function FreePlayLeaderboard({
                 Player
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Pts Won %
+                Record
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
+                +/-
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Games
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Pts Won
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Pts Possible
               </th>
             </tr>
           </thead>
@@ -123,17 +133,24 @@ export function FreePlayLeaderboard({
                     </span>
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-brand-400">
-                  {stat.pct.toFixed(1)}%
+                <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-dark-100">
+                  {stat.wins}-{stat.losses}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                  {stat.games_played}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                  {stat.points_won}
+                <td
+                  className={cn(
+                    "whitespace-nowrap px-4 py-3 text-right text-sm font-semibold",
+                    stat.point_diff > 0
+                      ? "text-teal-300"
+                      : stat.point_diff < 0
+                        ? "text-red-400"
+                        : "text-surface-muted"
+                  )}
+                >
+                  {stat.point_diff > 0 ? "+" : ""}
+                  {stat.point_diff}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-surface-muted">
-                  {stat.points_possible}
+                  {stat.games_played}
                 </td>
               </tr>
             ))}

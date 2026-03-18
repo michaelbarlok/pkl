@@ -432,6 +432,9 @@ export interface FreePlayPlayerStats {
   points_won: number;
   points_possible: number;
   games_played: number;
+  wins: number;
+  losses: number;
+  point_diff: number;
   pct: number;
 }
 

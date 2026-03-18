@@ -58,7 +58,7 @@ export default async function LadderPage({
         </h1>
         <p className="mt-1 text-surface-muted">
           {isFreePlay
-            ? "Standings sorted by percent of points won."
+            ? "Standings sorted by wins, then point differential."
             : "Rankings sorted by Step, Win %, Last Played, and Sessions."}
         </p>
       </div>

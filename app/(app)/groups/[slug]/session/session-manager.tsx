@@ -537,7 +537,7 @@ function ActivePhase({
                   {p.displayName}
                 </span>
                 <span className="text-xs text-dark-200 shrink-0">
-                  {p.wins}W-{p.losses}L
+                  {p.wins}-{p.losses}
                 </span>
                 <span
                   className={cn(

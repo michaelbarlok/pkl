@@ -87,28 +87,34 @@ export async function getPlayerStats(
   const { data: matches } = await query;
   if (!matches?.length) return [];
 
-  // 4. Calculate per-player: points won, points possible, games played
-  const playerMap: Record<string, { points_won: number; points_possible: number; games_played: number }> = {};
+  // 4. Calculate per-player: points won, points possible, games played, W/L, point diff
+  const playerMap: Record<string, { points_won: number; points_possible: number; games_played: number; wins: number; losses: number; point_diff: number }> = {};
 
   for (const match of matches) {
     const pointsPossible = Math.max(match.score_a, match.score_b);
+    const teamAWon = match.score_a > match.score_b;
+    const tie = match.score_a === match.score_b;
 
     // Team A players
     for (const playerId of [match.team_a_p1, match.team_a_p2]) {
       if (!playerId) continue;
-      if (!playerMap[playerId]) playerMap[playerId] = { points_won: 0, points_possible: 0, games_played: 0 };
+      if (!playerMap[playerId]) playerMap[playerId] = { points_won: 0, points_possible: 0, games_played: 0, wins: 0, losses: 0, point_diff: 0 };
       playerMap[playerId].points_won += match.score_a;
       playerMap[playerId].points_possible += pointsPossible;
       playerMap[playerId].games_played += 1;
+      playerMap[playerId].point_diff += match.score_a - match.score_b;
+      if (!tie) { teamAWon ? playerMap[playerId].wins++ : playerMap[playerId].losses++; }
     }
 
     // Team B players
     for (const playerId of [match.team_b_p1, match.team_b_p2]) {
       if (!playerId) continue;
-      if (!playerMap[playerId]) playerMap[playerId] = { points_won: 0, points_possible: 0, games_played: 0 };
+      if (!playerMap[playerId]) playerMap[playerId] = { points_won: 0, points_possible: 0, games_played: 0, wins: 0, losses: 0, point_diff: 0 };
       playerMap[playerId].points_won += match.score_b;
       playerMap[playerId].points_possible += pointsPossible;
       playerMap[playerId].games_played += 1;
+      playerMap[playerId].point_diff += match.score_b - match.score_a;
+      if (!tie) { !teamAWon ? playerMap[playerId].wins++ : playerMap[playerId].losses++; }
     }
   }
 
@@ -131,9 +137,12 @@ export async function getPlayerStats(
         points_won: s.points_won,
         points_possible: s.points_possible,
         games_played: s.games_played,
+        wins: s.wins,
+        losses: s.losses,
+        point_diff: s.point_diff,
         pct: s.points_possible > 0 ? (s.points_won / s.points_possible) * 100 : 0,
         player: profileMap[id] ?? { id, display_name: "Unknown", avatar_url: null },
       };
     })
-    .sort((a, b) => b.pct - a.pct || b.games_played - a.games_played);
+    .sort((a, b) => b.wins - a.wins || b.point_diff - a.point_diff || b.pct - a.pct);
 }
