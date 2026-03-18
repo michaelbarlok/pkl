@@ -95,6 +95,7 @@ export async function GET(
       playerId: id,
       displayName:
         profileMap[id]?.display_name ?? "Unknown",
+      avatarUrl: profileMap[id]?.avatar_url ?? null,
       wins: playerMap[id].wins,
       losses: playerMap[id].losses,
       pointDiff: playerMap[id].pointDiff,

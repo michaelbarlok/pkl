@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 interface PlayerStanding {
   playerId: string;
   displayName: string;
+  avatarUrl: string | null;
   wins: number;
   losses: number;
   pointDiff: number;
@@ -533,25 +534,38 @@ function ActivePhase({
                 <span className="text-sm font-medium text-surface-muted w-5 text-center shrink-0">
                   {i + 1}
                 </span>
+                {p.avatarUrl ? (
+                  <img
+                    src={p.avatarUrl}
+                    alt=""
+                    className="h-8 w-8 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted shrink-0">
+                    {p.displayName.charAt(0)}
+                  </div>
+                )}
                 <span className="text-sm font-medium text-dark-100 flex-1 min-w-0 truncate">
                   {p.displayName}
                 </span>
-                <span className="text-xs text-dark-200 shrink-0">
-                  {p.wins}-{p.losses}
-                </span>
-                <span
-                  className={cn(
-                    "text-xs font-semibold shrink-0 w-10 text-right",
-                    p.pointDiff > 0
-                      ? "text-teal-300"
-                      : p.pointDiff < 0
-                        ? "text-red-400"
-                        : "text-surface-muted"
-                  )}
-                >
-                  {p.pointDiff > 0 ? "+" : ""}
-                  {p.pointDiff}
-                </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-sm font-semibold text-dark-100">
+                    {p.wins}-{p.losses}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm font-semibold w-10 text-right",
+                      p.pointDiff > 0
+                        ? "text-teal-300"
+                        : p.pointDiff < 0
+                          ? "text-red-400"
+                          : "text-surface-muted"
+                    )}
+                  >
+                    {p.pointDiff > 0 ? "+" : ""}
+                    {p.pointDiff}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -568,10 +582,7 @@ function ActivePhase({
                     Player
                   </th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    W
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    L
+                    Record
                   </th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                     +/-
@@ -589,14 +600,26 @@ function ActivePhase({
                     <td className="whitespace-nowrap px-4 py-2.5 text-sm text-surface-muted">
                       {i + 1}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-sm font-medium text-dark-100">
-                      {p.displayName}
+                    <td className="whitespace-nowrap px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        {p.avatarUrl ? (
+                          <img
+                            src={p.avatarUrl}
+                            alt=""
+                            className="h-7 w-7 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
+                            {p.displayName.charAt(0)}
+                          </div>
+                        )}
+                        <span className="text-sm font-medium text-dark-100">
+                          {p.displayName}
+                        </span>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right text-sm text-dark-100">
-                      {p.wins}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right text-sm text-dark-100">
-                      {p.losses}
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right text-sm font-semibold text-dark-100">
+                      {p.wins}-{p.losses}
                     </td>
                     <td
                       className={cn(
