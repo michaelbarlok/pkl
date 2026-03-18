@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+
+interface PlayerStanding {
+  playerId: string;
+  displayName: string;
+  wins: number;
+  losses: number;
+  pointDiff: number;
+}
 
 // ------------------------------------------------------------------
 // Types
@@ -272,9 +280,28 @@ function ActivePhase({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [standings, setStandings] = useState<PlayerStanding[]>([]);
 
   const memberMap = new Map(members.map((m) => [m.id, m]));
   const getName = (id: string) => memberMap.get(id)?.displayName ?? "Unknown";
+
+  const fetchStandings = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/groups/${group.id}/sessions/${session.id}/standings`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setStandings(data.standings ?? []);
+      }
+    } catch {
+      // Silently fail — standings are supplementary
+    }
+  }, [group.id, session.id]);
+
+  useEffect(() => {
+    fetchStandings();
+  }, [fetchStandings]);
 
   const allScored = scores.every((s) => s.scoreA !== "" && s.scoreB !== "");
 
@@ -485,6 +512,112 @@ function ActivePhase({
           {allScored ? "Submit Scores & End Session" : "End Session"}
         </button>
       </div>
+
+      {/* Session Standings */}
+      {standings.length > 0 && (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-muted">
+            Session Standings
+          </h2>
+
+          {/* Mobile: card list */}
+          <div className="space-y-1.5 sm:hidden">
+            {standings.map((p, i) => (
+              <div
+                key={p.playerId}
+                className={cn(
+                  "card flex items-center gap-3 py-2.5",
+                  p.playerId === currentPlayerId && "ring-2 ring-brand-500/40"
+                )}
+              >
+                <span className="text-sm font-medium text-surface-muted w-5 text-center shrink-0">
+                  {i + 1}
+                </span>
+                <span className="text-sm font-medium text-dark-100 flex-1 min-w-0 truncate">
+                  {p.displayName}
+                </span>
+                <span className="text-xs text-dark-200 shrink-0">
+                  {p.wins}W-{p.losses}L
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-semibold shrink-0 w-10 text-right",
+                    p.pointDiff > 0
+                      ? "text-teal-300"
+                      : p.pointDiff < 0
+                        ? "text-red-400"
+                        : "text-surface-muted"
+                  )}
+                >
+                  {p.pointDiff > 0 ? "+" : ""}
+                  {p.pointDiff}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="card overflow-hidden p-0 hidden sm:block">
+            <table className="min-w-full divide-y divide-surface-border">
+              <thead className="bg-surface-overlay">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    #
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    Player
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    W
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    L
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    +/-
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border bg-surface-raised">
+                {standings.map((p, i) => (
+                  <tr
+                    key={p.playerId}
+                    className={cn(
+                      p.playerId === currentPlayerId && "bg-brand-900/40"
+                    )}
+                  >
+                    <td className="whitespace-nowrap px-4 py-2.5 text-sm text-surface-muted">
+                      {i + 1}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-sm font-medium text-dark-100">
+                      {p.displayName}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right text-sm text-dark-100">
+                      {p.wins}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right text-sm text-dark-100">
+                      {p.losses}
+                    </td>
+                    <td
+                      className={cn(
+                        "whitespace-nowrap px-4 py-2.5 text-right text-sm font-semibold",
+                        p.pointDiff > 0
+                          ? "text-teal-300"
+                          : p.pointDiff < 0
+                            ? "text-red-400"
+                            : "text-surface-muted"
+                      )}
+                    >
+                      {p.pointDiff > 0 ? "+" : ""}
+                      {p.pointDiff}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

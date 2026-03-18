@@ -60,12 +60,12 @@ export async function getPlayerStats(
 
   const rollingCount = group?.rolling_sessions_count ?? 14;
 
-  // 2. Get last N completed session IDs
+  // 2. Get last N completed session IDs + any active session
   const { data: sessions } = await supabase
     .from("free_play_sessions")
     .select("id")
     .eq("group_id", groupId)
-    .eq("status", "completed")
+    .in("status", ["completed", "active"])
     .order("created_at", { ascending: false })
     .limit(rollingCount);
 
