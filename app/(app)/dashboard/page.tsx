@@ -171,32 +171,12 @@ export default async function DashboardPage() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card">
-          <p className="text-sm text-surface-muted">My Groups</p>
-          <p className="mt-1 text-2xl font-bold text-dark-100">
-            {memberships?.length ?? 0}
-          </p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-surface-muted">Upcoming Events</p>
-          <p className="mt-1 text-2xl font-bold text-dark-100">
-            {(sheets?.length ?? 0) + upcomingTournaments.length + activeTournaments.length + activeSessions.length}
-          </p>
-        </div>
         <Link href="/badges" className="card hover:ring-brand-500/30 transition-shadow">
           <p className="text-sm text-surface-muted">Badges Earned</p>
           <p className="mt-1 text-2xl font-bold text-dark-100">
             {badgeStats.earned} <span className="text-sm font-normal text-surface-muted">/ {badgeStats.total}</span>
           </p>
         </Link>
-        <div className="card">
-          <p className="text-sm text-surface-muted">Member Since</p>
-          <p className="mt-1 text-2xl font-bold text-dark-100">
-            {profile.member_since
-              ? formatDate(profile.member_since)
-              : "—"}
-          </p>
-        </div>
       </div>
 
       {/* My Groups */}
