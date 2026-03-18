@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -44,7 +45,7 @@ export function AdminDeleteSheet({ sheetId }: { sheetId: string }) {
       >
         {deleting ? "Cancelling..." : "Cancel Event"}
       </button>
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
     </div>
   );
 }

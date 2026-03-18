@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { listTournaments } from "@/lib/queries/tournament";
 import { TournamentCard } from "@/components/tournament-card";
 import Link from "next/link";
@@ -63,9 +64,12 @@ export default async function TournamentsPage({
       )}
 
       {tournaments.length === 0 && (
-        <div className="card text-center text-surface-muted py-12">
-          <p>No tournaments yet. Be the first to create one!</p>
-        </div>
+        <EmptyState
+          title="No tournaments yet"
+          description="Be the first to create one!"
+          actionLabel="Create Tournament"
+          actionHref="/tournaments/new"
+        />
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -106,9 +107,7 @@ export default function ResetPasswordPage() {
           />
         </div>
 
-        {error && (
-          <p className="text-red-400 text-sm">{error}</p>
-        )}
+        <FormError message={error} />
 
         <button
           type="submit"

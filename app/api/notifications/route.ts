@@ -1,28 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
-
-  const { data, error } = await supabase
+  const { data, error } = await auth.supabase
     .from("notifications")
     .select("*")
-    .eq("user_id", profile.id)
+    .eq("user_id", auth.profile.id)
     .order("created_at", { ascending: false })
     .limit(20);
 

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { generateRound, pairKey } from "@/lib/free-play-engine";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -18,27 +18,11 @@ export async function POST(
   const body = await request.json();
   const { scores } = body as { scores: { scoreA: number; scoreB: number }[] };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   // Get session
-  const { data: session } = await supabase
+  const { data: session } = await auth.supabase
     .from("free_play_sessions")
     .select("*")
     .eq("id", sessionId)
@@ -61,7 +45,7 @@ export async function POST(
   // Persist scored matches to free_play_matches
   const matchRows = round.matches.map((m: any, i: number) => ({
     group_id: groupId,
-    created_by: profile.id,
+    created_by: auth.profile.id,
     session_id: sessionId,
     round_number: round.roundNumber,
     team_a_p1: m.teamA[0],
@@ -72,7 +56,7 @@ export async function POST(
     score_b: scores[i].scoreB,
   }));
 
-  const { error: insertError } = await supabase
+  const { error: insertError } = await auth.supabase
     .from("free_play_matches")
     .insert(matchRows);
 
@@ -81,7 +65,7 @@ export async function POST(
   }
 
   // Get checked-in players
-  const { data: sessionPlayers } = await supabase
+  const { data: sessionPlayers } = await auth.supabase
     .from("free_play_session_players")
     .select("player_id")
     .eq("session_id", sessionId);
@@ -116,7 +100,7 @@ export async function POST(
     previousSitting: nextRound.sitting,
   };
 
-  const { data: updated, error: updateError } = await supabase
+  const { data: updated, error: updateError } = await auth.supabase
     .from("free_play_sessions")
     .update({ current_round: currentRound, round_number: newRoundNumber })
     .eq("id", sessionId)

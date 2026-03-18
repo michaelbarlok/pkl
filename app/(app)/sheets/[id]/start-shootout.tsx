@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -204,9 +205,7 @@ export function StartShootout({
           Need at least 4 confirmed players
         </p>
       )}
-      {error && (
-        <p className="mt-2 text-sm text-red-400">{error}</p>
-      )}
+      <FormError message={error} />
     </div>
   );
 }

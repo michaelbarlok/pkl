@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/empty-state";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import type { ShootoutSession, SessionParticipant, GameResult } from "@/types/database";
 import Link from "next/link";
@@ -471,19 +472,22 @@ export default function PlayerSessionPage() {
 
       {/* Session status messages */}
       {session.status === "created" && (
-        <div className="card text-center text-surface-muted">
-          <p>This session hasn&apos;t started yet. Check-in will open soon.</p>
-        </div>
+        <EmptyState
+          title="Session hasn't started yet"
+          description="Check-in will open soon."
+        />
       )}
       {session.status === "checking_in" && !myCourt && (
-        <div className="card text-center text-surface-muted">
-          <p>Check-in is open. Please check in with the session organizer.</p>
-        </div>
+        <EmptyState
+          title="Check-in is open"
+          description="Please check in with the session organizer."
+        />
       )}
       {session.status === "seeding" && (
-        <div className="card text-center text-surface-muted">
-          <p>Courts are being assigned. Your court number will appear here shortly.</p>
-        </div>
+        <EmptyState
+          title="Courts are being assigned"
+          description="Your court number will appear here shortly."
+        />
       )}
       {session.status === "session_complete" && (
         <div className="card text-center">

@@ -1,4 +1,5 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -8,16 +9,14 @@ export async function POST(
   try {
     const { id: groupId } = await params;
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
-    const { data: senderProfile } = await supabase
+    // Need extra profile fields for email
+    const { data: senderProfile } = await auth.supabase
       .from("profiles")
       .select("id, display_name, email")
-      .eq("user_id", user.id)
+      .eq("id", auth.profile.id)
       .single();
 
     if (!senderProfile) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { getDivisionLabel } from "@/lib/divisions";
 import type { TournamentRegistration } from "@/types/database";
@@ -127,7 +128,7 @@ export function TournamentRegistrationButton({
             {loading ? "..." : "Withdraw"}
           </button>
         </div>
-        {error && <p className="text-sm text-red-400 mt-2">{error}</p>}
+        <FormError message={error} />
       </div>
     );
   }
@@ -221,7 +222,7 @@ export function TournamentRegistrationButton({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
 
       <button
         onClick={handleRegister}

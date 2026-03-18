@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -168,7 +169,7 @@ export function LogMatchForm({
         />
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <FormError message={error} />
       {success && <p className="text-sm text-teal-300">{success}</p>}
 
       <button type="submit" disabled={submitting} className="btn-primary">

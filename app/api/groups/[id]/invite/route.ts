@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -14,29 +14,15 @@ export async function POST(
     visibility?: string;
   };
 
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   // Verify caller is a member of this group
-  const { data: membership } = await supabase
+  const { data: membership } = await auth.supabase
     .from("group_memberships")
     .select("player_id")
     .eq("group_id", groupId)
-    .eq("player_id", profile.id)
+    .eq("player_id", auth.profile.id)
     .maybeSingle();
 
   if (!membership) {
@@ -49,9 +35,9 @@ export async function POST(
 
   // For private groups, create a token so non-members can access the page
   if (body.visibility === "private") {
-    const { data: invite, error: inviteError } = await supabase
+    const { data: invite, error: inviteError } = await auth.supabase
       .from("group_invites")
-      .insert({ group_id: groupId, created_by: profile.id })
+      .insert({ group_id: groupId, created_by: auth.profile.id })
       .select("token")
       .single();
 

@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/sessions/[id]/complete-round
  *
- * Called when admin advances from round_active → round_complete.
+ * Called when admin advances from round_active -> round_complete.
  * 1. Validates all courts have all scores submitted
  * 2. Computes pool_finish for each player from game results
  * 3. Updates win_pct in group_memberships (rolling window)
@@ -15,28 +15,13 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Verify admin
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
-  }
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
 
   const { id: sessionId } = await params;
 
   // Fetch session
-  const { data: session } = await supabase
+  const { data: session } = await auth.supabase
     .from("shootout_sessions")
     .select("*")
     .eq("id", sessionId)
@@ -51,7 +36,7 @@ export async function POST(
   }
 
   // Fetch all checked-in participants with court assignments
-  const { data: participants } = await supabase
+  const { data: participants } = await auth.supabase
     .from("session_participants")
     .select("*")
     .eq("session_id", sessionId)
@@ -71,7 +56,7 @@ export async function POST(
   }
 
   // Fetch all game results for this session/round
-  const { data: gameResults } = await supabase
+  const { data: gameResults } = await auth.supabase
     .from("game_results")
     .select("*")
     .eq("session_id", sessionId)
@@ -133,7 +118,7 @@ export async function POST(
       }
     }
 
-    // Sort: wins DESC → point diff DESC → h2h → random
+    // Sort: wins DESC -> point diff DESC -> h2h -> random
     const ranked = Array.from(standings.entries())
       .sort(([, a], [, b]) => {
         if (a.wins !== b.wins) return b.wins - a.wins;
@@ -150,7 +135,7 @@ export async function POST(
       const [playerId] = ranked[i];
       const participant = courtPlayers.find((p) => p.player_id === playerId);
       if (participant) {
-        await supabase
+        await auth.supabase
           .from("session_participants")
           .update({ pool_finish: i + 1 })
           .eq("id", participant.id);
@@ -159,7 +144,7 @@ export async function POST(
   }
 
   // Update win_pct for all players based on rolling window
-  const { data: prefs } = await supabase
+  const { data: prefs } = await auth.supabase
     .from("group_preferences")
     .select("pct_window_sessions")
     .eq("group_id", session.group_id)
@@ -170,7 +155,7 @@ export async function POST(
   for (const p of participants) {
     // Get all game results for this player within the rolling window of recent sessions
     // First, find the most recent N sessions for this group that this player participated in
-    const { data: recentSessions } = await supabase
+    const { data: recentSessions } = await auth.supabase
       .from("session_participants")
       .select("session_id")
       .eq("player_id", p.player_id)
@@ -186,7 +171,7 @@ export async function POST(
     }
 
     // Fetch all game results across these sessions for this player
-    const { data: playerGames } = await supabase
+    const { data: playerGames } = await auth.supabase
       .from("game_results")
       .select("*")
       .in("session_id", sessionIds);
@@ -207,7 +192,7 @@ export async function POST(
     const total = wins + losses;
     const winPct = total > 0 ? Math.round((wins / total) * 10000) / 100 : 0;
 
-    await supabase
+    await auth.supabase
       .from("group_memberships")
       .update({ win_pct: winPct })
       .eq("group_id", session.group_id)
@@ -215,10 +200,10 @@ export async function POST(
   }
 
   // Call the existing RPC to update steps and target courts
-  await supabase.rpc("update_steps_on_round_complete", { p_session_id: sessionId });
+  await auth.supabase.rpc("update_steps_on_round_complete", { p_session_id: sessionId });
 
   // Advance session status
-  await supabase
+  await auth.supabase
     .from("shootout_sessions")
     .update({ status: "round_complete" })
     .eq("id", sessionId);

@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/empty-state";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -243,9 +244,12 @@ export default function AdminGroupDetailPage() {
 
   if (!group) {
     return (
-      <div className="card text-center text-surface-muted">
-        Group not found.
-      </div>
+      <EmptyState
+        title="Group not found"
+        description="The group you're looking for doesn't exist or has been removed."
+        actionLabel="Back to groups"
+        actionHref="/admin/groups"
+      />
     );
   }
 

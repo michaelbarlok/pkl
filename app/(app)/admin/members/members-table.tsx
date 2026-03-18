@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/empty-state";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useToast } from "@/components/toast";
 import { cn, formatDate } from "@/lib/utils";
@@ -354,9 +355,10 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         })}
 
         {filtered.length === 0 && (
-          <div className="card text-center text-sm text-surface-muted py-8">
-            No members found matching your filters.
-          </div>
+          <EmptyState
+            title="No members found"
+            description="No members match your current filters."
+          />
         )}
       </div>
 

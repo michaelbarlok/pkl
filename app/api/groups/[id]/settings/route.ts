@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -12,39 +12,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: groupId } = await params;
-  const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
-
-  // Verify caller is a group member with admin role
-  const { data: membership } = await supabase
-    .from("group_memberships")
-    .select("group_role")
-    .eq("group_id", groupId)
-    .eq("player_id", profile.id)
-    .maybeSingle();
-
-  if (!membership) {
-    return NextResponse.json({ error: "Not a group member" }, { status: 403 });
-  }
-
-  if (membership.group_role !== "admin") {
+  // Verify caller is a group admin
+  const canManage = await isGroupAdmin(auth.supabase, auth.profile.id, groupId, auth.profile.role);
+  if (!canManage) {
     return NextResponse.json({ error: "Only group admins can update settings" }, { status: 403 });
   }
 
@@ -66,7 +40,7 @@ export async function PATCH(
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  const { error } = await supabase
+  const { error } = await auth.supabase
     .from("shootout_groups")
     .update(updates)
     .eq("id", groupId);

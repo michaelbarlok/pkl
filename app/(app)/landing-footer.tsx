@@ -18,22 +18,22 @@ export function LandingFooter() {
             <h3 className="text-sm font-semibold text-dark-100">Product</h3>
             <ul className="mt-3 space-y-2">
               <li>
-                <Link href="/#features" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                <Link href="/#features" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
                   Features
                 </Link>
               </li>
               <li>
-                <Link href="/#signup-sheets" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                <Link href="/#signup-sheets" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
                   Sign-Up Sheets
                 </Link>
               </li>
               <li>
-                <Link href="/#rankings" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                <Link href="/#rankings" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
                   Rankings
                 </Link>
               </li>
               <li>
-                <Link href="/#tournaments" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                <Link href="/#tournaments" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
                   Tournaments
                 </Link>
               </li>
@@ -45,12 +45,12 @@ export function LandingFooter() {
             <h3 className="text-sm font-semibold text-dark-100">Company</h3>
             <ul className="mt-3 space-y-2">
               <li>
-                <Link href="/contact" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                <Link href="/contact" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
                   Contact Us
                 </Link>
               </li>
               <li>
-                <a href="mailto:info@pkl-ball.app" className="text-sm text-dark-300 hover:text-dark-100 transition-colors">
+                <a href="mailto:info@pkl-ball.app" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
                   info@pkl-ball.app
                 </a>
               </li>

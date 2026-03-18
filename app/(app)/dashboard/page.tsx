@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -220,12 +221,12 @@ export default async function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="card text-center text-surface-muted">
-            <p>You haven&apos;t joined any groups yet.</p>
-            <Link href="/groups" className="mt-2 inline-block text-brand-400 hover:text-brand-300">
-              Browse available groups
-            </Link>
-          </div>
+          <EmptyState
+            title="You haven't joined any groups yet"
+            description="Find a group that matches your schedule and play style."
+            actionLabel="Browse available groups"
+            actionHref="/groups"
+          />
         )}
       </section>
 
@@ -285,9 +286,12 @@ export default async function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="card text-center text-surface-muted">
-            No upcoming events.
-          </div>
+          <EmptyState
+            title="No upcoming events"
+            description="Check back soon for upcoming events and tournaments."
+            actionLabel="View all sheets"
+            actionHref="/sheets"
+          />
         )}
       </section>
     </div>

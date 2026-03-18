@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -9,18 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
  */
 
 async function authorize(tournamentId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("user_id", user.id)
-    .single();
-  if (!profile) return null;
-
-  const { data: tournament } = await supabase
+  const { data: tournament } = await auth.supabase
     .from("tournaments")
     .select("created_by")
     .eq("id", tournamentId)
@@ -28,9 +20,9 @@ async function authorize(tournamentId: string) {
   if (!tournament) return null;
 
   // Only creator or global admin can manage co-organizers
-  if (tournament.created_by !== profile.id && profile.role !== "admin") return null;
+  if (tournament.created_by !== auth.profile.id && auth.profile.role !== "admin") return null;
 
-  return { profile, supabase };
+  return { profile: auth.profile, supabase: auth.supabase };
 }
 
 export async function POST(

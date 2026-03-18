@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import Link from "next/link";
 import { useState } from "react";
@@ -74,9 +75,7 @@ export default function ForgotPasswordPage() {
           />
         </div>
 
-        {error && (
-          <p className="text-sm text-red-400">{error}</p>
-        )}
+        <FormError message={error} />
 
         <button type="submit" className="btn-primary w-full" disabled={loading}>
           {loading ? "Sending..." : "Send reset link"}

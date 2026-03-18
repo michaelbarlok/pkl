@@ -294,7 +294,7 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
           <div className="border-t border-surface-border py-1">
             <button
               onClick={handleSignOut}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-surface-muted active:bg-surface-overlay"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-dark-200 active:bg-surface-overlay"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
@@ -321,7 +321,7 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
                   "flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors",
                   active
                     ? "text-brand-400"
-                    : "text-surface-muted active:text-dark-200"
+                    : "text-dark-300 active:text-dark-100"
                 )}
               >
                 {tab.icon}
@@ -336,7 +336,7 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
               "flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors",
               moreOpen || isMoreActive
                 ? "text-brand-400"
-                : "text-surface-muted active:text-dark-200"
+                : "text-dark-300 active:text-dark-100"
             )}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -13,17 +13,11 @@ export async function GET(
 ) {
   const { id: groupId, sessionId } = await params;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   // Get all matches for this session
-  const { data: matches, error } = await supabase
+  const { data: matches, error } = await auth.supabase
     .from("free_play_matches")
     .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b")
     .eq("session_id", sessionId)
@@ -80,7 +74,7 @@ export async function GET(
 
   // Get player profiles
   const playerIds = Object.keys(playerMap);
-  const { data: profiles } = await supabase
+  const { data: profiles } = await auth.supabase
     .from("profiles")
     .select("id, display_name, avatar_url")
     .in("id", playerIds);

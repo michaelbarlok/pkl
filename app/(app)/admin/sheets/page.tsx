@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
@@ -64,9 +65,12 @@ export default async function AdminSheetsPage() {
       </div>
 
       {!sortedSheets || sortedSheets.length === 0 ? (
-        <div className="card text-center text-surface-muted">
-          No sign-up sheets created yet.
-        </div>
+        <EmptyState
+          title="No sign-up sheets created yet"
+          description="Create a sheet to start managing event sign-ups."
+          actionLabel="Create Sheet"
+          actionHref="/admin/sheets/new"
+        />
       ) : (
         <>
           {(() => {

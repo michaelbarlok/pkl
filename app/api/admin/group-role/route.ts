@@ -1,25 +1,10 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
+import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: callerProfile } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!callerProfile) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
   const { playerId, groupId, groupRole } = body;
@@ -29,17 +14,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Allow global admins OR group admins of the target group
-  if (callerProfile.role !== "admin") {
-    const { data: callerMembership } = await supabase
-      .from("group_memberships")
-      .select("group_role")
-      .eq("group_id", groupId)
-      .eq("player_id", callerProfile.id)
-      .single();
-
-    if (!callerMembership || callerMembership.group_role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  const canManage = await isGroupAdmin(auth.supabase, auth.profile.id, groupId, auth.profile.role);
+  if (!canManage) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const admin = await createServiceClient();

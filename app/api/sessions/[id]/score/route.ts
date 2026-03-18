@@ -1,26 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   const { id: sessionId } = await params;
   const body = await request.json();
@@ -44,7 +30,7 @@ export async function POST(
   }
 
   // Fetch session and group preferences for validation
-  const { data: session } = await supabase
+  const { data: session } = await auth.supabase
     .from("shootout_sessions")
     .select("*, group:shootout_groups(id)")
     .eq("id", sessionId)
@@ -54,7 +40,7 @@ export async function POST(
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  const { data: prefs } = await supabase
+  const { data: prefs } = await auth.supabase
     .from("group_preferences")
     .select("*")
     .eq("group_id", session.group_id)
@@ -62,7 +48,7 @@ export async function POST(
 
   if (prefs) {
     // Determine game limit based on how many players are on the court (not in the game)
-    const { count: poolSize } = await supabase
+    const { count: poolSize } = await auth.supabase
       .from("session_participants")
       .select("*", { count: "exact", head: true })
       .eq("session_id", sessionId)
@@ -89,7 +75,7 @@ export async function POST(
   }
 
   // Check for duplicate submission (must match full team composition)
-  let dupQuery = supabase
+  let dupQuery = auth.supabase
     .from("game_results")
     .select("id")
     .eq("session_id", sessionId)
@@ -119,7 +105,7 @@ export async function POST(
   }
 
   // Insert game result
-  const { data: result, error } = await supabase
+  const { data: result, error } = await auth.supabase
     .from("game_results")
     .insert({
       session_id: sessionId,
@@ -132,7 +118,7 @@ export async function POST(
       team_b_p2: team_b_p2 || null,
       score_a,
       score_b,
-      entered_by: profile.id,
+      entered_by: auth.profile.id,
       is_confirmed: false,
       is_disputed: false,
     })
@@ -150,29 +136,15 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
   const { game_result_id, confirmed_by, is_disputed } = body;
 
   if (is_disputed) {
     // Flag for admin resolution
-    const { error } = await supabase
+    const { error } = await auth.supabase
       .from("game_results")
       .update({ is_disputed: true })
       .eq("id", game_result_id);
@@ -182,11 +154,11 @@ export async function PUT(
   }
 
   // Confirm score
-  const { error } = await supabase
+  const { error } = await auth.supabase
     .from("game_results")
     .update({
       is_confirmed: true,
-      confirmed_by: profile.id,
+      confirmed_by: auth.profile.id,
     })
     .eq("id", game_result_id);
 

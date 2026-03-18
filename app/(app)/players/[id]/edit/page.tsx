@@ -1,6 +1,7 @@
 "use client";
 
 import { AvatarUpload } from "@/components/avatar-upload";
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -396,7 +397,7 @@ export default function EditProfilePage() {
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          <FormError message={error} />
           {success && <p className="text-sm text-teal-300">{success}</p>}
 
           <div className="flex gap-3">

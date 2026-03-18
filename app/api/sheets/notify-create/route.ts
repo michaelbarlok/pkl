@@ -1,29 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { notifyMany } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 import { formatDate, formatTime } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  // Verify admin auth
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   const { sheetId } = (await request.json()) as { sheetId?: string };
   if (!sheetId) {
@@ -31,7 +13,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Fetch sheet + group
-  const { data: sheet } = await supabase
+  const { data: sheet } = await auth.supabase
     .from("signup_sheets")
     .select("*, group:shootout_groups(id, name)")
     .eq("id", sheetId)
@@ -42,21 +24,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Allow global admins OR group admins of this sheet's group
-  if (profile.role !== "admin") {
-    const { data: membership } = await supabase
-      .from("group_memberships")
-      .select("group_role")
-      .eq("group_id", sheet.group_id)
-      .eq("player_id", profile.id)
-      .single();
-
-    if (!membership || membership.group_role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  const canManage = await isGroupAdmin(auth.supabase, auth.profile.id, sheet.group_id, auth.profile.role);
+  if (!canManage) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   // Get all group members to notify
-  const { data: members } = await supabase
+  const { data: members } = await auth.supabase
     .from("group_memberships")
     .select("player_id")
     .eq("group_id", sheet.group_id);

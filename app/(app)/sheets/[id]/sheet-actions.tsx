@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { RegistrationStatus } from "@/types/database";
@@ -75,8 +76,8 @@ export function SheetActions({
   return (
     <div className="card">
       {error && (
-        <div className="mb-4 rounded-md bg-red-900/30 p-3 text-sm text-red-400">
-          {error}
+        <div className="mb-4">
+          <FormError message={error} />
         </div>
       )}
 

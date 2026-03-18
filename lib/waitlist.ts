@@ -62,7 +62,7 @@ export async function promoteNextWaitlistPlayer(sheetId: string): Promise<string
   const eventDate = sheet?.event_date ?? "";
 
   notify({
-    userId: next.player_id,
+    profileId: next.player_id,
     type: "waitlist_promoted",
     title: "You're in!",
     body: `A spot opened up for ${groupName} on ${eventDate ? formatDate(eventDate) : "the upcoming date"}. You've been moved from the waitlist to the confirmed list.`,

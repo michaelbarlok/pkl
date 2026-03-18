@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { MentionTextarea } from "@/components/mention-textarea";
 import { useParams, useRouter } from "next/navigation";
@@ -322,7 +323,7 @@ export default function NewThreadPage() {
           </div>
         )}
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        <FormError message={error} />
 
         <div className="flex gap-3">
           <button type="submit" className="btn-primary" disabled={submitting}>

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -6,33 +6,16 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: groupId } = await params;
-  const supabase = await createClient();
 
-  // Verify authenticated user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   // Verify caller is a member of the group
-  const { data: membership } = await supabase
+  const { data: membership } = await auth.supabase
     .from("group_memberships")
     .select("player_id")
     .eq("group_id", groupId)
-    .eq("player_id", profile.id)
+    .eq("player_id", auth.profile.id)
     .maybeSingle();
 
   if (!membership) {
@@ -43,7 +26,7 @@ export async function POST(
   }
 
   // Verify group is free_play type
-  const { data: group } = await supabase
+  const { data: group } = await auth.supabase
     .from("shootout_groups")
     .select("group_type")
     .eq("id", groupId)
@@ -77,7 +60,7 @@ export async function POST(
 
   // Validate all players are group members
   const playerIds = [team_a_p1, team_a_p2, team_b_p1, team_b_p2].filter(Boolean);
-  const { data: memberCheck } = await supabase
+  const { data: memberCheck } = await auth.supabase
     .from("group_memberships")
     .select("player_id")
     .eq("group_id", groupId)
@@ -90,11 +73,11 @@ export async function POST(
     );
   }
 
-  const { data: match, error } = await supabase
+  const { data: match, error } = await auth.supabase
     .from("free_play_matches")
     .insert({
       group_id: groupId,
-      created_by: profile.id,
+      created_by: auth.profile.id,
       team_a_p1,
       team_a_p2: team_a_p2 || null,
       team_b_p1,

@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/form-error";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
@@ -125,7 +126,7 @@ export default function InviteMemberPage() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          <FormError message={error} />
 
           <button type="submit" className="btn-primary w-full" disabled={loading}>
             {loading ? "Sending Invite..." : "Send Invite"}

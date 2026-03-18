@@ -1,4 +1,5 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,13 +12,8 @@ export async function POST(
   try {
     const { id: sheetId } = await params;
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     // Optionally accept a player_id and priority in the body
     let targetPlayerId: string | null = null;
@@ -32,22 +28,8 @@ export async function POST(
       // No body or invalid JSON — signing up self
     }
 
-    // Get the caller's profile
-    const { data: callerProfile } = await supabase
-      .from("profiles")
-      .select("id, role")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!callerProfile) {
-      return NextResponse.json(
-        { error: "Profile not found" },
-        { status: 404 }
-      );
-    }
-
     // Fetch the sheet (need allow_member_guests for authorization check)
-    const { data: sheet, error: sheetError } = await supabase
+    const { data: sheet, error: sheetError } = await auth.supabase
       .from("signup_sheets")
       .select("id, group_id, status, player_limit, signup_closes_at, allow_member_guests")
       .eq("id", sheetId)
@@ -58,9 +40,9 @@ export async function POST(
     }
 
     // Authorization: signing up someone else requires admin OR allow_member_guests
-    const playerId = targetPlayerId || callerProfile.id;
-    if (targetPlayerId && targetPlayerId !== callerProfile.id) {
-      const isAdmin = callerProfile.role === "admin";
+    const playerId = targetPlayerId || auth.profile.id;
+    if (targetPlayerId && targetPlayerId !== auth.profile.id) {
+      const isAdmin = auth.profile.role === "admin";
       if (!isAdmin && !sheet.allow_member_guests) {
         return NextResponse.json(
           { error: "Adding other members is not enabled for this sheet" },
@@ -72,15 +54,15 @@ export async function POST(
     // Determine priority: explicit override > auto (global admin or group admin = high) > normal
     let priority = priorityOverride ?? "normal";
     if (!priorityOverride) {
-      const checkPlayerId = targetPlayerId && targetPlayerId !== callerProfile.id
+      const checkPlayerId = targetPlayerId && targetPlayerId !== auth.profile.id
         ? targetPlayerId
-        : callerProfile.id;
+        : auth.profile.id;
 
       // Check global admin
-      if (checkPlayerId === callerProfile.id && callerProfile.role === "admin") {
+      if (checkPlayerId === auth.profile.id && auth.profile.role === "admin") {
         priority = "high";
-      } else if (checkPlayerId !== callerProfile.id) {
-        const { data: targetProfile } = await supabase
+      } else if (checkPlayerId !== auth.profile.id) {
+        const { data: targetProfile } = await auth.supabase
           .from("profiles")
           .select("role")
           .eq("id", checkPlayerId)
@@ -90,7 +72,7 @@ export async function POST(
 
       // Check group admin (if not already high from global admin)
       if (priority !== "high" && sheet.group_id) {
-        const { data: membership } = await supabase
+        const { data: membership } = await auth.supabase
           .from("group_memberships")
           .select("group_role")
           .eq("group_id", sheet.group_id)
@@ -115,7 +97,7 @@ export async function POST(
     }
 
     // Check for existing registration
-    const { data: existing } = await supabase
+    const { data: existing } = await auth.supabase
       .from("registrations")
       .select("id, status")
       .eq("sheet_id", sheetId)
@@ -130,7 +112,7 @@ export async function POST(
     }
 
     // Count confirmed players
-    const { count: confirmedCount } = await supabase
+    const { count: confirmedCount } = await auth.supabase
       .from("registrations")
       .select("id", { count: "exact", head: true })
       .eq("sheet_id", sheetId)
@@ -220,7 +202,7 @@ export async function POST(
     }
 
     if (regStatus === "waitlist") {
-      const { data: maxWl } = await supabase
+      const { data: maxWl } = await auth.supabase
         .from("registrations")
         .select("waitlist_position")
         .eq("sheet_id", sheetId)
@@ -235,7 +217,7 @@ export async function POST(
 
     if (existing && existing.status === "withdrawn") {
       // Re-activate withdrawn registration
-      const { data, error } = await supabase
+      const { data, error } = await auth.supabase
         .from("registrations")
         .update({
           status: regStatus,
@@ -254,7 +236,7 @@ export async function POST(
       registration = data;
     } else {
       // New registration
-      const { data, error } = await supabase
+      const { data, error } = await auth.supabase
         .from("registrations")
         .insert({
           sheet_id: sheetId,
@@ -263,7 +245,7 @@ export async function POST(
           priority,
           waitlist_position: waitlistPosition,
           signed_up_at: signedUpAt,
-          registered_by: targetPlayerId ? callerProfile.id : null,
+          registered_by: targetPlayerId ? auth.profile.id : null,
         })
         .select()
         .single();
@@ -278,7 +260,7 @@ export async function POST(
     // Notify the bumped player that they've been moved to the waitlist
     if (bumpedPlayerId) {
       // Get group name for the notification
-      const { data: sheetGroup } = await supabase
+      const { data: sheetGroup } = await auth.supabase
         .from("signup_sheets")
         .select("event_date, group:shootout_groups(name)")
         .eq("id", sheetId)
@@ -288,7 +270,7 @@ export async function POST(
       const evDate = sheetGroup?.event_date ?? "";
 
       notify({
-        userId: bumpedPlayerId,
+        profileId: bumpedPlayerId,
         type: "waitlist_promoted",
         title: "Moved to waitlist",
         body: `A group admin has signed up for ${gName} on ${evDate ? formatDate(evDate) : "the upcoming date"} and your spot has been moved to the waitlist. You'll be notified if a spot opens up.`,
