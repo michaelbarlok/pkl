@@ -14,6 +14,7 @@ const playerNav = [
   { name: "Groups", href: "/groups" },
   { name: "Sheets", href: "/sheets" },
   { name: "Tournaments", href: "/tournaments" },
+  { name: "Badges", href: "/badges" },
 ];
 
 const adminNav = [

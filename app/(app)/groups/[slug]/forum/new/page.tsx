@@ -191,6 +191,13 @@ export default function NewThreadPage() {
       });
     }
 
+    // Check community badges (non-blocking)
+    fetch("/api/badges/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categories: ["community"] }),
+    }).catch(() => {});
+
     router.push(`/groups/${slug}/forum/${thread.id}`);
   }
 

@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { checkAndAwardBadges } from "@/lib/badges";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
@@ -123,6 +124,9 @@ export async function POST(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Check tournament badges (non-blocking)
+  checkAndAwardBadges(auth.profile.id, ["tournament"]).catch(() => {});
 
   return NextResponse.json(registration);
 }

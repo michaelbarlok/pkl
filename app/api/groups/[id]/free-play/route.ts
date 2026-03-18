@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { checkAndAwardBadges } from "@/lib/badges";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -91,6 +92,12 @@ export async function POST(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Check play/winning badges for all players in the match (non-blocking)
+  const allPlayerIds = [team_a_p1, team_a_p2, team_b_p1, team_b_p2].filter(Boolean) as string[];
+  for (const pid of allPlayerIds) {
+    checkAndAwardBadges(pid, ["play", "winning"]).catch(() => {});
   }
 
   return NextResponse.json(match, { status: 201 });

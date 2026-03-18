@@ -129,6 +129,7 @@ const EMAIL_TEMPLATES: Record<string, () => Promise<{ default: (props: any) => R
   PoolAssigned: () => import("@/emails/PoolAssigned"),
   StepChanged: () => import("@/emails/StepChanged"),
   TournamentWaitlistPromoted: () => import("@/emails/TournamentWaitlistPromoted"),
+  BadgeEarned: () => import("@/emails/BadgeEarned"),
 };
 
 async function sendEmail({

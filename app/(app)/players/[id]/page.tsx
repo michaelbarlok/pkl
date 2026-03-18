@@ -1,9 +1,19 @@
 import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
-import type { Profile, GroupMembership, GameResult, Registration } from "@/types/database";
+import { getPlayerBadges, getBadgeStats } from "@/lib/queries/badges";
+import type { Profile, GroupMembership, GameResult, Registration, BadgeCategory } from "@/types/database";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+const BADGE_CATEGORY_STYLES: Record<BadgeCategory, string> = {
+  play: "bg-blue-900/40 text-blue-300 border-blue-500/30",
+  winning: "bg-teal-900/40 text-teal-300 border-teal-500/30",
+  rating: "bg-accent-900/40 text-accent-300 border-accent-500/30",
+  community: "bg-violet-900/40 text-violet-300 border-violet-500/30",
+  tournament: "bg-amber-900/40 text-amber-300 border-amber-500/30",
+  ladder: "bg-rose-900/40 text-rose-300 border-rose-500/30",
+};
 
 interface PlayerPageProps {
   params: Promise<{ id: string }>;
@@ -57,6 +67,12 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
 
   const isOwnProfile = currentProfile?.id === id;
   const isAdmin = currentProfile?.role === "admin";
+
+  // Fetch badges
+  const [playerBadges, badgeStats] = await Promise.all([
+    getPlayerBadges(id),
+    getBadgeStats(id),
+  ]);
 
   // Compute stats
   const totalSessions = memberships?.reduce((sum, m) => sum + m.total_sessions, 0) ?? 0;
@@ -150,6 +166,48 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
           </p>
         </div>
       </div>
+
+      {/* Badges */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-dark-100">
+            Badges
+          </h2>
+          <Link href="/badges" className="text-sm text-brand-400 hover:text-brand-300">
+            View all badges
+          </Link>
+        </div>
+        {playerBadges.length > 0 ? (
+          <>
+            <p className="text-sm text-surface-muted mb-3">
+              {badgeStats.earned} of {badgeStats.total} earned
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {playerBadges.map((pb) => {
+                const category = pb.badge?.category as BadgeCategory | undefined;
+                return (
+                  <div
+                    key={pb.badge_code}
+                    className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${
+                      BADGE_CATEGORY_STYLES[category ?? "play"]
+                    }`}
+                    title={`${pb.badge?.description ?? ""} — Earned ${new Date(pb.earned_at).toLocaleDateString()}`}
+                  >
+                    <span>{pb.badge?.name ?? pb.badge_code}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <EmptyState
+            title="No badges yet"
+            description="Play games and participate in the community to earn badges."
+            actionLabel="View all badges"
+            actionHref="/badges"
+          />
+        )}
+      </section>
 
       {/* DUPR & USA Pickleball */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

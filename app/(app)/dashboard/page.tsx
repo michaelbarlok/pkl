@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
+import { getBadgeStats } from "@/lib/queries/badges";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatDate, formatTime } from "@/lib/utils";
@@ -96,6 +97,8 @@ export default async function DashboardPage() {
     return status && !["session_complete", "created"].includes(status);
   });
 
+  const badgeStats = await getBadgeStats(profile.id);
+
   const hasActiveSessions = activeSessions.length > 0 || activeTournaments.length > 0;
 
   return (
@@ -167,7 +170,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card">
           <p className="text-sm text-surface-muted">My Groups</p>
           <p className="mt-1 text-2xl font-bold text-dark-100">
@@ -180,6 +183,12 @@ export default async function DashboardPage() {
             {(sheets?.length ?? 0) + upcomingTournaments.length + activeTournaments.length + activeSessions.length}
           </p>
         </div>
+        <Link href="/badges" className="card hover:ring-brand-500/30 transition-shadow">
+          <p className="text-sm text-surface-muted">Badges Earned</p>
+          <p className="mt-1 text-2xl font-bold text-dark-100">
+            {badgeStats.earned} <span className="text-sm font-normal text-surface-muted">/ {badgeStats.total}</span>
+          </p>
+        </Link>
         <div className="card">
           <p className="text-sm text-surface-muted">Member Since</p>
           <p className="mt-1 text-2xl font-bold text-dark-100">
