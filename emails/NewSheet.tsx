@@ -1,4 +1,4 @@
-import { Button, Text } from "@react-email/components";
+import { Button, Link, Text } from "@react-email/components";
 import BaseEmail from "./BaseEmail";
 import { formatDate, formatTime } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ interface Props {
 
 export default function NewSheet({ groupName, eventDate, eventTime, location, sheetId }: Props) {
   const formattedTime = eventTime ? formatTime(eventTime) : null;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   return (
     <BaseEmail preview="New event posted!" heading="New Sign-Up Sheet">
@@ -28,21 +29,34 @@ export default function NewSheet({ groupName, eventDate, eventTime, location, sh
         </Text>
       )}
       <Button
-        href={sheetId ? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sheets/${sheetId}` : "#"}
-        style={{
-          backgroundColor: "#2563eb",
-          borderRadius: "6px",
-          color: "#ffffff",
-          fontSize: "14px",
-          fontWeight: "600",
-          padding: "12px 24px",
-          textDecoration: "none",
-          display: "inline-block",
-          marginTop: "16px",
-        }}
+        href={sheetId ? `${appUrl}/sheets/${sheetId}` : "#"}
+        style={buttonStyle}
       >
         Sign Up
       </Button>
+      <Text style={{ color: "#6b7280", fontSize: "13px", marginTop: "20px" }}>
+        Have questions?{" "}
+        <Link href={sheetId ? `${appUrl}/sheets/${sheetId}` : "#"} style={linkStyle}>
+          Contact Group Admins
+        </Link>
+      </Text>
     </BaseEmail>
   );
 }
+
+const buttonStyle = {
+  backgroundColor: "#2563eb",
+  borderRadius: "6px",
+  color: "#ffffff",
+  fontSize: "14px",
+  fontWeight: "600" as const,
+  padding: "12px 24px",
+  textDecoration: "none" as const,
+  display: "inline-block" as const,
+  marginTop: "16px",
+};
+
+const linkStyle = {
+  color: "#6366f1",
+  textDecoration: "underline" as const,
+};

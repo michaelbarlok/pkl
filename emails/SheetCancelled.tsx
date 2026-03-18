@@ -1,4 +1,4 @@
-import { Text } from "@react-email/components";
+import { Link, Text } from "@react-email/components";
 import BaseEmail from "./BaseEmail";
 import { formatDate, formatTime } from "@/lib/utils";
 
@@ -6,10 +6,12 @@ interface Props {
   groupName?: string;
   eventDate?: string;
   eventTime?: string;
+  sheetId?: string;
 }
 
-export default function SheetCancelled({ groupName, eventDate, eventTime }: Props) {
+export default function SheetCancelled({ groupName, eventDate, eventTime, sheetId }: Props) {
   const formattedTime = eventTime ? formatTime(eventTime) : null;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   return (
     <BaseEmail preview="Event cancelled" heading="Event Cancelled">
@@ -20,8 +22,16 @@ export default function SheetCancelled({ groupName, eventDate, eventTime }: Prop
         cancelled by the admin.
       </Text>
       <Text style={{ color: "#6b7280", fontSize: "14px" }}>
-        If you have any questions, please reach out to the league admin.
+        Have questions?{" "}
+        <Link href={sheetId ? `${appUrl}/sheets/${sheetId}` : "#"} style={linkStyle}>
+          Contact Group Admins
+        </Link>
       </Text>
     </BaseEmail>
   );
 }
+
+const linkStyle = {
+  color: "#6366f1",
+  textDecoration: "underline" as const,
+};

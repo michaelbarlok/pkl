@@ -9,6 +9,7 @@ import { AdminDeleteSheet } from "./admin-delete-sheet";
 import { AdminRemovePlayer } from "./admin-remove-player";
 import { StartShootout } from "./start-shootout";
 import { Breadcrumb } from "@/components/breadcrumb";
+import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 
 export const dynamic = "force-dynamic";
 
@@ -227,6 +228,14 @@ export default async function SheetDetailPage({
           </div>
         )}
       </div>
+
+      {/* Contact Group Admins */}
+      {!isAdmin && !isCancelled && (
+        <ContactOrganizersButton
+          endpoint={`/api/groups/${sheet.group_id}/contact-admins`}
+          label="Contact Group Admins"
+        />
+      )}
 
       {/* Sign-Up / Withdraw Actions */}
       {!isCancelled && (

@@ -99,7 +99,7 @@ export async function POST(
       link: `/sheets/${id}`,
       groupId: sheet.group_id,
       emailTemplate: "SheetCancelled",
-      emailData: { groupName, eventDate, eventTime: sheet.event_time },
+      emailData: { groupName, eventDate, eventTime: sheet.event_time, sheetId: id },
     });
   }
 
