@@ -8,6 +8,7 @@ import { AdminAddMember } from "./admin-add-member";
 import { AdminDeleteSheet } from "./admin-delete-sheet";
 import { AdminRemovePlayer } from "./admin-remove-player";
 import { StartShootout } from "./start-shootout";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 export const dynamic = "force-dynamic";
 
@@ -137,16 +138,15 @@ export default async function SheetDetailPage({
 
   return (
     <div className="space-y-8">
+      <Breadcrumb items={[
+        { label: "Sheets", href: "/sheets" },
+        { label: sheet.group?.name ?? "Event" },
+      ]} />
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <Link
-            href="/sheets"
-            className="text-sm text-brand-400 hover:text-brand-300"
-          >
-            &larr; All Sheets
-          </Link>
-          <h1 className="mt-2 text-2xl font-bold text-dark-100">
+          <h1 className="text-2xl font-bold text-dark-100">
             {sheet.group?.name ?? "Event"}
           </h1>
           <p className="mt-1 text-surface-muted">{sheet.location}</p>

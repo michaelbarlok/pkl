@@ -209,7 +209,7 @@ export function TournamentRegistrationButton({
                         setPartnerSearch("");
                         setSearchResults([]);
                       }}
-                      className="w-full px-3 py-2 text-left text-sm text-dark-100 hover:bg-surface-overlay"
+                      className="w-full px-3 py-2.5 text-left text-sm text-dark-100 hover:bg-surface-overlay focus:bg-surface-overlay focus:outline-none transition-colors"
                     >
                       {p.display_name}
                     </button>

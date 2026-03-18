@@ -202,6 +202,13 @@ export function SheetCard({
                 +{waitlistCount}
               </span>
             )}
+            {/* Capacity bar */}
+            <div className="mt-1 h-1 w-14 rounded-full bg-surface-overlay overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${confirmedCount >= playerLimit ? "bg-accent-400" : "bg-teal-400"}`}
+                style={{ width: `${Math.min((confirmedCount / playerLimit) * 100, 100)}%` }}
+              />
+            </div>
           </div>
           {players.length > 0 && (
             <button
@@ -302,9 +309,9 @@ export function SheetCard({
               <p className="text-xs font-medium uppercase text-surface-muted mb-2">
                 Confirmed ({confirmedPlayers.length})
               </p>
-              <div className="space-y-1.5">
+              <div className="space-y-0.5">
                 {confirmedPlayers.map((p, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex items-center gap-2 min-h-[2.75rem]">
                     <span className="text-xs text-surface-muted w-5 text-right shrink-0">
                       {i + 1}.
                     </span>
@@ -320,9 +327,9 @@ export function SheetCard({
               <p className="text-xs font-medium uppercase text-surface-muted mb-2">
                 Waitlist ({waitlistedPlayers.length})
               </p>
-              <div className="space-y-1.5">
+              <div className="space-y-0.5">
                 {waitlistedPlayers.map((p, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex items-center gap-2 min-h-[2.75rem]">
                     <span className="text-xs text-surface-muted w-5 text-right shrink-0">
                       {i + 1}.
                     </span>

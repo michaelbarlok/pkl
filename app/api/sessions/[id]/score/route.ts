@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -22,6 +22,7 @@ export async function POST(
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
+  const { id: sessionId } = await params;
   const body = await request.json();
   const {
     round_number,
@@ -46,7 +47,7 @@ export async function POST(
   const { data: session } = await supabase
     .from("shootout_sessions")
     .select("*, group:shootout_groups(id)")
-    .eq("id", params.id)
+    .eq("id", sessionId)
     .single();
 
   if (!session) {
@@ -64,7 +65,7 @@ export async function POST(
     const { count: poolSize } = await supabase
       .from("session_participants")
       .select("*", { count: "exact", head: true })
-      .eq("session_id", params.id)
+      .eq("session_id", sessionId)
       .eq("court_number", pool_number)
       .eq("checked_in", true);
 
@@ -91,7 +92,7 @@ export async function POST(
   let dupQuery = supabase
     .from("game_results")
     .select("id")
-    .eq("session_id", params.id)
+    .eq("session_id", sessionId)
     .eq("round_number", round_number)
     .eq("pool_number", pool_number)
     .eq("team_a_p1", team_a_p1)
@@ -121,7 +122,7 @@ export async function POST(
   const { data: result, error } = await supabase
     .from("game_results")
     .insert({
-      session_id: params.id,
+      session_id: sessionId,
       group_id: session.group_id,
       round_number,
       pool_number,
@@ -147,7 +148,7 @@ export async function POST(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

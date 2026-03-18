@@ -90,6 +90,7 @@ function LoginForm() {
           <input
             id="email"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="input"
@@ -104,6 +105,7 @@ function LoginForm() {
           <input
             id="password"
             type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="input"
@@ -112,7 +114,7 @@ function LoginForm() {
         </div>
 
         {error && (
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-red-300" role="alert">{error}</p>
         )}
 
         <button type="submit" className="btn-primary w-full" disabled={loading}>

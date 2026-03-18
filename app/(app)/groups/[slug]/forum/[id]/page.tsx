@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, Fragment } from "react";
 import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 interface Thread {
   id: string;
@@ -288,13 +289,10 @@ export default function ThreadPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-surface-muted">
-        <Link href={`/groups/${slug}/forum`} className="hover:text-dark-200">
-          Forum
-        </Link>
-        <span>/</span>
-      </div>
+      <Breadcrumb items={[
+        { label: "Forum", href: "/forum" },
+        { label: thread?.title ?? "Thread" },
+      ]} />
 
       {/* Thread */}
       <div className="card">
