@@ -93,18 +93,32 @@ export async function notify({
 
 /**
  * Send bulk notifications to multiple users.
+ * Processes in batches of 10 with a short delay between batches
+ * to avoid overwhelming Resend/Twilio rate limits.
  */
 export async function notifyMany(
   profileIds: string[],
   params: Omit<NotifyParams, "profileId">
 ): Promise<void> {
-  const results = await Promise.allSettled(
-    profileIds.map((profileId) => notify({ ...params, profileId }))
-  );
-  const failures = results.filter((r) => r.status === "rejected");
-  if (failures.length > 0) {
-    console.error(`notifyMany: ${failures.length}/${results.length} failed:`,
-      failures.map((f) => (f as PromiseRejectedResult).reason));
+  const BATCH_SIZE = 10;
+  let totalFailures = 0;
+
+  for (let i = 0; i < profileIds.length; i += BATCH_SIZE) {
+    const batch = profileIds.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((profileId) => notify({ ...params, profileId }))
+    );
+    const failures = results.filter((r) => r.status === "rejected");
+    totalFailures += failures.length;
+
+    // Delay between batches to respect rate limits (skip after last batch)
+    if (i + BATCH_SIZE < profileIds.length) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+
+  if (totalFailures > 0) {
+    console.error(`notifyMany: ${totalFailures}/${profileIds.length} failed`);
   }
 }
 

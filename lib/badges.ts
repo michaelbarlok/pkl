@@ -183,19 +183,36 @@ async function buildPlayerContext(
   if (neededCategories.has("play") || neededCategories.has("winning")) {
     promises.push(
       (async () => {
-        // Shootout games
-        const { data: shootoutGames } = await supabase
-          .from("game_results")
-          .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, created_at")
-          .or(`team_a_p1.eq.${playerId},team_a_p2.eq.${playerId},team_b_p1.eq.${playerId},team_b_p2.eq.${playerId}`)
-          .order("created_at", { ascending: false });
-
-        // Free play games
-        const { data: freePlayGames } = await supabase
-          .from("free_play_matches")
-          .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, created_at")
-          .or(`team_a_p1.eq.${playerId},team_a_p2.eq.${playerId},team_b_p1.eq.${playerId},team_b_p2.eq.${playerId}`)
-          .order("created_at", { ascending: false });
+        // Use count queries for totals (fast with indexes), only fetch
+        // recent games for win streak calculation
+        const [
+          { count: shootoutCount },
+          { count: freePlayCount },
+          { data: shootoutGames },
+          { data: freePlayGames },
+        ] = await Promise.all([
+          supabase
+            .from("game_results")
+            .select("id", { count: "exact", head: true })
+            .or(`team_a_p1.eq.${playerId},team_a_p2.eq.${playerId},team_b_p1.eq.${playerId},team_b_p2.eq.${playerId}`),
+          supabase
+            .from("free_play_matches")
+            .select("id", { count: "exact", head: true })
+            .or(`team_a_p1.eq.${playerId},team_a_p2.eq.${playerId},team_b_p1.eq.${playerId},team_b_p2.eq.${playerId}`),
+          // Only fetch recent games for streak + win counting
+          supabase
+            .from("game_results")
+            .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, created_at")
+            .or(`team_a_p1.eq.${playerId},team_a_p2.eq.${playerId},team_b_p1.eq.${playerId},team_b_p2.eq.${playerId}`)
+            .order("created_at", { ascending: false })
+            .limit(500),
+          supabase
+            .from("free_play_matches")
+            .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, created_at")
+            .or(`team_a_p1.eq.${playerId},team_a_p2.eq.${playerId},team_b_p1.eq.${playerId},team_b_p2.eq.${playerId}`)
+            .order("created_at", { ascending: false })
+            .limit(500),
+        ]);
 
         // Combine and sort by date descending for streak calculation
         type GameRow = { team_a_p1: string; team_a_p2: string | null; team_b_p1: string; team_b_p2: string | null; score_a: number; score_b: number; created_at: string };
@@ -204,7 +221,9 @@ async function buildPlayerContext(
           ...(freePlayGames ?? []),
         ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-        ctx.totalGames = allGames.length;
+        // Use the exact counts from the count queries (covers all games,
+        // not just the limited fetch used for streak/win calculation)
+        ctx.totalGames = (shootoutCount ?? 0) + (freePlayCount ?? 0);
 
         let wins = 0;
         let streak = 0;

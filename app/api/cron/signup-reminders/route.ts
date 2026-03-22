@@ -26,13 +26,15 @@ export async function GET() {
 
   let totalReminded = 0;
 
-  for (const sheet of sheets) {
-    // Get all active members
-    const { data: allMembers } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("is_active", true);
+  // Fetch all active members once (not per-sheet)
+  const { data: allMembers } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("is_active", true);
 
+  const allMemberIds = (allMembers ?? []).map((m) => m.id);
+
+  for (const sheet of sheets) {
     // Get already-registered player IDs
     const { data: registered } = await supabase
       .from("registrations")
@@ -44,9 +46,7 @@ export async function GET() {
       (registered ?? []).map((r) => r.player_id)
     );
 
-    const unregistered = (allMembers ?? [])
-      .filter((m) => !registeredIds.has(m.id))
-      .map((m) => m.id);
+    const unregistered = allMemberIds.filter((id) => !registeredIds.has(id));
 
     if (unregistered.length > 0) {
       await notifyMany(unregistered, {

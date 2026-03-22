@@ -51,23 +51,24 @@ export async function getPlayerStats(
 ): Promise<(FreePlayPlayerStats & { player: { id: string; display_name: string; avatar_url: string | null } })[]> {
   const supabase = await createClient();
 
-  // 1. Get group settings
-  const { data: group } = await supabase
-    .from("shootout_groups")
-    .select("rolling_sessions_count, stats_reset_at")
-    .eq("id", groupId)
-    .single();
+  // 1. Get group settings and sessions in parallel
+  const [{ data: group }, { data: allSessions }] = await Promise.all([
+    supabase
+      .from("shootout_groups")
+      .select("rolling_sessions_count, stats_reset_at")
+      .eq("id", groupId)
+      .single(),
+    supabase
+      .from("free_play_sessions")
+      .select("id")
+      .eq("group_id", groupId)
+      .in("status", ["completed", "active"])
+      .order("created_at", { ascending: false })
+      .limit(50), // fetch enough, trim after settings loaded
+  ]);
 
   const rollingCount = group?.rolling_sessions_count ?? 14;
-
-  // 2. Get last N completed session IDs + any active session
-  const { data: sessions } = await supabase
-    .from("free_play_sessions")
-    .select("id")
-    .eq("group_id", groupId)
-    .in("status", ["completed", "active"])
-    .order("created_at", { ascending: false })
-    .limit(rollingCount);
+  const sessions = (allSessions ?? []).slice(0, rollingCount);
 
   if (!sessions?.length) return [];
 

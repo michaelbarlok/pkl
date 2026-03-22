@@ -172,13 +172,20 @@ export async function POST(
             .eq("status", "waitlist")
             .order("waitlist_position", { ascending: true });
 
-          // Shift all existing waitlist positions up by 1
-          if (currentWaitlist) {
-            for (let i = currentWaitlist.length - 1; i >= 0; i--) {
-              await admin
-                .from("registrations")
-                .update({ waitlist_position: (currentWaitlist[i].waitlist_position ?? i + 1) + 1 })
-                .eq("id", currentWaitlist[i].id);
+          // Shift all existing waitlist positions up by 1 in a single query
+          if (currentWaitlist && currentWaitlist.length > 0) {
+            const waitlistIds = currentWaitlist.map((w) => w.id);
+            const { error: rpcErr } = await admin.rpc("increment_waitlist_positions", {
+              p_sheet_id: sheetId,
+            });
+            if (rpcErr) {
+              // Fallback if RPC not deployed yet: individual updates
+              for (let i = currentWaitlist.length - 1; i >= 0; i--) {
+                await admin
+                  .from("registrations")
+                  .update({ waitlist_position: (currentWaitlist[i].waitlist_position ?? i + 1) + 1 })
+                  .eq("id", currentWaitlist[i].id);
+              }
             }
           }
 

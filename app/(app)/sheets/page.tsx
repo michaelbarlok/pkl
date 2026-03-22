@@ -22,9 +22,14 @@ export default async function SheetsPage() {
         .single()
     : { data: null };
 
+  // Only fetch sheets with event_date in the last 14 days or in the future
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+
   const { data: sheets, error } = await supabase
     .from("signup_sheets")
     .select("*, group:shootout_groups(id, name, slug)")
+    .gte("event_date", cutoff.toISOString().split("T")[0])
     .order("event_date", { ascending: false });
 
   if (error) {

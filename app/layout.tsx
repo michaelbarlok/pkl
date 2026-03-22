@@ -3,6 +3,8 @@ import { SupabaseProvider } from "@/components/providers/supabase-provider";
 import { ToastProvider } from "@/components/toast";
 import "./globals.css";
 
+// Required: SupabaseProvider needs env vars at render time, so the
+// root layout cannot be statically prerendered.
 export const dynamic = "force-dynamic";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://pkl.app";
