@@ -2,10 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { notifyMany } from "@/lib/notify";
-import { NextResponse } from "next/server";
+import { verifyCronSecret } from "@/lib/cron-auth";
+import { NextRequest, NextResponse } from "next/server";
 import { formatDate } from "@/lib/utils";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = verifyCronSecret(request);
+  if (authError) return authError;
   const supabase = await createServiceClient();
 
   const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000).toISOString();
