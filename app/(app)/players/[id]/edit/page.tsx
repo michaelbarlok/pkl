@@ -31,7 +31,6 @@ export default function EditProfilePage() {
   const [usapTier, setUsapTier] = useState("");
   const [usapExpiration, setUsapExpiration] = useState("");
   const [notifyEmail, setNotifyEmail] = useState(true);
-  const [notifySms, setNotifySms] = useState(false);
   const [notifyPush, setNotifyPush] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
@@ -85,7 +84,6 @@ export default function EditProfilePage() {
       setAvatarUrl(profile.avatar_url ?? null);
       const prefs: string[] = profile.preferred_notify ?? ["email"];
       setNotifyEmail(prefs.includes("email"));
-      setNotifySms(prefs.includes("sms"));
       setNotifyPush(prefs.includes("push"));
       setDuprId(profile.dupr_id ?? "");
       setDuprSingles(profile.dupr_singles_rating?.toString() ?? "");
@@ -192,7 +190,6 @@ export default function EditProfilePage() {
     // Build notification preferences array
     const preferredNotify: string[] = [];
     if (notifyEmail) preferredNotify.push("email");
-    if (notifySms) preferredNotify.push("sms");
     if (notifyPush) preferredNotify.push("push");
 
     const updates: Record<string, unknown> = {
@@ -461,22 +458,6 @@ export default function EditProfilePage() {
                 <div>
                   <span className="text-sm font-medium text-dark-100">Email</span>
                   <p className="text-xs text-surface-muted">Receive notifications via email</p>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={notifySms}
-                  onChange={(e) => setNotifySms(e.target.checked)}
-                  disabled={!phone}
-                  className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-50"
-                />
-                <div>
-                  <span className="text-sm font-medium text-dark-100">SMS</span>
-                  <p className="text-xs text-surface-muted">
-                    {phone ? "Receive text message notifications" : "Add a phone number above to enable SMS"}
-                  </p>
                 </div>
               </label>
 
