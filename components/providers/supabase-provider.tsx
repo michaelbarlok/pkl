@@ -29,6 +29,15 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [supabase, router]);
 
+  // Register service worker for push notifications
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Service worker registration failed — not critical
+      });
+    }
+  }, []);
+
   return (
     <Context.Provider value={{ supabase }}>{children}</Context.Provider>
   );

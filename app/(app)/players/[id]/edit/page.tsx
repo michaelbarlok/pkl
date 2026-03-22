@@ -3,6 +3,7 @@
 import { AvatarUpload } from "@/components/avatar-upload";
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { isPushSupported, subscribeToPush, unsubscribeFromPush, getExistingSubscription } from "@/lib/push-client";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -29,6 +30,12 @@ export default function EditProfilePage() {
   const [usapMemberId, setUsapMemberId] = useState("");
   const [usapTier, setUsapTier] = useState("");
   const [usapExpiration, setUsapExpiration] = useState("");
+  const [notifyEmail, setNotifyEmail] = useState(true);
+  const [notifySms, setNotifySms] = useState(false);
+  const [notifyPush, setNotifyPush] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [togglingPush, setTogglingPush] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [groupAdminIds, setGroupAdminIds] = useState<Set<string>>(new Set());
@@ -76,6 +83,10 @@ export default function EditProfilePage() {
       setHomeCourt(profile.home_court ?? "");
       setSkillLevel(profile.skill_level?.toString() ?? "");
       setAvatarUrl(profile.avatar_url ?? null);
+      const prefs: string[] = profile.preferred_notify ?? ["email"];
+      setNotifyEmail(prefs.includes("email"));
+      setNotifySms(prefs.includes("sms"));
+      setNotifyPush(prefs.includes("push"));
       setDuprId(profile.dupr_id ?? "");
       setDuprSingles(profile.dupr_singles_rating?.toString() ?? "");
       setDuprDoubles(profile.dupr_doubles_rating?.toString() ?? "");
@@ -101,6 +112,16 @@ export default function EditProfilePage() {
               .map((m) => m.group_id)
           );
           setGroupAdminIds(adminSet);
+        }
+      }
+
+      // Check push notification support
+      if (isPushSupported()) {
+        setPushSupported(true);
+        setPushPermission(Notification.permission);
+        const existingSub = await getExistingSubscription();
+        if (existingSub && prefs.includes("push")) {
+          setNotifyPush(true);
         }
       }
 
@@ -143,11 +164,35 @@ export default function EditProfilePage() {
     setTogglingGroup(null);
   };
 
+  const handlePushToggle = async (enable: boolean) => {
+    setTogglingPush(true);
+    if (enable) {
+      const success = await subscribeToPush();
+      if (success) {
+        setNotifyPush(true);
+        setPushPermission("granted");
+      } else {
+        // Permission was denied or subscription failed
+        setPushPermission(Notification.permission);
+      }
+    } else {
+      await unsubscribeFromPush();
+      setNotifyPush(false);
+    }
+    setTogglingPush(false);
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess("");
     setSaving(true);
+
+    // Build notification preferences array
+    const preferredNotify: string[] = [];
+    if (notifyEmail) preferredNotify.push("email");
+    if (notifySms) preferredNotify.push("sms");
+    if (notifyPush) preferredNotify.push("push");
 
     const updates: Record<string, unknown> = {
       display_name: displayName.trim(),
@@ -156,6 +201,7 @@ export default function EditProfilePage() {
       bio: bio.trim() || null,
       home_court: homeCourt.trim() || null,
       skill_level: skillLevel ? parseFloat(skillLevel) : null,
+      preferred_notify: preferredNotify,
       dupr_id: duprId.trim() || null,
       dupr_singles_rating: duprSingles ? parseFloat(duprSingles) : null,
       dupr_doubles_rating: duprDoubles ? parseFloat(duprDoubles) : null,
@@ -394,6 +440,66 @@ export default function EditProfilePage() {
                   className="input"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Notification Preferences */}
+          <div className="border-t border-surface-border pt-4 mt-4">
+            <h3 className="text-sm font-semibold text-dark-100 mb-1">Notification Preferences</h3>
+            <p className="text-xs text-surface-muted mb-3">
+              Choose how you want to receive notifications. In-app notifications are always on.
+            </p>
+            <div className="space-y-3">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={notifyEmail}
+                  onChange={(e) => setNotifyEmail(e.target.checked)}
+                  className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-dark-100">Email</span>
+                  <p className="text-xs text-surface-muted">Receive notifications via email</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={notifySms}
+                  onChange={(e) => setNotifySms(e.target.checked)}
+                  disabled={!phone}
+                  className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-50"
+                />
+                <div>
+                  <span className="text-sm font-medium text-dark-100">SMS</span>
+                  <p className="text-xs text-surface-muted">
+                    {phone ? "Receive text message notifications" : "Add a phone number above to enable SMS"}
+                  </p>
+                </div>
+              </label>
+
+              {pushSupported && (
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={notifyPush}
+                    disabled={togglingPush || pushPermission === "denied"}
+                    onChange={(e) => handlePushToggle(e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-50"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-dark-100">Push Notifications</span>
+                    <p className="text-xs text-surface-muted">
+                      {pushPermission === "denied"
+                        ? "Push notifications are blocked. Enable them in your browser settings."
+                        : togglingPush
+                          ? "Setting up..."
+                          : "Receive push notifications on this device"}
+                    </p>
+                  </div>
+                </label>
+              )}
             </div>
           </div>
 
