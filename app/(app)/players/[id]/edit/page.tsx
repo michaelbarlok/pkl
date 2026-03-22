@@ -115,17 +115,18 @@ export default function EditProfilePage() {
         }
       }
 
-      // Check push notification support
+      setLoading(false);
+
+      // Check push notification support (non-blocking)
       if (isPushSupported()) {
         setPushSupported(true);
         setPushPermission(Notification.permission);
-        const existingSub = await getExistingSubscription();
-        if (existingSub && prefs.includes("push")) {
-          setNotifyPush(true);
-        }
+        getExistingSubscription().then((existingSub) => {
+          if (existingSub && prefs.includes("push")) {
+            setNotifyPush(true);
+          }
+        });
       }
-
-      setLoading(false);
     }
 
     load();
