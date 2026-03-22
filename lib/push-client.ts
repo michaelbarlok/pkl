@@ -96,13 +96,17 @@ export async function unsubscribeFromPush(): Promise<boolean> {
 
 /**
  * Check if the user currently has an active push subscription.
+ * Uses a timeout to avoid blocking if service worker isn't ready.
  */
 export async function getExistingSubscription(): Promise<PushSubscription | null> {
   if (!isPushSupported()) return null;
 
   try {
-    const registration = await navigator.serviceWorker.ready;
-    return await registration.pushManager.getSubscription();
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+    const check = navigator.serviceWorker.ready.then((reg) =>
+      reg.pushManager.getSubscription()
+    );
+    return await Promise.race([check, timeout]);
   } catch {
     return null;
   }
