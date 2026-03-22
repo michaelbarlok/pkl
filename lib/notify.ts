@@ -1,5 +1,6 @@
 import type React from "react";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sendPushNotification } from "@/lib/push";
 import type { NotificationType } from "@/types/database";
 
 interface NotifyParams {
@@ -87,6 +88,20 @@ export async function notify({
       });
     } catch (err) {
       console.error("Failed to send SMS notification:", err);
+    }
+  }
+
+  // 5. Web Push notification
+  if (prefs.includes("push")) {
+    try {
+      await sendPushNotification(supabase, profileId, {
+        title,
+        body,
+        link,
+        tag: type,
+      });
+    } catch (err) {
+      console.error("Failed to send push notification:", err);
     }
   }
 }

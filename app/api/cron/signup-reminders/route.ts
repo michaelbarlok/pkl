@@ -2,10 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { notifyMany } from "@/lib/notify";
-import { NextResponse } from "next/server";
+import { verifyCronSecret } from "@/lib/cron-auth";
+import { NextRequest, NextResponse } from "next/server";
 import { formatDate } from "@/lib/utils";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = verifyCronSecret(request);
+  if (authError) return authError;
   const supabase = await createServiceClient();
 
   // Find sheets where signup closes in the next 1 hour and reminder not yet sent
