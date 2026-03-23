@@ -3,6 +3,7 @@ import { FormError } from "@/components/form-error";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import type { SignupSheet } from "@/types/database";
+import Link from "next/link";
 import { SheetCard } from "./sheet-card";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +18,26 @@ export default async function SheetsPage() {
   const { data: profile } = user
     ? await supabase
         .from("profiles")
-        .select("id")
+        .select("id, role")
         .eq("user_id", user.id)
         .single()
     : { data: null };
+
+  // Check if user is admin of any group
+  let isAnyGroupAdmin = false;
+  if (profile) {
+    if (profile.role === "admin") {
+      isAnyGroupAdmin = true;
+    } else {
+      const { data: adminMemberships } = await supabase
+        .from("group_memberships")
+        .select("group_id")
+        .eq("player_id", profile.id)
+        .eq("group_role", "admin")
+        .limit(1);
+      isAnyGroupAdmin = (adminMemberships?.length ?? 0) > 0;
+    }
+  }
 
   // Only fetch sheets with event_date in the last 14 days or in the future
   const cutoff = new Date();
@@ -177,6 +194,11 @@ export default async function SheetsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-dark-100">Sign-Up Sheets</h1>
+        {isAnyGroupAdmin && (
+          <Link href="/sheets/new" className="btn-primary text-sm">
+            Create Sign-Up Sheet
+          </Link>
+        )}
       </div>
 
       {!sortedSheets || sortedSheets.length === 0 ? (
