@@ -118,7 +118,7 @@ export function MentionTextarea({
         required={required}
       />
       {showSuggestions && (
-        <div className="absolute z-20 bottom-full mb-1 w-64 max-h-48 overflow-y-auto rounded-lg border border-surface-border bg-surface-raised shadow-lg">
+        <div className="absolute z-20 bottom-full mb-1 w-64 max-h-48 overflow-y-auto rounded-lg border-2 border-brand-600/60 bg-surface-overlay shadow-xl shadow-black/40 ring-1 ring-white/5">
           {suggestions.map((member) => (
             <button
               key={member.id}
@@ -128,7 +128,7 @@ export function MentionTextarea({
                 e.preventDefault();
                 selectMember(member);
               }}
-              className="block w-full px-3 py-2 text-left text-sm text-dark-200 hover:bg-surface-overlay"
+              className="block w-full px-3 py-2 text-left text-sm text-dark-100 hover:bg-brand-700/40"
             >
               @{member.display_name}
             </button>

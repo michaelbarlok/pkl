@@ -96,42 +96,38 @@ export async function POST(
       );
     }
 
-    // Check for existing registration
-    const { data: existing } = await auth.supabase
-      .from("registrations")
-      .select("id, status")
-      .eq("sheet_id", sheetId)
-      .eq("player_id", playerId)
-      .single();
-
-    if (existing && (existing.status === "confirmed" || existing.status === "waitlist")) {
-      // Already registered — just return success
-      revalidatePath(`/sheets/${sheetId}`);
-      revalidatePath("/sheets");
-      return NextResponse.json({ registration: existing }, { status: 200 });
-    }
-
-    // Count confirmed players
-    const { count: confirmedCount } = await auth.supabase
-      .from("registrations")
-      .select("id", { count: "exact", head: true })
-      .eq("sheet_id", sheetId)
-      .eq("status", "confirmed");
-
-    const isFull = (confirmedCount ?? 0) >= sheet.player_limit;
-    let regStatus: string;
-    let waitlistPosition: number | null = null;
     let bumpedPlayerId: string | null = null;
-    // For high-priority players, we set signed_up_at before the earliest confirmed
-    // so they appear at position #1 in the list (ordered by signed_up_at asc)
-    let signedUpAt = new Date().toISOString();
+    let registration;
 
     if (priority === "high") {
-      // Use service client for cross-user operations
-      const admin = await createServiceClient();
+      // High-priority admin signup: may need to bump a lower-priority player.
+      // This path is rare (only group/global admins) so concurrency risk is minimal.
+      const adminClient = await createServiceClient();
+
+      // Check for existing active registration
+      const { data: existing } = await auth.supabase
+        .from("registrations")
+        .select("id, status")
+        .eq("sheet_id", sheetId)
+        .eq("player_id", playerId)
+        .single();
+
+      if (existing && (existing.status === "confirmed" || existing.status === "waitlist")) {
+        revalidatePath(`/sheets/${sheetId}`);
+        revalidatePath("/sheets");
+        return NextResponse.json({ registration: existing }, { status: 200 });
+      }
+
+      const { count: confirmedCount } = await adminClient
+        .from("registrations")
+        .select("id", { count: "exact", head: true })
+        .eq("sheet_id", sheetId)
+        .eq("status", "confirmed");
+
+      const isFull = (confirmedCount ?? 0) >= sheet.player_limit;
 
       // Get all confirmed registrations to find earliest timestamp
-      let { data: confirmed } = await admin
+      const { data: confirmed } = await adminClient
         .from("registrations")
         .select("id, player_id, priority, signed_up_at")
         .eq("sheet_id", sheetId)
@@ -140,20 +136,19 @@ export async function POST(
 
       // Set signed_up_at to 1 second before the earliest confirmed player
       // so this admin always appears at position #1
+      let signedUpAt = new Date().toISOString();
       if (confirmed && confirmed.length > 0) {
         const earliest = new Date(confirmed[0].signed_up_at);
         signedUpAt = new Date(earliest.getTime() - 1000).toISOString();
       }
 
+      let regStatus: string;
+      let waitlistPosition: number | null = null;
+
       if (!isFull) {
-        // Sheet has room — admin gets confirmed at position #1
         regStatus = "confirmed";
       } else {
-        // Sheet is full — need to bump the lowest-priority player
         const priorityOrder: Record<string, number> = { low: 0, normal: 1, high: 2 };
-
-        // Sort: low priority first, then normal, then high
-        // Within same priority, latest signup first (they get bumped first)
         const sorted = (confirmed ?? []).sort((a, b) => {
           const aPri = priorityOrder[a.priority ?? "normal"] ?? 1;
           const bPri = priorityOrder[b.priority ?? "normal"] ?? 1;
@@ -164,104 +159,113 @@ export async function POST(
         const toBump = sorted[0];
 
         if (toBump && (priorityOrder[toBump.priority ?? "normal"] ?? 1) < 2) {
-          // Bump this player to waitlist position 1, shift others down
-          const { data: currentWaitlist } = await admin
-            .from("registrations")
-            .select("id, waitlist_position")
-            .eq("sheet_id", sheetId)
-            .eq("status", "waitlist")
-            .order("waitlist_position", { ascending: true });
-
-          // Shift all existing waitlist positions up by 1 in a single query
-          if (currentWaitlist && currentWaitlist.length > 0) {
-            const waitlistIds = currentWaitlist.map((w) => w.id);
-            const { error: rpcErr } = await admin.rpc("increment_waitlist_positions", {
-              p_sheet_id: sheetId,
-            });
-            if (rpcErr) {
-              // Fallback if RPC not deployed yet: individual updates
-              for (let i = currentWaitlist.length - 1; i >= 0; i--) {
-                await admin
-                  .from("registrations")
-                  .update({ waitlist_position: (currentWaitlist[i].waitlist_position ?? i + 1) + 1 })
-                  .eq("id", currentWaitlist[i].id);
-              }
-            }
-          }
-
-          // Move bumped player to waitlist position 1
-          await admin
+          await adminClient.rpc("increment_waitlist_positions", { p_sheet_id: sheetId });
+          await adminClient
             .from("registrations")
             .update({ status: "waitlist", waitlist_position: 1 })
             .eq("id", toBump.id);
-
           bumpedPlayerId = toBump.player_id;
           regStatus = "confirmed";
         } else {
-          // All confirmed players are high priority — go to waitlist
           regStatus = "waitlist";
         }
       }
-    } else if (!isFull) {
-      regStatus = "confirmed";
-    } else {
-      regStatus = "waitlist";
-    }
 
-    if (regStatus === "waitlist") {
-      const { data: maxWl } = await auth.supabase
-        .from("registrations")
-        .select("waitlist_position")
-        .eq("sheet_id", sheetId)
-        .eq("status", "waitlist")
-        .order("waitlist_position", { ascending: false })
-        .limit(1)
-        .single();
-      waitlistPosition = (maxWl?.waitlist_position ?? 0) + 1;
-    }
-
-    let registration;
-
-    if (existing && existing.status === "withdrawn") {
-      // Re-activate withdrawn registration
-      const { data, error } = await auth.supabase
-        .from("registrations")
-        .update({
-          status: regStatus,
-          priority,
-          waitlist_position: waitlistPosition,
-          signed_up_at: signedUpAt,
-        })
-        .eq("id", existing.id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Update registration error:", error);
-        return NextResponse.json({ error: error.message }, { status: 400 });
+      if (regStatus === "waitlist") {
+        const { data: maxWl } = await adminClient
+          .from("registrations")
+          .select("waitlist_position")
+          .eq("sheet_id", sheetId)
+          .eq("status", "waitlist")
+          .order("waitlist_position", { ascending: false })
+          .limit(1)
+          .single();
+        waitlistPosition = (maxWl?.waitlist_position ?? 0) + 1;
       }
-      registration = data;
-    } else {
-      // New registration
-      const { data, error } = await auth.supabase
-        .from("registrations")
-        .insert({
-          sheet_id: sheetId,
-          player_id: playerId,
-          status: regStatus,
-          priority,
-          waitlist_position: waitlistPosition,
-          signed_up_at: signedUpAt,
-          registered_by: targetPlayerId ? auth.profile.id : null,
-        })
-        .select()
-        .single();
 
-      if (error) {
-        console.error("Insert registration error:", error);
-        return NextResponse.json({ error: error.message }, { status: 400 });
+      if (existing && existing.status === "withdrawn") {
+        const { data, error } = await adminClient
+          .from("registrations")
+          .update({
+            status: regStatus,
+            priority,
+            waitlist_position: waitlistPosition,
+            signed_up_at: signedUpAt,
+          })
+          .eq("id", existing.id)
+          .select()
+          .single();
+        if (error) {
+          console.error("Update registration error:", error);
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        registration = data;
+      } else {
+        const { data, error } = await adminClient
+          .from("registrations")
+          .insert({
+            sheet_id: sheetId,
+            player_id: playerId,
+            status: regStatus,
+            priority,
+            waitlist_position: waitlistPosition,
+            signed_up_at: signedUpAt,
+            registered_by: targetPlayerId ? auth.profile.id : null,
+          })
+          .select()
+          .single();
+        if (error) {
+          console.error("Insert registration error:", error);
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        registration = data;
       }
-      registration = data;
+    } else {
+      // Normal/low priority signup: use atomic RPC to prevent race conditions.
+      // The RPC locks the sheet row (SELECT ... FOR UPDATE) so concurrent signups
+      // can't over-confirm past the player limit.
+      const adminClient = await createServiceClient();
+      const { data: rpcResult, error: rpcError } = await adminClient.rpc(
+        "safe_signup_for_sheet",
+        {
+          p_sheet_id: sheetId,
+          p_player_id: playerId,
+          p_priority: priority,
+          p_registered_by: targetPlayerId ? auth.profile.id : null,
+        }
+      );
+
+      if (rpcError) {
+        console.error("safe_signup_for_sheet RPC error:", rpcError);
+        return NextResponse.json({ error: rpcError.message }, { status: 400 });
+      }
+
+      const result = rpcResult as {
+        error?: string;
+        status?: string;
+        id?: string;
+        already_registered?: boolean;
+        waitlist_position?: number | null;
+      };
+
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+
+      if (result.already_registered) {
+        revalidatePath(`/sheets/${sheetId}`);
+        revalidatePath("/sheets");
+        return NextResponse.json(
+          { registration: { id: result.id, status: result.status } },
+          { status: 200 }
+        );
+      }
+
+      registration = {
+        id: result.id,
+        status: result.status,
+        waitlist_position: result.waitlist_position,
+      };
     }
 
     // Notify the bumped player that they've been moved to the waitlist
