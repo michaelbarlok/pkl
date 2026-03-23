@@ -83,18 +83,25 @@ export default async function SheetDetailPage({
     }
   }
 
-  const sortByPriority = (a: Registration, b: Registration) => {
-    const aPri = PRIORITY_ORDER[a.priority ?? "normal"] ?? 1;
-    const bPri = PRIORITY_ORDER[b.priority ?? "normal"] ?? 1;
-    if (aPri !== bPri) return aPri - bPri;
-    return new Date(a.signed_up_at).getTime() - new Date(b.signed_up_at).getTime();
-  };
   const confirmed = (registrations ?? [])
     .filter((r: Registration) => r.status === "confirmed")
-    .sort(sortByPriority);
+    .sort((a, b) => {
+      // High-priority (admins) first, then by signup timestamp
+      const aPri = PRIORITY_ORDER[a.priority ?? "normal"] ?? 1;
+      const bPri = PRIORITY_ORDER[b.priority ?? "normal"] ?? 1;
+      if (aPri !== bPri) return aPri - bPri;
+      return new Date(a.signed_up_at).getTime() - new Date(b.signed_up_at).getTime();
+    });
   const waitlisted = (registrations ?? [])
     .filter((r: Registration) => r.status === "waitlist")
-    .sort(sortByPriority);
+    .sort((a, b) => {
+      // Waitlist uses waitlist_position as the authoritative order
+      // (matches promotion order in the promote_next_waitlist_player RPC)
+      const aPri = PRIORITY_ORDER[a.priority ?? "normal"] ?? 1;
+      const bPri = PRIORITY_ORDER[b.priority ?? "normal"] ?? 1;
+      if (aPri !== bPri) return aPri - bPri;
+      return (a.waitlist_position ?? 999) - (b.waitlist_position ?? 999);
+    });
 
   // Check current user's registration
   const myRegistration = (registrations ?? []).find(
