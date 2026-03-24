@@ -5,10 +5,15 @@
  * and round robin formats.
  *
  * Round Robin Format:
- *   4-6 teams:  Full round robin (all play all) → top 4 seed into playoff
- *   7-10 teams: 5-round random round robin → top 4 seed into playoff
- *   11+ teams:  Split into 2 pools, round robin within each → top 3 per pool
- *               seed into 6-team playoff (top 2 get bye)
+ *   3-7 teams:  Single pool, organizer-configured rounds (max = teams-1)
+ *   8-14 teams: 2 pools (split evenly), organizer-configured rounds
+ *   15+ teams:  Split into pools of ~5 (target size 5, distributed evenly).
+ *               Top 2 from each pool advance to a seeded single-elim bracket
+ *               ranked by record then point differential.
+ *
+ *   For 3-7: top 4 advance to playoff (or all if fewer than 4).
+ *   For 8-14: top 3 per pool (6 total) advance to 6-team playoff.
+ *   For 15+: top 2 per pool advance to single-elim bracket.
  *
  *   Playoffs always include a 3rd place game.
  *   Pool matches are generated upfront; playoff matches are created when
@@ -18,7 +23,7 @@
 interface BracketMatch {
   round: number;
   match_number: number;
-  bracket: "winners" | "losers" | "grand_final" | "playoff";
+  bracket: string;
   player1_id: string | null;
   player2_id: string | null;
   status: "pending" | "bye";
@@ -149,49 +154,91 @@ export function generateDoubleElimination(playerIds: string[]): BracketMatch[] {
 // ============================================================
 
 /**
+ * Determine pool structure for a given team count.
+ *   3-7 teams:  1 pool
+ *   8-14 teams: 2 pools
+ *   15+ teams:  pools of ~5 (Math.round(n/5) pools, distributed evenly)
+ */
+export function getPoolStructure(teamCount: number): {
+  numPools: number;
+  poolSizes: number[];
+  maxRoundsPerPool: number;
+} {
+  if (teamCount <= 7) {
+    return { numPools: 1, poolSizes: [teamCount], maxRoundsPerPool: teamCount - 1 };
+  }
+  if (teamCount <= 14) {
+    const half = Math.ceil(teamCount / 2);
+    const other = teamCount - half;
+    return { numPools: 2, poolSizes: [half, other], maxRoundsPerPool: half - 1 };
+  }
+  // 15+ teams: pools of ~5
+  const numPools = Math.round(teamCount / 5);
+  const baseSize = Math.floor(teamCount / numPools);
+  const remainder = teamCount % numPools;
+  const poolSizes: number[] = [];
+  for (let i = 0; i < numPools; i++) {
+    poolSizes.push(baseSize + (i < remainder ? 1 : 0));
+  }
+  const maxPoolSize = Math.max(...poolSizes);
+  return { numPools, poolSizes, maxRoundsPerPool: maxPoolSize - 1 };
+}
+
+/**
  * Generate round robin pool play matches.
  *
- * - 4-6 teams: full round robin in a single pool (bracket="winners")
- * - 7-10 teams: 5 rounds of randomized round robin (bracket="winners")
- * - 11+ teams: randomly split into 2 pools; Pool A (bracket="winners"),
- *   Pool B (bracket="losers"). Each pool plays full RR if ≤6, else 5 rounds.
- *
- * Playoff matches are NOT created here — they are generated via
- * generatePlayoffBracket() when the organizer advances from pool play.
+ * @param playerIds - All players in this division
+ * @param poolRounds - Organizer-configured number of rounds (optional; defaults to max)
  */
-export function generateRoundRobin(playerIds: string[]): BracketMatch[] {
+export function generateRoundRobin(playerIds: string[], poolRounds?: number): BracketMatch[] {
   const n = playerIds.length;
   if (n < 2) return [];
 
   // Shuffle for randomization
   const shuffled = shuffle([...playerIds]);
+  const structure = getPoolStructure(n);
 
-  if (n <= 10) {
+  if (structure.numPools === 1) {
     // Single pool
-    const maxRounds = n <= 6 ? undefined : 5;
+    const maxRounds = poolRounds ? Math.min(poolRounds, n - 1) : n - 1;
     return generatePoolMatches(shuffled, "winners", maxRounds);
   }
 
-  // 11+ teams: split into 2 pools
-  const mid = Math.ceil(n / 2);
-  const poolA = shuffled.slice(0, mid);
-  const poolB = shuffled.slice(mid);
+  if (structure.numPools === 2) {
+    // Two pools — use "winners" and "losers" bracket labels for backward compat
+    const poolA = shuffled.slice(0, structure.poolSizes[0]);
+    const poolB = shuffled.slice(structure.poolSizes[0]);
+    const maxA = poolRounds ? Math.min(poolRounds, poolA.length - 1) : poolA.length - 1;
+    const maxB = poolRounds ? Math.min(poolRounds, poolB.length - 1) : poolB.length - 1;
+    return [
+      ...generatePoolMatches(poolA, "winners", maxA),
+      ...generatePoolMatches(poolB, "losers", maxB),
+    ];
+  }
 
-  const poolAMatches = generatePoolMatches(poolA, "winners", poolA.length <= 6 ? undefined : 5);
-  const poolBMatches = generatePoolMatches(poolB, "losers", poolB.length <= 6 ? undefined : 5);
-
-  return [...poolAMatches, ...poolBMatches];
+  // 3+ pools — use "pool_1", "pool_2", etc.
+  const allMatches: BracketMatch[] = [];
+  let offset = 0;
+  for (let i = 0; i < structure.numPools; i++) {
+    const poolPlayers = shuffled.slice(offset, offset + structure.poolSizes[i]);
+    offset += structure.poolSizes[i];
+    const maxR = poolRounds
+      ? Math.min(poolRounds, poolPlayers.length - 1)
+      : poolPlayers.length - 1;
+    allMatches.push(...generatePoolMatches(poolPlayers, `pool_${i + 1}`, maxR));
+  }
+  return allMatches;
 }
 
 /**
  * Generate round robin matches for a single pool using the circle method.
  * @param playerIds - Players in this pool
- * @param bracket - "winners" for Pool A (or single pool), "losers" for Pool B
- * @param maxRounds - If set, limit to this many rounds (for 7-10 team partial RR)
+ * @param bracket - Pool identifier ("winners", "losers", "pool_1", "pool_2", etc.)
+ * @param maxRounds - Number of rounds to play
  */
 function generatePoolMatches(
   playerIds: string[],
-  bracket: "winners" | "losers",
+  bracket: string,
   maxRounds?: number
 ): BracketMatch[] {
   const n = playerIds.length;
@@ -257,6 +304,9 @@ function generatePoolMatches(
  *   R2: #1 vs lowest remaining, #2 vs other (semis)
  *   R3: Final + 3rd place game
  *
+ * For 8+ teams (15+ division, top 2 per pool):
+ *   Standard single-elimination bracket with 3rd place game.
+ *
  * All matches use bracket="playoff".
  * @param seededPlayerIds - Players ordered by seed (index 0 = #1 seed)
  */
@@ -270,11 +320,70 @@ export function generatePlayoffBracket(seededPlayerIds: string[]): BracketMatch[
     return generateSixTeamPlayoff(seededPlayerIds);
   }
 
-  // Fallback: use standard single elim for other sizes
-  return generateSingleElimination(seededPlayerIds).map((m) => ({
-    ...m,
-    bracket: "playoff" as const,
-  }));
+  // For any other size (including 8+ from multi-pool): single elim + 3rd place game
+  return generateSingleElimWithThirdPlace(seededPlayerIds);
+}
+
+/**
+ * Single elimination bracket with a 3rd place game.
+ * Used for 15+ team divisions where top 2 from each pool advance.
+ */
+function generateSingleElimWithThirdPlace(playerIds: string[]): BracketMatch[] {
+  const n = playerIds.length;
+  if (n < 2) return [];
+
+  const bracketSize = nextPowerOf2(n);
+  const totalRounds = Math.log2(bracketSize);
+
+  const seeds = standardBracketOrder(bracketSize);
+  const matches: BracketMatch[] = [];
+
+  // Round 1
+  let matchNumber = 1;
+  for (let i = 0; i < seeds.length; i += 2) {
+    const seed1 = seeds[i];
+    const seed2 = seeds[i + 1];
+    const p1 = seed1 <= n ? playerIds[seed1 - 1] : null;
+    const p2 = seed2 <= n ? playerIds[seed2 - 1] : null;
+
+    const isBye = !p1 || !p2;
+    matches.push({
+      round: 1,
+      match_number: matchNumber++,
+      bracket: "playoff",
+      player1_id: p1,
+      player2_id: p2,
+      status: isBye ? "bye" : "pending",
+    });
+  }
+
+  // Rounds 2 through totalRounds (empty slots filled as winners advance)
+  let matchesInRound = bracketSize / 4;
+  for (let round = 2; round <= totalRounds; round++) {
+    for (let m = 1; m <= matchesInRound; m++) {
+      matches.push({
+        round,
+        match_number: m,
+        bracket: "playoff",
+        player1_id: null,
+        player2_id: null,
+        status: "pending",
+      });
+    }
+    matchesInRound = matchesInRound / 2;
+  }
+
+  // Add 3rd place game in the final round (match_number 2)
+  matches.push({
+    round: totalRounds,
+    match_number: 2,
+    bracket: "playoff",
+    player1_id: null,
+    player2_id: null,
+    status: "pending",
+  });
+
+  return matches;
 }
 
 /**
@@ -426,6 +535,42 @@ export function computePoolStandings(
     .sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
 }
 
+/**
+ * Helper: detect all pool bracket labels from a set of matches.
+ * Returns sorted list of bracket identifiers that represent pool play.
+ */
+export function getPoolBrackets(matches: { bracket: string }[]): string[] {
+  const poolBrackets = new Set<string>();
+  for (const m of matches) {
+    if (m.bracket === "winners" || m.bracket === "losers" || m.bracket.startsWith("pool_")) {
+      poolBrackets.add(m.bracket);
+    }
+  }
+  // Sort: "winners" first, "losers" second, then pool_1, pool_2, etc.
+  return Array.from(poolBrackets).sort((a, b) => {
+    if (a === "winners") return -1;
+    if (b === "winners") return 1;
+    if (a === "losers") return -1;
+    if (b === "losers") return 1;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+}
+
+/**
+ * Get a display label for a pool bracket identifier.
+ */
+export function getPoolLabel(bracket: string, totalPools: number): string {
+  if (totalPools === 1) return "Pool Play";
+  if (bracket === "winners") return "Pool A";
+  if (bracket === "losers") return "Pool B";
+  if (bracket.startsWith("pool_")) {
+    const num = parseInt(bracket.replace("pool_", ""));
+    // Convert 1→A, 2→B, etc.
+    return `Pool ${String.fromCharCode(64 + num)}`;
+  }
+  return bracket;
+}
+
 // ============================================================
 // Bracket Advancement
 // ============================================================
@@ -486,7 +631,7 @@ export function getPlayoffAdvancement(
   const winnerSlot = currentMatch.match_number % 2 === 1 ? "player1_id" as const : "player2_id" as const;
   const winner = {
     round: currentMatch.round + 1,
-    match_number: 1, // Final is always match 1
+    match_number: nextMatch,
     slot: winnerSlot,
   };
 
@@ -502,17 +647,22 @@ export function getPlayoffAdvancement(
     };
   }
 
-  // For QF round (6-team bracket), winners go to specific SF slots
+  // For QF round in 6-team bracket, winners go to specific SF slots
   if (!isSemifinalRound) {
-    // R1M1 winner → R2 player2 of match 1, R1M2 winner → R2 player2 of match 2
-    return {
-      winner: {
-        round: currentMatch.round + 1,
-        match_number: currentMatch.match_number,
-        slot: "player2_id",
-      },
-      loser: null,
-    };
+    // Check if this is the specific 6-team QF layout (2 matches in round, top seeds have byes)
+    const matchesInRound = allPlayoffMatches.filter((m) => m.round === currentMatch.round).length;
+    const matchesInNextRound = allPlayoffMatches.filter((m) => m.round === currentMatch.round + 1).length;
+    if (matchesInRound === 2 && matchesInNextRound === 2) {
+      // 6-team bracket: R1M1 winner → R2M1 player2, R1M2 winner → R2M2 player2
+      return {
+        winner: {
+          round: currentMatch.round + 1,
+          match_number: currentMatch.match_number,
+          slot: "player2_id",
+        },
+        loser: null,
+      };
+    }
   }
 
   return { winner, loser };

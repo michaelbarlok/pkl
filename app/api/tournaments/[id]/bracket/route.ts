@@ -272,16 +272,40 @@ export async function PUT(
             }
           }
         } else {
-          // QF winners → SF (for 6-team bracket)
-          // R1M1 winner → R2M1 player2, R1M2 winner → R2M2 player2
-          const sfMatch = allPlayoff.find(
-            (m: any) => m.round === match.round + 1 && m.match_number === match.match_number
-          );
-          if (sfMatch) {
-            await supabase
-              .from("tournament_matches")
-              .update({ player2_id: winner_id })
-              .eq("id", sfMatch.id);
+          // Earlier rounds: standard single-elim advancement
+          // Check if this is the 6-team QF layout (2 QF matches feed into 2 SF matches 1:1)
+          const matchesInThisRound = allPlayoff.filter(
+            (m: any) => m.round === match.round
+          ).length;
+          const matchesInNextRound = allPlayoff.filter(
+            (m: any) => m.round === match.round + 1
+          ).length;
+          const isSixTeamQF = matchesInThisRound === 2 && matchesInNextRound === 2;
+
+          if (isSixTeamQF) {
+            // 6-team bracket: R1M1 winner → R2M1 player2, R1M2 winner → R2M2 player2
+            const sfMatch = allPlayoff.find(
+              (m: any) => m.round === match.round + 1 && m.match_number === match.match_number
+            );
+            if (sfMatch) {
+              await supabase
+                .from("tournament_matches")
+                .update({ player2_id: winner_id })
+                .eq("id", sfMatch.id);
+            }
+          } else {
+            // Standard bracket: advance to ceil(matchNumber/2) in next round
+            const nextMatchNumber = Math.ceil(match.match_number / 2);
+            const slot = match.match_number % 2 === 1 ? "player1_id" : "player2_id";
+            const nextMatch = allPlayoff.find(
+              (m: any) => m.round === match.round + 1 && m.match_number === nextMatchNumber
+            );
+            if (nextMatch) {
+              await supabase
+                .from("tournament_matches")
+                .update({ [slot]: winner_id })
+                .eq("id", nextMatch.id);
+            }
           }
         }
       }

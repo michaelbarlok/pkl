@@ -156,7 +156,7 @@ function DivisionRules({
       </h3>
       <div className="text-xs text-dark-200 space-y-1.5">
         <p>
-          <span className="font-medium">Format:</span> Round Robin pool play followed by a seeded playoff bracket with a 3rd place game.
+          <span className="font-medium">Format:</span> Round Robin pool play followed by a seeded playoff bracket.
         </p>
         <p>
           <span className="font-medium">Pool play games to:</span> {scoreToWinPool ?? 11} &mdash;

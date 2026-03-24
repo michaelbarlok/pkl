@@ -279,6 +279,7 @@ export default async function TournamentDetailPage({
             <DivisionReview
               tournamentId={id}
               divisions={divisionCounts}
+              format={tournament.format}
             />
           )}
 

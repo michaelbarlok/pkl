@@ -2,6 +2,7 @@
 
 import { FormError } from "@/components/form-error";
 import { getDivisionLabel } from "@/lib/divisions";
+import { getPoolStructure } from "@/lib/tournament-bracket";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -14,17 +15,21 @@ interface DivisionCount {
 interface Props {
   tournamentId: string;
   divisions: DivisionCount[];
+  format?: string;
 }
 
-export function DivisionReview({ tournamentId, divisions: initialDivisions }: Props) {
+export function DivisionReview({ tournamentId, divisions: initialDivisions, format }: Props) {
   const router = useRouter();
   const [divisions, setDivisions] = useState(initialDivisions);
   const [selectedForMerge, setSelectedForMerge] = useState<string[]>([]);
   const [merging, setMerging] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  // Per-division pool rounds: { divisionCode: roundsValue }
+  const [poolRounds, setPoolRounds] = useState<Record<string, string>>({});
 
-  const MIN_PLAYERS = 4;
+  const isRoundRobin = format === "round_robin";
+  const MIN_PLAYERS = isRoundRobin ? 3 : 4;
 
   function toggleMergeSelect(div: string) {
     setSelectedForMerge((prev) =>
@@ -111,10 +116,21 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions }: Pr
     setGenerating(true);
     setError("");
 
+    // Build division_settings from pool rounds configuration
+    const divisionSettings: Record<string, { pool_rounds: number }> = {};
+    if (isRoundRobin) {
+      for (const d of divisions) {
+        const val = parseInt(poolRounds[d.division] ?? "");
+        if (val > 0) {
+          divisionSettings[d.division] = { pool_rounds: val };
+        }
+      }
+    }
+
     const res = await fetch(`/api/tournaments/${tournamentId}/divisions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "generate" }),
+      body: JSON.stringify({ action: "generate", division_settings: divisionSettings }),
     });
 
     if (!res.ok) {
@@ -144,52 +160,90 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions }: Pr
         {divisions.map((d) => {
           const isSmall = d.count < MIN_PLAYERS;
           const isSelected = selectedForMerge.includes(d.division);
+          const poolStructure = isRoundRobin ? getPoolStructure(d.count) : null;
 
           return (
-            <div
-              key={d.division}
-              className={`rounded-lg border px-3 py-2.5 flex items-center justify-between gap-3 transition-colors ${
-                isSelected
-                  ? "border-brand-500 bg-brand-900/20"
-                  : isSmall
-                  ? "border-red-500/40 bg-red-900/10"
-                  : "border-surface-border bg-surface-raised"
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleMergeSelect(d.division)}
-                  className="rounded border-surface-border text-brand-500 focus:ring-brand-500 shrink-0"
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-dark-100 truncate">
-                    {getDivisionLabel(d.division)}
-                  </p>
-                  <p className="text-xs text-surface-muted truncate">
-                    {d.playerNames.slice(0, 4).join(", ")}
-                    {d.playerNames.length > 4 && ` +${d.playerNames.length - 4} more`}
-                  </p>
+            <div key={d.division} className="space-y-0">
+              <div
+                className={`rounded-lg border px-3 py-2.5 flex items-center justify-between gap-3 transition-colors ${
+                  isSelected
+                    ? "border-brand-500 bg-brand-900/20"
+                    : isSmall
+                    ? "border-red-500/40 bg-red-900/10"
+                    : "border-surface-border bg-surface-raised"
+                } ${isRoundRobin && !isSmall ? "rounded-b-none" : ""}`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleMergeSelect(d.division)}
+                    className="rounded border-surface-border text-brand-500 focus:ring-brand-500 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-dark-100 truncate">
+                      {getDivisionLabel(d.division)}
+                    </p>
+                    <p className="text-xs text-surface-muted truncate">
+                      {d.playerNames.slice(0, 4).join(", ")}
+                      {d.playerNames.length > 4 && ` +${d.playerNames.length - 4} more`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`text-sm font-semibold ${
+                      isSmall ? "text-red-400" : "text-teal-300"
+                    }`}
+                  >
+                    {d.count} player{d.count !== 1 ? "s" : ""}
+                  </span>
+                  <button
+                    onClick={() => handleCancel(d.division)}
+                    className="text-xs text-red-400 hover:text-red-300 font-medium ml-1"
+                    title="Cancel this division"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <span
-                  className={`text-sm font-semibold ${
-                    isSmall ? "text-red-400" : "text-teal-300"
-                  }`}
-                >
-                  {d.count} player{d.count !== 1 ? "s" : ""}
-                </span>
-                <button
-                  onClick={() => handleCancel(d.division)}
-                  className="text-xs text-red-400 hover:text-red-300 font-medium ml-1"
-                  title="Cancel this division"
-                >
-                  Cancel
-                </button>
-              </div>
+              {/* Pool rounds configuration for round robin */}
+              {isRoundRobin && poolStructure && !isSmall && (
+                <div className="rounded-b-lg border border-t-0 border-surface-border bg-surface-overlay px-3 py-2.5">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-xs text-surface-muted">
+                      {poolStructure.numPools === 1
+                        ? "1 pool"
+                        : `${poolStructure.numPools} pools (${poolStructure.poolSizes.join(", ")} teams)`}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-medium text-dark-200">
+                        Rounds:
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={poolStructure.maxRoundsPerPool}
+                        value={poolRounds[d.division] ?? String(poolStructure.maxRoundsPerPool)}
+                        onChange={(e) =>
+                          setPoolRounds((prev) => ({ ...prev, [d.division]: e.target.value }))
+                        }
+                        className="input w-16 py-1 text-center text-xs"
+                      />
+                      <span className="text-xs text-surface-muted">
+                        (max {poolStructure.maxRoundsPerPool})
+                      </span>
+                    </div>
+                    {poolStructure.numPools >= 3 && (
+                      <span className="text-xs text-brand-300">
+                        Top 2 per pool advance to bracket
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

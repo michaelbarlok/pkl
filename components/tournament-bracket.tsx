@@ -1,6 +1,7 @@
 "use client";
 
 import { FormError } from "@/components/form-error";
+import { getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -193,13 +194,12 @@ function RoundRobinView({
   const [editableSeeds, setEditableSeeds] = useState<{ id: string; name: string; wins: number; losses: number; pointDiff: number }[]>([]);
 
   // Separate pool play from playoff matches
-  const poolMatches = matches.filter((m) => m.bracket === "winners" || m.bracket === "losers");
   const playoffMatches = matches.filter((m) => m.bracket === "playoff");
+  const poolMatches = matches.filter((m) => m.bracket !== "playoff");
 
-  // Check for two-pool setup
-  const poolAMatches = poolMatches.filter((m) => m.bracket === "winners");
-  const poolBMatches = poolMatches.filter((m) => m.bracket === "losers");
-  const hasTwoPools = poolBMatches.length > 0;
+  // Detect pool structure from bracket labels
+  const poolBrackets = getPoolBrackets(poolMatches);
+  const isMultiPool = poolBrackets.length >= 3; // 3+ pools (15+ teams)
 
   // Check if all pool matches are complete
   const poolComplete = poolMatches.length > 0 && poolMatches.every(
@@ -215,7 +215,21 @@ function RoundRobinView({
     // Compute the proposed seeding from pool standings
     let proposed: { id: string; name: string; wins: number; losses: number; pointDiff: number }[];
 
-    if (hasTwoPools) {
+    if (isMultiPool) {
+      // 15+ teams: top 2 from each pool, ranked across all pools
+      const allQualifiers: { id: string; name: string; wins: number; losses: number; pointDiff: number }[] = [];
+      for (const bracket of poolBrackets) {
+        const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
+        const standings = computeStandings(bracketMatches, partnerMap);
+        allQualifiers.push(...standings.slice(0, 2));
+      }
+      proposed = allQualifiers.sort(
+        (a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff
+      );
+    } else if (poolBrackets.length === 2) {
+      // 8-14 teams: top 3 from each pool
+      const poolAMatches = poolMatches.filter((m) => m.bracket === poolBrackets[0]);
+      const poolBMatches = poolMatches.filter((m) => m.bracket === poolBrackets[1]);
       const poolAStandings = computeStandings(poolAMatches, partnerMap);
       const poolBStandings = computeStandings(poolBMatches, partnerMap);
       const poolATop3 = poolAStandings.slice(0, 3);
@@ -224,8 +238,9 @@ function RoundRobinView({
         (a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff
       );
     } else {
-      const standings = computeStandings(poolAMatches, partnerMap);
-      proposed = standings.slice(0, 4);
+      // Single pool: top 4
+      const standings = computeStandings(poolMatches, partnerMap);
+      proposed = standings.slice(0, Math.min(4, standings.length));
     }
 
     setEditableSeeds(proposed);
@@ -263,6 +278,13 @@ function RoundRobinView({
     setAdvancing(false);
   }
 
+  // Build advancement description
+  const advancementDesc = isMultiPool
+    ? ` Top 2 from each pool (${poolBrackets.length * 2} teams) will advance to the playoff bracket.`
+    : poolBrackets.length === 2
+      ? " Review the top 3 from each pool before advancing to a 6-team playoff."
+      : " Review the top 4 teams before advancing to the playoff bracket.";
+
   return (
     <div className="space-y-6">
       {/* Division Results (visible to everyone when playoffs complete) */}
@@ -293,45 +315,27 @@ function RoundRobinView({
       )}
 
       {/* Pool Standings + Matches */}
-      {hasTwoPools ? (
-        <>
+      {poolBrackets.map((bracket) => {
+        const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
+        return (
           <PoolSection
-            label="Pool A"
-            matches={poolAMatches}
+            key={bracket}
+            label={getPoolLabel(bracket, poolBrackets.length)}
+            matches={bracketMatches}
             canManage={canManage}
             tournamentId={tournamentId}
             scoreToWin={scoreToWinPool}
             partnerMap={partnerMap}
           />
-          <PoolSection
-            label="Pool B"
-            matches={poolBMatches}
-            canManage={canManage}
-            tournamentId={tournamentId}
-            scoreToWin={scoreToWinPool}
-            partnerMap={partnerMap}
-          />
-        </>
-      ) : (
-        <PoolSection
-          label="Pool Play"
-          matches={poolAMatches}
-          canManage={canManage}
-          tournamentId={tournamentId}
-          scoreToWin={scoreToWinPool}
-          partnerMap={partnerMap}
-        />
-      )}
+        );
+      })}
 
       {/* Advance to Playoffs — Review Step */}
       {canManage && poolComplete && !hasPlayoffs && division && !showReview && (
         <div className="card">
           <h3 className="text-sm font-semibold text-dark-200 mb-2">Pool Play Complete</h3>
           <p className="text-xs text-surface-muted mb-3">
-            All pool matches are finished.
-            {hasTwoPools
-              ? " Review the top 3 from each pool before advancing to a 6-team playoff."
-              : " Review the top 4 teams before advancing to the playoff bracket."}
+            All pool matches are finished.{advancementDesc}
           </p>
           <button
             onClick={handleReviewAdvancement}

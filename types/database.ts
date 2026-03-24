@@ -50,7 +50,7 @@ export type TournamentSkill = "3.0" | "3.5" | "4.0" | "4.5+";
 export type TournamentStatus = "draft" | "registration_open" | "registration_closed" | "in_progress" | "completed" | "cancelled";
 export type TournamentRegistrationStatus = "confirmed" | "waitlist" | "withdrawn";
 export type TournamentMatchStatus = "pending" | "in_progress" | "completed" | "bye";
-export type TournamentBracket = "winners" | "losers" | "grand_final" | "playoff";
+export type TournamentBracket = "winners" | "losers" | "grand_final" | "playoff" | `pool_${number}`;
 
 export type GroupType = "ladder_league" | "free_play";
 export type GroupVisibility = "public" | "private";
@@ -346,6 +346,7 @@ export interface Tournament {
   score_to_win_pool?: number | null;
   score_to_win_playoff?: number | null;
   finals_best_of_3?: boolean | null;
+  division_settings?: Record<string, { pool_rounds?: number }> | null;
   created_by: string;
   created_at: string;
   updated_at: string;
