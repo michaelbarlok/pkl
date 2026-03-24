@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     description: "Pickleball ladder league platform",
     images: [
       {
-        url: "/pkl-logo.png",
+        url: "/pkl-og.png",
         width: 1200,
         height: 630,
         alt: "PKL – Pickleball ladder league platform",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "PKL",
     description: "Pickleball ladder league platform",
-    images: ["/pkl-logo.png"],
+    images: ["/pkl-og.png"],
   },
 };
 
