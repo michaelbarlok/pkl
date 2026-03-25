@@ -45,7 +45,8 @@ function RegisterForm() {
     setLoading(true);
 
     // Sign up with Supabase Auth — pass `next` through the email confirmation link
-    const confirmUrl = `${window.location.origin}/auth/confirm?next=${encodeURIComponent(next)}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const confirmUrl = `${appUrl}/auth/confirm?next=${encodeURIComponent(next)}`;
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -108,7 +109,7 @@ function RegisterForm() {
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     });
     if (oauthError) {
