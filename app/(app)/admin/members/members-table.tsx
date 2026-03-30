@@ -37,6 +37,10 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
   const [togglingGlobalRole, setTogglingGlobalRole] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   const filtered = useMemo(() => {
     let result = profiles;
 
@@ -65,6 +69,35 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
 
     return result;
   }, [profiles, search, statusFilter, roleFilter]);
+
+  // Selectable = filtered members excluding yourself
+  const selectableIds = useMemo(
+    () => filtered.filter((p) => p.id !== currentProfileId).map((p) => p.id),
+    [filtered, currentProfileId]
+  );
+
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableIds));
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   async function handleSuspend(profileId: string, currentlyActive: boolean) {
     setSuspending(profileId);
@@ -161,6 +194,33 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
     }
   }
 
+  async function handleBulkDelete() {
+    const count = selectedIds.size;
+    if (!confirm(`Permanently delete ${count} member${count !== 1 ? "s" : ""}? This removes them from all groups and cannot be undone.`)) return;
+    if (!confirm(`Final confirmation: delete ${count} member${count !== 1 ? "s" : ""} forever?`)) return;
+
+    setBulkDeleting(true);
+    try {
+      const res = await fetch("/api/admin/bulk-delete-members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerIds: [...selectedIds] }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.error || "Bulk delete failed.", "error");
+      } else {
+        toast(`${data.deleted} member${data.deleted !== 1 ? "s" : ""} permanently deleted.`, "success");
+        setSelectedIds(new Set());
+      }
+      router.refresh();
+    } catch {
+      toast("Bulk delete failed.", "error");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   function exportCSV() {
     const headers = [
       "Name",
@@ -242,6 +302,18 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         </div>
 
         <div className="flex gap-2">
+          {someSelected && (
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="btn-danger text-sm disabled:opacity-50"
+            >
+              {bulkDeleting
+                ? "Deleting..."
+                : `Delete Selected (${selectedIds.size})`}
+            </button>
+          )}
           <button
             type="button"
             onClick={exportCSV}
@@ -258,16 +330,50 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
       {/* Results count */}
       <p className="text-sm text-surface-muted">
         Showing {filtered.length} of {profiles.length} members
+        {someSelected && (
+          <span className="ml-2 text-red-400 font-medium">
+            · {selectedIds.size} selected
+          </span>
+        )}
       </p>
 
       {/* Mobile card layout */}
       <div className="space-y-3 sm:hidden">
+        {/* Mobile: check-all bar */}
+        {selectableIds.length > 0 && (
+          <div className="flex items-center gap-3 px-1">
+            <input
+              type="checkbox"
+              id="select-all-mobile"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              className="h-4 w-4 rounded border-surface-border bg-surface-overlay text-brand-500 focus:ring-brand-500"
+            />
+            <label htmlFor="select-all-mobile" className="text-sm text-surface-muted cursor-pointer">
+              {allSelected ? "Deselect all" : "Select all"}
+            </label>
+          </div>
+        )}
+
         {filtered.map((profile) => {
           const memberships = membershipMap[profile.id] ?? [];
+          const isSelf = profile.id === currentProfileId;
+          const isSelected = selectedIds.has(profile.id);
           return (
-            <div key={profile.id} className="card space-y-3">
-              {/* Header: avatar + name + status + actions */}
+            <div
+              key={profile.id}
+              className={cn("card space-y-3", isSelected && "ring-1 ring-red-500/50")}
+            >
+              {/* Header: checkbox + avatar + name + status + actions */}
               <div className="flex items-center gap-3">
+                {!isSelf && (
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(profile.id)}
+                    className="h-4 w-4 rounded border-surface-border bg-surface-overlay text-brand-500 focus:ring-brand-500 flex-shrink-0"
+                  />
+                )}
                 {profile.avatar_url ? (
                   <img
                     src={profile.avatar_url}
@@ -333,6 +439,17 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         <table className="min-w-full divide-y divide-surface-border">
           <thead className="bg-surface-overlay">
             <tr>
+              {/* Check-all column */}
+              <th className="w-10 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  disabled={selectableIds.length === 0}
+                  className="h-4 w-4 rounded border-surface-border bg-surface-overlay text-brand-500 focus:ring-brand-500 disabled:opacity-30"
+                  aria-label="Select all members"
+                />
+              </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
                 Member
               </th>
@@ -359,8 +476,29 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
           <tbody className="divide-y divide-surface-border bg-surface-raised">
             {filtered.map((profile) => {
               const memberships = membershipMap[profile.id] ?? [];
+              const isSelf = profile.id === currentProfileId;
+              const isSelected = selectedIds.has(profile.id);
               return (
-                <tr key={profile.id} className="hover:bg-surface-overlay">
+                <tr
+                  key={profile.id}
+                  className={cn(
+                    "hover:bg-surface-overlay",
+                    isSelected && "bg-red-900/10"
+                  )}
+                >
+                  {/* Per-row checkbox */}
+                  <td className="px-4 py-3">
+                    {!isSelf && (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(profile.id)}
+                        className="h-4 w-4 rounded border-surface-border bg-surface-overlay text-brand-500 focus:ring-brand-500"
+                        aria-label={`Select ${profile.display_name}`}
+                      />
+                    )}
+                  </td>
+
                   {/* Avatar + Name */}
                   <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -454,7 +592,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-8 text-center text-sm text-surface-muted"
                 >
                   No members found matching your filters.
