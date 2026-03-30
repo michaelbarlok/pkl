@@ -303,34 +303,43 @@ async function buildPlayerContext(
 
     promises.push(
       (async () => {
-        // Count tournament wins: matches where this player is the winner in a final round
+        // Count tournament wins: player won the highest-round match in a tournament.
+        // Step 1 — find tournaments where this player won at least one match.
         const { data: wonMatches } = await supabase
           .from("tournament_matches")
           .select("tournament_id")
           .eq("winner_id", playerId)
           .eq("status", "completed");
 
-        // A tournament win is when the player won the last match (highest round) in a bracket
-        // Simplified: count distinct tournaments where they have at least one win
-        // More accurate: check if they won the final match — but for now, we check
-        // tournament_matches where they are winner_id AND there's no next match
-        // For simplicity, count tournaments where player is winner in final match (round = max round)
         ctx.tournamentWins = 0;
         if (wonMatches && wonMatches.length > 0) {
-          // Get unique tournament IDs
           const tournamentIds = [...new Set(wonMatches.map((m) => m.tournament_id))];
-          for (const tid of tournamentIds) {
-            const { data: maxRoundMatch } = await supabase
-              .from("tournament_matches")
-              .select("winner_id")
-              .eq("tournament_id", tid)
-              .eq("status", "completed")
-              .order("round", { ascending: false })
-              .limit(1)
-              .single();
 
-            if (maxRoundMatch?.winner_id === playerId) {
-              ctx.tournamentWins++;
+          // Step 2 — single query for all completed matches in those tournaments.
+          // Avoids one query per tournament (N+1 → 2 queries total).
+          const { data: allMatches } = await supabase
+            .from("tournament_matches")
+            .select("tournament_id, round, winner_id")
+            .in("tournament_id", tournamentIds)
+            .eq("status", "completed");
+
+          if (allMatches) {
+            // Find the max round per tournament
+            const maxRoundByTournament = new Map<string, number>();
+            for (const match of allMatches) {
+              const cur = maxRoundByTournament.get(match.tournament_id) ?? 0;
+              if (match.round > cur) {
+                maxRoundByTournament.set(match.tournament_id, match.round);
+              }
+            }
+            // Count tournaments where the player won the final round
+            for (const match of allMatches) {
+              if (
+                match.winner_id === playerId &&
+                match.round === maxRoundByTournament.get(match.tournament_id)
+              ) {
+                ctx.tournamentWins++;
+              }
             }
           }
         }

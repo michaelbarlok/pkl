@@ -45,30 +45,33 @@ export default async function TournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [tournament, registrations, matches, myRegistration] = await Promise.all([
-    getTournament(id),
-    getTournamentRegistrations(id),
-    getTournamentMatches(id),
-    getMyRegistration(id),
-  ]);
+
+  // Create a single supabase client for the page-level queries so it can be
+  // reused for the organizers fetch without an extra createClient() call.
+  const supabase = await createClient();
+
+  const [tournament, registrations, matches, myRegistration, organizersResult, { data: { user } }] =
+    await Promise.all([
+      getTournament(id),
+      getTournamentRegistrations(id),
+      getTournamentMatches(id),
+      getMyRegistration(id),
+      supabase
+        .from("tournament_organizers")
+        .select("profile_id, added_at, profile:profiles!profile_id(id, display_name)")
+        .eq("tournament_id", id),
+      supabase.auth.getUser(),
+    ]);
 
   if (!tournament) notFound();
 
-  // Check if current user can manage this tournament
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = user
     ? await supabase.from("profiles").select("id, role").eq("user_id", user.id).single()
     : { data: null };
   const isCreator = profile?.id === tournament.created_by;
   const isAdmin = profile?.role === "admin";
 
-  // Fetch co-organizers
-  const { data: organizers } = await supabase
-    .from("tournament_organizers")
-    .select("profile_id, added_at, profile:profiles!profile_id(id, display_name)")
-    .eq("tournament_id", id);
-  const coOrganizers = (organizers ?? []) as any[];
+  const coOrganizers = (organizersResult.data ?? []) as any[];
   const isCoOrganizer = profile ? coOrganizers.some((o: any) => o.profile_id === profile.id) : false;
   const canManage = isCreator || isAdmin || isCoOrganizer;
 

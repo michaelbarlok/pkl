@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/auth";
 import { checkAndAwardBadges } from "@/lib/badges";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -128,6 +129,9 @@ export async function POST(
   // Check tournament badges (non-blocking)
   checkAndAwardBadges(auth.profile.id, ["tournament"]).catch(() => {});
 
+  revalidatePath(`/tournaments/${tournamentId}`);
+  revalidatePath("/tournaments");
+
   return NextResponse.json(registration);
 }
 
@@ -170,6 +174,9 @@ export async function DELETE(
     await promoteTournamentWaitlist(tournamentId, division);
   }
 
+  revalidatePath(`/tournaments/${tournamentId}`);
+  revalidatePath("/tournaments");
+
   return NextResponse.json({ status: "withdrawn" });
 }
 
@@ -206,29 +213,11 @@ async function promoteTournamentWaitlist(
     .update({ status: "confirmed", waitlist_position: null })
     .eq("id", nextWaitlist.id);
 
-  // Reorder remaining waitlist positions for this division
-  let reorderQuery = supabase
-    .from("tournament_registrations")
-    .select("id, waitlist_position")
-    .eq("tournament_id", tournamentId)
-    .eq("status", "waitlist")
-    .order("waitlist_position", { ascending: true });
-
-  if (division) {
-    reorderQuery = reorderQuery.eq("division", division);
-  }
-
-  const { data: remaining } = await reorderQuery;
-  if (remaining && remaining.length > 0) {
-    for (let i = 0; i < remaining.length; i++) {
-      if (remaining[i].waitlist_position !== i + 1) {
-        await supabase
-          .from("tournament_registrations")
-          .update({ waitlist_position: i + 1 })
-          .eq("id", remaining[i].id);
-      }
-    }
-  }
+  // Reorder remaining waitlist positions for this division in a single RPC call
+  await supabase.rpc("reorder_tournament_waitlist", {
+    p_tournament_id: tournamentId,
+    p_division: division ?? null,
+  });
 
   // Fetch tournament info for notification
   const { data: tournament } = await supabase

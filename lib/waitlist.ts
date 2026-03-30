@@ -88,22 +88,8 @@ async function fallbackPromote(
     .update({ status: "confirmed", waitlist_position: null })
     .eq("id", next.id);
 
-  // Reorder remaining
-  const { data: remaining } = await admin
-    .from("registrations")
-    .select("id, waitlist_position")
-    .eq("sheet_id", sheetId)
-    .eq("status", "waitlist")
-    .order("waitlist_position", { ascending: true });
-
-  if (remaining) {
-    for (let i = 0; i < remaining.length; i++) {
-      await admin
-        .from("registrations")
-        .update({ waitlist_position: i + 1 })
-        .eq("id", remaining[i].id);
-    }
-  }
+  // Reorder remaining waitlist in a single RPC call instead of one UPDATE per row
+  await admin.rpc("reorder_sheet_waitlist", { p_sheet_id: sheetId });
 
   return next.player_id;
 }

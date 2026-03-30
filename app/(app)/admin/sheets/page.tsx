@@ -14,7 +14,9 @@ const statusBadge: Record<string, { className: string; label: string }> = {
 export default async function AdminSheetsPage() {
   const supabase = await createClient();
 
-  // Fetch all sheets
+  // Fetch all sheets, pre-sorted by event_date desc at the DB level.
+  // The secondary cancelled-last partition is done in JS via a stable sort
+  // (JS sort is stable since ES2019, so relative date order is preserved).
   const { data: sheets, error } = await supabase
     .from("signup_sheets")
     .select("*, group:shootout_groups(id, name)")
@@ -28,12 +30,12 @@ export default async function AdminSheetsPage() {
     );
   }
 
-  // Sort: active sheets first (most recent on top), then cancelled (most recent on top)
+  // Stable partition: non-cancelled first, then cancelled.
+  // Each group retains the event_date-desc order from the DB query.
   const sortedSheets = [...(sheets ?? [])].sort((a, b) => {
     const aCancelled = a.status === "cancelled" ? 1 : 0;
     const bCancelled = b.status === "cancelled" ? 1 : 0;
-    if (aCancelled !== bCancelled) return aCancelled - bCancelled;
-    return new Date(b.event_date).getTime() - new Date(a.event_date).getTime();
+    return aCancelled - bCancelled;
   });
 
   // Fetch registration counts
