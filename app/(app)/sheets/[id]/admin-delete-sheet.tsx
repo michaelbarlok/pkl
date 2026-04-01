@@ -1,21 +1,24 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { FormError } from "@/components/form-error";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function AdminDeleteSheet({ sheetId }: { sheetId: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleDelete() {
-    if (
-      !confirm(
-        "Are you sure you want to cancel this event? All registrants will be notified."
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Cancel this event?",
+      description: "All registrants will be notified that the event has been cancelled.",
+      confirmLabel: "Cancel Event",
+      variant: "warning",
+    });
+    if (!ok) return;
 
     setDeleting(true);
     setError(null);

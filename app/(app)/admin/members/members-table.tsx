@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { EmptyState } from "@/components/empty-state";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useToast } from "@/components/toast";
@@ -28,6 +29,7 @@ type RoleFilter = "all" | "admin" | "player";
 export function MembersTable({ profiles, membershipMap, currentProfileId }: MembersTableProps) {
   const { supabase } = useSupabase();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -147,8 +149,16 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
 
   async function handleToggleGlobalRole(playerId: string, currentRole: string) {
     const newRole = currentRole === "admin" ? "player" : "admin";
-    const action = newRole === "admin" ? "promote to global admin" : "remove global admin";
-    if (!confirm(`Are you sure you want to ${action} this member?`)) return;
+    const isPromoting = newRole === "admin";
+    const ok = await confirm({
+      title: isPromoting ? "Promote to global admin?" : "Remove global admin?",
+      description: isPromoting
+        ? "This member will have full access to all admin features across the entire app."
+        : "This member will lose all global admin privileges.",
+      confirmLabel: isPromoting ? "Promote" : "Remove Admin",
+      variant: isPromoting ? "default" : "warning",
+    });
+    if (!ok) return;
 
     setTogglingGlobalRole(playerId);
     try {
@@ -170,8 +180,13 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
   }
 
   async function handleDelete(profileId: string, displayName: string) {
-    if (!confirm(`Are you sure you want to permanently delete ${displayName}? This will remove them from all groups and cannot be undone.`)) return;
-    if (!confirm(`This is irreversible. Type confirm by clicking OK to proceed with deleting ${displayName}.`)) return;
+    const ok = await confirm({
+      title: `Delete ${displayName}?`,
+      description: "This will permanently remove them from all groups, sessions, and tournaments. This cannot be undone.",
+      confirmLabel: "Delete Member",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setDeleting(profileId);
     try {
@@ -196,8 +211,13 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
 
   async function handleBulkDelete() {
     const count = selectedIds.size;
-    if (!confirm(`Permanently delete ${count} member${count !== 1 ? "s" : ""}? This removes them from all groups and cannot be undone.`)) return;
-    if (!confirm(`Final confirmation: delete ${count} member${count !== 1 ? "s" : ""} forever?`)) return;
+    const ok = await confirm({
+      title: `Delete ${count} member${count !== 1 ? "s" : ""}?`,
+      description: `All ${count} selected member${count !== 1 ? "s" : ""} will be permanently removed from all groups, sessions, and tournaments. This cannot be undone.`,
+      confirmLabel: `Delete ${count} Member${count !== 1 ? "s" : ""}`,
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setBulkDeleting(true);
     try {

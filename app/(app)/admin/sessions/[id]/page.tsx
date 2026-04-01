@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import type { ShootoutSession, SessionParticipant, ShootoutGroup, GameResult } from "@/types/database";
@@ -35,6 +36,7 @@ export default function AdminSessionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { supabase } = useSupabase();
   const router = useRouter();
+  const confirm = useConfirm();
   const [session, setSession] = useState<SessionWithRelations | null>(null);
   const [participants, setParticipants] = useState<SessionParticipant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,7 +165,13 @@ export default function AdminSessionDetailPage() {
 
   async function deleteSession() {
     if (!session) return;
-    if (!confirm("Delete this session? All participant data will be lost. You can start a new session from the sign up sheet.")) return;
+    const ok = await confirm({
+      title: "Delete this session?",
+      description: "All participant data will be lost. You can start a new session from the sign-up sheet.",
+      confirmLabel: "Delete Session",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setDeleting(true);
     try {

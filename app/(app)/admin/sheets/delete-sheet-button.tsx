@@ -1,17 +1,23 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function DeleteSheetButton({ sheetId }: { sheetId: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault();
-    if (!confirm("Are you sure you want to permanently delete this sheet and all its registrations? This cannot be undone.")) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Delete this sheet?",
+      description: "All registrations will be permanently deleted. This cannot be undone.",
+      confirmLabel: "Delete Sheet",
+      variant: "danger",
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/sheets/${sheetId}/delete`, { method: "POST" });

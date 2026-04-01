@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
@@ -20,6 +21,7 @@ export function StartShootout({
 }: StartShootoutProps) {
   const { supabase } = useSupabase();
   const router = useRouter();
+  const confirm = useConfirm();
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [numCourts, setNumCourts] = useState<number | null>(null);
@@ -55,12 +57,13 @@ export function StartShootout({
       setError("Please select the number of courts.");
       return;
     }
-    if (
-      !confirm(
-        `Create a shootout session with ${numCourts} court${numCourts > 1 ? "s" : ""} for ${confirmedPlayerIds.length} players?`
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Start shootout session?",
+      description: `${numCourts} court${numCourts > 1 ? "s" : ""} · ${confirmedPlayerIds.length} players`,
+      confirmLabel: "Start Session",
+      variant: "default",
+    });
+    if (!ok) return;
 
     setStarting(true);
     setError(null);
