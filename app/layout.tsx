@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SupabaseProvider } from "@/components/providers/supabase-provider";
 import { ToastProvider } from "@/components/toast";
+import { ConfirmProvider } from "@/components/confirm-modal";
 import "./globals.css";
 
 // Required: SupabaseProvider needs env vars at render time, so the
@@ -52,7 +53,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans">
         <SupabaseProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <ConfirmProvider>{children}</ConfirmProvider>
+          </ToastProvider>
         </SupabaseProvider>
       </body>
     </html>

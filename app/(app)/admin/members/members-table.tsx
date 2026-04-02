@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { EmptyState } from "@/components/empty-state";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useToast } from "@/components/toast";
@@ -28,6 +29,7 @@ type RoleFilter = "all" | "admin" | "player";
 export function MembersTable({ profiles, membershipMap, currentProfileId }: MembersTableProps) {
   const { supabase } = useSupabase();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -147,8 +149,16 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
 
   async function handleToggleGlobalRole(playerId: string, currentRole: string) {
     const newRole = currentRole === "admin" ? "player" : "admin";
-    const action = newRole === "admin" ? "promote to global admin" : "remove global admin";
-    if (!confirm(`Are you sure you want to ${action} this member?`)) return;
+    const isPromoting = newRole === "admin";
+    const ok = await confirm({
+      title: isPromoting ? "Promote to global admin?" : "Remove global admin?",
+      description: isPromoting
+        ? "This member will have full access to all admin features across the entire app."
+        : "This member will lose all global admin privileges.",
+      confirmLabel: isPromoting ? "Promote" : "Remove Admin",
+      variant: isPromoting ? "default" : "warning",
+    });
+    if (!ok) return;
 
     setTogglingGlobalRole(playerId);
     try {
@@ -170,8 +180,13 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
   }
 
   async function handleDelete(profileId: string, displayName: string) {
-    if (!confirm(`Are you sure you want to permanently delete ${displayName}? This will remove them from all groups and cannot be undone.`)) return;
-    if (!confirm(`This is irreversible. Type confirm by clicking OK to proceed with deleting ${displayName}.`)) return;
+    const ok = await confirm({
+      title: `Delete ${displayName}?`,
+      description: "This will permanently remove them from all groups, sessions, and tournaments. This cannot be undone.",
+      confirmLabel: "Delete Member",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setDeleting(profileId);
     try {
@@ -196,8 +211,13 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
 
   async function handleBulkDelete() {
     const count = selectedIds.size;
-    if (!confirm(`Permanently delete ${count} member${count !== 1 ? "s" : ""}? This removes them from all groups and cannot be undone.`)) return;
-    if (!confirm(`Final confirmation: delete ${count} member${count !== 1 ? "s" : ""} forever?`)) return;
+    const ok = await confirm({
+      title: `Delete ${count} member${count !== 1 ? "s" : ""}?`,
+      description: `All ${count} selected member${count !== 1 ? "s" : ""} will be permanently removed from all groups, sessions, and tournaments. This cannot be undone.`,
+      confirmLabel: `Delete ${count} Member${count !== 1 ? "s" : ""}`,
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setBulkDeleting(true);
     try {
@@ -302,18 +322,6 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         </div>
 
         <div className="flex gap-2">
-          {someSelected && (
-            <button
-              type="button"
-              onClick={handleBulkDelete}
-              disabled={bulkDeleting}
-              className="btn-danger text-sm disabled:opacity-50"
-            >
-              {bulkDeleting
-                ? "Deleting..."
-                : `Delete Selected (${selectedIds.size})`}
-            </button>
-          )}
           <button
             type="button"
             onClick={exportCSV}
@@ -602,6 +610,31 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
           </tbody>
         </table>
       </div>
+
+      {/* Floating bulk action toolbar */}
+      {someSelected && (
+        <div className="fixed bottom-16 md:bottom-6 inset-x-4 z-40 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto animate-slide-up flex items-center gap-3 rounded-xl bg-dark-900 px-4 py-2.5 shadow-2xl ring-1 ring-surface-border">
+            <span className="text-sm font-semibold text-dark-100 whitespace-nowrap">
+              {selectedIds.size} selected
+            </span>
+            <div className="h-4 w-px bg-surface-border shrink-0" />
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-surface-muted hover:text-dark-100 transition-colors whitespace-nowrap"
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="btn-danger btn-sm whitespace-nowrap"
+            >
+              {bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size}`}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

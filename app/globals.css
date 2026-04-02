@@ -60,6 +60,13 @@
     @apply rounded-xl bg-surface-raised p-4 ring-1 ring-surface-border;
   }
 
+  /* Left-border accent variants — add alongside .card to indicate status */
+  .card-accent-green  { @apply border-l-[3px] border-l-teal-500/70; }
+  .card-accent-yellow { @apply border-l-[3px] border-l-accent-500/60; }
+  .card-accent-red    { @apply border-l-[3px] border-l-red-500/60; }
+  .card-accent-brand  { @apply border-l-[3px] border-l-brand-400/70; }
+  .card-accent-gray   { @apply border-l-[3px] border-l-dark-400/30; }
+
   /* ── Badges ── */
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold;
@@ -115,6 +122,30 @@
   }
 }
 
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .animate-slide-up {
   animation: slide-up 0.2s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
 }

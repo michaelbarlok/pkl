@@ -96,7 +96,7 @@ export function GroupList({
               key={group.id}
               className={cn(
                 "card flex flex-col transition-shadow hover:ring-brand-500/30",
-                group.isJoined && "ring-2 ring-brand-200"
+                group.isJoined ? "card-accent-brand ring-brand-500/30" : "card-accent-gray"
               )}
             >
               <Link href={`/groups/${group.slug}`} className="flex-1">

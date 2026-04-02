@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -13,10 +14,17 @@ export function RosterRemoveButton({
   playerName,
 }: RosterRemoveButtonProps) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
 
   async function handleRemove() {
-    if (!confirm(`Remove ${playerName} from this sheet?`)) return;
+    const ok = await confirm({
+      title: `Remove ${playerName}?`,
+      description: "They will be removed from this sheet. If there is a waitlist, the next player will be promoted.",
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     setLoading(true);
     try {

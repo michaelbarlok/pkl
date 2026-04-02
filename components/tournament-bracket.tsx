@@ -4,7 +4,7 @@ import { FormError } from "@/components/form-error";
 import { getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 
 // Map from player_id → partner display name (for doubles)
 export type PartnerMap = Map<string, string>;
@@ -47,6 +47,16 @@ function teamLabel(playerId: string | null | undefined, playerName: string, part
   return playerName;
 }
 
+/** Human-readable round label based on number of matches in that round */
+function getRoundLabel(matchCount: number, isLast: boolean): string {
+  if (isLast && matchCount <= 1) return "Final";
+  if (matchCount === 2) return "Semifinals";
+  if (matchCount === 4) return "Quarterfinals";
+  if (matchCount === 8) return "Round of 16";
+  if (matchCount === 16) return "Round of 32";
+  return `Round of ${matchCount * 2}`;
+}
+
 // ============================================================
 // Elimination Bracket
 // ============================================================
@@ -78,27 +88,37 @@ function EliminationBracketView({
           {format === "double_elimination" ? "Winners Bracket" : "Bracket"}
         </h3>
         <div className="overflow-x-auto">
-          <div className="flex gap-6 min-w-max pb-4">
-            {Array.from({ length: winnersRounds }, (_, i) => i + 1).map((round) => {
+          <div className="flex items-start min-w-max pb-4">
+            {Array.from({ length: winnersRounds }, (_, i) => i + 1).map((round, roundIdx) => {
               const roundMatches = winnersMatches
                 .filter((m) => m.round === round)
                 .sort((a, b) => a.match_number - b.match_number);
+              const isLast = round === winnersRounds;
 
               return (
-                <div key={round} className="flex flex-col gap-4" style={{ minWidth: 260 }}>
-                  <p className="text-xs font-medium text-surface-muted text-center">
-                    {round === winnersRounds ? "Final" : `Round ${round}`}
-                  </p>
-                  {roundMatches.map((match) => (
-                    <MatchCard
-                      key={match.id}
-                      match={match}
-                      canManage={canManage}
-                      tournamentId={tournamentId}
-                      partnerMap={partnerMap}
-                    />
-                  ))}
-                </div>
+                <Fragment key={round}>
+                  {roundIdx > 0 && (
+                    <div className="flex items-center px-1 pt-6 shrink-0 text-surface-border">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-3" style={{ minWidth: 240 }}>
+                    <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
+                      {getRoundLabel(roundMatches.length, isLast)}
+                    </p>
+                    {roundMatches.map((match) => (
+                      <MatchCard
+                        key={match.id}
+                        match={match}
+                        canManage={canManage}
+                        tournamentId={tournamentId}
+                        partnerMap={partnerMap}
+                      />
+                    ))}
+                  </div>
+                </Fragment>
               );
             })}
           </div>
@@ -112,31 +132,39 @@ function EliminationBracketView({
             Losers Bracket
           </h3>
           <div className="overflow-x-auto">
-            <div className="flex gap-6 min-w-max pb-4">
-              {Array.from(
-                new Set(losersMatches.map((m) => m.round))
-              )
+            <div className="flex items-start min-w-max pb-4">
+              {Array.from(new Set(losersMatches.map((m) => m.round)))
                 .sort((a, b) => a - b)
-                .map((round) => {
+                .map((round, roundIdx, arr) => {
                   const roundMatches = losersMatches
                     .filter((m) => m.round === round)
                     .sort((a, b) => a.match_number - b.match_number);
+                  const isLast = roundIdx === arr.length - 1;
 
                   return (
-                    <div key={round} className="flex flex-col gap-4" style={{ minWidth: 260 }}>
-                      <p className="text-xs font-medium text-surface-muted text-center">
-                        LR {round}
-                      </p>
-                      {roundMatches.map((match) => (
-                        <MatchCard
-                          key={match.id}
-                          match={match}
-                          canManage={canManage}
-                          tournamentId={tournamentId}
-                          partnerMap={partnerMap}
-                        />
-                      ))}
-                    </div>
+                    <Fragment key={round}>
+                      {roundIdx > 0 && (
+                        <div className="flex items-center px-1 pt-6 shrink-0 text-surface-border">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-3" style={{ minWidth: 240 }}>
+                        <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
+                          {isLast ? "LB Final" : `LB Round ${roundIdx + 1}`}
+                        </p>
+                        {roundMatches.map((match) => (
+                          <MatchCard
+                            key={match.id}
+                            match={match}
+                            canManage={canManage}
+                            tournamentId={tournamentId}
+                            partnerMap={partnerMap}
+                          />
+                        ))}
+                      </div>
+                    </Fragment>
                   );
                 })}
             </div>
@@ -533,15 +561,23 @@ function PlayoffBracketView({
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider">Playoffs</h3>
       <div className="overflow-x-auto">
-        <div className="flex gap-6 min-w-max pb-4">
-          {rounds.map((round) => {
+        <div className="flex items-start min-w-max pb-4">
+          {rounds.map((round, roundIdx) => {
             const roundMatches = matches
               .filter((m) => m.round === round)
               .sort((a, b) => a.match_number - b.match_number);
 
             return (
-              <div key={round} className="flex flex-col gap-4" style={{ minWidth: 260 }}>
-                <p className="text-xs font-medium text-surface-muted text-center">
+              <Fragment key={round}>
+                {roundIdx > 0 && (
+                  <div className="flex items-center px-1 pt-6 shrink-0 text-surface-border">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </div>
+                )}
+              <div className="flex flex-col gap-3" style={{ minWidth: 240 }}>
+                <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                   {roundLabels(round)}
                 </p>
                 {roundMatches.map((match) => {
@@ -573,6 +609,7 @@ function PlayoffBracketView({
                   );
                 })}
               </div>
+              </Fragment>
             );
           })}
         </div>
@@ -839,13 +876,13 @@ function MatchCard({
   const p2MatchWinner = bestOf3 ? (p2GameWins >= 2) : p2Won;
 
   return (
-    <div className={`rounded-lg px-3 py-2 ${isCompleted ? "bg-surface-overlay" : isBye ? "bg-surface-overlay/50" : "bg-surface-raised border border-surface-border"}`}>
+    <div className={`rounded-lg overflow-hidden ring-1 transition-shadow ${isCompleted ? "ring-surface-border" : isBye ? "ring-surface-border/40" : "ring-surface-border hover:ring-brand-500/40"}`}>
       {isBye && (
-        <div>
-          <span className="text-sm text-dark-100">
+        <div className="px-3 py-2.5 bg-surface-raised/60">
+          <span className="text-sm text-dark-200">
             {match.player1_id ? p1Name : p2Name}
           </span>
-          <p className="text-xs text-surface-muted mt-0.5">BYE — no opponent this round</p>
+          <p className="text-xs text-surface-muted mt-0.5">BYE — advances automatically</p>
         </div>
       )}
 
@@ -853,7 +890,7 @@ function MatchCard({
         <>
           {/* Tennis-style scoreboard for multi-game matches */}
           {isMultiGame ? (
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 px-3 py-2.5 bg-surface-overlay">
               <div className="flex-1 min-w-0">
                 {/* Scoreboard table */}
                 <table className="w-full text-xs">
@@ -910,64 +947,66 @@ function MatchCard({
               )}
             </div>
           ) : (
-          <div className="flex items-start gap-3">
-            {/* Teams + Scores */}
-            <div className="flex-1 min-w-0">
-              {/* Team 1 */}
-              <div className="flex items-center justify-between gap-2">
-                <span className={`text-sm truncate ${p1Won ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
-                  {p1Name}
+          <>
+            {/* Player 1 row */}
+            <div className={`flex items-center justify-between gap-2 px-3 py-2 ${p1Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+              <span className={`text-sm truncate ${p1Won ? "font-semibold text-teal-300" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
+                {p1Won && <span className="mr-1 text-teal-400">✓</span>}
+                {p1Name}
+              </span>
+              {isCompleted && match.score1.length > 0 && (
+                <span className={`font-mono text-sm font-semibold shrink-0 ${p1Won ? "text-teal-300" : "text-dark-300"}`}>
+                  {match.score1[0]}
                 </span>
-                {isCompleted && match.score1.length > 0 && (
-                  <span className="font-mono text-xs text-dark-200 shrink-0">
-                    {match.score1.join("-")}
-                  </span>
-                )}
-              </div>
-
-              <div className="text-xs text-surface-muted my-0.5">vs</div>
-
-              {/* Team 2 */}
-              <div className="flex items-center justify-between gap-2">
-                <span className={`text-sm truncate ${p2Won ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
-                  {p2Name}
-                </span>
-                {isCompleted && match.score2.length > 0 && (
-                  <span className="font-mono text-xs text-dark-200 shrink-0">
-                    {match.score2.join("-")}
-                  </span>
-                )}
-              </div>
+              )}
             </div>
 
-            {/* Enter Score / Edit Score button — to the right */}
-            {canEnterNew && !scoring && (
-              <button
-                onClick={openNew}
-                className="shrink-0 self-center rounded-md bg-brand-300/20 px-3 py-2 text-xs font-semibold text-brand-300 hover:bg-brand-300/30 transition-colors"
-              >
-                Enter Score
-              </button>
-            )}
+            {/* Divider */}
+            <div className="h-px bg-surface-border" />
 
-            {canEdit && !scoring && (
-              <button
-                onClick={openEdit}
-                className="shrink-0 self-center rounded-md bg-surface-raised px-3 py-2 text-xs font-medium text-surface-muted hover:text-brand-300 transition-colors"
-              >
-                Edit
-              </button>
-            )}
-          </div>
-          )}
+            {/* Player 2 row */}
+            <div className={`flex items-center justify-between gap-2 px-3 py-2 ${p2Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+              <span className={`text-sm truncate ${p2Won ? "font-semibold text-teal-300" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
+                {p2Won && <span className="mr-1 text-teal-400">✓</span>}
+                {p2Name}
+              </span>
+              {isCompleted && match.score2.length > 0 && (
+                <span className={`font-mono text-sm font-semibold shrink-0 ${p2Won ? "text-teal-300" : "text-dark-300"}`}>
+                  {match.score2[0]}
+                </span>
+              )}
+            </div>
 
-          {/* Game Info */}
-          {gameInfo && !isCompleted && match.player1_id && match.player2_id && (
-            <p className="text-xs text-surface-muted mt-1">{gameInfo}</p>
+            {/* Footer: game info + score actions + live indicator */}
+            {(canEnterNew || canEdit || gameInfo || match.status === "in_progress") && !scoring && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-overlay/60 border-t border-surface-border">
+                {match.status === "in_progress" && (
+                  <span className="flex items-center gap-1 text-xs text-accent-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent-400 animate-pulse" />
+                    Live
+                  </span>
+                )}
+                {gameInfo && !isCompleted && match.player1_id && match.player2_id && (
+                  <span className="text-xs text-surface-muted">{gameInfo}</span>
+                )}
+                <div className="flex-1" />
+                {canEnterNew && (
+                  <button onClick={openNew} className="text-xs font-semibold text-brand-300 hover:text-brand-200 transition-colors">
+                    Enter Score
+                  </button>
+                )}
+                {canEdit && (
+                  <button onClick={openEdit} className="text-xs text-surface-muted hover:text-dark-100 transition-colors">
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
+          </>
           )}
 
           {scoring && (
-            <div className="mt-2 space-y-2">
+            <div className="px-3 py-2.5 bg-surface-overlay space-y-2">
               {gameScores.map((game, i) => (
                 <div key={i}>
                   {bestOf3 && (

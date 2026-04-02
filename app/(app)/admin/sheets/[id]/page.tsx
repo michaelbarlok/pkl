@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
@@ -15,6 +16,7 @@ import { PRIORITY_ORDER } from "@/lib/utils";
 export default function AdminSheetDetailPage() {
   const { supabase } = useSupabase();
   const router = useRouter();
+  const confirm = useConfirm();
   const params = useParams<{ id: string }>();
   const sheetId = params.id;
 
@@ -175,7 +177,13 @@ export default function AdminSheetDetailPage() {
   }
 
   async function handleCancel() {
-    if (!confirm("Are you sure you want to cancel this event? All registrants will be notified.")) return;
+    const ok = await confirm({
+      title: "Cancel this event?",
+      description: "All registrants will be notified that the event has been cancelled.",
+      confirmLabel: "Cancel Event",
+      variant: "warning",
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/sheets/${sheetId}/cancel`, {
@@ -245,7 +253,13 @@ export default function AdminSheetDetailPage() {
   }
 
   async function handleRemovePlayer(registrationId: string) {
-    if (!confirm("Remove this player from the sheet?")) return;
+    const ok = await confirm({
+      title: "Remove player from sheet?",
+      description: "If there is a waitlist, the next player will be promoted automatically.",
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       const { error: delErr } = await supabase
         .from("registrations")
@@ -311,12 +325,13 @@ export default function AdminSheetDetailPage() {
       );
       return;
     }
-    if (
-      !confirm(
-        `Create a shootout session with ${numCourts} court${numCourts > 1 ? "s" : ""} for ${confirmed.length} players?`
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Start shootout session?",
+      description: `${numCourts} court${numCourts > 1 ? "s" : ""} · ${confirmed.length} players`,
+      confirmLabel: "Start Session",
+      variant: "default",
+    });
+    if (!ok) return;
 
     try {
       // Block if there's already an active (non-complete) session

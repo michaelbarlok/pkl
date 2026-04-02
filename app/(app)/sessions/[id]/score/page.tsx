@@ -182,27 +182,27 @@ export default function ScoreEntryPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {prefilledMatch ? (
           <>
-            {/* Pre-filled match display */}
-            <div className="text-center space-y-1">
-              <p className="text-xs font-medium text-surface-muted uppercase">Game {prefilledMatch.gameNumber}</p>
-              <div className="flex items-center justify-center gap-3">
-                <span className="text-lg font-semibold text-dark-100">
-                  {formatTeamNames(prefilledMatch.team1)}
-                </span>
-                <span className="text-sm text-surface-muted">vs</span>
-                <span className="text-lg font-semibold text-dark-100">
-                  {formatTeamNames(prefilledMatch.team2)}
-                </span>
-              </div>
+            {/* Game header */}
+            <div className="card bg-surface-overlay text-center py-3">
+              <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-1">
+                Game {prefilledMatch.gameNumber}
+              </p>
+              <p className="text-base font-semibold text-dark-100">
+                {formatTeamNames(prefilledMatch.team1)}
+              </p>
+              <p className="text-xs text-surface-muted my-0.5">vs</p>
+              <p className="text-base font-semibold text-dark-100">
+                {formatTeamNames(prefilledMatch.team2)}
+              </p>
             </div>
 
-            {/* Score inputs side by side */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Score inputs */}
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
               <div>
-                <label className="block text-sm font-medium text-dark-200 mb-1 text-center">
+                <label className="block text-xs font-semibold text-surface-muted mb-2 text-center uppercase tracking-wider truncate">
                   {formatTeamNames(prefilledMatch.team1)}
                 </label>
                 <input
@@ -210,14 +210,15 @@ export default function ScoreEntryPage() {
                   min={0}
                   value={scoreA}
                   onChange={(e) => setScoreA(e.target.value)}
-                  className="input text-center text-2xl font-bold py-4"
+                  className="input text-center text-3xl font-bold py-5 w-full"
                   placeholder="0"
                   required
                   autoFocus
                 />
               </div>
+              <span className="text-lg font-bold text-surface-muted mt-6">—</span>
               <div>
-                <label className="block text-sm font-medium text-dark-200 mb-1 text-center">
+                <label className="block text-xs font-semibold text-surface-muted mb-2 text-center uppercase tracking-wider truncate">
                   {formatTeamNames(prefilledMatch.team2)}
                 </label>
                 <input
@@ -225,7 +226,7 @@ export default function ScoreEntryPage() {
                   min={0}
                   value={scoreB}
                   onChange={(e) => setScoreB(e.target.value)}
-                  className="input text-center text-2xl font-bold py-4"
+                  className="input text-center text-3xl font-bold py-5 w-full"
                   placeholder="0"
                   required
                 />

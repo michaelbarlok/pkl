@@ -11,6 +11,12 @@ const statusBadge: Record<string, { className: string; label: string }> = {
   cancelled: { className: "badge-red", label: "Cancelled" },
 };
 
+const statusAccent: Record<string, string> = {
+  open: "card-accent-green",
+  closed: "card-accent-gray",
+  cancelled: "card-accent-red",
+};
+
 interface PlayerInfo {
   name: string;
   status: string;
@@ -179,8 +185,10 @@ export function SheetCard({
     }
   }
 
+  const accent = statusAccent[status] ?? "card-accent-gray";
+
   return (
-    <div className="card hover:ring-brand-500/30 transition-shadow">
+    <div className={`card hover:ring-brand-500/30 transition-shadow ${accent}`}>
       {/* Row 1: Title + status badge, player count + chevron */}
       <div className="flex items-start justify-between gap-3">
         <Link href={`/sheets/${sheetId}`} className="min-w-0 flex-1">
@@ -203,7 +211,7 @@ export function SheetCard({
               </span>
             )}
             {/* Capacity bar */}
-            <div className="mt-1 h-1 w-14 rounded-full bg-surface-overlay overflow-hidden">
+            <div className="mt-1.5 h-1.5 w-20 rounded-full bg-surface-overlay overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${confirmedCount >= playerLimit ? "bg-accent-400" : "bg-teal-400"}`}
                 style={{ width: `${Math.min((confirmedCount / playerLimit) * 100, 100)}%` }}

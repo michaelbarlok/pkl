@@ -344,13 +344,42 @@ export default function PlayerSessionPage() {
 
       {/* My Court Assignment */}
       {myCourt != null && (
-        <div className="card bg-brand-900/40 border border-brand-500/30">
-          <div className="flex items-center justify-between">
+        <div className="card bg-brand-900/40 border border-brand-500/30 space-y-3">
+          <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-brand-300">Your Court</p>
-              <p className="text-3xl font-bold text-brand-200">Court {myCourt}</p>
+              <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Your Court</p>
+              <p className="text-4xl font-bold text-brand-100">Court {myCourt}</p>
             </div>
+            {isActive && matchSchedule.length > 0 && (
+              <div className="text-right shrink-0">
+                <p className="text-2xl font-bold text-brand-100">
+                  {matchSchedule.filter((m) => m.result).length}
+                  <span className="text-base font-normal text-brand-400">/{matchSchedule.length}</span>
+                </p>
+                <p className="text-xs text-brand-400">games scored</p>
+              </div>
+            )}
           </div>
+          {myCourtPlayers.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {myCourtPlayers.map((p) => {
+                const name = p.player?.display_name ?? "?";
+                const isMe = p.player_id === myPlayerId;
+                return (
+                  <span
+                    key={p.player_id}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${isMe ? "bg-brand-500/30 text-brand-100 ring-1 ring-brand-400/40" : "bg-surface-overlay text-dark-200"}`}
+                  >
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-800 text-[9px] font-bold text-brand-200 shrink-0">
+                      {name.charAt(0).toUpperCase()}
+                    </span>
+                    {name}
+                    {isMe && <span className="text-brand-400">(you)</span>}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -409,34 +438,32 @@ export default function PlayerSessionPage() {
 
               if (hasResult) {
                 return (
-                  <div
-                    key={match.gameNumber}
-                    className="rounded-lg px-4 py-3 bg-surface-overlay"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium text-surface-muted w-8 shrink-0">G{match.gameNumber}</span>
+                  <div key={match.gameNumber} className="rounded-lg overflow-hidden ring-1 ring-surface-border">
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-surface-overlay border-b border-surface-border">
+                      <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
+                      {match.bye && (
+                        <span className="text-xs text-accent-300">Bye: {playerNames.get(match.bye) ?? "?"}</span>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className={`text-sm font-semibold ${team1Won ? "text-teal-300" : "text-red-400"}`}>
+                    <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${team1Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+                      <span className={`text-sm truncate ${team1Won ? "font-semibold text-teal-300" : "text-dark-300"}`}>
+                        {team1Won && <span className="mr-1">✓</span>}
                         {formatTeam(match.team1, playerNames)}
                       </span>
-                      <span className={`font-mono text-sm font-bold ${team1Won ? "text-teal-300" : "text-red-400"}`}>
+                      <span className={`font-mono text-base font-bold shrink-0 ${team1Won ? "text-teal-300" : "text-dark-300"}`}>
                         {match.result!.scoreA}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className={`text-sm font-semibold ${team2Won ? "text-teal-300" : "text-red-400"}`}>
+                    <div className="h-px bg-surface-border" />
+                    <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${team2Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+                      <span className={`text-sm truncate ${team2Won ? "font-semibold text-teal-300" : "text-dark-300"}`}>
+                        {team2Won && <span className="mr-1">✓</span>}
                         {formatTeam(match.team2, playerNames)}
                       </span>
-                      <span className={`font-mono text-sm font-bold ${team2Won ? "text-teal-300" : "text-red-400"}`}>
+                      <span className={`font-mono text-base font-bold shrink-0 ${team2Won ? "text-teal-300" : "text-dark-300"}`}>
                         {match.result!.scoreB}
                       </span>
                     </div>
-                    {match.bye && (
-                      <p className="text-[11px] text-accent-300/80 mt-1">
-                        Bye: {playerNames.get(match.bye) ?? "?"}
-                      </p>
-                    )}
                   </div>
                 );
               }
@@ -445,23 +472,23 @@ export default function PlayerSessionPage() {
                 <Link
                   key={match.gameNumber}
                   href={`/sessions/${sessionId}/score?game=${match.gameNumber}`}
-                  className="block rounded-lg px-4 py-3 bg-surface-raised border border-surface-border hover:border-brand-500/50 hover:bg-brand-900/20 transition-colors"
+                  className="block rounded-lg overflow-hidden ring-1 ring-surface-border hover:ring-brand-500/50 transition-all group"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-surface-muted">G{match.gameNumber}</span>
-                    <span className="text-xs text-brand-300 font-medium">Enter score &rarr;</span>
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-surface-overlay border-b border-surface-border">
+                    <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
+                    <span className="text-xs font-semibold text-brand-300 group-hover:text-brand-200 transition-colors">Enter score →</span>
                   </div>
-                  <div className="text-sm text-dark-100">
-                    {formatTeam(match.team1, playerNames)}
+                  <div className="px-3 py-2.5 bg-surface-raised">
+                    <span className="text-sm text-dark-200">{formatTeam(match.team1, playerNames)}</span>
                   </div>
-                  <div className="text-xs text-surface-muted my-0.5">vs</div>
-                  <div className="text-sm text-dark-100">
-                    {formatTeam(match.team2, playerNames)}
+                  <div className="h-px bg-surface-border" />
+                  <div className="px-3 py-2.5 bg-surface-raised">
+                    <span className="text-sm text-dark-200">{formatTeam(match.team2, playerNames)}</span>
                   </div>
                   {match.bye && (
-                    <p className="text-[11px] text-accent-300/80 mt-1">
-                      Bye: {playerNames.get(match.bye) ?? "?"}
-                    </p>
+                    <div className="px-3 py-1.5 bg-surface-overlay/60 border-t border-surface-border">
+                      <span className="text-xs text-accent-300">Bye: {playerNames.get(match.bye) ?? "?"}</span>
+                    </div>
                   )}
                 </Link>
               );

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { AppNav } from "./nav";
+import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
 import { MissingProfile } from "./missing-profile";
 import { LandingNav } from "./landing-nav";
@@ -52,11 +52,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="min-h-screen bg-dark-950">
-      <AppNav profile={profile} isGroupAdmin={isGroupAdmin} />
-      <main className="mx-auto max-w-7xl px-3 py-4 pb-20 sm:px-6 md:pb-6 lg:px-8">
-        {children}
-      </main>
+    <div className="flex min-h-screen bg-dark-950">
+      <Sidebar profile={profile} isGroupAdmin={isGroupAdmin} />
+      <div className="flex flex-1 flex-col min-w-0">
+        <main className="flex-1 px-3 py-4 pb-20 sm:px-6 md:pb-6 lg:px-8">
+          {children}
+        </main>
+      </div>
       <MobileNav profile={profile} isGroupAdmin={isGroupAdmin} />
     </div>
   );

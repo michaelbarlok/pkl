@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,10 +12,17 @@ export function AdminRemovePlayer({
   playerName: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [removing, setRemoving] = useState(false);
 
   async function handleRemove() {
-    if (!confirm(`Remove ${playerName} from this sheet?`)) return;
+    const ok = await confirm({
+      title: `Remove ${playerName}?`,
+      description: "They will be removed from this sheet. If there is a waitlist, the next player will be promoted.",
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (!ok) return;
     setRemoving(true);
     try {
       const res = await fetch(`/api/sheets/registrations/${registrationId}/remove`, {

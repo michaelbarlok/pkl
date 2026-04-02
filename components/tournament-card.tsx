@@ -3,6 +3,15 @@ import type { TournamentWithCounts } from "@/lib/queries/tournament";
 import { formatDate, formatTime } from "@/lib/utils";
 import { TOURNAMENT_STATUS_COLORS, TOURNAMENT_STATUS_LABELS } from "@/lib/status-colors";
 
+const STATUS_ACCENT: Record<string, string> = {
+  draft: "card-accent-gray",
+  registration_open: "card-accent-green",
+  registration_closed: "card-accent-brand",
+  in_progress: "card-accent-yellow",
+  completed: "card-accent-gray",
+  cancelled: "card-accent-red",
+};
+
 const FORMAT_LABELS: Record<string, string> = {
   single_elimination: "Single Elim",
   double_elimination: "Double Elim",
@@ -12,9 +21,13 @@ const FORMAT_LABELS: Record<string, string> = {
 export function TournamentCard({ tournament }: { tournament: TournamentWithCounts }) {
   const t = tournament;
   const isOpen = t.status === "registration_open";
+  const accent = STATUS_ACCENT[t.status] ?? "card-accent-gray";
+  const fillPct = t.player_cap && t.registration_count != null
+    ? Math.min((t.registration_count / t.player_cap) * 100, 100)
+    : null;
 
   return (
-    <div className="card hover:ring-1 hover:ring-brand-500/30 transition-all flex flex-col">
+    <div className={`card hover:ring-1 hover:ring-brand-500/30 transition-all flex flex-col ${accent}`}>
       <Link href={`/tournaments/${t.id}`} className="flex-1">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="text-base font-semibold text-dark-100 line-clamp-2">{t.title}</h3>
@@ -45,13 +58,23 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithCount
           )}
         </div>
 
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border">
-          <span className="text-xs text-surface-muted">
-            {t.registration_count} registered{t.player_cap ? ` / ${t.player_cap}` : ""}
-          </span>
-          <span className="text-xs text-surface-muted">
-            by {t.creator?.display_name ?? "Unknown"}
-          </span>
+        <div className="mt-3 pt-3 border-t border-surface-border space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-surface-muted">
+              {t.registration_count} registered{t.player_cap ? ` / ${t.player_cap}` : ""}
+            </span>
+            <span className="text-xs text-surface-muted">
+              by {t.creator?.display_name ?? "Unknown"}
+            </span>
+          </div>
+          {fillPct !== null && (
+            <div className="h-1.5 w-full rounded-full bg-surface-overlay overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${fillPct >= 100 ? "bg-accent-400" : "bg-teal-400"}`}
+                style={{ width: `${fillPct}%` }}
+              />
+            </div>
+          )}
         </div>
       </Link>
 

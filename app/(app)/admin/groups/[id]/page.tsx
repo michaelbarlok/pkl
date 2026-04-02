@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { EmptyState } from "@/components/empty-state";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useEffect, useState, useCallback } from "react";
@@ -38,6 +39,7 @@ export default function AdminGroupDetailPage() {
   const [allPlayers, setAllPlayers] = useState<Profile[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("members");
   const [loading, setLoading] = useState(true);
+  const confirm = useConfirm();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -164,7 +166,13 @@ export default function AdminGroupDetailPage() {
   };
 
   const removeMember = async (playerId: string) => {
-    if (!confirm("Are you sure you want to remove this member?")) return;
+    const ok = await confirm({
+      title: "Remove member from group?",
+      description: "They will lose their ladder step and session history for this group.",
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (!ok) return;
 
     const { error } = await supabase
       .from("group_memberships")
