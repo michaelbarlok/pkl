@@ -3,44 +3,44 @@
 @tailwind utilities;
 
 /* ── Theme CSS variables ── */
-/* Default = dark theme */
+/* Default = dark theme (carbon gray) */
 :root {
-  --color-dark-50:  #f5f3f5;
-  --color-dark-100: #e8e3e7;
-  --color-dark-200: #d0c6ce;
-  --color-dark-300: #b0a1ad;
-  --color-dark-400: #897587;
-  --color-dark-500: #6b5768;
-  --color-dark-600: #564154;
-  --color-dark-700: #473647;
-  --color-dark-800: #3b2c3b;
-  --color-dark-900: #2f2330;
-  --color-dark-950: #1e1520;
-  --color-surface:         #241a28;
-  --color-surface-raised:  #2e2233;
-  --color-surface-overlay: #382a3e;
-  --color-surface-border:  #44334a;
-  --color-surface-muted:   #9882a0;
+  --color-dark-50:  #f0f2f5;
+  --color-dark-100: #dde2ea;
+  --color-dark-200: #b8c0cc;
+  --color-dark-300: #8892a4;
+  --color-dark-400: #565e72;
+  --color-dark-500: #3d4454;
+  --color-dark-600: #2e333d;
+  --color-dark-700: #252930;
+  --color-dark-800: #1d2028;
+  --color-dark-900: #161920;
+  --color-dark-950: #111318;
+  --color-surface:         #141720;
+  --color-surface-raised:  #1a1d24;
+  --color-surface-overlay: #22262f;
+  --color-surface-border:  #2e333d;
+  --color-surface-muted:   #6b7280;
 }
 
 /* Light theme — toggled by adding `.light` to <html> */
 .light {
-  --color-dark-50:  #140d13;
-  --color-dark-100: #20161f;
-  --color-dark-200: #3a2938;
-  --color-dark-300: #5a4857;
-  --color-dark-400: #7d6679;
-  --color-dark-500: #a38ea0;
-  --color-dark-600: #c2afbf;
-  --color-dark-700: #d7c8da;
-  --color-dark-800: #e6dce8;
-  --color-dark-900: #f0eaf2;
-  --color-dark-950: #f8f5f9;
+  --color-dark-50:  #0d0f12;
+  --color-dark-100: #111318;
+  --color-dark-200: #1d2028;
+  --color-dark-300: #2e333d;
+  --color-dark-400: #565e72;
+  --color-dark-500: #8892a4;
+  --color-dark-600: #b8c0cc;
+  --color-dark-700: #d4dae3;
+  --color-dark-800: #e8ecf0;
+  --color-dark-900: #f3f5f7;
+  --color-dark-950: #f8f9fb;
   --color-surface:         #ffffff;
-  --color-surface-raised:  #f5f0f7;
-  --color-surface-overlay: #ede5ef;
-  --color-surface-border:  #d0c3d3;
-  --color-surface-muted:   #7a6478;
+  --color-surface-raised:  #f3f5f7;
+  --color-surface-overlay: #e8ecf0;
+  --color-surface-border:  #d0d7e0;
+  --color-surface-muted:   #6b7280;
 }
 
 @layer base {

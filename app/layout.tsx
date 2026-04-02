@@ -17,9 +17,10 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "48x48" },
-      { url: "/pkl-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/PKLBall-AppIcon.png", sizes: "192x192", type: "image/png" },
+      { url: "/PKLBall-AppIcon.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/pkl-icon-512.png",
+    apple: "/PKLBall-AppIcon.png",
   },
   manifest: "/manifest.json",
   openGraph: {
@@ -27,9 +28,7 @@ export const metadata: Metadata = {
     description: "Pickleball ladder league platform",
     images: [
       {
-        url: "/pkl-og.png",
-        width: 1200,
-        height: 630,
+        url: "/PKLBall.png",
         alt: "PKL – Pickleball ladder league platform",
       },
     ],
@@ -40,7 +39,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "PKL",
     description: "Pickleball ladder league platform",
-    images: ["/pkl-og.png"],
+    images: ["/PKLBall.png"],
   },
 };
 

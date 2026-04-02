@@ -7,7 +7,7 @@ export function LandingFooter() {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
           {/* Brand */}
           <div className="space-y-3">
-            <img src="/pkl-logo.png" alt="PKL" className="h-8 w-auto" />
+            <img src="/PKLBall.png" alt="PKL" className="h-8 w-auto" />
             <p className="text-sm text-dark-300">
               Your pickleball community, all in one place.
             </p>

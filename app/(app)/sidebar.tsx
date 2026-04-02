@@ -185,9 +185,13 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
           collapsed ? "justify-center" : "justify-between px-3"
         )}
       >
-        {!collapsed && (
+        {collapsed ? (
+          <Link href="/">
+            <img src="/PKLBall-Minimal.png" alt="PKL" className="h-8 w-8 object-contain shrink-0" />
+          </Link>
+        ) : (
           <Link href="/" className="flex items-center gap-2 min-w-0">
-            <img src="/pkl-logo.png" alt="PKL" className="h-7 w-auto shrink-0" />
+            <img src="/PKLBall.png" alt="PKL" className="h-7 w-auto shrink-0" />
           </Link>
         )}
         <button

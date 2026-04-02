@@ -4,23 +4,23 @@
   "description": "Pickleball ladder league platform",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#111318",
+  "theme_color": "#0d9488",
   "icons": [
     {
-      "src": "/pkl-icon-192.png",
+      "src": "/PKLBall-AppIcon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/pkl-icon-512.png",
+      "src": "/PKLBall-AppIcon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/pkl-icon-512.png",
+      "src": "/PKLBall-AppIcon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

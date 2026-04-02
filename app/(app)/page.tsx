@@ -12,7 +12,7 @@ export default async function HomePage() {
       {/* ── Hero ── */}
       <section className="text-center space-y-6">
         <img
-          src="/pkl-logo.png"
+          src="/PKLBall.png"
           alt="PKL"
           className="mx-auto h-28 w-auto sm:h-36"
         />

@@ -41,7 +41,7 @@ function ConfirmForm() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
         <div className="w-full max-w-md text-center space-y-4">
-          <img src="/pkl-logo.png" alt="PKL" className="mx-auto h-28 w-auto" />
+          <img src="/PKLBall.png" alt="PKL" className="mx-auto h-28 w-auto" />
           <p className="text-surface-muted">This confirmation link is invalid or missing required parameters.</p>
           <a href="/login" className="btn-secondary inline-block">Back to Login</a>
         </div>
@@ -53,7 +53,7 @@ function ConfirmForm() {
     <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <img src="/pkl-logo.png" alt="PKL" className="mx-auto h-28 w-auto" />
+          <img src="/PKLBall.png" alt="PKL" className="mx-auto h-28 w-auto" />
         </div>
         <div className="card space-y-6 text-center">
           <div>
