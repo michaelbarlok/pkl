@@ -54,6 +54,11 @@ export default function AdminSessionDetailPage() {
   const [submittingNewScore, setSubmittingNewScore] = useState(false);
   const [newScoreError, setNewScoreError] = useState<string | null>(null);
 
+  // Play-again flow
+  const [showPlayAgain, setShowPlayAgain] = useState(false);
+  const [numCourtsNext, setNumCourtsNext] = useState<number | null>(null);
+  const [startingNext, setStartingNext] = useState(false);
+
   useEffect(() => {
     async function fetch() {
       const { data: s } = await supabase
@@ -83,6 +88,88 @@ export default function AdminSessionDetailPage() {
   }, [id, supabase]);
 
   const [advanceError, setAdvanceError] = useState<string | null>(null);
+
+  async function endSession() {
+    if (!session) return;
+    setUpdating(true);
+    await supabase
+      .from("shootout_sessions")
+      .update({ status: "session_complete" })
+      .eq("id", id);
+    setSession({ ...session, status: "session_complete" });
+    setUpdating(false);
+  }
+
+  async function startNextSession() {
+    if (!session || numCourtsNext == null) return;
+    setStartingNext(true);
+
+    try {
+      // Mark current session as complete
+      await supabase
+        .from("shootout_sessions")
+        .update({ status: "session_complete" })
+        .eq("id", id);
+
+      // Build target court map from participants
+      const targetCourtMap = new Map<string, number>();
+      for (const p of participants) {
+        if (p.target_court_next != null) {
+          targetCourtMap.set(p.player_id, p.target_court_next);
+        }
+      }
+
+      // Create new session
+      const { data: newSession, error: sessionErr } = await supabase
+        .from("shootout_sessions")
+        .insert({
+          sheet_id: session.sheet_id,
+          group_id: session.group_id,
+          status: "created",
+          num_courts: numCourtsNext,
+          current_round: 0,
+          is_same_day_continuation: true,
+          prev_session_id: id,
+        })
+        .select()
+        .single();
+
+      if (sessionErr) throw sessionErr;
+
+      // Fetch current steps from group_memberships
+      const checkedInIds = participants.filter((p) => p.checked_in).map((p) => p.player_id);
+      const { data: memberships } = await supabase
+        .from("group_memberships")
+        .select("player_id, current_step")
+        .eq("group_id", session.group_id)
+        .in("player_id", checkedInIds);
+
+      const stepMap = new Map(
+        (memberships ?? []).map((m: any) => [m.player_id, m.current_step])
+      );
+
+      const newParticipants = checkedInIds.map((playerId) => ({
+        session_id: newSession.id,
+        group_id: session.group_id,
+        player_id: playerId,
+        checked_in: false,
+        step_before: stepMap.get(playerId) ?? 1,
+        target_court_next: targetCourtMap.get(playerId) ?? null,
+      }));
+
+      if (newParticipants.length > 0) {
+        const { error: partErr } = await supabase
+          .from("session_participants")
+          .insert(newParticipants);
+        if (partErr) throw partErr;
+      }
+
+      router.push(`/admin/sessions/${newSession.id}`);
+    } catch (err) {
+      setStartingNext(false);
+      alert(err instanceof Error ? err.message : "Failed to start next session");
+    }
+  }
 
   async function advanceStatus() {
     if (!session) return;
@@ -351,6 +438,33 @@ export default function AdminSessionDetailPage() {
     });
   }, [courtPlayers, courtScores]);
 
+  // Play-again preview: group checked-in players by target_court_next
+  const nextCourtGroups = useMemo(() => {
+    const checkedIn = participants.filter((p) => p.checked_in);
+    const groups = new Map<number, typeof checkedIn>();
+    for (const p of checkedIn) {
+      if (p.target_court_next != null) {
+        const arr = groups.get(p.target_court_next) ?? [];
+        arr.push(p);
+        groups.set(p.target_court_next, arr);
+      }
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
+  }, [participants]);
+
+  const unassignedPlayers = useMemo(
+    () => participants.filter((p) => p.checked_in && p.target_court_next == null),
+    [participants]
+  );
+
+  const validNextCourtOptions = useMemo(() => {
+    const n = participants.filter((p) => p.checked_in).length;
+    return Array.from({ length: Math.floor(n / 4) }, (_, i) => i + 1).filter((c) => {
+      const per = n / c;
+      return per >= 4 && per <= 5;
+    });
+  }, [participants]);
+
   const isRoundLive = session?.status === "round_active" || session?.status === "round_complete";
 
   if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
@@ -435,12 +549,32 @@ export default function AdminSessionDetailPage() {
               Manage Check-In
             </Link>
           )}
-          {session.status !== "session_complete" && (
+          {session.status === "round_complete" ? (
+            <>
+              {!showPlayAgain ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setNumCourtsNext(session.num_courts ?? null);
+                      setShowPlayAgain(true);
+                    }}
+                    className="btn-primary"
+                  >
+                    Play Again
+                  </button>
+                  <button onClick={endSession} disabled={updating} className="btn-secondary">
+                    {updating ? "Ending..." : "End Session"}
+                  </button>
+                </>
+              ) : (
+                <span className="text-sm text-surface-muted">See court preview below ↓</span>
+              )}
+            </>
+          ) : session.status !== "session_complete" ? (
             <button onClick={advanceStatus} className="btn-secondary" disabled={updating}>
               {updating ? "Updating..." : `Advance to ${STATUS_LABELS[LIFECYCLE_ORDER[currentIdx + 1]] ?? "—"}`}
             </button>
-          )}
-          {session.status === "session_complete" && (
+          ) : (
             <span className="badge-green text-sm">Session Complete</span>
           )}
           <FormError message={advanceError} />
@@ -453,6 +587,96 @@ export default function AdminSessionDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Play Again Preview */}
+      {showPlayAgain && session.status === "round_complete" && (
+        <div className="card space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-dark-200">Next Session — Court Preview</h2>
+            <button
+              onClick={() => setShowPlayAgain(false)}
+              className="text-xs text-surface-muted hover:text-dark-200"
+            >
+              Cancel
+            </button>
+          </div>
+
+          <p className="text-xs text-surface-muted">
+            Court assignments below are based on each player's finish in this round.
+          </p>
+
+          {/* Court count selector */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-dark-200">Courts:</label>
+            <select
+              value={numCourtsNext ?? ""}
+              onChange={(e) => setNumCourtsNext(e.target.value ? Number(e.target.value) : null)}
+              className="input w-20 py-1"
+            >
+              <option value="">—</option>
+              {validNextCourtOptions.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            {validNextCourtOptions.length === 0 && (
+              <span className="text-xs text-red-400">Not enough checked-in players</span>
+            )}
+          </div>
+
+          {/* Court assignment grid */}
+          {nextCourtGroups.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {nextCourtGroups.map(([courtNum, courtPlayers]) => (
+                <div key={courtNum} className="rounded-lg border border-surface-border bg-surface-raised p-3">
+                  <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-2">
+                    Court {courtNum}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {courtPlayers.map((p) => (
+                      <span
+                        key={p.player_id}
+                        className="rounded-full bg-surface-overlay px-2.5 py-0.5 text-xs font-medium text-dark-100"
+                      >
+                        {(p as any).player?.display_name ?? "?"}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Players without a target court assignment */}
+          {unassignedPlayers.length > 0 && (
+            <div>
+              <p className="text-xs text-surface-muted mb-1">No court assignment yet:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {unassignedPlayers.map((p) => (
+                  <span key={p.player_id} className="badge-gray text-xs">
+                    {(p as any).player?.display_name ?? "?"}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={startNextSession}
+              disabled={numCourtsNext == null || startingNext}
+              className="btn-primary"
+            >
+              {startingNext ? "Starting..." : "Start Next Session"}
+            </button>
+            <button
+              onClick={() => setShowPlayAgain(false)}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Live Court View */}
       {isRoundLive && courtNumbers.length > 0 && (
