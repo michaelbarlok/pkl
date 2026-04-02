@@ -322,18 +322,6 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         </div>
 
         <div className="flex gap-2">
-          {someSelected && (
-            <button
-              type="button"
-              onClick={handleBulkDelete}
-              disabled={bulkDeleting}
-              className="btn-danger text-sm disabled:opacity-50"
-            >
-              {bulkDeleting
-                ? "Deleting..."
-                : `Delete Selected (${selectedIds.size})`}
-            </button>
-          )}
           <button
             type="button"
             onClick={exportCSV}
@@ -622,6 +610,31 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
           </tbody>
         </table>
       </div>
+
+      {/* Floating bulk action toolbar */}
+      {someSelected && (
+        <div className="fixed bottom-16 md:bottom-6 inset-x-4 z-40 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto animate-slide-up flex items-center gap-3 rounded-xl bg-dark-900 px-4 py-2.5 shadow-2xl ring-1 ring-surface-border">
+            <span className="text-sm font-semibold text-dark-100 whitespace-nowrap">
+              {selectedIds.size} selected
+            </span>
+            <div className="h-4 w-px bg-surface-border shrink-0" />
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-surface-muted hover:text-dark-100 transition-colors whitespace-nowrap"
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="btn-danger btn-sm whitespace-nowrap"
+            >
+              {bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size}`}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
