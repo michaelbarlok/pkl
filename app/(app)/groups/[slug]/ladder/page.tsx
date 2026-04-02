@@ -68,92 +68,63 @@ export default async function LadderPage({
         <FreePlayLeaderboard stats={playerStats as any} currentPlayerId={profile?.id} />
       )}
 
-      {/* Ladder Table (Ladder League only) */}
-      {!isFreePlay && <div className="card overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-surface-border">
-            <thead className="bg-surface-overlay">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Rank
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Player
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Step
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Pt %
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Sessions
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Last Played
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-border bg-surface-raised">
+      {/* Ladder List (Ladder League only) */}
+      {!isFreePlay && (
+        <div className="card overflow-hidden p-0">
+          {members.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-surface-muted">
+              No members in this group yet.
+            </p>
+          ) : (
+            <ul className="divide-y divide-surface-border">
               {members.map((member, index) => (
-                <tr
+                <li
                   key={member.player_id}
                   className={cn(
-                    member.player_id === profile?.id &&
-                      "bg-brand-900/40 font-medium"
+                    "flex items-center gap-3 px-4 py-3",
+                    member.player_id === profile?.id && "bg-brand-900/40"
                   )}
                 >
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
+                  {/* Rank */}
+                  <span className="w-6 shrink-0 text-sm text-surface-muted text-center">
                     {index + 1}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {member.player?.avatar_url ? (
-                        <img
-                          src={member.player.avatar_url}
-                          alt=""
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
-                          {member.player?.display_name?.charAt(0) ?? "?"}
-                        </div>
-                      )}
-                      <span className="text-sm text-dark-100">
-                        {member.player?.display_name}
-                      </span>
+                  </span>
+
+                  {/* Avatar */}
+                  {member.player?.avatar_url ? (
+                    <img
+                      src={member.player.avatar_url}
+                      alt=""
+                      className="h-9 w-9 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted shrink-0">
+                      {member.player?.display_name?.charAt(0) ?? "?"}
                     </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                    {member.current_step}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                    {member.win_pct}%
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                    {member.total_sessions}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-surface-muted">
-                    {member.last_played_at
-                      ? formatDate(member.last_played_at)
-                      : "Never"}
-                  </td>
-                </tr>
+                  )}
+
+                  {/* Name + subheading */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-dark-100 truncate">
+                      {member.player?.display_name}
+                    </p>
+                    <p className="text-xs text-surface-muted mt-0.5">
+                      {member.total_sessions} session{member.total_sessions !== 1 ? "s" : ""} &middot;{" "}
+                      {member.last_played_at ? formatDate(member.last_played_at) : "Never played"}
+                    </p>
+                  </div>
+
+                  {/* Step + Pt% */}
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold text-dark-100">Step {member.current_step}</p>
+                    <p className="text-xs text-surface-muted">{member.win_pct}% Pt</p>
+                  </div>
+                </li>
               ))}
-              {members.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-8 text-center text-sm text-surface-muted"
-                  >
-                    No members in this group yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            </ul>
+          )}
         </div>
-      </div>}
+      )}
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
 import { MissingProfile } from "./missing-profile";
 import { LandingNav } from "./landing-nav";
+import { NotificationBell } from "@/components/notification-bell";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +57,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen bg-dark-950">
       <Sidebar profile={profile} isGroupAdmin={isGroupAdmin} />
       <div className="flex flex-1 flex-col min-w-0">
+        {/* Mobile header — logo + notification bell, desktop hidden */}
+        <header className="md:hidden flex items-center justify-between px-4 h-12 border-b border-surface-border bg-surface shrink-0">
+          <Link href="/dashboard">
+            <img src="/PKLBall.png" alt="PKL" className="h-7 w-auto" />
+          </Link>
+          <NotificationBell profileId={profile.id} />
+        </header>
         <main className="flex-1 px-3 py-4 pb-20 sm:px-6 md:pb-6 lg:px-8">
           {children}
         </main>

@@ -515,23 +515,25 @@ export default function AdminSessionDetailPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <div className="card">
-          <p className="text-sm text-surface-muted">Players</p>
-          <p className="text-2xl font-bold">{participants.length}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-surface-muted">Checked In</p>
-          <p className="text-2xl font-bold">{checkedInCount}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-surface-muted">Courts</p>
-          <p className="text-2xl font-bold">{session.num_courts}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-surface-muted">Round</p>
-          <p className="text-2xl font-bold">{session.current_round || 1}</p>
+      {/* Stats — compact single-line bar */}
+      <div className="card py-2 px-0">
+        <div className="flex items-center divide-x divide-surface-border">
+          <div className="flex-1 px-4 text-center">
+            <p className="text-xs text-surface-muted leading-tight">Players</p>
+            <p className="text-lg font-bold text-dark-100 leading-tight">{participants.length}</p>
+          </div>
+          <div className="flex-1 px-4 text-center">
+            <p className="text-xs text-surface-muted leading-tight">Checked In</p>
+            <p className="text-lg font-bold text-dark-100 leading-tight">{checkedInCount}</p>
+          </div>
+          <div className="flex-1 px-4 text-center">
+            <p className="text-xs text-surface-muted leading-tight">Courts</p>
+            <p className="text-lg font-bold text-dark-100 leading-tight">{session.num_courts}</p>
+          </div>
+          <div className="flex-1 px-4 text-center">
+            <p className="text-xs text-surface-muted leading-tight">Round</p>
+            <p className="text-lg font-bold text-dark-100 leading-tight">{session.current_round || 1}</p>
+          </div>
         </div>
       </div>
 
@@ -632,14 +634,30 @@ export default function AdminSessionDetailPage() {
                     Court {courtNum}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {courtPlayers.map((p) => (
-                      <span
-                        key={p.player_id}
-                        className="rounded-full bg-surface-overlay px-2.5 py-0.5 text-xs font-medium text-dark-100"
-                      >
-                        {(p as any).player?.display_name ?? "?"}
-                      </span>
-                    ))}
+                    {courtPlayers.map((p) => {
+                      const prev = p.court_number;
+                      const next = p.target_court_next;
+                      // Lower court number = higher/better court (court 1 is top)
+                      const moved = prev != null && next != null && prev !== next
+                        ? next < prev ? "up" : "down"
+                        : null;
+                      return (
+                        <span
+                          key={p.player_id}
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            moved === "up"
+                              ? "bg-teal-900/40 text-teal-300"
+                              : moved === "down"
+                              ? "bg-red-900/30 text-red-400"
+                              : "bg-surface-overlay text-dark-100"
+                          }`}
+                        >
+                          {(p as any).player?.display_name ?? "?"}
+                          {moved === "up" && " ↑"}
+                          {moved === "down" && " ↓"}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               ))}

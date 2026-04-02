@@ -133,16 +133,27 @@ export default async function SheetDetailPage({
     (registrations ?? []).map((r: Registration) => r.player_id)
   );
   let availableMembers: { id: string; display_name: string }[] = [];
-  if (canAddMembers && !isCancelled) {
-    const { data: allProfiles } = await supabase
-      .from("profiles")
-      .select("id, display_name")
-      .eq("is_active", true)
-      .order("display_name", { ascending: true });
+  if (canAddMembers && !isCancelled && sheet.group_id) {
+    // Only show group members who haven't already signed up
+    const { data: memberships } = await supabase
+      .from("group_memberships")
+      .select("player_id")
+      .eq("group_id", sheet.group_id);
 
-    availableMembers = (allProfiles ?? []).filter(
-      (p) => !registeredPlayerIds.has(p.id)
-    );
+    const memberIds = (memberships ?? [])
+      .map((m) => m.player_id)
+      .filter((pid) => !registeredPlayerIds.has(pid));
+
+    if (memberIds.length > 0) {
+      const { data: memberProfiles } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", memberIds)
+        .eq("is_active", true)
+        .order("display_name", { ascending: true });
+
+      availableMembers = memberProfiles ?? [];
+    }
   }
 
   return (
