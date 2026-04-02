@@ -1,6 +1,7 @@
 "use client";
 
 import { NotificationBell } from "@/components/notification-bell";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import type { Profile } from "@/types/database";
 import Link from "next/link";
@@ -285,6 +286,8 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
             <span className="truncate font-medium">{profile.display_name}</span>
           )}
         </Link>
+
+        <ThemeToggle collapsed={collapsed} />
 
         <button
           onClick={handleSignOut}

@@ -51,6 +51,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      {/* Apply saved theme before paint to prevent flash */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}})()`,
+        }}
+      />
       <body className="font-sans">
         <SupabaseProvider>
           <ToastProvider>

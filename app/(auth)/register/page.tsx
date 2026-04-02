@@ -26,6 +26,12 @@ function RegisterForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const showEmailError = emailTouched && email.length > 0 && !emailValid;
+  const showNameError = nameTouched && fullName.trim().length === 0;
 
   const hasMinLength = password.length >= 8;
   const hasLetter = /[a-zA-Z]/.test(password);
@@ -163,9 +169,13 @@ function RegisterForm() {
             autoComplete="name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="input"
+            onBlur={() => setNameTouched(true)}
+            className={`input ${showNameError ? "input-error" : nameTouched && fullName.trim().length > 0 ? "input-success" : ""}`}
             required
           />
+          {showNameError && (
+            <p className="mt-1 text-xs text-red-400">Name is required</p>
+          )}
         </div>
 
         <div>
@@ -178,9 +188,13 @@ function RegisterForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="input"
+            onBlur={() => setEmailTouched(true)}
+            className={`input ${showEmailError ? "input-error" : emailTouched && emailValid ? "input-success" : ""}`}
             required
           />
+          {showEmailError && (
+            <p className="mt-1 text-xs text-red-400">Enter a valid email address</p>
+          )}
         </div>
 
         <div>

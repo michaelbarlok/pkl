@@ -2,12 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme CSS variables ── */
+/* Default = dark theme */
+:root {
+  --color-dark-50:  #f5f3f5;
+  --color-dark-100: #e8e3e7;
+  --color-dark-200: #d0c6ce;
+  --color-dark-300: #b0a1ad;
+  --color-dark-400: #897587;
+  --color-dark-500: #6b5768;
+  --color-dark-600: #564154;
+  --color-dark-700: #473647;
+  --color-dark-800: #3b2c3b;
+  --color-dark-900: #2f2330;
+  --color-dark-950: #1e1520;
+  --color-surface:         #241a28;
+  --color-surface-raised:  #2e2233;
+  --color-surface-overlay: #382a3e;
+  --color-surface-border:  #44334a;
+  --color-surface-muted:   #9882a0;
+}
+
+/* Light theme — toggled by adding `.light` to <html> */
+.light {
+  --color-dark-50:  #140d13;
+  --color-dark-100: #20161f;
+  --color-dark-200: #3a2938;
+  --color-dark-300: #5a4857;
+  --color-dark-400: #7d6679;
+  --color-dark-500: #a38ea0;
+  --color-dark-600: #c2afbf;
+  --color-dark-700: #d7c8da;
+  --color-dark-800: #e6dce8;
+  --color-dark-900: #f0eaf2;
+  --color-dark-950: #f8f5f9;
+  --color-surface:         #ffffff;
+  --color-surface-raised:  #f5f0f7;
+  --color-surface-overlay: #ede5ef;
+  --color-surface-border:  #d0c3d3;
+  --color-surface-muted:   #7a6478;
+}
+
 @layer base {
   body {
     @apply bg-dark-950 text-dark-100 antialiased;
   }
 
-  /* Dark-mode scrollbars */
+  /* Scrollbars */
   ::-webkit-scrollbar {
     @apply w-1.5;
   }
@@ -52,7 +93,15 @@
 
   /* ── Inputs ── */
   .input {
-    @apply block w-full rounded-lg border-0 bg-surface-raised py-2 px-3 text-dark-100 ring-1 ring-inset ring-surface-border placeholder:text-surface-muted focus:ring-2 focus:ring-inset focus:ring-brand-500 sm:text-sm;
+    @apply block w-full rounded-lg border-0 bg-surface-raised py-2 px-3 text-dark-100 ring-1 ring-inset ring-surface-border placeholder:text-surface-muted focus:ring-2 focus:ring-inset focus:ring-brand-500 sm:text-sm transition-shadow;
+  }
+
+  /* Input state variants — combine with .input */
+  .input-error {
+    @apply ring-2 ring-red-500 focus:ring-red-500;
+  }
+  .input-success {
+    @apply ring-2 ring-teal-500 focus:ring-teal-500;
   }
 
   /* ── Cards ── */
@@ -65,7 +114,7 @@
   .card-accent-yellow { @apply border-l-[3px] border-l-accent-500/60; }
   .card-accent-red    { @apply border-l-[3px] border-l-red-500/60; }
   .card-accent-brand  { @apply border-l-[3px] border-l-brand-400/70; }
-  .card-accent-gray   { @apply border-l-[3px] border-l-dark-400/30; }
+  .card-accent-gray   { @apply border-l-[3px] border-l-surface-border; }
 
   /* ── Badges ── */
   .badge {
@@ -108,9 +157,32 @@
   tbody tr {
     @apply border-surface-border;
   }
+
+  /* ── Skeleton loader ── */
+  .skeleton {
+    @apply rounded bg-surface-overlay;
+    background-image: linear-gradient(
+      90deg,
+      var(--color-surface-overlay) 0%,
+      var(--color-surface-border) 50%,
+      var(--color-surface-overlay) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
 }
 
 /* ── Animations ── */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
 @keyframes slide-up {
   from {
     opacity: 0;
@@ -123,8 +195,8 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scale-in {
@@ -138,12 +210,16 @@
   }
 }
 
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .animate-slide-up {
   animation: slide-up 0.2s ease-out;
 }
 
 .animate-fade-in {
-  animation: fade-in 0.15s ease-out;
+  animation: fade-in 0.2s ease-out;
 }
 
 .animate-scale-in {

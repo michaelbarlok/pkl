@@ -23,6 +23,12 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const showEmailError = emailTouched && email.length > 0 && !emailValid;
+  const showPasswordError = passwordTouched && password.length === 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -102,9 +108,13 @@ function LoginForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="input"
+            onBlur={() => setEmailTouched(true)}
+            className={`input ${showEmailError ? "input-error" : emailTouched && emailValid ? "input-success" : ""}`}
             required
           />
+          {showEmailError && (
+            <p className="mt-1 text-xs text-red-400">Enter a valid email address</p>
+          )}
         </div>
 
         <div>
@@ -117,9 +127,13 @@ function LoginForm() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="input"
+            onBlur={() => setPasswordTouched(true)}
+            className={`input ${showPasswordError ? "input-error" : ""}`}
             required
           />
+          {showPasswordError && (
+            <p className="mt-1 text-xs text-red-400">Password is required</p>
+          )}
         </div>
 
         <FormError message={error} />
