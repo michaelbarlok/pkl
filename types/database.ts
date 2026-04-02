@@ -158,6 +158,8 @@ export interface GroupPreferences {
 
 export type GroupRole = "admin" | "member";
 
+export type MemberSignupPriority = "high" | "normal" | "low";
+
 export interface GroupMembership {
   group_id: string;
   player_id: string;
@@ -167,6 +169,7 @@ export interface GroupMembership {
   last_played_at?: string | null;
   joined_at: string;
   group_role: GroupRole;
+  signup_priority: MemberSignupPriority;
   // Relations
   player?: Profile;
   group?: ShootoutGroup;

@@ -165,6 +165,24 @@ export default function AdminGroupDetailPage() {
     }
   };
 
+  const updateSignupPriority = async (playerId: string, priority: string) => {
+    const { error } = await supabase
+      .from("group_memberships")
+      .update({ signup_priority: priority })
+      .eq("group_id", id)
+      .eq("player_id", playerId);
+
+    if (error) {
+      setMessage({ type: "error", text: `Failed to update priority: ${error.message}` });
+    } else {
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.player_id === playerId ? { ...m, signup_priority: priority as any } : m
+        )
+      );
+    }
+  };
+
   const removeMember = async (playerId: string) => {
     const ok = await confirm({
       title: "Remove member from group?",
@@ -507,6 +525,20 @@ export default function AdminGroupDetailPage() {
                     <span className="text-sm font-semibold text-brand-400">{member.win_pct}% Pt</span>
                   </div>
                 )}
+                {/* Signup Priority */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-surface-muted shrink-0">Signup Priority</span>
+                  <select
+                    value={(member as any).signup_priority ?? "normal"}
+                    onChange={(e) => updateSignupPriority(member.player_id, e.target.value)}
+                    className="flex-1 rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  >
+                    <option value="high">High — always active list</option>
+                    <option value="normal">Normal — first come, first served</option>
+                    <option value="low">Low — always waitlist</option>
+                  </select>
+                </div>
+
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-surface-muted">Joined {formatDate(member.joined_at)}</span>
                   <div className="flex items-center gap-3">
@@ -556,6 +588,9 @@ export default function AdminGroupDetailPage() {
                       </th>
                     </>
                   )}
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    Signup Priority
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
                     Joined
                   </th>
@@ -628,6 +663,17 @@ export default function AdminGroupDetailPage() {
                         </td>
                       </>
                     )}
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <select
+                        value={(member as any).signup_priority ?? "normal"}
+                        onChange={(e) => updateSignupPriority(member.player_id, e.target.value)}
+                        className="rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="high">High</option>
+                        <option value="normal">Normal</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-surface-muted">
                       {formatDate(member.joined_at)}
                     </td>
@@ -657,7 +703,7 @@ export default function AdminGroupDetailPage() {
                 {members.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-4 py-8 text-center text-sm text-surface-muted"
                     >
                       No members yet. Add players above.

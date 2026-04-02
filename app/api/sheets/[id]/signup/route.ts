@@ -51,34 +51,22 @@ export async function POST(
       }
     }
 
-    // Determine priority: explicit override > auto (global admin or group admin = high) > normal
+    // Determine priority: explicit override > group membership signup_priority > normal
     let priority = priorityOverride ?? "normal";
-    if (!priorityOverride) {
+    if (!priorityOverride && sheet.group_id) {
       const checkPlayerId = targetPlayerId && targetPlayerId !== auth.profile.id
         ? targetPlayerId
         : auth.profile.id;
 
-      // Check global admin
-      if (checkPlayerId === auth.profile.id && auth.profile.role === "admin") {
-        priority = "high";
-      } else if (checkPlayerId !== auth.profile.id) {
-        const { data: targetProfile } = await auth.supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", checkPlayerId)
-          .single();
-        if (targetProfile?.role === "admin") priority = "high";
-      }
+      const { data: membership } = await auth.supabase
+        .from("group_memberships")
+        .select("signup_priority")
+        .eq("group_id", sheet.group_id)
+        .eq("player_id", checkPlayerId)
+        .maybeSingle();
 
-      // Check group admin (if not already high from global admin)
-      if (priority !== "high" && sheet.group_id) {
-        const { data: membership } = await auth.supabase
-          .from("group_memberships")
-          .select("group_role")
-          .eq("group_id", sheet.group_id)
-          .eq("player_id", checkPlayerId)
-          .single();
-        if (membership?.group_role === "admin") priority = "high";
+      if (membership?.signup_priority) {
+        priority = membership.signup_priority;
       }
     }
 

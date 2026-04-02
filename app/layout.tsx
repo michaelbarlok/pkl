@@ -49,13 +49,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      {/* Apply saved theme before paint to prevent flash */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}})()`,
-        }}
-      />
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply saved theme before paint so React hydration doesn't strip it */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className="font-sans">
         <SupabaseProvider>
           <ToastProvider>
