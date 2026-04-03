@@ -16,9 +16,8 @@ export const metadata: Metadata = {
   description: "Pickleball ladder league platform",
   icons: {
     icon: [
-      { url: "/PKLBall-AppIcon.png", sizes: "32x32", type: "image/png" },
       { url: "/PKLBall-AppIcon.png", sizes: "192x192", type: "image/png" },
-      { url: "/PKLBall-AppIcon.png", sizes: "512x512", type: "image/png" },
+      { url: "/PKLBall-AppIcon-512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: "/PKLBall-AppIcon.png",
   },
