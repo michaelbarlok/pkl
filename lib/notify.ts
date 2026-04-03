@@ -190,7 +190,7 @@ async function sendEmail({
   const emailComponent = (await loader()).default;
 
   await resend.emails.send({
-    from: "PKL <info@pkl-ball.app>",
+    from: "PKL Ball <info@pkl-ball.app>",
     to,
     subject,
     react: emailComponent(data),
