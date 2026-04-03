@@ -13,7 +13,7 @@ export default async function HomePage() {
       <section className="text-center space-y-6">
         <img
           src="/PKLBall.png"
-          alt="PKL"
+          alt="PKL Ball"
           className="mx-auto h-28 w-auto sm:h-36"
         />
         <h1 className="text-3xl font-bold text-dark-100 sm:text-5xl tracking-tight">
@@ -368,41 +368,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Testimonials ── */}
-      <section className="max-w-4xl mx-auto space-y-8">
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold text-dark-100 sm:text-3xl tracking-tight">What players are saying</h2>
-          <p className="text-dark-300">From casual players to competitive regulars — PKL works for everyone.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {[
-            {
-              quote: "I used to dread organizing our Thursday sessions. Now I just open the app, check who signed up, and show up. It handles everything.",
-              name: "Marcus D.",
-              label: "Group Organizer",
-            },
-            {
-              quote: "The rankings actually make me want to come back every week. Watching your step climb after a good session is addicting.",
-              name: "Priya S.",
-              label: "Competitive Ladder Player",
-            },
-            {
-              quote: "Free Play is genius. We had an odd number one night and it just figured out the rotations without anyone having to do the math.",
-              name: "Tom R.",
-              label: "Casual Player",
-            },
-          ].map((t) => (
-            <div key={t.name} className="card space-y-4">
-              <p className="text-sm text-dark-200 leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
-              <div>
-                <p className="text-sm font-semibold text-dark-100">{t.name}</p>
-                <p className="text-xs text-surface-muted">{t.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* ── FAQ ── */}
       <section className="max-w-2xl mx-auto space-y-8">
         <div className="text-center space-y-2">
@@ -411,16 +376,16 @@ export default async function HomePage() {
         <div className="space-y-4">
           {[
             {
-              q: "Is PKL free to use?",
-              a: "Yes — PKL is free for players. Sign up, join groups, track your games, and climb the rankings at no cost.",
+              q: "Is PKL Ball free to use?",
+              a: "Yes — PKL Ball is free for players. Sign up, join groups, track your games, and climb the rankings at no cost.",
             },
             {
               q: "Do I need to be invited or can anyone join?",
               a: "Anyone can create an account. To join a specific group or ladder league, you request access and the group organizer approves you.",
             },
             {
-              q: "What formats does PKL support?",
-              a: "PKL supports ladder leagues (shootouts with step-based rankings), free play sessions with automatic team rotation, and tournaments in single elimination, double elimination, and round robin formats.",
+              q: "What formats does PKL Ball support?",
+              a: "PKL Ball supports ladder leagues (shootouts with step-based rankings), free play sessions with automatic team rotation, and tournaments in single elimination, double elimination, and round robin formats.",
             },
             {
               q: "Can I run my own group?",

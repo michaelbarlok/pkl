@@ -84,7 +84,7 @@ export default function InviteMemberPage() {
           Invite Member
         </h1>
         <p className="mt-1 text-surface-muted">
-          Send an email invitation to join PKL.
+          Send an email invitation to join PKL Ball.
         </p>
       </div>
 

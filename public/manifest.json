@@ -1,6 +1,6 @@
 {
-  "name": "PKL Leagues & Tournaments",
-  "short_name": "PKL",
+  "name": "PKL Ball Leagues & Tournaments",
+  "short_name": "PKL Ball",
   "description": "Pickleball ladder league platform",
   "start_url": "/",
   "display": "standalone",

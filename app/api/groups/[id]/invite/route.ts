@@ -58,7 +58,7 @@ export async function POST(
         const { default: GroupInvite } = await import("@/emails/GroupInvite");
 
         await resend.emails.send({
-          from: "PKL <info@pkl-ball.app>",
+          from: "PKL Ball <info@pkl-ball.app>",
           to: body.email,
           subject: `You're invited to join ${body.groupName ?? "a pickleball group"}`,
           react: GroupInvite({ groupName: body.groupName ?? "a group", inviteUrl }),

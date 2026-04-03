@@ -368,12 +368,12 @@ function InviteButton({ displayName, onDone }: { displayName: string; onDone: ()
 
   async function handleInvite() {
     const inviteUrl = `${window.location.origin}/register`;
-    const text = `${displayName} invited you to join PKL — a pickleball community for ladder leagues, tournaments, and more. Sign up here:`;
+    const text = `${displayName} invited you to join PKL Ball — a pickleball community for ladder leagues, tournaments, and more. Sign up here:`;
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Join PKL",
+          title: "Join PKL Ball",
           text,
           url: inviteUrl,
         });

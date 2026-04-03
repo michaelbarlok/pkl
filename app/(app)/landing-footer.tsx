@@ -61,7 +61,7 @@ export function LandingFooter() {
         {/* Bottom bar */}
         <div className="mt-10 border-t border-surface-border/50 pt-6">
           <p className="text-xs text-dark-400 text-center">
-            &copy; {new Date().getFullYear()} PKL. All rights reserved.
+            &copy; {new Date().getFullYear()} PKL Ball. All rights reserved.
           </p>
         </div>
       </div>

@@ -128,8 +128,8 @@ export function InviteButton({
     if (!inviteUrl) return;
     try {
       await navigator.share({
-        title: `Join ${groupName} on PKL`,
-        text: `You're invited to join ${groupName} — a pickleball group on PKL!`,
+        title: `Join ${groupName} on PKL Ball`,
+        text: `You're invited to join ${groupName} — a pickleball group on PKL Ball!`,
         url: inviteUrl,
       });
     } catch {

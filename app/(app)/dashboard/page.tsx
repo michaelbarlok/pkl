@@ -101,7 +101,7 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold text-dark-100">
           Welcome back, {profile.display_name}
         </h1>
-        <p className="mt-1 text-surface-muted">Here&apos;s what&apos;s happening in PKL.</p>
+        <p className="mt-1 text-surface-muted">Here&apos;s what&apos;s happening in PKL Ball.</p>
       </div>
 
       {/* Active now */}

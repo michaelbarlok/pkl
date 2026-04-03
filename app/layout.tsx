@@ -12,7 +12,7 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://pkl.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
-  title: "PKL",
+  title: "PKL Ball",
   description: "Pickleball ladder league platform",
   icons: {
     icon: [
@@ -24,20 +24,20 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   openGraph: {
-    title: "PKL",
+    title: "PKL Ball",
     description: "Pickleball ladder league platform",
     images: [
       {
         url: "/PKLBall.png",
-        alt: "PKL – Pickleball ladder league platform",
+        alt: "PKL Ball – Pickleball ladder league platform",
       },
     ],
-    siteName: "PKL",
+    siteName: "PKL Ball",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "PKL",
+    title: "PKL Ball",
     description: "Pickleball ladder league platform",
     images: ["/PKLBall.png"],
   },
