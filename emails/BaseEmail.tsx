@@ -25,10 +25,10 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
       <Body style={main}>
         <Container style={container}>
           <Img
-            src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/pkl-logo.png`}
-            width="140"
+            src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/PKLBall.png`}
+            width="180"
             height="auto"
-            alt="PKL"
+            alt="PKL Ball"
             style={logo}
           />
           <Hr style={hr} />
@@ -38,7 +38,7 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
           <Section>{children}</Section>
           <Hr style={hr} />
           <Text style={footer}>
-            PKL Ladder League
+            PKL Ball
           </Text>
         </Container>
       </Body>

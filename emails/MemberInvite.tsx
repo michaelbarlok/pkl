@@ -7,12 +7,12 @@ interface Props {
 
 export default function MemberInvite({ displayName }: Props) {
   return (
-    <BaseEmail preview="Set up your PKL account" heading="Welcome to PKL">
+    <BaseEmail preview="Set up your PKL Ball account" heading="Welcome to PKL Ball">
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
         Hi {displayName ?? "there"},
       </Text>
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
-        A PKL Ladder League account has been created for you. Click below to
+        A PKL Ball account has been created for you. Click below to
         complete your registration and join the league.
       </Text>
       <Button
