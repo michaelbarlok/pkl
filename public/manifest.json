@@ -14,13 +14,13 @@
       "purpose": "any"
     },
     {
-      "src": "/PKLBall-AppIcon.png",
+      "src": "/PKLBall-AppIcon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/PKLBall-AppIcon.png",
+      "src": "/PKLBall-AppIcon-Maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
