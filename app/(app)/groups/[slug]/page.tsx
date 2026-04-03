@@ -268,47 +268,31 @@ export default async function GroupPage({
             Recent Matches
           </h2>
           <div className="space-y-2">
-            {recentMatches.map((match) => (
-              <div
-                key={match.id}
-                className="card flex items-center justify-between"
-              >
-                <div className="text-sm">
-                  <span className="font-medium text-dark-100">
+            {recentMatches.map((match) => {
+              const aWon = match.score_a > match.score_b;
+              const bWon = match.score_b > match.score_a;
+              return (
+              <div key={match.id} className="card p-0 overflow-hidden">
+                <div className={`flex items-center justify-between gap-2 px-4 py-2.5 ${aWon ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+                  <span className={`text-sm truncate ${aWon ? "font-semibold text-teal-300" : "text-dark-300"}`}>
+                    {aWon && <span className="mr-1">✓</span>}
                     {match.team_a_p1_profile?.display_name}
-                    {match.team_a_p2_profile &&
-                      ` & ${match.team_a_p2_profile.display_name}`}
+                    {match.team_a_p2_profile && ` & ${match.team_a_p2_profile.display_name}`}
                   </span>
-                  <span className="text-surface-muted"> vs </span>
-                  <span className="font-medium text-dark-100">
-                    {match.team_b_p1_profile?.display_name}
-                    {match.team_b_p2_profile &&
-                      ` & ${match.team_b_p2_profile.display_name}`}
-                  </span>
+                  <span className={`font-mono text-sm font-bold shrink-0 ${aWon ? "text-teal-300" : "text-dark-300"}`}>{match.score_a}</span>
                 </div>
-                <div className="text-sm font-bold">
-                  <span
-                    className={
-                      match.score_a > match.score_b
-                        ? "text-teal-300"
-                        : "text-dark-200"
-                    }
-                  >
-                    {match.score_a}
+                <div className="h-px bg-surface-border" />
+                <div className={`flex items-center justify-between gap-2 px-4 py-2.5 ${bWon ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+                  <span className={`text-sm truncate ${bWon ? "font-semibold text-teal-300" : "text-dark-300"}`}>
+                    {bWon && <span className="mr-1">✓</span>}
+                    {match.team_b_p1_profile?.display_name}
+                    {match.team_b_p2_profile && ` & ${match.team_b_p2_profile.display_name}`}
                   </span>
-                  <span className="text-surface-muted mx-1">-</span>
-                  <span
-                    className={
-                      match.score_b > match.score_a
-                        ? "text-teal-300"
-                        : "text-dark-200"
-                    }
-                  >
-                    {match.score_b}
-                  </span>
+                  <span className={`font-mono text-sm font-bold shrink-0 ${bWon ? "text-teal-300" : "text-dark-300"}`}>{match.score_b}</span>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

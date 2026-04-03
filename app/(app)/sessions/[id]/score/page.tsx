@@ -210,7 +210,7 @@ export default function ScoreEntryPage() {
                   min={0}
                   value={scoreA}
                   onChange={(e) => setScoreA(e.target.value)}
-                  className="input text-center text-3xl font-bold py-5 w-full"
+                  className="input text-center text-3xl font-bold py-5 sm:text-xl sm:py-2 w-full"
                   placeholder="0"
                   required
                   autoFocus
@@ -226,7 +226,7 @@ export default function ScoreEntryPage() {
                   min={0}
                   value={scoreB}
                   onChange={(e) => setScoreB(e.target.value)}
-                  className="input text-center text-3xl font-bold py-5 w-full"
+                  className="input text-center text-3xl font-bold py-5 sm:text-xl sm:py-2 w-full"
                   placeholder="0"
                   required
                 />
