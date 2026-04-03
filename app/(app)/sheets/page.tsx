@@ -39,14 +39,16 @@ export default async function SheetsPage() {
     }
   }
 
-  // Only fetch sheets with event_date in the last 14 days or in the future
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 14);
+  // Hide sheets more than 12 hours after their event start time.
+  // event_date is a date string (YYYY-MM-DD) and event_time is a time string (HH:MM).
+  // We fetch a generous date window then filter precisely in JS using event_time.
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - 1); // fetch up to yesterday to cover edge cases
 
   const { data: sheets, error } = await supabase
     .from("signup_sheets")
     .select("*, group:shootout_groups(id, name, slug)")
-    .gte("event_date", cutoff.toISOString().split("T")[0])
+    .gte("event_date", cutoffDate.toISOString().split("T")[0])
     .order("event_date", { ascending: false });
 
   if (error) {
@@ -55,8 +57,15 @@ export default async function SheetsPage() {
     );
   }
 
+  // Drop any sheet whose event started more than 12 hours ago
+  const now = Date.now();
+  const filteredSheets = (sheets ?? []).filter((s) => {
+    const eventStart = new Date(`${s.event_date}T${s.event_time ?? "00:00"}`).getTime();
+    return now < eventStart + 12 * 60 * 60 * 1000;
+  });
+
   // Sort: active sheets first (most recent on top), then cancelled (most recent on top)
-  const sortedSheets = [...(sheets ?? [])].sort((a, b) => {
+  const sortedSheets = [...filteredSheets].sort((a, b) => {
     const aCancelled = a.status === "cancelled" ? 1 : 0;
     const bCancelled = b.status === "cancelled" ? 1 : 0;
     if (aCancelled !== bCancelled) return aCancelled - bCancelled;
@@ -64,7 +73,7 @@ export default async function SheetsPage() {
   });
 
   // Fetch registrations per sheet
-  const sheetIds = (sheets ?? []).map((s: SignupSheet) => s.id);
+  const sheetIds = filteredSheets.map((s: SignupSheet) => s.id);
   const safeSheetIds = sheetIds.length > 0 ? sheetIds : ["__none__"];
 
   // Try with player join first, fall back to plain + separate profiles query
