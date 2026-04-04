@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -8,9 +8,37 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
+    if (!error && sessionData?.user) {
+      const user = sessionData.user;
+
+      // Ensure a profile exists — Google OAuth users skip /api/register
+      const serviceClient = await createServiceClient();
+      const { data: existing } = await serviceClient
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!existing) {
+        const fullName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email?.split("@")[0] ||
+          "Player";
+
+        await serviceClient.from("profiles").insert({
+          user_id: user.id,
+          full_name: fullName,
+          display_name: fullName,
+          email: user.email ?? "",
+          role: "player",
+          member_since: new Date().toISOString(),
+          preferred_notify: ["email"],
+        });
+      }
+
       return NextResponse.redirect(new URL(next, request.url));
     }
   }
