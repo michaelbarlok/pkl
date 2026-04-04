@@ -34,6 +34,20 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [groupFilter, setGroupFilter] = useState<string>("all");
+
+  // Build sorted list of unique groups from all memberships
+  const allGroups = useMemo(() => {
+    const map = new Map<string, string>(); // groupId -> groupName
+    for (const memberships of Object.values(membershipMap)) {
+      for (const m of memberships) {
+        map.set(m.groupId, m.groupName);
+      }
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [membershipMap]);
   const [suspending, setSuspending] = useState<string | null>(null);
   const [togglingGroupRole, setTogglingGroupRole] = useState<string | null>(null);
   const [togglingGlobalRole, setTogglingGlobalRole] = useState<string | null>(null);
@@ -69,8 +83,15 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
       result = result.filter((p) => p.role === roleFilter);
     }
 
+    // Filter by group
+    if (groupFilter !== "all") {
+      result = result.filter((p) =>
+        (membershipMap[p.id] ?? []).some((m) => m.groupId === groupFilter)
+      );
+    }
+
     return result;
-  }, [profiles, search, statusFilter, roleFilter]);
+  }, [profiles, search, statusFilter, roleFilter, groupFilter, membershipMap]);
 
   // Selectable = filtered members excluding yourself
   const selectableIds = useMemo(
@@ -319,6 +340,20 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
             <option value="admin">Admin</option>
             <option value="player">Player</option>
           </select>
+
+          {/* Group filter */}
+          {allGroups.length > 0 && (
+            <select
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+              className="input w-auto"
+            >
+              <option value="all">All Groups</option>
+              {allGroups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="flex gap-2">
