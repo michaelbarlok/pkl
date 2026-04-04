@@ -50,7 +50,7 @@ export default async function HomePage() {
           <div className="space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 font-bold text-lg">1</div>
             <h3 className="text-base font-semibold text-dark-100">Create your account</h3>
-            <p className="text-sm text-dark-300">Sign up in seconds — no credit card, no hassle. Just your name and email.</p>
+            <p className="text-sm text-dark-300">Sign up in seconds. Just your name and email.</p>
           </div>
           <div className="space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 font-bold text-lg">2</div>
@@ -357,10 +357,6 @@ export default async function HomePage() {
         </div>
         <div className="space-y-4">
           {[
-            {
-              q: "Is PKL Ball free to use?",
-              a: "Yes — PKL Ball is free for players. Sign up, join groups, track your games, and climb the rankings at no cost.",
-            },
             {
               q: "Do I need to be invited or can anyone join?",
               a: "Anyone can create an account. To join a specific group or ladder league, you request access and the group organizer approves you.",
