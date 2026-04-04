@@ -18,6 +18,7 @@ interface ParticipantRow {
   last_played_at: string | null;
   total_sessions: number;
   target_court_next: number | null;
+  is_guest: boolean;
 }
 
 export default function CheckInPage() {
@@ -29,6 +30,13 @@ export default function CheckInPage() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
+
+  // Guest form state
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [addingGuest, setAddingGuest] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -47,7 +55,7 @@ export default function CheckInPage() {
     // Fetch participants with profile and group membership data
     const { data: parts } = await supabase
       .from("session_participants")
-      .select("*, player:profiles(id, display_name, avatar_url)")
+      .select("*, player:profiles(id, display_name, avatar_url, is_guest)")
       .eq("session_id", sessionId)
       .order("court_number", { ascending: true, nullsFirst: false });
 
@@ -78,6 +86,7 @@ export default function CheckInPage() {
           last_played_at: membership?.last_played_at ?? null,
           total_sessions: membership?.total_sessions ?? 0,
           target_court_next: p.target_court_next,
+          is_guest: p.player?.is_guest ?? false,
         };
       });
 
@@ -224,9 +233,36 @@ export default function CheckInPage() {
     router.push(`/admin/sessions/${sessionId}`);
   }
 
+  async function addGuest(e: React.FormEvent) {
+    e.preventDefault();
+    setGuestError(null);
+    setAddingGuest(true);
+
+    const res = await fetch(`/api/sessions/${sessionId}/add-guest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ display_name: guestName, email: guestEmail || undefined }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      setGuestError(data.error ?? "Failed to add guest");
+      setAddingGuest(false);
+      return;
+    }
+
+    // Re-fetch to get the new participant row with proper shape
+    await fetchData();
+    setGuestName("");
+    setGuestEmail("");
+    setShowGuestForm(false);
+    setAddingGuest(false);
+  }
+
   if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
   if (!session) return <div className="text-center py-12 text-surface-muted">Session not found.</div>;
 
+  const isPrivateGroup = session.group?.visibility === "private";
   const checkedInCount = participants.filter((p) => p.checked_in).length;
 
   return (
@@ -238,7 +274,15 @@ export default function CheckInPage() {
             {session.group?.name} — {checkedInCount} / {participants.length} checked in
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
+          {isPrivateGroup && (
+            <button
+              onClick={() => { setShowGuestForm((v) => !v); setGuestError(null); }}
+              className="btn-secondary"
+            >
+              + Add Guest
+            </button>
+          )}
           <button onClick={checkInAll} className="btn-secondary">
             Check In All
           </button>
@@ -254,6 +298,49 @@ export default function CheckInPage() {
           </button>
         </div>
       </div>
+
+      {/* Add Guest Form */}
+      {showGuestForm && (
+        <form onSubmit={addGuest} className="card space-y-3">
+          <h3 className="text-sm font-semibold text-dark-100">Add Guest</h3>
+          <p className="text-xs text-surface-muted">
+            Guests play this session only and are not added to the group roster. Steps and point % are not tracked.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-dark-200 mb-1">Name <span className="text-red-400">*</span></label>
+              <input
+                type="text"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                className="input w-full"
+                placeholder="First Last"
+                required
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-dark-200 mb-1">Email <span className="text-surface-muted">(optional)</span></label>
+              <input
+                type="email"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                className="input w-full"
+                placeholder="guest@example.com"
+              />
+            </div>
+          </div>
+          {guestError && <p className="text-sm text-red-400">{guestError}</p>}
+          <div className="flex gap-2">
+            <button type="submit" disabled={addingGuest} className="btn-primary btn-sm">
+              {addingGuest ? "Adding..." : "Add Guest"}
+            </button>
+            <button type="button" onClick={() => setShowGuestForm(false)} className="btn-secondary btn-sm">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Court Distribution Preview */}
       {checkedInCount > 0 && (
@@ -315,6 +402,9 @@ export default function CheckInPage() {
                       </div>
                     )}
                     <span className="text-sm font-medium text-dark-100">{p.display_name}</span>
+                    {p.is_guest && (
+                      <span className="badge-yellow text-[10px]">Guest</span>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-dark-200">{p.current_step}</td>
