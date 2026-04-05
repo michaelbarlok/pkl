@@ -32,7 +32,7 @@ function ConfirmForm() {
         if (exchangeError) {
           setError(exchangeError.message);
         } else {
-          router.replace(next);
+          window.location.replace(next);
         }
         return;
       }
@@ -43,7 +43,7 @@ function ConfirmForm() {
         if (verifyError) {
           setError(verifyError.message);
         } else {
-          router.replace(next);
+          window.location.replace(next);
         }
       }
     }
