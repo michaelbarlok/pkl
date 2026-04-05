@@ -405,10 +405,10 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
           return (
             <div
               key={profile.id}
-              className={cn("card space-y-3", isSelected && "ring-1 ring-red-500/50")}
+              className={cn("card !p-3 space-y-2", isSelected && "ring-1 ring-red-500/50")}
             >
               {/* Header: checkbox + avatar + name + status + actions */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {!isSelf && (
                   <input
                     type="checkbox"
@@ -421,10 +421,10 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                   <img
                     src={profile.avatar_url}
                     alt=""
-                    className="h-10 w-10 rounded-full object-cover"
+                    className="h-8 w-8 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 font-medium">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-sm font-medium flex-shrink-0">
                     {profile.display_name.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -437,7 +437,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                   </Link>
                   <p className="text-xs text-surface-muted truncate">{profile.email}</p>
                 </div>
-                <span className={profile.is_active ? "badge-green" : "badge-red"}>
+                <span className={cn("shrink-0", profile.is_active ? "badge-green" : "badge-red")}>
                   {profile.is_active ? "Active" : "Inactive"}
                 </span>
                 <ActionsDropdown
@@ -456,12 +456,13 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
               </div>
 
               {/* Details row */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-surface-muted">
-                {profile.skill_level && <span>Skill {profile.skill_level}</span>}
-                <span className="capitalize">{profile.role}</span>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-surface-muted">
+                <span>Joined {formatDate(profile.member_since)}</span>
+                {profile.skill_level && <span>· Skill {profile.skill_level}</span>}
+                <span className="capitalize">· {profile.role}</span>
                 {memberships.map((m, i) => (
                   <span key={i} className={cn(m.groupRole === "admin" ? "text-accent-300" : "text-brand-300")}>
-                    {m.groupRole === "admin" ? "★ " : ""}{m.groupName}: Step {m.step}
+                    · {m.groupRole === "admin" ? "★ " : ""}{m.groupName}: Step {m.step}
                   </span>
                 ))}
               </div>
@@ -482,8 +483,7 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         <table className="min-w-full divide-y divide-surface-border">
           <thead className="bg-surface-overlay">
             <tr>
-              {/* Check-all column */}
-              <th className="w-10 px-4 py-3">
+              <th className="w-8 px-3 py-2">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -493,27 +493,13 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                   aria-label="Select all members"
                 />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Member
-              </th>
-              <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Email
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Skill
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Step
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                Role
-              </th>
-              <th className="w-10 px-4 py-3">
-                <span className="sr-only">Actions</span>
-              </th>
+              <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Member</th>
+              <th className="hidden lg:table-cell px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Email</th>
+              <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Groups</th>
+              <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Joined</th>
+              <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Status</th>
+              <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Role</th>
+              <th className="w-8 px-3 py-2"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">
@@ -529,8 +515,8 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                     isSelected && "bg-red-900/10"
                   )}
                 >
-                  {/* Per-row checkbox */}
-                  <td className="px-4 py-3">
+                  {/* Checkbox */}
+                  <td className="px-3 py-1.5">
                     {!isSelf && (
                       <input
                         type="checkbox"
@@ -542,41 +528,34 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                     )}
                   </td>
 
-                  {/* Avatar + Name */}
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex items-center gap-3">
+                  {/* Avatar + Name + Skill */}
+                  <td className="whitespace-nowrap px-3 py-1.5">
+                    <div className="flex items-center gap-2">
                       {profile.avatar_url ? (
-                        <img
-                          src={profile.avatar_url}
-                          alt=""
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
+                        <img src={profile.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
                       ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-sm font-medium">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs font-medium flex-shrink-0">
                           {profile.display_name.charAt(0).toUpperCase()}
                         </div>
                       )}
-                      <Link
-                        href={`/players/${profile.id}`}
-                        className="text-sm font-medium text-dark-100 hover:text-brand-400"
-                      >
-                        {profile.display_name}
-                      </Link>
+                      <div>
+                        <Link href={`/players/${profile.id}`} className="text-sm font-medium text-dark-100 hover:text-brand-400 leading-tight block">
+                          {profile.display_name}
+                        </Link>
+                        {profile.skill_level && (
+                          <span className="text-xs text-surface-muted">Skill {profile.skill_level}</span>
+                        )}
+                      </div>
                     </div>
                   </td>
 
                   {/* Email */}
-                  <td className="hidden md:table-cell whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
+                  <td className="hidden lg:table-cell whitespace-nowrap px-3 py-1.5 text-xs text-surface-muted">
                     {profile.email}
                   </td>
 
-                  {/* Skill Level */}
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-surface-muted">
-                    {profile.skill_level ?? "—"}
-                  </td>
-
-                  {/* Step (from group memberships) */}
-                  <td className="px-4 py-3 text-sm text-surface-muted">
+                  {/* Groups */}
+                  <td className="px-3 py-1.5 text-xs text-surface-muted">
                     {memberships.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {memberships.map((m, i) => (
@@ -585,35 +564,30 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                           </span>
                         ))}
                       </div>
-                    ) : (
-                      "—"
-                    )}
+                    ) : "—"}
+                  </td>
+
+                  {/* Joined */}
+                  <td className="whitespace-nowrap px-3 py-1.5 text-xs text-surface-muted">
+                    {formatDate(profile.member_since)}
                   </td>
 
                   {/* Status */}
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span
-                      className={
-                        profile.is_active ? "badge-green" : "badge-red"
-                      }
-                    >
+                  <td className="whitespace-nowrap px-3 py-1.5">
+                    <span className={profile.is_active ? "badge-green" : "badge-red"}>
                       {profile.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
 
                   {/* Role */}
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span
-                      className={
-                        profile.role === "admin" ? "badge-yellow" : "badge-gray"
-                      }
-                    >
+                  <td className="whitespace-nowrap px-3 py-1.5">
+                    <span className={profile.role === "admin" ? "badge-yellow" : "badge-gray"}>
                       {profile.role}
                     </span>
                   </td>
 
-                  {/* Actions dropdown */}
-                  <td className="px-4 py-3 text-right">
+                  {/* Actions */}
+                  <td className="px-3 py-1.5 text-right">
                     <ActionsDropdown
                       profile={profile}
                       memberships={memberships}

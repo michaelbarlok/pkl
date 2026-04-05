@@ -13,11 +13,11 @@ export default async function AdminMembersPage() {
     .eq("user_id", user!.id)
     .single();
 
-  // Fetch all profiles
+  // Fetch all profiles — newest members first
   const { data: profiles } = await supabase
     .from("profiles")
     .select("*")
-    .order("display_name", { ascending: true })
+    .order("member_since", { ascending: false })
     .returns<Profile[]>();
 
   // Fetch all group memberships to show step info
