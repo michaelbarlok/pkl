@@ -45,7 +45,7 @@ export default function NewSheet({ groupName, eventDate, eventTime, location, sh
 }
 
 const buttonStyle = {
-  backgroundColor: "#2563eb",
+  backgroundColor: "#14b8a6",
   borderRadius: "6px",
   color: "#ffffff",
   fontSize: "14px",
@@ -57,6 +57,6 @@ const buttonStyle = {
 };
 
 const linkStyle = {
-  color: "#6366f1",
+  color: "#14b8a6",
   textDecoration: "underline" as const,
 };

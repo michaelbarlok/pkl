@@ -24,21 +24,28 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
       <Preview>{preview}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Img
-            src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/PKLBall.png`}
-            width="180"
-            height="auto"
-            alt="PKL Ball"
-            style={logo}
-          />
-          <Hr style={hr} />
-          <Heading as="h2" style={h2}>
-            {heading}
-          </Heading>
-          <Section>{children}</Section>
+          {/* Dark branded header */}
+          <Section style={header}>
+            <Img
+              src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/PKLBall.png`}
+              width="160"
+              height="auto"
+              alt="PKL Ball"
+              style={logo}
+            />
+          </Section>
+
+          {/* Body */}
+          <Section style={body}>
+            <Heading as="h2" style={h2}>
+              {heading}
+            </Heading>
+            {children}
+          </Section>
+
           <Hr style={hr} />
           <Text style={footer}>
-            PKL Ball
+            PKL Ball · You're receiving this because you have an account on pkl-ball.app
           </Text>
         </Container>
       </Body>
@@ -47,35 +54,51 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
 }
 
 const main = {
-  backgroundColor: "#f6f9fc",
+  backgroundColor: "#f1f5f9",
   fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
+  padding: "24px 0",
 };
 
 const container = {
   backgroundColor: "#ffffff",
   margin: "0 auto",
-  padding: "40px 20px",
   maxWidth: "560px",
-  borderRadius: "8px",
+  borderRadius: "10px",
+  overflow: "hidden" as const,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+};
+
+const header = {
+  backgroundColor: "#111318",
+  padding: "28px 32px",
+  textAlign: "center" as const,
 };
 
 const logo = {
-  margin: "0 0 16px",
+  margin: "0 auto",
+  display: "block",
+};
+
+const body = {
+  padding: "32px 32px 24px",
 };
 
 const h2 = {
-  color: "#111827",
+  color: "#0d9488",
   fontSize: "20px",
   fontWeight: "600" as const,
-  margin: "16px 0",
+  margin: "0 0 20px",
 };
 
 const hr = {
-  borderColor: "#e5e7eb",
-  margin: "20px 0",
+  borderColor: "#e2e8f0",
+  margin: "0 32px 20px",
 };
 
 const footer = {
-  color: "#9ca3af",
-  fontSize: "12px",
+  color: "#94a3b8",
+  fontSize: "11px",
+  textAlign: "center" as const,
+  padding: "0 32px 24px",
+  margin: 0,
 };

@@ -19,7 +19,7 @@ export default function TournamentWaitlistPromoted({ tournamentTitle, tournament
       <Button
         href={tournamentId ? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/tournaments/${tournamentId}` : "#"}
         style={{
-          backgroundColor: "#2563eb",
+          backgroundColor: "#14b8a6",
           borderRadius: "6px",
           color: "#ffffff",
           fontSize: "14px",

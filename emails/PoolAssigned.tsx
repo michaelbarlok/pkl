@@ -16,7 +16,7 @@ export default function PoolAssigned({ groupName, courtNumber }: Props) {
         style={{
           fontSize: "32px",
           fontWeight: "700",
-          color: "#1e40af",
+          color: "#0d9488",
           textAlign: "center" as const,
           margin: "24px 0",
         }}

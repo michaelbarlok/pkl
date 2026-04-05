@@ -15,7 +15,7 @@ export default function ForumReply({ threadTitle, threadId }: Props) {
       <Button
         href={threadId ? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/forum/${threadId}` : "#"}
         style={{
-          backgroundColor: "#2563eb",
+          backgroundColor: "#14b8a6",
           borderRadius: "6px",
           color: "#ffffff",
           fontSize: "14px",

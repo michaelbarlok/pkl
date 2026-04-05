@@ -27,7 +27,7 @@ export default function BadgeEarned({ badgeName, playerUrl }: Props) {
 }
 
 const buttonStyle = {
-  backgroundColor: "#2563eb",
+  backgroundColor: "#14b8a6",
   borderRadius: "6px",
   color: "#ffffff",
   fontSize: "14px",

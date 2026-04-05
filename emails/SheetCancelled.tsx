@@ -32,6 +32,6 @@ export default function SheetCancelled({ groupName, eventDate, eventTime, sheetI
 }
 
 const linkStyle = {
-  color: "#6366f1",
+  color: "#14b8a6",
   textDecoration: "underline" as const,
 };

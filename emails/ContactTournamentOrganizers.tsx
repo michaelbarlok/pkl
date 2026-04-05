@@ -46,10 +46,10 @@ const messageBox = {
   backgroundColor: "#f3f4f6",
   padding: "12px 16px",
   borderRadius: "6px",
-  borderLeft: "3px solid #6366f1",
+  borderLeft: "3px solid #14b8a6",
 };
 
 const link = {
-  color: "#6366f1",
+  color: "#14b8a6",
   textDecoration: "underline",
 };
