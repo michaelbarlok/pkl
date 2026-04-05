@@ -24,7 +24,7 @@
                 Thanks for signing up for PKL Ball! Click the button below to confirm your email address and activate your account.
               </p>
               <p style="margin:24px 0;">
-                <a href="{{ .ConfirmationURL }}" style="display:inline-block;background-color:#14b8a6;color:#ffffff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px;text-decoration:none;">
+                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup" style="display:inline-block;background-color:#14b8a6;color:#ffffff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px;text-decoration:none;">
                   Confirm Email Address
                 </a>
               </p>

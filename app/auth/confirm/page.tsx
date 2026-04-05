@@ -2,7 +2,7 @@
 
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 export default function ConfirmPage() {
@@ -17,73 +17,81 @@ function ConfirmForm() {
   const { supabase } = useSupabase();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
+  const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
 
-  async function handleConfirm() {
-    if (!token_hash || !type) return;
-    setLoading(true);
-    setError(null);
-    const { error: verifyError } = await supabase.auth.verifyOtp({ token_hash, type });
-    if (verifyError) {
-      setError(verifyError.message);
-      setLoading(false);
-    } else {
-      router.push(next);
-    }
-  }
+  useEffect(() => {
+    async function verify() {
+      // PKCE code exchange (fallback — some Supabase flows issue a code instead)
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          setError(exchangeError.message);
+        } else {
+          router.replace(next);
+        }
+        return;
+      }
 
-  if (!token_hash || !type) {
+      // Standard email OTP token_hash flow
+      if (token_hash && type) {
+        const { error: verifyError } = await supabase.auth.verifyOtp({ token_hash, type });
+        if (verifyError) {
+          setError(verifyError.message);
+        } else {
+          router.replace(next);
+        }
+      }
+    }
+
+    if (token_hash || code) {
+      verify();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // No params at all — invalid link
+  if (!token_hash && !type && !code) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
         <div className="w-full max-w-md text-center space-y-4">
           <img src="/PKLBall.png" alt="PKL Ball" className="mx-auto h-28 w-auto" />
-          <p className="text-surface-muted">This confirmation link is invalid or missing required parameters.</p>
+          <p className="text-surface-muted">This confirmation link is invalid or has already been used.</p>
+          <p className="text-sm text-surface-muted">If you need a new confirmation email, try signing in and following the prompt.</p>
           <a href="/login" className="btn-secondary inline-block">Back to Login</a>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
+  // Error state
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
+        <div className="w-full max-w-md text-center space-y-4">
           <img src="/PKLBall.png" alt="PKL Ball" className="mx-auto h-28 w-auto" />
-        </div>
-        <div className="card space-y-6 text-center">
-          <div>
-            <h1 className="text-xl font-bold text-dark-100">Confirm your email</h1>
-            <p className="mt-2 text-sm text-surface-muted">
-              Click the button below to verify your email address and activate your account.
+          <div className="rounded-lg bg-red-900/20 border border-red-500/30 px-4 py-3 text-sm text-red-400">
+            {error}
+            <p className="mt-1 text-xs text-surface-muted">
+              The link may have expired. Please request a new confirmation email.
             </p>
           </div>
-          {error && (
-            <div className="rounded-lg bg-red-900/20 border border-red-500/30 px-4 py-3 text-sm text-red-400">
-              {error}
-              <p className="mt-1 text-xs text-surface-muted">
-                The link may have expired. Please request a new confirmation email.
-              </p>
-            </div>
-          )}
-          <button
-            onClick={handleConfirm}
-            disabled={loading}
-            className="btn-primary w-full"
-          >
-            {loading ? "Confirming…" : "Confirm Email Address"}
-          </button>
-          <p className="text-xs text-surface-muted">
-            Already confirmed?{" "}
-            <a href="/login" className="text-brand-300 hover:text-brand-200">
-              Sign in
-            </a>
-          </p>
+          <a href="/login" className="btn-secondary inline-block">Back to Login</a>
         </div>
+      </div>
+    );
+  }
+
+  // Verifying state
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
+      <div className="w-full max-w-md text-center space-y-4">
+        <img src="/PKLBall.png" alt="PKL Ball" className="mx-auto h-28 w-auto" />
+        <p className="text-surface-muted">Confirming your email address…</p>
       </div>
     </div>
   );
