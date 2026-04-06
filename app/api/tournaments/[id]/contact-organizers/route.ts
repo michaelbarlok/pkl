@@ -80,7 +80,7 @@ export async function POST(
     const emailComponent = (await import("@/emails/ContactTournamentOrganizers")).default;
 
     await resend.emails.send({
-      from: "PKL Ball <info@pkl-ball.app>",
+      from: "Tri-Star Pickleball <info@tristarpickleball.com>",
       to: organizerEmails,
       subject: `Message from ${senderProfile.display_name} about ${tournament.title}`,
       replyTo: senderProfile.email,

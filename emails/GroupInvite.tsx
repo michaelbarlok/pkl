@@ -13,7 +13,7 @@ export default function GroupInvite({ groupName, inviteUrl }: Props) {
       heading={`Join ${groupName}`}
     >
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
-        You&apos;ve been invited to join a pickleball group on PKL Ball:{" "}
+        You&apos;ve been invited to join a pickleball group on Tri-Star Pickleball:{" "}
         <strong>{groupName}</strong>.
       </Text>
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
@@ -24,7 +24,7 @@ export default function GroupInvite({ groupName, inviteUrl }: Props) {
       <Button
         href={inviteUrl}
         style={{
-          backgroundColor: "#14b8a6",
+          backgroundColor: "#0ea5a0",
           borderRadius: "6px",
           color: "#ffffff",
           fontSize: "14px",

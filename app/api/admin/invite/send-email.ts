@@ -11,9 +11,9 @@ export async function sendInviteEmail(
   const resend = new Resend(apiKey);
 
   await resend.emails.send({
-    from: "PKL Ball <info@pkl-ball.app>",
+    from: "Tri-Star Pickleball <info@tristarpickleball.com>",
     to: email,
-    subject: "Your PKL Ball account is ready to set up",
+    subject: "Your Tri-Star Pickleball account is ready to set up",
     react: MemberInvite({ displayName }),
   });
 }

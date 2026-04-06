@@ -27,10 +27,10 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
           {/* Dark branded header */}
           <Section style={header}>
             <Img
-              src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/PKLBall.png`}
+              src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/TriStarPB-dark.png`}
               width="160"
               height="auto"
-              alt="PKL Ball"
+              alt="Tri-Star Pickleball"
               style={logo}
             />
           </Section>
@@ -45,7 +45,7 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
 
           <Hr style={hr} />
           <Text style={footer}>
-            PKL Ball · You're receiving this because you have an account on pkl-ball.app
+            Tri-Star Pickleball · You're receiving this because you have an account on tristarpickleball.com
           </Text>
         </Container>
       </Body>
@@ -69,7 +69,7 @@ const container = {
 };
 
 const header = {
-  backgroundColor: "#111318",
+  backgroundColor: "#24262c",
   padding: "28px 32px",
   textAlign: "center" as const,
 };
@@ -84,7 +84,7 @@ const body = {
 };
 
 const h2 = {
-  color: "#0d9488",
+  color: "#0d9490",
   fontSize: "20px",
   fontWeight: "600" as const,
   margin: "0 0 20px",

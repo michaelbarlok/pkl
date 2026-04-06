@@ -12,33 +12,33 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://pkl.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
-  title: "PKL Ball",
+  title: "Tri-Star Pickleball",
   description: "Pickleball ladder league platform",
   icons: {
     icon: [
-      { url: "/PKLBall-AppIcon.png", sizes: "192x192", type: "image/png" },
-      { url: "/PKLBall-AppIcon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/TriStarPB-dark.png", sizes: "192x192", type: "image/png" },
+      { url: "/TriStarPB-dark.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/PKLBall-AppIcon.png",
+    apple: "/TriStarPB-dark.png",
   },
   manifest: "/manifest.json",
   openGraph: {
-    title: "PKL Ball",
+    title: "Tri-Star Pickleball",
     description: "Pickleball ladder league platform",
     images: [
       {
-        url: "/PKLBall.png",
-        alt: "PKL Ball – Pickleball ladder league platform",
+        url: "/TriStarPB-dark.png",
+        alt: "Tri-Star Pickleball – Pickleball ladder league platform",
       },
     ],
-    siteName: "PKL Ball",
+    siteName: "Tri-Star Pickleball",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "PKL Ball",
+    title: "Tri-Star Pickleball",
     description: "Pickleball ladder league platform",
-    images: ["/PKLBall.png"],
+    images: ["/TriStarPB-dark.png"],
   },
 };
 

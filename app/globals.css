@@ -3,50 +3,56 @@
 @tailwind utilities;
 
 /* ── Theme CSS variables ── */
-/* Default = dark theme (carbon gray) */
+/* Default = dark theme (charcoal blue-gray) */
 :root {
-  --color-dark-50:  #f0f2f5;
-  --color-dark-100: #dde2ea;
-  --color-dark-200: #b8c0cc;
-  --color-dark-300: #8892a4;
-  --color-dark-400: #565e72;
-  --color-dark-500: #3d4454;
-  --color-dark-600: #2e333d;
-  --color-dark-700: #252930;
-  --color-dark-800: #1d2028;
-  --color-dark-900: #161920;
-  --color-dark-950: #111318;
-  --color-surface:         #141720;
-  --color-surface-raised:  #1a1d24;
-  --color-surface-overlay: #22262f;
-  --color-surface-border:  #2e333d;
-  --color-surface-muted:   #6b7280;
+  --color-dark-50:  #f0f2f8;
+  --color-dark-100: #dee0eb;
+  --color-dark-200: #bfc1ce;
+  --color-dark-300: #9597a6;
+  --color-dark-400: #737685;
+  --color-dark-500: #5a5d6a;
+  --color-dark-600: #464953;
+  --color-dark-700: #383a44;
+  --color-dark-800: #30323b;
+  --color-dark-900: #2a2c34;
+  --color-dark-950: #24262c;
+  --color-surface:         #2c2e36;
+  --color-surface-raised:  #32343e;
+  --color-surface-overlay: #393b45;
+  --color-surface-border:  #444753;
+  --color-surface-muted:   #737685;
 }
 
 /* Light theme — toggled by adding `.light` to <html> */
 .light {
-  --color-dark-50:  #0d0f12;
-  --color-dark-100: #111318;
-  --color-dark-200: #1d2028;
-  --color-dark-300: #2e333d;
-  --color-dark-400: #565e72;
-  --color-dark-500: #8892a4;
-  --color-dark-600: #b8c0cc;
-  --color-dark-700: #d4dae3;
-  --color-dark-800: #e8ecf0;
-  --color-dark-900: #f3f5f7;
-  --color-dark-950: #f8f9fb;
-  --color-surface:         #ffffff;
-  --color-surface-raised:  #f3f5f7;
-  --color-surface-overlay: #e8ecf0;
-  --color-surface-border:  #d0d7e0;
-  --color-surface-muted:   #6b7280;
+  --color-dark-50:  #0f131c;
+  --color-dark-100: #1e2534;
+  --color-dark-200: #353d4e;
+  --color-dark-300: #4e5768;
+  --color-dark-400: #6a7282;
+  --color-dark-500: #8992a3;
+  --color-dark-600: #a5abb7;
+  --color-dark-700: #b4b9c3;
+  --color-dark-800: #bec2cc;
+  --color-dark-900: #c8ccd5;
+  --color-dark-950: #d3d7df;
+  --color-surface:         #e2e5ed;
+  --color-surface-raised:  #eceef5;
+  --color-surface-overlay: #f5f6fa;
+  --color-surface-border:  #b8bdc9;
+  --color-surface-muted:   #8992a3;
 }
 
 @layer base {
   body {
     @apply bg-dark-950 text-dark-100 antialiased;
   }
+
+  /* Theme-aware logo switching — pairs with components/logo.tsx */
+  .logo-dark  { display: block; }
+  .logo-light { display: none;  }
+  .light .logo-dark  { display: none;  }
+  .light .logo-light { display: block; }
 
   /* Scrollbars */
   ::-webkit-scrollbar {

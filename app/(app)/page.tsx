@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { LandingFooter } from "./landing-footer";
 
 export default async function HomePage() {
@@ -11,11 +12,7 @@ export default async function HomePage() {
     <div className="space-y-12 sm:space-y-20 py-8 sm:py-16">
       {/* ── Hero ── */}
       <section className="text-center space-y-6">
-        <img
-          src="/PKLBall.png"
-          alt="PKL Ball"
-          className="mx-auto h-28 w-auto sm:h-36"
-        />
+        <Logo className="mx-auto h-28 w-auto sm:h-36" />
         <h1 className="text-3xl font-bold text-dark-100 sm:text-5xl tracking-tight">
           Your pickleball community,<br className="hidden sm:block" /> all in one place.
         </h1>
@@ -362,8 +359,8 @@ export default async function HomePage() {
               a: "Anyone can create an account. To join a specific group or ladder league, you request access and the group organizer approves you.",
             },
             {
-              q: "What formats does PKL Ball support?",
-              a: "PKL Ball supports ladder leagues (shootouts with step-based rankings), free play sessions with automatic team rotation, and tournaments in single elimination, double elimination, and round robin formats.",
+              q: "What formats does Tri-Star Pickleball support?",
+              a: "Tri-Star Pickleball supports ladder leagues (shootouts with step-based rankings), free play sessions with automatic team rotation, and tournaments in single elimination, double elimination, and round robin formats.",
             },
             {
               q: "Can I run my own group?",
