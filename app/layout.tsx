@@ -16,10 +16,10 @@ export const metadata: Metadata = {
   description: "Pickleball ladder league platform",
   icons: {
     icon: [
-      { url: "/TriStarPB-dark-Photoroom.png", sizes: "192x192", type: "image/png" },
-      { url: "/TriStarPB-dark-Photoroom.png", sizes: "512x512", type: "image/png" },
+      { url: "/TriStarPB-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/TriStarPB-icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/TriStarPB-dark-Photoroom.png",
+    apple: "/TriStarPB-icon-192.png",
   },
   manifest: "/manifest.json",
   openGraph: {
