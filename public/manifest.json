@@ -20,9 +20,9 @@
       "purpose": "any"
     },
     {
-      "src": "/TriStarPB-light-minimal.jpg",
+      "src": "/TriStarPB-dark-Photoroom.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ]
