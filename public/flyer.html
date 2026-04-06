@@ -106,10 +106,19 @@
 
     /* ── Hero ── */
     .hero {
-      padding: 28px 52px 20px;
+      padding: 26px 52px 18px;
       flex-shrink: 0;
       position: relative;
       z-index: 1;
+    }
+    .hero-inner {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .hero-text {
+      flex: 1;
+      min-width: 0;
     }
     .hero-eyebrow {
       display: inline-flex;
@@ -148,11 +157,45 @@
       color: #f59e0b;
     }
     .hero-sub {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 400;
       color: #94a3b8;
       line-height: 1.65;
-      max-width: 560px;
+    }
+    /* QR in hero */
+    .hero-qr {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .hero-qr-box {
+      width: 164px; height: 164px;
+      background: #ffffff;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 0 0 3px rgba(14,165,160,0.35), 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .hero-qr-box img {
+      width: 152px; height: 152px;
+    }
+    .hero-qr-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #0ea5a0;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+    .hero-qr-url {
+      font-size: 10.5px;
+      font-weight: 500;
+      color: #475569;
+      text-align: center;
     }
 
     /* ── Accent divider ── */
@@ -321,32 +364,6 @@
       border-radius: 8px;
       padding: 5px 14px;
     }
-    .cta-right {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-    .qr-box {
-      width: 86px; height: 86px;
-      background: #ffffff;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-    .qr-box img {
-      width: 78px; height: 78px;
-    }
-    .qr-label {
-      font-size: 10.5px;
-      font-weight: 700;
-      color: rgba(13,16,23,0.75);
-      letter-spacing: 0.04em;
-      text-align: center;
-    }
 
     /* ── Footer ── */
     .footer {
@@ -402,16 +419,27 @@
 
   <!-- Hero -->
   <div class="hero">
-    <div class="hero-eyebrow">
-      <div class="hero-eyebrow-dot"></div>
-      Now live in Athens, Tennessee
-    </div>
-    <div class="hero-headline">
-      Compete. Climb.<br><span class="teal">Win on the court.</span>
-    </div>
-    <div class="hero-sub">
-      Tri-Star Pickleball is the app for your local pickleball community — ladder leagues,
-      sign-up sheets, court assignments, and live rankings all in one place.
+    <div class="hero-inner">
+      <div class="hero-text">
+        <div class="hero-eyebrow">
+          <div class="hero-eyebrow-dot"></div>
+          Now live in Athens, Tennessee
+        </div>
+        <div class="hero-headline">
+          Compete. Climb.<br><span class="teal">Win on the court.</span>
+        </div>
+        <div class="hero-sub">
+          Tri-Star Pickleball is the app for your local pickleball community — ladder leagues,
+          sign-up sheets, court assignments, and live rankings all in one place.
+        </div>
+      </div>
+      <div class="hero-qr">
+        <div class="hero-qr-box">
+          <img src="/TriStarPB-QR_code.png" alt="Scan to join Tri-Star Pickleball" />
+        </div>
+        <div class="hero-qr-label">Scan to join</div>
+        <div class="hero-qr-url">tristarpickleball.com</div>
+      </div>
     </div>
   </div>
 
@@ -496,15 +524,9 @@
   <!-- CTA -->
   <div class="cta">
     <div class="cta-left">
-      <div class="cta-headline">Ready to play?<br>Join free today.</div>
+      <div class="cta-headline">Ready to play? Join free today.</div>
       <div class="cta-sub">Works on iPhone &amp; Android — no app store required</div>
       <div class="cta-url">tristarpickleball.com</div>
-    </div>
-    <div class="cta-right">
-      <div class="qr-box">
-        <img src="/TriStarPB-QR_code.png" alt="Scan to join Tri-Star Pickleball" />
-      </div>
-      <div class="qr-label">Scan to join</div>
     </div>
   </div>
 
