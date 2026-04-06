@@ -16,10 +16,10 @@ export const metadata: Metadata = {
   description: "Pickleball ladder league platform",
   icons: {
     icon: [
-      { url: "/TriStarPB-dark.png", sizes: "192x192", type: "image/png" },
-      { url: "/TriStarPB-dark.png", sizes: "512x512", type: "image/png" },
+      { url: "/TriStarPB-dark-Photoroom.png", sizes: "192x192", type: "image/png" },
+      { url: "/TriStarPB-dark-Photoroom.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/TriStarPB-dark.png",
+    apple: "/TriStarPB-dark-Photoroom.png",
   },
   manifest: "/manifest.json",
   openGraph: {
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     description: "Pickleball ladder league platform",
     images: [
       {
-        url: "/TriStarPB-dark.png",
+        url: "/TriStarPB-dark-Photoroom.png",
         alt: "Tri-Star Pickleball – Pickleball ladder league platform",
       },
     ],
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Tri-Star Pickleball",
     description: "Pickleball ladder league platform",
-    images: ["/TriStarPB-dark.png"],
+    images: ["/TriStarPB-dark-Photoroom.png"],
   },
 };
 
