@@ -56,6 +56,13 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}})()`,
           }}
         />
+        {/* Register SW immediately — before React hydrates — so Chrome sees
+            the fetch handler early enough to evaluate PWA installability */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js');}`,
+          }}
+        />
       </head>
       <body className="font-sans">
         <SupabaseProvider>

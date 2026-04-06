@@ -14,6 +14,14 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Serve the web app manifest with the correct MIME type so Chrome
+        // recognises it as a PWA manifest rather than plain JSON.
+        source: "/manifest.json",
+        headers: [
+          { key: "Content-Type", value: "application/manifest+json" },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },

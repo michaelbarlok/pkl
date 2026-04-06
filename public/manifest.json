@@ -1,9 +1,12 @@
 {
+  "id": "/",
   "name": "Tri-Star Pickleball",
   "short_name": "Tri-Star",
   "description": "Pickleball ladder league platform",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "prefer_related_applications": false,
   "background_color": "#24262c",
   "theme_color": "#0ea5a0",
   "icons": [
