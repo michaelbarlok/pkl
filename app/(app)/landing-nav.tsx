@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 
 export function LandingNav() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -32,7 +33,7 @@ export function LandingNav() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="h-8 w-auto" />
+            <Logo className="h-8 w-auto" />
           </Link>
 
           {/* Desktop links */}

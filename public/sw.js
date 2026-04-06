@@ -14,7 +14,7 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: payload.body ?? "",
-    icon: "/PKLBall-Minimal.png",
+    icon: "/TriStarPB-light-minimal.jpg",
     badge: "/pkl-badge-96.png",
     data: { url: payload.link ?? "/" },
     vibrate: [100, 50, 100],

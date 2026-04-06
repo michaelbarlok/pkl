@@ -5,6 +5,7 @@ import { MobileNav } from "./mobile-nav";
 import { MissingProfile } from "./missing-profile";
 import { LandingNav } from "./landing-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { Logo } from "@/components/logo";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {/* Mobile header — logo + notification bell, desktop hidden */}
         <header className="md:hidden flex items-center justify-between px-4 h-12 border-b border-surface-border bg-surface shrink-0">
           <Link href="/dashboard">
-            <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="h-7 w-auto" />
+            <Logo className="h-7 w-auto" />
           </Link>
           <NotificationBell profileId={profile.id} />
         </header>

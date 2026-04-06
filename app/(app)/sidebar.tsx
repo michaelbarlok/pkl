@@ -2,6 +2,7 @@
 
 import { NotificationBell } from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/logo";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import type { Profile } from "@/types/database";
 import Link from "next/link";
@@ -187,11 +188,11 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
       >
         {collapsed ? (
           <Link href="/">
-            <img src="/PKLBall-Minimal.png" alt="Tri-Star Pickleball" className="h-8 w-8 object-contain shrink-0" />
+            <Logo className="h-8 w-8 object-contain shrink-0" />
           </Link>
         ) : (
           <Link href="/" className="flex items-center gap-2 min-w-0">
-            <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="h-7 w-auto shrink-0" />
+            <Logo className="h-7 w-auto shrink-0" />
           </Link>
         )}
         <button

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { LandingFooter } from "./landing-footer";
 
 export default async function HomePage() {
@@ -11,11 +12,7 @@ export default async function HomePage() {
     <div className="space-y-12 sm:space-y-20 py-8 sm:py-16">
       {/* ── Hero ── */}
       <section className="text-center space-y-6">
-        <img
-          src="/PKLBall.png"
-          alt="Tri-Star Pickleball"
-          className="mx-auto h-28 w-auto sm:h-36"
-        />
+        <Logo className="mx-auto h-28 w-auto sm:h-36" />
         <h1 className="text-3xl font-bold text-dark-100 sm:text-5xl tracking-tight">
           Your pickleball community,<br className="hidden sm:block" /> all in one place.
         </h1>

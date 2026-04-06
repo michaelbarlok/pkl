@@ -48,6 +48,12 @@
     @apply bg-dark-950 text-dark-100 antialiased;
   }
 
+  /* Theme-aware logo switching — pairs with components/logo.tsx */
+  .logo-dark  { display: block; }
+  .logo-light { display: none;  }
+  .light .logo-dark  { display: none;  }
+  .light .logo-light { display: block; }
+
   /* Scrollbars */
   ::-webkit-scrollbar {
     @apply w-1.5;

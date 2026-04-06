@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -47,7 +48,7 @@ export default function ConfirmedPage() {
     <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="mx-auto h-28 w-auto" />
+          <Logo className="mx-auto h-28 w-auto" />
         </div>
         <Suspense>
           <ConfirmedContent />
