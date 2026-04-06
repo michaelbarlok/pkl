@@ -11,10 +11,10 @@ export default function ContactPage() {
         <div>
           <h2 className="text-sm font-semibold text-dark-100 uppercase tracking-wide">Email</h2>
           <a
-            href="mailto:info@pkl-ball.app"
+            href="mailto:info@tristarpickleball.com"
             className="text-brand-300 hover:text-brand-200 transition-colors text-base"
           >
-            info@pkl-ball.app
+            info@tristarpickleball.com
           </a>
         </div>
         <p className="text-sm text-dark-300">

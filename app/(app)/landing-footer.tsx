@@ -50,8 +50,8 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
-                <a href="mailto:info@pkl-ball.app" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
-                  info@pkl-ball.app
+                <a href="mailto:info@tristarpickleball.com" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
+                  info@tristarpickleball.com
                 </a>
               </li>
             </ul>

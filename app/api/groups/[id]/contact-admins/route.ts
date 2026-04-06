@@ -82,7 +82,7 @@ export async function POST(
     const emailComponent = (await import("@/emails/ContactGroupAdmins")).default;
 
     await resend.emails.send({
-      from: "Tri-Star Pickleball <info@pkl-ball.app>",
+      from: "Tri-Star Pickleball <info@tristarpickleball.com>",
       to: adminEmails,
       subject: `Message from ${senderProfile.display_name} about ${group.name}`,
       replyTo: senderProfile.email,

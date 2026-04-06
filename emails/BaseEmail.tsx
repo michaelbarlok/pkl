@@ -45,7 +45,7 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
 
           <Hr style={hr} />
           <Text style={footer}>
-            Tri-Star Pickleball · You're receiving this because you have an account on pkl-ball.app
+            Tri-Star Pickleball · You're receiving this because you have an account on tristarpickleball.com
           </Text>
         </Container>
       </Body>
