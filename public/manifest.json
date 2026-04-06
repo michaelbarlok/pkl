@@ -8,13 +8,13 @@
   "theme_color": "#0ea5a0",
   "icons": [
     {
-      "src": "/TriStarPB-dark.png",
+      "src": "/TriStarPB-dark-Photoroom.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/TriStarPB-dark.png",
+      "src": "/TriStarPB-dark-Photoroom.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"

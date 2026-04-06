@@ -27,7 +27,7 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
           {/* Dark branded header */}
           <Section style={header}>
             <Img
-              src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/TriStarPB-dark.png`}
+              src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/TriStarPB-dark-Photoroom.png`}
               width="160"
               height="auto"
               alt="Tri-Star Pickleball"
