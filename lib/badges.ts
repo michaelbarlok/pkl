@@ -204,14 +204,12 @@ async function buildPlayerContext(
             .from("game_results")
             .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, created_at")
             .or(`team_a_p1.eq.${playerId},team_a_p2.eq.${playerId},team_b_p1.eq.${playerId},team_b_p2.eq.${playerId}`)
-            .order("created_at", { ascending: false })
-            .limit(500),
+            .order("created_at", { ascending: false }),
           supabase
             .from("free_play_matches")
             .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, created_at")
             .or(`team_a_p1.eq.${playerId},team_a_p2.eq.${playerId},team_b_p1.eq.${playerId},team_b_p2.eq.${playerId}`)
-            .order("created_at", { ascending: false })
-            .limit(500),
+            .order("created_at", { ascending: false }),
         ]);
 
         // Combine and sort by date descending for streak calculation
@@ -221,8 +219,6 @@ async function buildPlayerContext(
           ...(freePlayGames ?? []),
         ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-        // Use the exact counts from the count queries (covers all games,
-        // not just the limited fetch used for streak/win calculation)
         ctx.totalGames = (shootoutCount ?? 0) + (freePlayCount ?? 0);
 
         let wins = 0;

@@ -133,7 +133,9 @@ export async function POST(
   // Check play/winning badges for all players in the game (non-blocking)
   const playerIds = [team_a_p1, team_a_p2, team_b_p1, team_b_p2].filter(Boolean) as string[];
   for (const pid of playerIds) {
-    checkAndAwardBadges(pid, ["play", "winning"]).catch(() => {});
+    checkAndAwardBadges(pid, ["play", "winning"]).catch((err) =>
+      console.error(`Badge check failed for player ${pid}:`, err)
+    );
   }
 
   return NextResponse.json(result);

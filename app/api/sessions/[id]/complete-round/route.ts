@@ -224,9 +224,11 @@ export async function POST(
     .update({ status: "round_complete" })
     .eq("id", sessionId);
 
-  // Check ladder and rating badges for all participants (non-blocking)
+  // Check all relevant badge categories for participants (non-blocking)
   for (const p of participants) {
-    checkAndAwardBadges(p.player_id, ["ladder", "rating"]).catch(() => {});
+    checkAndAwardBadges(p.player_id, ["play", "winning", "ladder", "rating"]).catch((err) =>
+      console.error(`Badge check failed for player ${p.player_id}:`, err)
+    );
   }
 
   return NextResponse.json({ status: "round_complete" });
