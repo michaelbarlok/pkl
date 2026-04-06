@@ -59,7 +59,7 @@ function ConfirmForm() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
         <div className="w-full max-w-md text-center space-y-4">
-          <img src="/PKLBall.png" alt="PKL Ball" className="mx-auto h-28 w-auto" />
+          <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="mx-auto h-28 w-auto" />
           <p className="text-surface-muted">This confirmation link is invalid or has already been used.</p>
           <p className="text-sm text-surface-muted">If you need a new confirmation email, try signing in and following the prompt.</p>
           <a href="/login" className="btn-secondary inline-block">Back to Login</a>
@@ -73,7 +73,7 @@ function ConfirmForm() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
         <div className="w-full max-w-md text-center space-y-4">
-          <img src="/PKLBall.png" alt="PKL Ball" className="mx-auto h-28 w-auto" />
+          <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="mx-auto h-28 w-auto" />
           <div className="rounded-lg bg-red-900/20 border border-red-500/30 px-4 py-3 text-sm text-red-400">
             {error}
             <p className="mt-1 text-xs text-surface-muted">
@@ -90,7 +90,7 @@ function ConfirmForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
       <div className="w-full max-w-md text-center space-y-4">
-        <img src="/PKLBall.png" alt="PKL Ball" className="mx-auto h-28 w-auto" />
+        <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="mx-auto h-28 w-auto" />
         <p className="text-surface-muted">Confirming your email address…</p>
       </div>
     </div>

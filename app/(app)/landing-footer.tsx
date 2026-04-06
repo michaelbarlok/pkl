@@ -7,7 +7,7 @@ export function LandingFooter() {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
           {/* Brand */}
           <div className="space-y-3">
-            <img src="/PKLBall.png" alt="PKL" className="h-8 w-auto" />
+            <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="h-8 w-auto" />
             <p className="text-sm text-dark-300">
               Your pickleball community, all in one place.
             </p>
@@ -61,7 +61,7 @@ export function LandingFooter() {
         {/* Bottom bar */}
         <div className="mt-10 border-t border-surface-border/50 pt-6">
           <p className="text-xs text-dark-400 text-center">
-            &copy; {new Date().getFullYear()} PKL Ball. All rights reserved.
+            &copy; {new Date().getFullYear()} Tri-Star Pickleball. All rights reserved.
           </p>
         </div>
       </div>

@@ -5,7 +5,7 @@ export default function ContactPage() {
         Contact Us
       </h1>
       <p className="text-dark-200 text-base sm:text-lg leading-relaxed">
-        Have questions, feedback, or want to learn more about PKL Ball? We&apos;d love to hear from you.
+        Have questions, feedback, or want to learn more about Tri-Star Pickleball? We&apos;d love to hear from you.
       </p>
       <div className="card space-y-4">
         <div>

@@ -116,7 +116,7 @@ export async function POST(
     const sheetUrl = `${appUrl}/sheets/${sheetId}`;
 
     await resend.emails.send({
-      from: "PKL Ball <info@pkl-ball.app>",
+      from: "Tri-Star Pickleball <info@pkl-ball.app>",
       to: adminEmails,
       subject: `Message from ${senderProfile.display_name} about ${groupName}`,
       replyTo: senderProfile.email,

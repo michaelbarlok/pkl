@@ -1,11 +1,11 @@
 {
-  "name": "PKL Ball Leagues & Tournaments",
-  "short_name": "PKL Ball",
+  "name": "Tri-Star Pickleball",
+  "short_name": "Tri-Star",
   "description": "Pickleball ladder league platform",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#111318",
-  "theme_color": "#0d9488",
+  "background_color": "#24262c",
+  "theme_color": "#0ea5a0",
   "icons": [
     {
       "src": "/PKLBall-AppIcon.png",

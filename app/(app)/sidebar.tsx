@@ -187,11 +187,11 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
       >
         {collapsed ? (
           <Link href="/">
-            <img src="/PKLBall-Minimal.png" alt="PKL Ball" className="h-8 w-8 object-contain shrink-0" />
+            <img src="/PKLBall-Minimal.png" alt="Tri-Star Pickleball" className="h-8 w-8 object-contain shrink-0" />
           </Link>
         ) : (
           <Link href="/" className="flex items-center gap-2 min-w-0">
-            <img src="/PKLBall.png" alt="PKL Ball" className="h-7 w-auto shrink-0" />
+            <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="h-7 w-auto shrink-0" />
           </Link>
         )}
         <button

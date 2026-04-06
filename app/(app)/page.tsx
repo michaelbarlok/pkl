@@ -13,7 +13,7 @@ export default async function HomePage() {
       <section className="text-center space-y-6">
         <img
           src="/PKLBall.png"
-          alt="PKL Ball"
+          alt="Tri-Star Pickleball"
           className="mx-auto h-28 w-auto sm:h-36"
         />
         <h1 className="text-3xl font-bold text-dark-100 sm:text-5xl tracking-tight">
@@ -362,8 +362,8 @@ export default async function HomePage() {
               a: "Anyone can create an account. To join a specific group or ladder league, you request access and the group organizer approves you.",
             },
             {
-              q: "What formats does PKL Ball support?",
-              a: "PKL Ball supports ladder leagues (shootouts with step-based rankings), free play sessions with automatic team rotation, and tournaments in single elimination, double elimination, and round robin formats.",
+              q: "What formats does Tri-Star Pickleball support?",
+              a: "Tri-Star Pickleball supports ladder leagues (shootouts with step-based rankings), free play sessions with automatic team rotation, and tournaments in single elimination, double elimination, and round robin formats.",
             },
             {
               q: "Can I run my own group?",

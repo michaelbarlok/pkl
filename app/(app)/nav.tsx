@@ -65,7 +65,7 @@ export function AppNav({ profile, isGroupAdmin = false }: { profile: Profile; is
         <div className="flex h-14 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img src="/PKLBall.png" alt="PKL Ball" className="h-8 w-auto" />
+            <img src="/PKLBall.png" alt="Tri-Star Pickleball" className="h-8 w-auto" />
           </Link>
 
           {/* Navigation */}
