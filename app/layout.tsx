@@ -8,7 +8,7 @@ import "./globals.css";
 // root layout cannot be statically prerendered.
 export const dynamic = "force-dynamic";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://pkl.app";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://tristarpickleball.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),

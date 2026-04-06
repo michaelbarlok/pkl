@@ -1,6 +1,11 @@
 /// <reference lib="webworker" />
 
-// PKL Push Notification Service Worker
+// Tri-Star Pickleball Push Notification Service Worker
+
+// Fetch handler required for PWA installability
+self.addEventListener("fetch", (event) => {
+  event.respondWith(fetch(event.request));
+});
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
@@ -9,20 +14,20 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data.json();
   } catch {
-    payload = { title: "PKL", body: event.data.text() };
+    payload = { title: "Tri-Star Pickleball", body: event.data.text() };
   }
 
   const options = {
     body: payload.body ?? "",
     icon: "/TriStarPB-light-minimal.jpg",
-    badge: "/pkl-badge-96.png",
+    badge: "/tristar-badge-96.png",
     data: { url: payload.link ?? "/" },
     vibrate: [100, 50, 100],
-    tag: payload.tag ?? "pkl-notification",
+    tag: payload.tag ?? "tristar-notification",
     renotify: true,
   };
 
-  event.waitUntil(self.registration.showNotification(payload.title ?? "PKL", options));
+  event.waitUntil(self.registration.showNotification(payload.title ?? "Tri-Star Pickleball", options));
 });
 
 // Handle notification click — open or focus the app

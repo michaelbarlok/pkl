@@ -382,11 +382,11 @@ athens-pickleball/
 
 ## 9. PWA Support
 
-- `manifest.json` configured with PKL branding
+- `manifest.json` configured with Tri-Star Pickleball branding
 - Service worker (`sw.js`) handles push notification display
 - Icons: 192x192 and 512x512 (maskable)
 - Standalone display mode
-- OG image for link previews (`pkl-og.png`, 1200x630)
+- OG image for link previews (`TriStarPB-dark-Photoroom.png`, 1200x630)
 
 ---
 

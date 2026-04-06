@@ -51,7 +51,7 @@ export async function POST(
     .insert({
       display_name: `${displayName} (Guest)`,
       full_name: displayName,
-      email: email ?? `guest-${crypto.randomUUID()}@pkl-guest.invalid`,
+      email: email ?? `guest-${crypto.randomUUID()}@tristar-guest.invalid`,
       is_guest: true,
       role: "player",
     })
