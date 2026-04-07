@@ -34,6 +34,7 @@ export default function EditProfilePage() {
   const [notifyPush, setNotifyPush] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [isStandalone, setIsStandalone] = useState(false);
   const [togglingPush, setTogglingPush] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
@@ -119,6 +120,10 @@ export default function EditProfilePage() {
       if (isPushSupported()) {
         setPushSupported(true);
         setPushPermission(Notification.permission);
+        setIsStandalone(
+          window.matchMedia("(display-mode: standalone)").matches ||
+          ("standalone" in navigator && (navigator as { standalone?: boolean }).standalone === true)
+        );
         getExistingSubscription().then((existingSub) => {
           if (existingSub && prefs.includes("push")) {
             setNotifyPush(true);
@@ -462,25 +467,50 @@ export default function EditProfilePage() {
               </label>
 
               {pushSupported && (
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={notifyPush}
-                    disabled={togglingPush || pushPermission === "denied"}
-                    onChange={(e) => handlePushToggle(e.target.checked)}
-                    className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-50"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-dark-100">Push Notifications</span>
-                    <p className="text-xs text-surface-muted">
-                      {pushPermission === "denied"
-                        ? "Push notifications are blocked. Enable them in your browser settings."
-                        : togglingPush
-                          ? "Setting up..."
-                          : "Receive push notifications on this device"}
-                    </p>
-                  </div>
-                </label>
+                <>
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={notifyPush}
+                      disabled={togglingPush || pushPermission === "denied"}
+                      onChange={(e) => handlePushToggle(e.target.checked)}
+                      className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-50"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-dark-100">Push Notifications</span>
+                      <p className="text-xs text-surface-muted">
+                        {pushPermission === "denied"
+                          ? "Notifications are blocked — see steps below to re-enable."
+                          : togglingPush
+                            ? "Setting up..."
+                            : "Receive push notifications on this device"}
+                      </p>
+                    </div>
+                  </label>
+
+                  {pushPermission === "denied" && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3 text-xs text-amber-200 space-y-2">
+                      <p className="font-semibold text-amber-100">How to re-enable notifications:</p>
+                      {isStandalone ? (
+                        // Installed PWA — Android path
+                        <ol className="list-decimal list-inside space-y-1 text-amber-200/90">
+                          <li>Long-press the <strong>Tri-Star Pickleball</strong> icon on your home screen</li>
+                          <li>Tap <strong>App info</strong></li>
+                          <li>Tap <strong>Permissions → Notifications</strong></li>
+                          <li>Select <strong>Allow</strong>, then return here and refresh</li>
+                        </ol>
+                      ) : (
+                        // Browser tab path
+                        <ol className="list-decimal list-inside space-y-1 text-amber-200/90">
+                          <li>Tap the <strong>lock icon</strong> (or ⓘ) in the address bar</li>
+                          <li>Tap <strong>Permissions</strong> or <strong>Site settings</strong></li>
+                          <li>Find <strong>Notifications</strong> and set it to <strong>Allow</strong></li>
+                          <li>Reload this page</li>
+                        </ol>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
