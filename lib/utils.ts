@@ -70,3 +70,18 @@ export function courtLabel(courtNumber: number): string {
   if (courtNumber === 1) return "Court 1 (Top)";
   return `Court ${courtNumber}`;
 }
+
+/**
+ * Returns true if the email or display name belongs to a test account.
+ * - email contains "test" (case-insensitive)
+ * - display name contains "[TEST]" (case-insensitive)
+ * Use this to suppress outbound emails to test/seed users.
+ */
+export function isTestUser(
+  email?: string | null,
+  displayName?: string | null
+): boolean {
+  if (email && email.toLowerCase().includes("test")) return true;
+  if (displayName && displayName.toLowerCase().includes("[test]")) return true;
+  return false;
+}

@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isTestUser } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -58,12 +59,12 @@ export async function POST(
     // Fetch admin emails
     const { data: adminProfiles } = await admin
       .from("profiles")
-      .select("email")
+      .select("email, display_name")
       .in("id", adminIds);
 
     const adminEmails = (adminProfiles ?? [])
-      .map((p) => p.email)
-      .filter(Boolean);
+      .filter((p) => p.email && !isTestUser(p.email, p.display_name))
+      .map((p) => p.email);
 
     if (adminEmails.length === 0) {
       return NextResponse.json({ error: "No admin emails found" }, { status: 404 });

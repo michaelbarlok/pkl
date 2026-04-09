@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { isTestUser } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -48,8 +49,8 @@ export async function POST(
     inviteUrl = `${appUrl}/groups/${groupSlug}?token=${invite.token}`;
   }
 
-  // Optionally send email
-  if (body.email) {
+  // Optionally send email (skip test accounts)
+  if (body.email && !isTestUser(body.email)) {
     try {
       const apiKey = process.env.RESEND_API_KEY;
       if (apiKey) {

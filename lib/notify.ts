@@ -1,6 +1,7 @@
 import type React from "react";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendPushNotification } from "@/lib/push";
+import { isTestUser } from "@/lib/utils";
 import type { NotificationType } from "@/types/database";
 
 interface NotifyParams {
@@ -54,7 +55,7 @@ export async function notify({
   // 2. Fetch user preferences
   const { data: profile, error: profileErr } = await supabase
     .from("profiles")
-    .select("email, phone, preferred_notify")
+    .select("email, phone, preferred_notify, display_name")
     .eq("id", profileId)
     .single();
 
@@ -66,7 +67,8 @@ export async function notify({
   const prefs: string[] = profile.preferred_notify ?? ["email"];
 
   // 3. Email via Resend
-  if (prefs.includes("email") && emailTemplate && profile.email) {
+  if (prefs.includes("email") && emailTemplate && profile.email &&
+      !isTestUser(profile.email, profile.display_name)) {
     try {
       await sendEmail({
         to: profile.email,

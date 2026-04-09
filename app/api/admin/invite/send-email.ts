@@ -1,9 +1,11 @@
 import MemberInvite from "@/emails/MemberInvite";
+import { isTestUser } from "@/lib/utils";
 
 export async function sendInviteEmail(
   email: string,
   displayName: string
 ): Promise<void> {
+  if (isTestUser(email, displayName)) return;
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
 

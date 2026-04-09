@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isTestUser } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -56,12 +57,12 @@ export async function POST(
     // Fetch organizer emails
     const { data: orgProfiles } = await admin
       .from("profiles")
-      .select("email")
+      .select("email, display_name")
       .in("id", allOrganizerIds);
 
     const organizerEmails = (orgProfiles ?? [])
-      .map((p) => p.email)
-      .filter(Boolean);
+      .filter((p) => p.email && !isTestUser(p.email, p.display_name))
+      .map((p) => p.email);
 
     if (organizerEmails.length === 0) {
       return NextResponse.json({ error: "No organizer emails found" }, { status: 404 });

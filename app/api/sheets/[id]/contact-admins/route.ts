@@ -1,7 +1,7 @@
 import { requireAuth } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isTestUser } from "@/lib/utils";
 
 export async function POST(
   request: NextRequest,
@@ -76,12 +76,12 @@ export async function POST(
     // Fetch admin emails
     const { data: adminProfiles } = await admin
       .from("profiles")
-      .select("email")
+      .select("email, display_name")
       .in("id", allAdminIds);
 
     const adminEmails = (adminProfiles ?? [])
-      .map((p) => p.email)
-      .filter(Boolean);
+      .filter((p) => p.email && !isTestUser(p.email, p.display_name))
+      .map((p) => p.email);
 
     if (adminEmails.length === 0) {
       return NextResponse.json(
