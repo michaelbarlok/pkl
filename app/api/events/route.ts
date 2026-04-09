@@ -71,33 +71,20 @@ export async function POST(request: NextRequest) {
   let html: string | undefined;
   let text: string | undefined;
 
-  // Attempt 1: SDK get (works for sent emails, may work for received)
+  // Fetch the full email content from Resend REST API using the email_id
   try {
-    const fetched = await resend.emails.get(email_id);
-    if (fetched.data) {
-      html = fetched.data.html ?? undefined;
-      text = fetched.data.text ?? undefined;
-      console.log("emails.get html length:", html?.length, "text length:", text?.length);
+    const res = await fetch(`https://api.resend.com/emails/${email_id}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (res.ok) {
+      const json = await res.json() as { html?: string; text?: string };
+      html = json.html ?? undefined;
+      text = json.text ?? undefined;
     } else {
-      console.warn("emails.get returned no data:", JSON.stringify(fetched.error));
+      console.warn("Resend email fetch failed:", res.status);
     }
   } catch (err) {
-    console.warn("emails.get threw:", err);
-  }
-
-  // Attempt 2: direct REST call to possible received-email endpoint
-  if (!html && !text) {
-    try {
-      const res = await fetch(`https://api.resend.com/emails/${email_id}`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      const json = await res.json() as Record<string, unknown>;
-      console.log("REST /emails/{id} status:", res.status, "keys:", Object.keys(json));
-      html = json.html as string | undefined;
-      text = json.text as string | undefined;
-    } catch (err) {
-      console.warn("REST fetch threw:", err);
-    }
+    console.warn("Could not fetch email body:", err);
   }
 
   const bodyText = text
