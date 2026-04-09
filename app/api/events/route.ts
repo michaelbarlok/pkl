@@ -68,6 +68,9 @@ export async function POST(request: NextRequest) {
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
 
+  console.log("event.data keys:", Object.keys(event.data));
+  console.log("event.data full:", JSON.stringify(event.data));
+
   const { from, to, subject, html: webhookHtml, text: webhookText, email_id } = event.data;
   const recipient = to[0] ?? "info@tristarpickleball.com";
 
