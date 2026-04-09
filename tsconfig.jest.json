@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "jsx": "react"
+  },
+  "exclude": ["node_modules", "_archive", "supabase/functions"]
+}
