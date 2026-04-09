@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
             from: `Tri-Star Pickleball <info@tristarpickleball.com>`,
             to: forwardTo,
             replyTo: from,
-            subject: `[INFO-TSB] ${subject}`,
+            subject: `[INFO-TSP] ${subject}`,
             html,
             text: bodyText,
           }
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
             from: `Tri-Star Pickleball <info@tristarpickleball.com>`,
             to: forwardTo,
             replyTo: from,
-            subject: `[INFO-TSB] ${subject}`,
+            subject: `[INFO-TSP] ${subject}`,
             text: bodyText,
           }
     );
