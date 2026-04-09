@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
   try {
     const fetched = await resend.emails.get(email_id);
     if (fetched.data) {
-      const d = fetched.data as Record<string, unknown>;
+      const d = fetched.data as unknown as Record<string, unknown>;
       html = d.html as string | undefined;
       text = d.text as string | undefined;
     }
