@@ -72,16 +72,28 @@ export async function POST(request: NextRequest) {
     const { Resend } = await import("resend");
     const resend = new Resend(apiKey);
 
-    await resend.emails.send({
-      from: `Tri-Star Pickleball <info@tristarpickleball.com>`,
-      to: forwardTo,
-      replyTo: from,
-      subject: `[${recipient}] ${subject}`,
-      html: html ?? undefined,
-      text: text
-        ? `--- Forwarded from ${from} to ${recipient} ---\n\n${text}`
-        : undefined,
-    });
+    const bodyText = text
+      ? `--- Forwarded from ${from} to ${recipient} ---\n\n${text}`
+      : `--- Forwarded from ${from} to ${recipient} ---`;
+
+    await resend.emails.send(
+      html
+        ? {
+            from: `Tri-Star Pickleball <info@tristarpickleball.com>`,
+            to: forwardTo,
+            replyTo: from,
+            subject: `[${recipient}] ${subject}`,
+            html,
+            text: bodyText,
+          }
+        : {
+            from: `Tri-Star Pickleball <info@tristarpickleball.com>`,
+            to: forwardTo,
+            replyTo: from,
+            subject: `[${recipient}] ${subject}`,
+            text: bodyText,
+          }
+    );
   } catch (err) {
     console.error("Failed to forward email:", err);
     return NextResponse.json({ error: "Forward failed" }, { status: 500 });
