@@ -68,6 +68,12 @@ export async function POST(request: NextRequest) {
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
 
+  const rawEvent = JSON.parse(payload) as Record<string, unknown>;
+  console.log("top-level event keys:", Object.keys(rawEvent));
+  if (rawEvent.html || rawEvent.text) {
+    console.log("html/text at top level — html:", typeof rawEvent.html, "text:", typeof rawEvent.text);
+  }
+
   console.log("event.data keys:", Object.keys(event.data));
   console.log("event.data full:", JSON.stringify(event.data));
 
