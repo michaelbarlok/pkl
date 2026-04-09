@@ -12,6 +12,8 @@ interface EmailReceivedEvent {
     cc: string[];
     bcc: string[];
     subject: string;
+    html?: string;
+    text?: string;
     message_id: string;
     attachments: {
       id: string;
@@ -66,26 +68,8 @@ export async function POST(request: NextRequest) {
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
 
-  const { from, to, subject, email_id } = event.data;
+  const { from, to, subject, html, text } = event.data;
   const recipient = to[0] ?? "info@tristarpickleball.com";
-  let html: string | undefined;
-  let text: string | undefined;
-
-  // Fetch the full email content from Resend REST API using the email_id
-  try {
-    const res = await fetch(`https://api.resend.com/emails/${email_id}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (res.ok) {
-      const json = await res.json() as { html?: string; text?: string };
-      html = json.html ?? undefined;
-      text = json.text ?? undefined;
-    } else {
-      console.warn("Resend email fetch failed:", res.status);
-    }
-  } catch (err) {
-    console.warn("Could not fetch email body:", err);
-  }
 
   const bodyText = text
     ? `--- Forwarded from ${from} to ${recipient} ---\n\n${text}`
