@@ -13,6 +13,7 @@ import { DivisionBrackets } from "./division-brackets";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import { PaidToggle } from "@/components/paid-toggle";
+import { PaymentReminderButton } from "@/components/payment-reminder-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -347,15 +348,22 @@ export default async function TournamentDetailPage({
 
       {/* Registrations List */}
       <div>
-        <div className="flex items-baseline gap-3 mb-3">
+        <div className="flex flex-wrap items-center gap-3 mb-3">
           <h2 className="text-lg font-semibold text-dark-100">
             Registered ({confirmedRegistrations.length}{tournament.player_cap ? `/${tournament.player_cap}` : ""})
           </h2>
-          {canManage && tournament.entry_fee && confirmedRegistrations.length > 0 && (
-            <span className="text-xs text-surface-muted">
-              {confirmedRegistrations.filter((r: any) => r.paid).length} of {confirmedRegistrations.length} paid
-            </span>
-          )}
+          {canManage && tournament.entry_fee && confirmedRegistrations.length > 0 && (() => {
+            const paidCount = confirmedRegistrations.filter((r: any) => r.paid).length;
+            const unpaidCount = confirmedRegistrations.length - paidCount;
+            return (
+              <>
+                <span className="text-xs text-surface-muted">
+                  {paidCount} of {confirmedRegistrations.length} paid
+                </span>
+                <PaymentReminderButton tournamentId={id} unpaidCount={unpaidCount} />
+              </>
+            );
+          })()}
         </div>
         {confirmedRegistrations.length > 0 ? (
           <div className="card overflow-x-auto p-0">
