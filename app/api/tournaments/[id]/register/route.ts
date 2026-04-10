@@ -135,7 +135,19 @@ export async function POST(
   const notifBody = status === "confirmed"
     ? `Your registration for ${tournament.title} is confirmed.`
     : `You've been added to the waitlist (#${waitlistPosition}) for ${tournament.title}.`;
-  const emailData = {
+
+  // Fetch partner display name so each email can show who they're playing with
+  let partnerName: string | undefined;
+  if (partner_id) {
+    const { data: partnerProfile } = await auth.supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", partner_id)
+      .single();
+    partnerName = partnerProfile?.display_name ?? undefined;
+  }
+
+  const baseEmailData = {
     tournamentTitle: tournament.title,
     tournamentId,
     status,
@@ -143,10 +155,10 @@ export async function POST(
     ...(division ? { divisionLabel: getDivisionLabel(division) } : {}),
   };
 
-  notify({ profileId: auth.profile.id, type: "tournament_registration", title: notifTitle, body: notifBody, link: `/tournaments/${tournamentId}`, emailTemplate: "TournamentRegistered", emailData }).catch(() => {});
+  notify({ profileId: auth.profile.id, type: "tournament_registration", title: notifTitle, body: notifBody, link: `/tournaments/${tournamentId}`, emailTemplate: "TournamentRegistered", emailData: { ...baseEmailData, ...(partnerName ? { partnerName } : {}) } }).catch(() => {});
 
   if (partner_id) {
-    notify({ profileId: partner_id, type: "tournament_registration", title: notifTitle, body: notifBody, link: `/tournaments/${tournamentId}`, emailTemplate: "TournamentRegistered", emailData }).catch(() => {});
+    notify({ profileId: partner_id, type: "tournament_registration", title: notifTitle, body: notifBody, link: `/tournaments/${tournamentId}`, emailTemplate: "TournamentRegistered", emailData: { ...baseEmailData, partnerName: auth.profile.display_name } }).catch(() => {});
   }
 
   revalidatePath(`/tournaments/${tournamentId}`);

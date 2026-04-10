@@ -7,6 +7,7 @@ interface Props {
   status?: "confirmed" | "waitlist";
   waitlistPosition?: number;
   divisionLabel?: string;
+  partnerName?: string;
 }
 
 export default function TournamentRegistered({
@@ -15,6 +16,7 @@ export default function TournamentRegistered({
   status = "confirmed",
   waitlistPosition,
   divisionLabel,
+  partnerName,
 }: Props) {
   const isWaitlist = status === "waitlist";
 
@@ -28,7 +30,8 @@ export default function TournamentRegistered({
           <Text style={text}>
             You've been added to the waitlist for{" "}
             <strong>{tournamentTitle ?? "the tournament"}</strong>
-            {waitlistPosition ? ` at position #${waitlistPosition}` : ""}.
+            {waitlistPosition ? ` at position #${waitlistPosition}` : ""}
+            {partnerName ? `, teaming up with ${partnerName}` : ""}.
           </Text>
           <Text style={text}>
             We'll notify you right away if a spot opens up. No action is needed in the meantime.
@@ -39,6 +42,7 @@ export default function TournamentRegistered({
           <Text style={text}>
             You're confirmed for <strong>{tournamentTitle ?? "the tournament"}</strong>
             {divisionLabel ? ` in the ${divisionLabel} division` : ""}.
+            {partnerName ? ` You'll be playing with ${partnerName}.` : ""}
           </Text>
           <Text style={text}>
             See you on the court! Check the tournament page for schedule updates and bracket info as the event approaches.
