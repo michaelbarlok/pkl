@@ -507,10 +507,10 @@ function OrganizerControls({
   tournamentId: string;
   status: string;
 }) {
-  // registration_closed is handled by DivisionReview above
-  const nextAction: Record<string, { label: string; next: string }> = {
+  const nextAction: Record<string, { label: string; next: string; variant?: "primary" | "secondary" | "danger" }> = {
     draft: { label: "Open Registration", next: "registration_open" },
     registration_open: { label: "Close Registration", next: "registration_closed" },
+    registration_closed: { label: "Reopen Registration", next: "registration_open", variant: "secondary" },
     in_progress: { label: "Mark Complete", next: "completed" },
   };
 
@@ -526,6 +526,7 @@ function OrganizerControls({
           tournamentId={tournamentId}
           nextStatus={action.next}
           label={action.label}
+          variant={action.variant ?? "primary"}
         />
       </div>
     </div>
@@ -541,7 +542,7 @@ function StatusAdvanceButton({
   tournamentId: string;
   nextStatus: string;
   label: string;
-  variant?: "primary" | "danger";
+  variant?: "primary" | "secondary" | "danger";
 }) {
   async function advance() {
     "use server";
@@ -558,9 +559,12 @@ function StatusAdvanceButton({
     <form action={advance}>
       <button
         type="submit"
-        className={variant === "danger"
-          ? "btn-secondary !border-red-500/50 !text-red-400 hover:!bg-red-900/20"
-          : "btn-primary"
+        className={
+          variant === "danger"
+            ? "btn-secondary !border-red-500/50 !text-red-400 hover:!bg-red-900/20"
+            : variant === "secondary"
+            ? "btn-secondary"
+            : "btn-primary"
         }
       >
         {label}
