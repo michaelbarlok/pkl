@@ -352,6 +352,8 @@ export interface Tournament {
   max_teams_per_division?: number | null;
   entry_fee?: string | null;
   payment_options?: PaymentOption[] | null;
+  payment_link?: string | null;
+  payment_directions?: string | null;
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   status: TournamentStatus;

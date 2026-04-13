@@ -19,7 +19,7 @@ export async function POST(
     // Get tournament with payment info
     const { data: tournament } = await admin
       .from("tournaments")
-      .select("title, start_date, entry_fee, payment_options, created_by")
+      .select("title, start_date, entry_fee, payment_options, payment_link, payment_directions, created_by")
       .eq("id", tournamentId)
       .single();
 
@@ -73,6 +73,8 @@ export async function POST(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
     const tournamentUrl = `${appUrl}/tournaments/${tournamentId}`;
     const paymentOptions = (tournament.payment_options as { method: string; detail: string }[]) ?? [];
+    const paymentLink = (tournament as any).payment_link ?? undefined;
+    const paymentDirections = (tournament as any).payment_directions ?? undefined;
 
     let sent = 0;
 
@@ -90,6 +92,8 @@ export async function POST(
           tournamentDate: formatDate(tournament.start_date),
           entryFee: tournament.entry_fee,
           paymentOptions,
+          paymentLink,
+          paymentDirections,
           tournamentUrl,
         }),
       });

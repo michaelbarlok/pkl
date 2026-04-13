@@ -24,6 +24,8 @@ export default function EditTournamentPage() {
   const [maxTeamsPerDivision, setMaxTeamsPerDivision] = useState("");
   const [entryFee, setEntryFee] = useState("");
   const [paymentOptions, setPaymentOptions] = useState<Record<string, string>>({});
+  const [paymentLink, setPaymentLink] = useState("");
+  const [paymentDirections, setPaymentDirections] = useState("");
   const [registrationOpensAt, setRegistrationOpensAt] = useState("");
   const [registrationClosesAt, setRegistrationClosesAt] = useState("");
   const [scoreToWinPool, setScoreToWinPool] = useState("11");
@@ -64,6 +66,8 @@ export default function EditTournamentPage() {
           }
           setPaymentOptions(opts);
         }
+        setPaymentLink((data as any).payment_link ?? "");
+        setPaymentDirections((data as any).payment_directions ?? "");
         setRegistrationOpensAt(data.registration_opens_at?.slice(0, 16) ?? "");
         setRegistrationClosesAt(data.registration_closes_at?.slice(0, 16) ?? "");
         setScoreToWinPool(data.score_to_win_pool?.toString() ?? "11");
@@ -125,6 +129,8 @@ export default function EditTournamentPage() {
         payment_options: Object.keys(paymentOptions).length > 0
           ? Object.entries(paymentOptions).map(([method, detail]) => ({ method, detail }))
           : null,
+        payment_link: paymentLink.trim() || null,
+        payment_directions: paymentDirections.trim() || null,
         registration_opens_at: registrationOpensAt || null,
         registration_closes_at: registrationClosesAt || null,
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
@@ -357,6 +363,33 @@ export default function EditTournamentPage() {
                 </div>
               ))}
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-dark-200 mb-1">
+              Payment Link
+            </label>
+            <input
+              type="url"
+              value={paymentLink}
+              onChange={(e) => setPaymentLink(e.target.value)}
+              className="input"
+              placeholder="e.g. https://donate.example.org/pay"
+            />
+            <p className="text-xs text-surface-muted mt-1">
+              Optional external link (donation page, payment portal, etc.)
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-dark-200 mb-1">
+              Payment Directions
+            </label>
+            <textarea
+              value={paymentDirections}
+              onChange={(e) => setPaymentDirections(e.target.value)}
+              className="input min-h-[72px]"
+              maxLength={1000}
+              placeholder="Any additional instructions for paying the entry fee..."
+            />
           </div>
         </div>
 

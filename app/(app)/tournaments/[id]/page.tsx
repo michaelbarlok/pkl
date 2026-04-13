@@ -215,6 +215,25 @@ export default async function TournamentDetailPage({
               </div>
             </div>
           )}
+          {(tournament as any).payment_link && (
+            <div>
+              <p className="text-xs text-surface-muted uppercase font-medium">Payment Link</p>
+              <a
+                href={(tournament as any).payment_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-brand-300 hover:underline break-all"
+              >
+                {(tournament as any).payment_link}
+              </a>
+            </div>
+          )}
+          {(tournament as any).payment_directions && (
+            <div>
+              <p className="text-xs text-surface-muted uppercase font-medium">Payment Directions</p>
+              <p className="text-sm text-dark-100 whitespace-pre-line">{(tournament as any).payment_directions}</p>
+            </div>
+          )}
           {tournament.registration_closes_at && (
             <div>
               <p className="text-xs text-surface-muted uppercase font-medium">Registration Closes</p>
