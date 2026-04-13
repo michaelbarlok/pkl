@@ -72,7 +72,8 @@ export default function AdminSessionDetailPage() {
         .from("session_participants")
         .select("*, player:profiles(id, display_name, avatar_url)")
         .eq("session_id", id)
-        .order("court_number", { ascending: true });
+        .order("court_number", { ascending: true })
+        .order("step_before", { ascending: true });
       setParticipants(p ?? []);
 
       const { data: gameScores } = await supabase
@@ -202,7 +203,8 @@ export default function AdminSessionDetailPage() {
       .from("session_participants")
       .select("*, player:profiles(id, display_name, avatar_url)")
       .eq("session_id", id)
-      .order("court_number", { ascending: true });
+      .order("court_number", { ascending: true })
+      .order("step_before", { ascending: true });
     if (refreshed) setParticipants(refreshed);
 
     setSession({ ...session, status: nextStatus });
@@ -222,6 +224,7 @@ export default function AdminSessionDetailPage() {
             .select("*, player:profiles(id, display_name, avatar_url)")
             .eq("session_id", id)
             .order("court_number", { ascending: true })
+            .order("step_before", { ascending: true })
             .then(({ data }) => {
               if (data) setParticipants(data);
             });
