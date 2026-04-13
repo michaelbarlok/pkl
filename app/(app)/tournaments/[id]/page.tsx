@@ -125,7 +125,7 @@ export default async function TournamentDetailPage({
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl lg:max-w-6xl mx-auto space-y-6">
       {/* Real-time bracket updates */}
       {isInProgress && <TournamentRealtimeSubscription tournamentId={id} />}
 
