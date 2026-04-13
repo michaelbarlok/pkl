@@ -87,8 +87,8 @@ function EliminationBracketView({
         <h3 className="text-sm font-semibold text-dark-200 mb-2 uppercase tracking-wider">
           {format === "double_elimination" ? "Winners Bracket" : "Bracket"}
         </h3>
-        <div className="overflow-x-auto">
-          <div className="flex items-start min-w-max pb-4">
+        <div className="relative overflow-x-auto">
+          <div className="flex items-start min-w-max lg:min-w-0 lg:w-full pb-4">
             {Array.from({ length: winnersRounds }, (_, i) => i + 1).map((round, roundIdx) => {
               const roundMatches = winnersMatches
                 .filter((m) => m.round === round)
@@ -104,7 +104,7 @@ function EliminationBracketView({
                       </svg>
                     </div>
                   )}
-                  <div className="flex flex-col gap-3" style={{ minWidth: 240 }}>
+                  <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 185 }}>
                     <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                       {getRoundLabel(roundMatches.length, isLast)}
                     </p>
@@ -122,6 +122,7 @@ function EliminationBracketView({
               );
             })}
           </div>
+          <div className="lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
         </div>
       </div>
 
@@ -131,8 +132,8 @@ function EliminationBracketView({
           <h3 className="text-sm font-semibold text-dark-200 mb-2 uppercase tracking-wider">
             Losers Bracket
           </h3>
-          <div className="overflow-x-auto">
-            <div className="flex items-start min-w-max pb-4">
+          <div className="relative overflow-x-auto">
+            <div className="flex items-start min-w-max lg:min-w-0 lg:w-full pb-4">
               {Array.from(new Set(losersMatches.map((m) => m.round)))
                 .sort((a, b) => a - b)
                 .map((round, roundIdx, arr) => {
@@ -150,7 +151,7 @@ function EliminationBracketView({
                           </svg>
                         </div>
                       )}
-                      <div className="flex flex-col gap-3" style={{ minWidth: 240 }}>
+                      <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 185 }}>
                         <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                           {isLast ? "LB Final" : `LB Round ${roundIdx + 1}`}
                         </p>
@@ -168,6 +169,7 @@ function EliminationBracketView({
                   );
                 })}
             </div>
+            <div className="lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
           </div>
         </div>
       )}
@@ -313,6 +315,82 @@ function RoundRobinView({
       ? " Review the top 3 from each pool before advancing to a 6-team playoff."
       : " Review the top 4 teams before advancing to the playoff bracket.";
 
+  const poolPlayoffContent = (
+    <>
+      {/* Pool Standings + Matches */}
+      {poolBrackets.map((bracket) => {
+        const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
+        return (
+          <PoolSection
+            key={bracket}
+            label={getPoolLabel(bracket, poolBrackets.length)}
+            matches={bracketMatches}
+            canManage={canManage}
+            tournamentId={tournamentId}
+            scoreToWin={scoreToWinPool}
+            partnerMap={partnerMap}
+          />
+        );
+      })}
+
+      {/* Advance to Playoffs — Review Step */}
+      {canManage && poolComplete && !hasPlayoffs && division && !showReview && (
+        <div className="card">
+          <h3 className="text-sm font-semibold text-dark-200 mb-2">Pool Play Complete</h3>
+          <p className="text-xs text-surface-muted mb-3">
+            All pool matches are finished.{advancementDesc}
+          </p>
+          <button onClick={handleReviewAdvancement} className="btn-primary">
+            Review Advancement
+          </button>
+        </div>
+      )}
+
+      {/* Seed Review / Confirmation Panel */}
+      {showReview && (
+        <div className="card border border-brand-300/40">
+          <h3 className="text-sm font-semibold text-dark-200 mb-1">Confirm Playoff Seeding</h3>
+          <p className="text-xs text-surface-muted mb-3">
+            Review and adjust the seeding order. Use the arrows to move teams up or down. Once confirmed, the playoff bracket will be generated.
+          </p>
+          <div className="space-y-1 mb-4">
+            {editableSeeds.map((team, i) => (
+              <div key={team.id} className="flex items-center gap-2 rounded-lg bg-surface-overlay px-3 py-2">
+                <span className="text-xs font-bold text-brand-300 w-5">#{i + 1}</span>
+                <span className="text-sm font-medium text-dark-100 flex-1">{team.name}</span>
+                <span className="text-xs text-surface-muted">
+                  {team.wins}W-{team.losses}L ({team.pointDiff > 0 ? "+" : ""}{team.pointDiff})
+                </span>
+                <div className="flex gap-1">
+                  <button onClick={() => moveSeed(i, -1)} disabled={i === 0} className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-surface-muted hover:text-dark-200 disabled:opacity-30">&uarr;</button>
+                  <button onClick={() => moveSeed(i, 1)} disabled={i === editableSeeds.length - 1} className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-surface-muted hover:text-dark-200 disabled:opacity-30">&darr;</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleConfirmAdvancement} disabled={advancing} className="btn-primary disabled:opacity-50">
+              {advancing ? "Generating..." : "Confirm & Generate Playoffs"}
+            </button>
+            <button onClick={() => setShowReview(false)} className="btn-secondary">Cancel</button>
+          </div>
+          <FormError message={advanceError} />
+        </div>
+      )}
+    </>
+  );
+
+  const playoffBracketView = hasPlayoffs ? (
+    <PlayoffBracketView
+      matches={playoffMatches}
+      canManage={canManage}
+      tournamentId={tournamentId}
+      scoreToWin={scoreToWinPlayoff}
+      finalsBestOf3={finalsBestOf3}
+      partnerMap={partnerMap}
+    />
+  ) : null;
+
   return (
     <div className="space-y-6">
       {/* Division Results (visible to everyone when playoffs complete) */}
@@ -342,101 +420,16 @@ function RoundRobinView({
         </div>
       )}
 
-      {/* Pool Standings + Matches */}
-      {poolBrackets.map((bracket) => {
-        const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
-        return (
-          <PoolSection
-            key={bracket}
-            label={getPoolLabel(bracket, poolBrackets.length)}
-            matches={bracketMatches}
-            canManage={canManage}
-            tournamentId={tournamentId}
-            scoreToWin={scoreToWinPool}
-            partnerMap={partnerMap}
-          />
-        );
-      })}
-
-      {/* Advance to Playoffs — Review Step */}
-      {canManage && poolComplete && !hasPlayoffs && division && !showReview && (
-        <div className="card">
-          <h3 className="text-sm font-semibold text-dark-200 mb-2">Pool Play Complete</h3>
-          <p className="text-xs text-surface-muted mb-3">
-            All pool matches are finished.{advancementDesc}
-          </p>
-          <button
-            onClick={handleReviewAdvancement}
-            className="btn-primary"
-          >
-            Review Advancement
-          </button>
+      {/* Desktop two-column layout when playoffs exist; stacked otherwise */}
+      {hasPlayoffs ? (
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] lg:gap-8 lg:items-start">
+          {/* Left / top: pool play */}
+          <div className="space-y-6 mb-6 lg:mb-0">{poolPlayoffContent}</div>
+          {/* Right / bottom: playoff bracket — sticky sidebar on desktop */}
+          <div className="lg:sticky lg:top-6">{playoffBracketView}</div>
         </div>
-      )}
-
-      {/* Seed Review / Confirmation Panel */}
-      {showReview && (
-        <div className="card border border-brand-300/40">
-          <h3 className="text-sm font-semibold text-dark-200 mb-1">Confirm Playoff Seeding</h3>
-          <p className="text-xs text-surface-muted mb-3">
-            Review and adjust the seeding order. Use the arrows to move teams up or down. Once confirmed, the playoff bracket will be generated.
-          </p>
-          <div className="space-y-1 mb-4">
-            {editableSeeds.map((team, i) => (
-              <div key={team.id} className="flex items-center gap-2 rounded-lg bg-surface-overlay px-3 py-2">
-                <span className="text-xs font-bold text-brand-300 w-5">#{i + 1}</span>
-                <span className="text-sm font-medium text-dark-100 flex-1">{team.name}</span>
-                <span className="text-xs text-surface-muted">
-                  {team.wins}W-{team.losses}L ({team.pointDiff > 0 ? "+" : ""}{team.pointDiff})
-                </span>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => moveSeed(i, -1)}
-                    disabled={i === 0}
-                    className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-surface-muted hover:text-dark-200 disabled:opacity-30"
-                  >
-                    &uarr;
-                  </button>
-                  <button
-                    onClick={() => moveSeed(i, 1)}
-                    disabled={i === editableSeeds.length - 1}
-                    className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-surface-muted hover:text-dark-200 disabled:opacity-30"
-                  >
-                    &darr;
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleConfirmAdvancement}
-              disabled={advancing}
-              className="btn-primary disabled:opacity-50"
-            >
-              {advancing ? "Generating..." : "Confirm & Generate Playoffs"}
-            </button>
-            <button
-              onClick={() => setShowReview(false)}
-              className="btn-secondary"
-            >
-              Cancel
-            </button>
-          </div>
-          <FormError message={advanceError} />
-        </div>
-      )}
-
-      {/* Playoff Bracket */}
-      {hasPlayoffs && (
-        <PlayoffBracketView
-          matches={playoffMatches}
-          canManage={canManage}
-          tournamentId={tournamentId}
-          scoreToWin={scoreToWinPlayoff}
-          finalsBestOf3={finalsBestOf3}
-          partnerMap={partnerMap}
-        />
+      ) : (
+        <div className="space-y-6">{poolPlayoffContent}</div>
       )}
     </div>
   );
@@ -560,8 +553,8 @@ function PlayoffBracketView({
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider">Playoffs</h3>
-      <div className="overflow-x-auto">
-        <div className="flex items-start min-w-max pb-4">
+      <div className="relative overflow-x-auto">
+        <div className="flex items-start min-w-max lg:min-w-0 lg:w-full pb-4">
           {rounds.map((round, roundIdx) => {
             const roundMatches = matches
               .filter((m) => m.round === round)
@@ -576,7 +569,7 @@ function PlayoffBracketView({
                     </svg>
                   </div>
                 )}
-              <div className="flex flex-col gap-3" style={{ minWidth: 240 }}>
+              <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 185 }}>
                 <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                   {roundLabels(round)}
                 </p>
@@ -613,6 +606,7 @@ function PlayoffBracketView({
             );
           })}
         </div>
+        <div className="lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
       </div>
     </div>
   );
@@ -907,7 +901,7 @@ function MatchCard({
                   <tbody>
                     {/* Player 1 row */}
                     <tr>
-                      <td className={`pr-2 text-sm truncate max-w-[120px] ${p1MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                      <td className={`pr-2 text-sm truncate max-w-[120px] lg:max-w-[200px] ${p1MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
                         {p1Name}
                       </td>
                       {match.score1.map((s1Val, i) => {
@@ -921,7 +915,7 @@ function MatchCard({
                     </tr>
                     {/* Player 2 row */}
                     <tr>
-                      <td className={`pr-2 text-sm truncate max-w-[120px] ${p2MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                      <td className={`pr-2 text-sm truncate max-w-[120px] lg:max-w-[200px] ${p2MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
                         {p2Name}
                       </td>
                       {match.score2.map((s2Val, i) => {
