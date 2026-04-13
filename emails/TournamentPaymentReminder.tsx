@@ -12,6 +12,8 @@ interface Props {
   tournamentDate: string;
   entryFee: string;
   paymentOptions: PaymentOption[];
+  paymentLink?: string;
+  paymentDirections?: string;
   tournamentUrl: string;
 }
 
@@ -30,6 +32,8 @@ export default function TournamentPaymentReminder({
   tournamentDate,
   entryFee,
   paymentOptions,
+  paymentLink,
+  paymentDirections,
   tournamentUrl,
 }: Props) {
   return (
@@ -74,6 +78,22 @@ export default function TournamentPaymentReminder({
               ) : null}
             </Text>
           ))}
+        </>
+      )}
+
+      {paymentLink && (
+        <>
+          <Text style={sectionLabel}>Payment Link</Text>
+          <Text style={text}>
+            <Link href={paymentLink} style={link}>{paymentLink}</Link>
+          </Text>
+        </>
+      )}
+
+      {paymentDirections && (
+        <>
+          <Text style={sectionLabel}>Payment Directions</Text>
+          <Text style={text}>{paymentDirections}</Text>
         </>
       )}
 
