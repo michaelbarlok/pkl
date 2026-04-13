@@ -64,7 +64,8 @@ export default function NewSheetPage() {
     }
     const hh = h.toString().padStart(2, "0");
     const mm = m.toString().padStart(2, "0");
-    return `${date}T${hh}:${mm}:00`;
+    // Parse as local time, then convert to UTC ISO string so Supabase stores the correct value
+    return new Date(`${date}T${hh}:${mm}:00`).toISOString();
   }
 
   useEffect(() => {
