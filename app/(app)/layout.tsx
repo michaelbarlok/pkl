@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
@@ -28,11 +28,40 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("user_id", user.id)
     .single();
+
+  // Profile missing — auto-create it (Google OAuth users who skip /api/register)
+  if (!profile) {
+    const serviceClient = await createServiceClient();
+    const fullName =
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email?.split("@")[0] ||
+      "Player";
+
+    const { data: created } = await serviceClient
+      .from("profiles")
+      .upsert(
+        {
+          user_id: user.id,
+          full_name: fullName,
+          display_name: fullName,
+          email: user.email ?? "",
+          role: "player",
+          member_since: new Date().toISOString(),
+          preferred_notify: ["email"],
+        },
+        { onConflict: "user_id" }
+      )
+      .select("*")
+      .single();
+
+    profile = created;
+  }
 
   if (!profile) {
     return (
