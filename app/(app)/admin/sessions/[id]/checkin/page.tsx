@@ -21,6 +21,14 @@ interface ParticipantRow {
   is_guest: boolean;
 }
 
+interface GroupMember {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  current_step: number;
+  win_pct: number;
+}
+
 export default function CheckInPage() {
   const { id: sessionId } = useParams<{ id: string }>();
   const { supabase } = useSupabase();
@@ -37,6 +45,15 @@ export default function CheckInPage() {
   const [guestEmail, setGuestEmail] = useState("");
   const [addingGuest, setAddingGuest] = useState(false);
   const [guestError, setGuestError] = useState<string | null>(null);
+
+  // Add member form state
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
+  const [removeParticipantId, setRemoveParticipantId] = useState("");
+  const [addingMember, setAddingMember] = useState(false);
+  const [addMemberError, setAddMemberError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -253,7 +270,6 @@ export default function CheckInPage() {
       return;
     }
 
-    // Re-fetch to get the new participant row with proper shape
     await fetchData();
     setGuestName("");
     setGuestEmail("");
@@ -261,11 +277,84 @@ export default function CheckInPage() {
     setAddingGuest(false);
   }
 
+  async function openAddMemberForm() {
+    setShowAddMemberForm(true);
+    setSelectedMember(null);
+    setRemoveParticipantId("");
+    setMemberSearch("");
+    setAddMemberError(null);
+    setShowGuestForm(false);
+
+    // Fetch group members not already in this session
+    const existingIds = new Set(participants.map((p) => p.player_id));
+    const { data: memberships } = await supabase
+      .from("group_memberships")
+      .select("player_id, current_step, win_pct, player:profiles(id, display_name, avatar_url)")
+      .eq("group_id", session.group_id);
+
+    const members: GroupMember[] = (memberships ?? [])
+      .filter((m: any) => !existingIds.has(m.player_id))
+      .map((m: any) => ({
+        id: m.player_id,
+        display_name: m.player?.display_name ?? "Unknown",
+        avatar_url: m.player?.avatar_url ?? null,
+        current_step: m.current_step ?? 1,
+        win_pct: m.win_pct ?? 0,
+      }))
+      .sort((a: GroupMember, b: GroupMember) =>
+        a.display_name.localeCompare(b.display_name)
+      );
+
+    setGroupMembers(members);
+  }
+
+  async function handleAddMember() {
+    if (!selectedMember || !session) return;
+    setAddingMember(true);
+    setAddMemberError(null);
+
+    try {
+      // Remove the no-show first (if selected)
+      if (removeParticipantId) {
+        const { error: delErr } = await supabase
+          .from("session_participants")
+          .delete()
+          .eq("id", removeParticipantId);
+        if (delErr) throw delErr;
+      }
+
+      // Add the new member, checked in and ready to play
+      const { error: insertErr } = await supabase
+        .from("session_participants")
+        .insert({
+          session_id: sessionId,
+          group_id: session.group_id,
+          player_id: selectedMember.id,
+          checked_in: true,
+          step_before: selectedMember.current_step,
+        });
+      if (insertErr) throw insertErr;
+
+      await fetchData();
+      setShowAddMemberForm(false);
+      setSelectedMember(null);
+      setRemoveParticipantId("");
+      setMemberSearch("");
+    } catch (err) {
+      setAddMemberError(err instanceof Error ? err.message : "Failed to add member");
+    }
+
+    setAddingMember(false);
+  }
+
   if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
   if (!session) return <div className="text-center py-12 text-surface-muted">Session not found.</div>;
 
   const isPrivateGroup = session.group?.visibility === "private";
   const checkedInCount = participants.filter((p) => p.checked_in).length;
+  const filteredMembers = groupMembers.filter((m) =>
+    m.display_name.toLowerCase().includes(memberSearch.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -277,9 +366,21 @@ export default function CheckInPage() {
           </p>
         </div>
         <div className="flex gap-3 flex-wrap">
+          <button
+            onClick={() => {
+              if (showAddMemberForm) {
+                setShowAddMemberForm(false);
+              } else {
+                openAddMemberForm();
+              }
+            }}
+            className="btn-secondary"
+          >
+            + Add Member
+          </button>
           {isPrivateGroup && (
             <button
-              onClick={() => { setShowGuestForm((v) => !v); setGuestError(null); }}
+              onClick={() => { setShowGuestForm((v) => !v); setShowAddMemberForm(false); setGuestError(null); }}
               className="btn-secondary"
             >
               + Add Guest
@@ -300,6 +401,147 @@ export default function CheckInPage() {
           </button>
         </div>
       </div>
+
+      {/* Add Member Form */}
+      {showAddMemberForm && (
+        <div className="card space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-dark-100">Add Member</h3>
+            <p className="text-xs text-surface-muted mt-0.5">
+              Add a group member who wasn&apos;t on the original sign-up sheet.
+              Optionally remove a no-show at the same time.
+            </p>
+          </div>
+
+          {!selectedMember ? (
+            /* Step 1: search and pick a member */
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                className="input w-full"
+                placeholder="Search members..."
+                autoFocus
+              />
+              {groupMembers.length === 0 ? (
+                <p className="text-sm text-surface-muted py-2">
+                  All group members are already in this session.
+                </p>
+              ) : filteredMembers.length === 0 ? (
+                <p className="text-sm text-surface-muted py-2">No members match &ldquo;{memberSearch}&rdquo;.</p>
+              ) : (
+                <div className="divide-y divide-surface-border rounded-lg border border-surface-border overflow-hidden max-h-64 overflow-y-auto">
+                  {filteredMembers.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSelectedMember(m)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-surface-overlay transition-colors text-left"
+                    >
+                      {m.avatar_url ? (
+                        <img src={m.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs font-medium shrink-0">
+                          {m.display_name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="flex-1 text-sm font-medium text-dark-100">{m.display_name}</span>
+                      <span className="text-xs text-surface-muted">Step {m.current_step} · {m.win_pct.toFixed(1)}%</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAddMemberForm(false)}
+                className="btn-secondary btn-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            /* Step 2: confirm add + optionally pick a no-show to remove */
+            <div className="space-y-4">
+              {/* Selected member */}
+              <div className="flex items-center gap-3 rounded-lg bg-teal-900/20 border border-teal-500/30 px-3 py-2.5">
+                {selectedMember.avatar_url ? (
+                  <img src={selectedMember.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover shrink-0" />
+                ) : (
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs font-medium shrink-0">
+                    {selectedMember.display_name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-teal-300">{selectedMember.display_name}</p>
+                  <p className="text-xs text-surface-muted">Step {selectedMember.current_step} · {selectedMember.win_pct.toFixed(1)}% Pt</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMember(null)}
+                  className="text-xs text-surface-muted hover:text-dark-200 transition-colors shrink-0"
+                >
+                  Change
+                </button>
+              </div>
+
+              {/* Optional: remove a no-show */}
+              <div>
+                <label className="block text-xs font-medium text-dark-200 mb-1.5">
+                  Remove a no-show{" "}
+                  <span className="text-surface-muted font-normal">(optional)</span>
+                </label>
+                <select
+                  value={removeParticipantId}
+                  onChange={(e) => setRemoveParticipantId(e.target.value)}
+                  className="input w-full"
+                >
+                  <option value="">— Keep everyone, just add —</option>
+                  {participants
+                    .filter((p) => !p.is_guest)
+                    .sort((a, b) => a.display_name.localeCompare(b.display_name))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.display_name} (Step {p.current_step})
+                      </option>
+                    ))}
+                </select>
+                {removeParticipantId && (
+                  <p className="mt-1 text-xs text-accent-300">
+                    {participants.find((p) => p.id === removeParticipantId)?.display_name} will be removed from this session.
+                  </p>
+                )}
+              </div>
+
+              {addMemberError && (
+                <p className="text-sm text-red-400">{addMemberError}</p>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddMember}
+                  disabled={addingMember}
+                  className="btn-primary btn-sm disabled:opacity-50"
+                >
+                  {addingMember
+                    ? "Saving..."
+                    : removeParticipantId
+                    ? `Swap in ${selectedMember.display_name}`
+                    : `Add ${selectedMember.display_name}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddMemberForm(false)}
+                  className="btn-secondary btn-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add Guest Form */}
       {showGuestForm && (
