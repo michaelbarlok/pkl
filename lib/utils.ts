@@ -73,15 +73,21 @@ export function courtLabel(courtNumber: number): string {
 
 /**
  * Returns true if the email or display name belongs to a test account.
- * - email contains "test" (case-insensitive)
- * - display name contains "[TEST]" (case-insensitive)
+ * - display name contains "[TEST]" prefix (seeded test users)
+ * - email is exactly a known test-only pattern (test@ or noreply@)
  * Use this to suppress outbound emails to test/seed users.
  */
 export function isTestUser(
   email?: string | null,
   displayName?: string | null
 ): boolean {
-  if (email && email.toLowerCase().includes("test")) return true;
   if (displayName && displayName.toLowerCase().includes("[test]")) return true;
+  if (email) {
+    const lower = email.toLowerCase();
+    // Only block obviously synthetic test addresses, not real users who
+    // happen to have "test" anywhere in their email (e.g. +tester1@gmail.com)
+    if (/^test@/.test(lower) || /^testuser@/.test(lower) || /^noreply@/.test(lower)) return true;
+  }
+  return false;
   return false;
 }
