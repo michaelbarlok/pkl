@@ -150,6 +150,7 @@ const EMAIL_TEMPLATES: Record<string, () => Promise<{ default: (props: any) => R
   SheetCancelled: () => import("@/emails/SheetCancelled"),
   SheetUpdated: () => import("@/emails/SheetUpdated"),
   WaitlistPromoted: () => import("@/emails/WaitlistPromoted"),
+  BumpedToWaitlist: () => import("@/emails/BumpedToWaitlist"),
   SignupReminder: () => import("@/emails/SignupReminder"),
   WithdrawReminder: () => import("@/emails/WithdrawReminder"),
   SessionStarting: () => import("@/emails/SessionStarting"),
