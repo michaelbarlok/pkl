@@ -175,7 +175,7 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "hidden md:flex flex-col h-screen sticky top-0 shrink-0 border-r border-surface-border bg-surface transition-[width] duration-200 ease-in-out overflow-hidden",
+        "hidden md:flex flex-col h-screen sticky top-0 shrink-0 border-r border-surface-border bg-gradient-to-b from-dark-800 to-dark-950 transition-[width] duration-200 ease-in-out overflow-hidden",
         collapsed ? "w-14" : "w-56"
       )}
     >
@@ -333,7 +333,7 @@ function NavItem({
         "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
         collapsed && "justify-center w-10 mx-auto px-0",
         active
-          ? "bg-brand-900/40 text-brand-300"
+          ? "bg-brand-500/20 text-brand-300 shadow-[inset_2px_0_0_#2dd4c5]"
           : "text-dark-200 hover:bg-surface-overlay hover:text-dark-100"
       )}
     >
