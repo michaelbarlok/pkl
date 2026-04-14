@@ -165,12 +165,14 @@ export default function CheckInPage() {
       const isSessionContinuation = session.is_same_day_continuation && session.prev_session_id;
 
       if (isSessionContinuation) {
-        // Session 2+ first seed: sort by previous court (target_court_next), pt% tiebreaker
+        // Session 2+ first seed: sort only by target_court_next from the previous round.
+        // winPct is zeroed out so it has no influence — the court assignment was already
+        // decided by pool finish and we don't want to re-rank within the same target court.
         positions = seedByCourtOrder(
           checkedIn.map((p) => ({
             id: p.player_id,
             courtNumber: p.target_court_next ?? 999,
-            winPct: p.win_pct,
+            winPct: 0,
           })),
           session.num_courts
         );
