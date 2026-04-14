@@ -138,10 +138,12 @@ export async function POST(
 
       notify({
         profileId: result.bumped_player_id,
-        type: "waitlist_promoted",
+        type: "bumped_to_waitlist",
         title: "Moved to waitlist",
-        body: `A group admin has signed up for ${gName} on ${evDate ? formatDate(evDate) : "the upcoming date"} and your spot has been moved to the waitlist. You'll be notified if a spot opens up.`,
+        body: `A group admin signed up for ${gName} on ${evDate ? formatDate(evDate) : "the upcoming date"} using a priority spot — your confirmed registration has moved to the waitlist. You'll be notified if a spot opens up.`,
         link: `/sheets/${sheetId}`,
+        emailTemplate: "BumpedToWaitlist",
+        emailData: { groupName: gName, eventDate: evDate, sheetId },
       }).catch((err) => console.error("Bump notify failed:", err));
     }
 

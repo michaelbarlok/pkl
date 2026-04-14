@@ -28,6 +28,7 @@ export type NotificationType =
   | "sheet_updated"
   | "sheet_cancelled"
   | "waitlist_promoted"
+  | "bumped_to_waitlist"
   | "withdraw_closing"
   | "session_starting"
   | "pool_assigned"

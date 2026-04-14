@@ -139,7 +139,7 @@ export async function getMyRegistration(
 
   if (!profile) return null;
 
-  // Check as player or partner
+  // Check as player or partner — maybeSingle() treats zero rows as null (not an error)
   const { data } = await supabase
     .from("tournament_registrations")
     .select("*")
@@ -147,7 +147,7 @@ export async function getMyRegistration(
     .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
     .neq("status", "withdrawn")
     .limit(1)
-    .single();
+    .maybeSingle();
 
   return data as unknown as TournamentRegistration | null;
 }
