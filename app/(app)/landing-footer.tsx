@@ -55,15 +55,33 @@ export function LandingFooter() {
                   info@tristarpickleball.com
                 </a>
               </li>
+              <li>
+                <Link href="/privacy" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-10 border-t border-surface-border/50 pt-6">
-          <p className="text-xs text-dark-400 text-center">
+        <div className="mt-10 border-t border-surface-border/50 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-dark-400">
             &copy; {new Date().getFullYear()} Tri-Star Pickleball. All rights reserved.
           </p>
+          <div className="flex items-center gap-4">
+            <Link href="/privacy" className="text-xs text-dark-400 hover:text-dark-200 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="text-xs text-dark-400 hover:text-dark-200 transition-colors">
+              Terms of Service
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
