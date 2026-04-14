@@ -28,11 +28,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // maybeSingle() treats zero rows as { data: null, error: null } — correct
+  // for a new user who has no profile yet. single() would log PGRST116.
   let { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   // Profile missing — auto-create it (Google OAuth users who skip /api/register)
   if (!profile) {

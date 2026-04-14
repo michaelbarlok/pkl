@@ -75,7 +75,12 @@ function RegisterForm() {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: confirmUrl },
+      options: {
+        emailRedirectTo: confirmUrl,
+        // Store full_name in user_metadata so the layout's fallback profile
+        // creation uses the correct name if /api/register ever fails to run.
+        data: { full_name: fullName },
+      },
     });
 
     if (authError) {
