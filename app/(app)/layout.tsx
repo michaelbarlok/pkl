@@ -43,6 +43,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       user.email?.split("@")[0] ||
       "Player";
 
+    const avatarUrl =
+      user.user_metadata?.avatar_url ||
+      user.user_metadata?.picture ||
+      null;
+
     const { data: created } = await serviceClient
       .from("profiles")
       .upsert(
@@ -54,6 +59,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           role: "player",
           member_since: new Date().toISOString(),
           preferred_notify: ["email"],
+          ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
         },
         { onConflict: "user_id" }
       )
