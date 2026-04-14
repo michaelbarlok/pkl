@@ -762,7 +762,7 @@ export default function AdminSessionDetailPage() {
                 >
                   {match.result ? (
                     <>
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium text-surface-muted">G{match.gameNumber}</span>
                         {editingScore !== match.result.id ? (
                           <div className="flex items-center gap-2">
@@ -817,13 +817,23 @@ export default function AdminSessionDetailPage() {
                           </div>
                         )}
                       </div>
-                      <div className="text-sm text-dark-100">
-                        {match.team1.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
-                      </div>
-                      <div className="text-xs text-surface-muted my-0.5">vs</div>
-                      <div className="text-sm text-dark-100">
-                        {match.team2.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
-                      </div>
+                      {(() => {
+                        const team1Won = match.result.scoreA > match.result.scoreB;
+                        const team2Won = match.result.scoreB > match.result.scoreA;
+                        return (
+                          <>
+                            <div className={`text-sm rounded px-2 py-0.5 -mx-2 ${team1Won ? "bg-teal-900/30 text-teal-300 font-semibold" : "text-dark-200"}`}>
+                              {team1Won && <span className="mr-1">✓</span>}
+                              {match.team1.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
+                            </div>
+                            <div className="text-xs text-surface-muted my-0.5 pl-2">vs</div>
+                            <div className={`text-sm rounded px-2 py-0.5 -mx-2 ${team2Won ? "bg-teal-900/30 text-teal-300 font-semibold" : "text-dark-200"}`}>
+                              {team2Won && <span className="mr-1">✓</span>}
+                              {match.team2.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </>
                   ) : (
                     <>
