@@ -3,7 +3,8 @@ import { isTestUser } from "@/lib/utils";
 
 export async function sendInviteEmail(
   email: string,
-  displayName: string
+  displayName: string,
+  message?: string
 ): Promise<void> {
   if (isTestUser(email, displayName)) return;
   const apiKey = process.env.RESEND_API_KEY;
@@ -16,6 +17,6 @@ export async function sendInviteEmail(
     from: "Tri-Star Pickleball <info@tristarpickleball.com>",
     to: email,
     subject: "Your Tri-Star Pickleball account is ready to set up",
-    react: MemberInvite({ displayName }),
+    react: MemberInvite({ displayName, message }),
   });
 }

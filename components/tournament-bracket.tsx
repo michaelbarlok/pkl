@@ -104,7 +104,7 @@ function EliminationBracketView({
                       </svg>
                     </div>
                   )}
-                  <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 185 }}>
+                  <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
                     <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                       {getRoundLabel(roundMatches.length, isLast)}
                     </p>
@@ -151,7 +151,7 @@ function EliminationBracketView({
                           </svg>
                         </div>
                       )}
-                      <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 185 }}>
+                      <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
                         <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                           {isLast ? "LB Final" : `LB Round ${roundIdx + 1}`}
                         </p>
@@ -422,7 +422,7 @@ function RoundRobinView({
 
       {/* Desktop two-column layout when playoffs exist; stacked otherwise */}
       {hasPlayoffs ? (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] lg:gap-8 lg:items-start">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,480px)] lg:gap-8 lg:items-start">
           {/* Left / top: pool play */}
           <div className="space-y-6 mb-6 lg:mb-0">{poolPlayoffContent}</div>
           {/* Right / bottom: playoff bracket — sticky sidebar on desktop */}
@@ -569,7 +569,7 @@ function PlayoffBracketView({
                     </svg>
                   </div>
                 )}
-              <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 185 }}>
+              <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
                 <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                   {roundLabels(round)}
                 </p>
@@ -901,13 +901,13 @@ function MatchCard({
                   <tbody>
                     {/* Player 1 row */}
                     <tr>
-                      <td className={`pr-2 text-sm truncate max-w-[120px] lg:max-w-[200px] ${p1MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                      <td className={`pr-2 text-sm break-words leading-snug min-w-0 w-full ${p1MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
                         {p1Name}
                       </td>
                       {match.score1.map((s1Val, i) => {
                         const won = s1Val > (match.score2[i] ?? 0);
                         return (
-                          <td key={i} className={`text-center px-1.5 font-mono ${won ? "text-teal-300 font-semibold" : "text-dark-200"}`}>
+                          <td key={i} className={`text-center px-1.5 font-mono whitespace-nowrap ${won ? "text-teal-300 font-semibold" : "text-dark-200"}`}>
                             {s1Val}
                           </td>
                         );
@@ -915,7 +915,7 @@ function MatchCard({
                     </tr>
                     {/* Player 2 row */}
                     <tr>
-                      <td className={`pr-2 text-sm truncate max-w-[120px] lg:max-w-[200px] ${p2MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                      <td className={`pr-2 text-sm break-words leading-snug min-w-0 w-full ${p2MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
                         {p2Name}
                       </td>
                       {match.score2.map((s2Val, i) => {
@@ -944,12 +944,12 @@ function MatchCard({
           <>
             {/* Player 1 row */}
             <div className={`flex items-center justify-between gap-2 px-3 py-2 ${p1Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-              <span className={`text-sm truncate ${p1Won ? "font-semibold text-teal-300" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
+              <span className={`text-sm min-w-0 break-words leading-snug ${p1Won ? "font-semibold text-teal-300" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
                 {p1Won && <span className="mr-1 text-teal-400">✓</span>}
                 {p1Name}
               </span>
               {isCompleted && match.score1.length > 0 && (
-                <span className={`font-mono text-sm font-semibold shrink-0 ${p1Won ? "text-teal-300" : "text-dark-300"}`}>
+                <span className={`font-mono text-sm font-semibold shrink-0 ml-2 ${p1Won ? "text-teal-300" : "text-dark-300"}`}>
                   {match.score1[0]}
                 </span>
               )}
@@ -960,12 +960,12 @@ function MatchCard({
 
             {/* Player 2 row */}
             <div className={`flex items-center justify-between gap-2 px-3 py-2 ${p2Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-              <span className={`text-sm truncate ${p2Won ? "font-semibold text-teal-300" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
+              <span className={`text-sm min-w-0 break-words leading-snug ${p2Won ? "font-semibold text-teal-300" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
                 {p2Won && <span className="mr-1 text-teal-400">✓</span>}
                 {p2Name}
               </span>
               {isCompleted && match.score2.length > 0 && (
-                <span className={`font-mono text-sm font-semibold shrink-0 ${p2Won ? "text-teal-300" : "text-dark-300"}`}>
+                <span className={`font-mono text-sm font-semibold shrink-0 ml-2 ${p2Won ? "text-teal-300" : "text-dark-300"}`}>
                   {match.score2[0]}
                 </span>
               )}

@@ -28,15 +28,19 @@ export async function GET(request: NextRequest) {
           user.email?.split("@")[0] ||
           "Player";
 
-        await serviceClient.from("profiles").insert({
-          user_id: user.id,
-          full_name: fullName,
-          display_name: fullName,
-          email: user.email ?? "",
-          role: "player",
-          member_since: new Date().toISOString(),
-          preferred_notify: ["email"],
-        });
+        // Use upsert so concurrent requests don't cause a duplicate-key error
+        await serviceClient.from("profiles").upsert(
+          {
+            user_id: user.id,
+            full_name: fullName,
+            display_name: fullName,
+            email: user.email ?? "",
+            role: "player",
+            member_since: new Date().toISOString(),
+            preferred_notify: ["email"],
+          },
+          { onConflict: "user_id", ignoreDuplicates: true }
+        );
       }
 
       return NextResponse.redirect(new URL(next, request.url));
