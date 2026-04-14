@@ -13,16 +13,41 @@ export async function POST(
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
 
-    // Find the registration
-    const { data: registration, error: regError } = await auth.supabase
-      .from("registrations")
-      .select("id, status")
-      .eq("sheet_id", sheetId)
-      .eq("player_id", auth.profile.id)
-      .in("status", ["confirmed", "waitlist"])
-      .single();
+    // Admins can remove any player by passing registration_id in the body.
+    // Regular users can only withdraw themselves (no body needed).
+    let registrationId: string | null = null;
+    try {
+      const body = await request.json();
+      registrationId = body?.registration_id ?? null;
+    } catch {
+      // No body — self-withdrawal
+    }
 
-    if (regError || !registration) {
+    let registration: { id: string; status: string } | null = null;
+
+    if (registrationId && auth.profile.role === "admin") {
+      // Admin removing a specific player by registration id
+      const { data: reg } = await auth.supabase
+        .from("registrations")
+        .select("id, status")
+        .eq("id", registrationId)
+        .eq("sheet_id", sheetId)
+        .in("status", ["confirmed", "waitlist"])
+        .single();
+      registration = reg ?? null;
+    } else {
+      // Self-withdrawal: find the caller's own registration
+      const { data: reg } = await auth.supabase
+        .from("registrations")
+        .select("id, status")
+        .eq("sheet_id", sheetId)
+        .eq("player_id", auth.profile.id)
+        .in("status", ["confirmed", "waitlist"])
+        .single();
+      registration = reg ?? null;
+    }
+
+    if (!registration) {
       return NextResponse.json(
         { error: "Registration not found" },
         { status: 404 }
