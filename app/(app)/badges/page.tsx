@@ -4,6 +4,7 @@ import { getAllBadgeDefinitions, getPlayerBadges, getBadgeLeaderboard } from "@/
 import type { BadgeCategory, BadgeDefinition } from "@/types/database";
 import type { PlayerBadgeWithDefinition } from "@/lib/queries/badges";
 import Link from "next/link";
+import { SyncBadgesButton } from "./sync-button";
 
 const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   play: "Play Milestones",
@@ -72,23 +73,26 @@ export default async function BadgesPage() {
       {/* Progress summary */}
       {profile && (
         <div className="card">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <p className="text-sm text-surface-muted">Your Progress</p>
               <p className="mt-1 text-2xl font-bold text-dark-100">
                 {earnedCount} / {totalCount}
               </p>
             </div>
-            <div className="w-48">
-              <div className="h-3 rounded-full bg-surface-overlay overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-brand-500 transition-all"
-                  style={{ width: `${totalCount > 0 ? (earnedCount / totalCount) * 100 : 0}%` }}
-                />
+            <div className="flex flex-col items-end gap-2">
+              <div className="w-48">
+                <div className="h-3 rounded-full bg-surface-overlay overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-brand-500 transition-all"
+                    style={{ width: `${totalCount > 0 ? (earnedCount / totalCount) * 100 : 0}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-surface-muted text-right">
+                  {totalCount > 0 ? Math.round((earnedCount / totalCount) * 100) : 0}% complete
+                </p>
               </div>
-              <p className="mt-1 text-xs text-surface-muted text-right">
-                {totalCount > 0 ? Math.round((earnedCount / totalCount) * 100) : 0}% complete
-              </p>
+              <SyncBadgesButton />
             </div>
           </div>
         </div>
