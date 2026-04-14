@@ -422,11 +422,11 @@ function RoundRobinView({
 
       {/* Desktop two-column layout when playoffs exist; stacked otherwise */}
       {hasPlayoffs ? (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,480px)] lg:gap-8 lg:items-start">
-          {/* Left / top: pool play */}
-          <div className="space-y-6 mb-6 lg:mb-0">{poolPlayoffContent}</div>
-          {/* Right / bottom: playoff bracket — sticky sidebar on desktop */}
-          <div className="lg:sticky lg:top-6">{playoffBracketView}</div>
+        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,480px)] lg:gap-8 lg:items-start">
+          {/* Pool play — below playoff on mobile, left column on desktop */}
+          <div className="order-2 lg:order-1 space-y-6 mt-6 lg:mt-0">{poolPlayoffContent}</div>
+          {/* Playoff bracket — above pool play on mobile, sticky right sidebar on desktop */}
+          <div className="order-1 lg:order-2 lg:sticky lg:top-6">{playoffBracketView}</div>
         </div>
       ) : (
         <div className="space-y-6">{poolPlayoffContent}</div>
@@ -553,60 +553,48 @@ function PlayoffBracketView({
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider">Playoffs</h3>
-      <div className="relative sm:overflow-x-auto">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:min-w-max lg:min-w-0 lg:w-full sm:pb-4">
-          {rounds.map((round, roundIdx) => {
-            const roundMatches = matches
-              .filter((m) => m.round === round)
-              .sort((a, b) => a.match_number - b.match_number);
+      <div className="flex flex-col gap-4">
+        {rounds.map((round) => {
+          const roundMatches = matches
+            .filter((m) => m.round === round)
+            .sort((a, b) => a.match_number - b.match_number);
 
-            return (
-              <Fragment key={round}>
-                {roundIdx > 0 && (
-                  <div className="hidden sm:flex items-center px-1 pt-6 shrink-0 text-surface-border">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                    </svg>
+          return (
+            <div key={round} className="flex flex-col gap-3">
+              <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
+                {roundLabels(round)}
+              </p>
+              {roundMatches.map((match) => {
+                const isThirdPlace = round === maxRound && match.match_number === 2;
+                const isChampionship = round === maxRound && match.match_number === 1;
+                const isBestOf3 = isChampionship && !!finalsBestOf3;
+                const gameInfoText = scoreToWin
+                  ? `Game to ${scoreToWin}${isBestOf3 ? " (Best 2 of 3)" : ""}`
+                  : (isBestOf3 ? "Best 2 of 3" : undefined);
+                return (
+                  <div key={match.id}>
+                    {isThirdPlace && (
+                      <p className="text-xs text-surface-muted mb-1 text-center">3rd Place</p>
+                    )}
+                    {isChampionship && (
+                      <p className="text-xs text-surface-muted mb-1 text-center">
+                        Championship{isBestOf3 ? " (Best 2 of 3)" : ""}
+                      </p>
+                    )}
+                    <MatchCard
+                      match={match}
+                      canManage={canManage}
+                      tournamentId={tournamentId}
+                      gameInfo={gameInfoText ?? (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
+                      partnerMap={partnerMap}
+                      bestOf3={isBestOf3}
+                    />
                   </div>
-                )}
-              <div className="flex flex-col gap-3 w-full sm:w-auto sm:shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
-                <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
-                  {roundLabels(round)}
-                </p>
-                {roundMatches.map((match) => {
-                  const isThirdPlace = round === maxRound && match.match_number === 2;
-                  const isChampionship = round === maxRound && match.match_number === 1;
-                  const isBestOf3 = isChampionship && !!finalsBestOf3;
-                  const gameInfoText = scoreToWin
-                    ? `Game to ${scoreToWin}${isBestOf3 ? " (Best 2 of 3)" : ""}`
-                    : (isBestOf3 ? "Best 2 of 3" : undefined);
-                  return (
-                    <div key={match.id}>
-                      {isThirdPlace && (
-                        <p className="text-xs text-surface-muted mb-1 text-center">3rd Place</p>
-                      )}
-                      {isChampionship && (
-                        <p className="text-xs text-surface-muted mb-1 text-center">
-                          Championship{isBestOf3 ? " (Best 2 of 3)" : ""}
-                        </p>
-                      )}
-                      <MatchCard
-                        match={match}
-                        canManage={canManage}
-                        tournamentId={tournamentId}
-                        gameInfo={gameInfoText ?? (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
-                        partnerMap={partnerMap}
-                        bestOf3={isBestOf3}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              </Fragment>
-            );
-          })}
-        </div>
-        <div className="hidden sm:block lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
