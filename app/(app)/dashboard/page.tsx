@@ -292,6 +292,16 @@ export default async function DashboardPage() {
           />
         )}
       </section>
+
+      {/* Footer */}
+      <footer className="pt-4 border-t border-surface-border flex items-center gap-4">
+        <Link href="/privacy" className="text-xs text-surface-muted hover:text-dark-200 transition-colors">
+          Privacy Policy
+        </Link>
+        <Link href="/terms" className="text-xs text-surface-muted hover:text-dark-200 transition-colors">
+          Terms of Service
+        </Link>
+      </footer>
     </div>
   );
 }
