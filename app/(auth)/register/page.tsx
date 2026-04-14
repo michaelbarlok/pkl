@@ -28,10 +28,29 @@ function RegisterForm() {
   const [registered, setRegistered] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [nameTouched, setNameTouched] = useState(false);
+  const [invitePrefilled, setInvitePrefilled] = useState(false);
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const showEmailError = emailTouched && email.length > 0 && !emailValid;
   const showNameError = nameTouched && fullName.trim().length === 0;
+
+  // Pre-fill from pending invite when a valid email is entered
+  async function handleEmailBlur() {
+    setEmailTouched(true);
+    if (!emailValid || invitePrefilled) return;
+    try {
+      const res = await fetch(`/api/pending-invite?email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.found && data.displayName && !fullName.trim()) {
+          setFullName(data.displayName);
+          setInvitePrefilled(true);
+        }
+      }
+    } catch {
+      // silently ignore — pre-fill is best-effort
+    }
+  }
 
   const hasMinLength = password.length >= 8;
   const hasLetter = /[a-zA-Z]/.test(password);
@@ -187,8 +206,8 @@ function RegisterForm() {
             type="email"
             autoComplete="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => setEmailTouched(true)}
+            onChange={(e) => { setEmail(e.target.value); setInvitePrefilled(false); }}
+            onBlur={handleEmailBlur}
             className={`input ${showEmailError ? "input-error" : emailTouched && emailValid ? "input-success" : ""}`}
             required
           />

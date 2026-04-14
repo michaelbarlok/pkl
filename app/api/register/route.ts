@@ -1,6 +1,37 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * Look up a pending invite by email and return any extra profile fields to apply.
+ * Marks the invite as used so it won't be reused.
+ */
+async function consumePendingInvite(
+  serviceClient: Awaited<ReturnType<typeof createServiceClient>>,
+  email: string
+): Promise<{ phone?: string; skill_level?: number } | null> {
+  const { data } = await serviceClient
+    .from("pending_invites")
+    .select("id, phone, skill_level")
+    .ilike("email", email)
+    .is("used_at", null)
+    .order("invited_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  // Mark as used
+  await serviceClient
+    .from("pending_invites")
+    .update({ used_at: new Date().toISOString() })
+    .eq("id", data.id);
+
+  return {
+    phone: data.phone ?? undefined,
+    skill_level: data.skill_level ?? undefined,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -41,6 +72,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ profile: existing }, { status: 200 });
     }
 
+    // Check for pending invite to pre-populate profile fields
+    const pendingData = await consumePendingInvite(serviceClient, email);
+
     const { data: profile, error: profileError } = await serviceClient
       .from("profiles")
       .insert({
@@ -51,6 +85,8 @@ export async function POST(request: NextRequest) {
         role: "player",
         member_since: new Date().toISOString(),
         preferred_notify: ["email"],
+        ...(pendingData?.phone ? { phone: pendingData.phone } : {}),
+        ...(pendingData?.skill_level != null ? { skill_level: pendingData.skill_level } : {}),
       })
       .select("*")
       .single();

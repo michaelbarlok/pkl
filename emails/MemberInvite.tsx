@@ -3,9 +3,10 @@ import BaseEmail from "./BaseEmail";
 
 interface Props {
   displayName?: string;
+  message?: string;
 }
 
-export default function MemberInvite({ displayName }: Props) {
+export default function MemberInvite({ displayName, message }: Props) {
   return (
     <BaseEmail preview="Set up your Tri-Star Pickleball account" heading="Welcome to Tri-Star Pickleball">
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
@@ -15,6 +16,11 @@ export default function MemberInvite({ displayName }: Props) {
         A Tri-Star Pickleball account has been created for you. Click below to
         complete your registration and join the league.
       </Text>
+      {message && (
+        <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px", borderLeft: "3px solid #0ea5a0", paddingLeft: "12px", marginTop: "8px" }}>
+          {message}
+        </Text>
+      )}
       <Button
         href={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/register`}
         style={{
