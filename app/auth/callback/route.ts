@@ -16,11 +16,12 @@ export async function GET(request: NextRequest) {
 
       // Ensure a profile exists — Google OAuth users skip /api/register
       const serviceClient = await createServiceClient();
+      // maybeSingle: zero rows is expected for a first-time OAuth user, not an error
       const { data: existing } = await serviceClient
         .from("profiles")
         .select("id")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!existing) {
         const fullName =

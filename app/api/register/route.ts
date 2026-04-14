@@ -62,12 +62,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if profile already exists
+    // Check if profile already exists (maybeSingle: zero rows is expected, not an error)
     const { data: existing } = await serviceClient
       .from("profiles")
       .select("id")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       return NextResponse.json({ profile: existing }, { status: 200 });
