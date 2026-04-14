@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { sendWelcomeEmail } from "@/lib/send-welcome-email";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -97,6 +98,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Send welcome email in the background (don't block the response)
+    sendWelcomeEmail(email, fullName).catch(() => {});
 
     return NextResponse.json({ profile }, { status: 201 });
   } catch (err) {
