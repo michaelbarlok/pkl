@@ -69,11 +69,11 @@
 @layer components {
   /* ── Buttons ── */
   .btn-base {
-    @apply inline-flex items-center justify-center rounded-lg font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-lg font-semibold transition-[background-color,box-shadow,color,border-color,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
-    @apply btn-base bg-brand-500 px-3.5 py-2 text-sm text-white hover:bg-brand-400 focus-visible:outline-brand-500;
+    @apply btn-base bg-brand-500 px-3.5 py-2 text-sm text-white hover:bg-brand-400 focus-visible:outline-brand-500 hover:shadow-[0_0_14px_rgba(14,165,160,0.40)];
   }
 
   .btn-accent {
@@ -112,7 +112,7 @@
 
   /* ── Cards ── */
   .card {
-    @apply rounded-xl bg-surface-raised p-4 ring-1 ring-surface-border;
+    @apply rounded-xl bg-surface-raised p-4 ring-1 ring-surface-border transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20 hover:ring-brand-500/30;
   }
 
   /* Left-border accent variants — add alongside .card to indicate status */
@@ -128,19 +128,19 @@
   }
 
   .badge-green {
-    @apply badge bg-teal-900/60 text-teal-300;
+    @apply badge bg-teal-900/80 text-teal-200;
   }
 
   .badge-yellow {
-    @apply badge bg-accent-900/60 text-accent-300;
+    @apply badge bg-accent-900/80 text-accent-200;
   }
 
   .badge-red {
-    @apply badge bg-red-900/60 text-red-300;
+    @apply badge bg-red-900/80 text-red-200;
   }
 
   .badge-blue {
-    @apply badge bg-brand-900/60 text-brand-300;
+    @apply badge bg-brand-900/80 text-brand-200;
   }
 
   .badge-gray {
