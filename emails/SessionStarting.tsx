@@ -1,32 +1,57 @@
-import { Text } from "@react-email/components";
+import { Button, Link, Text } from "@react-email/components";
 import BaseEmail from "./BaseEmail";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatTime } from "@/lib/utils";
 
 interface Props {
   groupName?: string;
   eventDate?: string;
-  location?: string;
+  eventTime?: string;
+  sheetId?: string;
 }
 
-export default function SessionStarting({ groupName, eventDate, location }: Props) {
+export default function SessionStarting({ groupName, eventDate, eventTime, sheetId }: Props) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
   return (
-    <BaseEmail preview="Session starting soon!" heading="Session Starting">
+    <BaseEmail preview="You're signed up for tomorrow's session" heading="Session Tomorrow!">
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
-        The <strong>{groupName ?? "pickleball"}</strong> session is about to begin!
+        Just a reminder — you&apos;re confirmed for <strong>{groupName ?? "the event"}</strong>
+        {eventDate ? ` on ${formatDate(eventDate)}` : " tomorrow"}
+        {eventTime ? ` at ${formatTime(eventTime)}` : ""}.
       </Text>
-      {eventDate && (
-        <Text style={{ color: "#374151", fontSize: "14px" }}>
-          Date: {formatDate(eventDate)}
-        </Text>
-      )}
-      {location && (
-        <Text style={{ color: "#374151", fontSize: "14px" }}>
-          Location: {location}
-        </Text>
-      )}
-      <Text style={{ color: "#6b7280", fontSize: "14px", marginTop: "12px" }}>
-        Please arrive on time for check-in. Courts will be assigned shortly after check-in closes.
+      <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
+        If something came up and you can&apos;t make it, please withdraw as soon as possible
+        so another player can take your spot.
+      </Text>
+      <Button
+        href={sheetId ? `${appUrl}/sheets/${sheetId}` : "#"}
+        style={buttonStyle}
+      >
+        View Event
+      </Button>
+      <Text style={{ color: "#6b7280", fontSize: "13px", marginTop: "20px" }}>
+        Have questions?{" "}
+        <Link href={sheetId ? `${appUrl}/sheets/${sheetId}` : "#"} style={linkStyle}>
+          Contact Group Admins
+        </Link>
       </Text>
     </BaseEmail>
   );
 }
+
+const buttonStyle = {
+  backgroundColor: "#14b8a6",
+  borderRadius: "6px",
+  color: "#ffffff",
+  fontSize: "14px",
+  fontWeight: "600" as const,
+  padding: "12px 24px",
+  textDecoration: "none" as const,
+  display: "inline-block" as const,
+  marginTop: "16px",
+};
+
+const linkStyle = {
+  color: "#14b8a6",
+  textDecoration: "underline" as const,
+};
