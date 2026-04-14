@@ -1,8 +1,8 @@
 "use client";
 
 import { useSupabase } from "@/components/providers/supabase-provider";
-import { distributeCourts, seedSession1, seedByCourtOrder } from "@/lib/shootout-engine";
-import type { RankedPlayer } from "@/lib/shootout-engine";
+import { distributeCourts, seedSession1, seedSameDaySession } from "@/lib/shootout-engine";
+import type { RankedPlayer, SeedablePlayer } from "@/lib/shootout-engine";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -182,17 +182,21 @@ export default function CheckInPage() {
       const isSessionContinuation = session.is_same_day_continuation && session.prev_session_id;
 
       if (isSessionContinuation) {
-        // Session 2+ first seed: sort only by target_court_next from the previous round.
-        // winPct is zeroed out so it has no influence — the court assignment was already
-        // decided by pool finish and we don't want to re-rank within the same target court.
-        positions = seedByCourtOrder(
-          checkedIn.map((p) => ({
-            id: p.player_id,
-            courtNumber: p.target_court_next ?? 999,
-            winPct: 0,
-          })),
-          session.num_courts
-        );
+        // Session 2+ seeding: players who finished the previous round are anchored
+        // to their target_court_next. Players added fresh (no target court — e.g.
+        // a waitlist member subbing in) are sorted by the standard ranking sheet
+        // order (Step → Pt% → Last Played → Sessions) and slotted into available
+        // court space. seedSameDaySession handles the mixed case correctly.
+        const seedablePlayers: SeedablePlayer[] = checkedIn.map((p) => ({
+          id: p.player_id,
+          currentStep: p.current_step,
+          winPct: p.win_pct,
+          lastPlayedAt: p.last_played_at,
+          totalSessions: p.total_sessions,
+          targetCourtNext: p.target_court_next,
+          seedSource: p.target_court_next != null ? "previous_court" : "ranking_sheet",
+        }));
+        positions = seedSameDaySession(seedablePlayers, session.num_courts);
       } else {
         // Standard ranking sheet sort: Step ASC → Pt% DESC → Last Played → Sessions
         const rankedPlayers: RankedPlayer[] = checkedIn.map((p) => ({
