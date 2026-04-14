@@ -215,8 +215,16 @@ export async function POST(
       .eq("player_id", p.player_id);
   }
 
-  // Call the existing RPC to update steps and target courts
-  await auth.supabase.rpc("update_steps_on_round_complete", { p_session_id: sessionId });
+  // Update steps in group_memberships and target courts for next session
+  const { error: rpcError } = await auth.supabase.rpc("update_steps_on_round_complete", {
+    p_session_id: sessionId,
+  });
+  if (rpcError) {
+    return NextResponse.json(
+      { error: `Failed to update player steps: ${rpcError.message}` },
+      { status: 500 }
+    );
+  }
 
   // Advance session status
   await auth.supabase
