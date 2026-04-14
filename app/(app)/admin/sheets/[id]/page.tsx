@@ -224,24 +224,16 @@ export default function AdminSheetDetailPage() {
   async function handleAddPlayer(playerId: string) {
     setError(null);
     try {
-      const status =
-        confirmed.length < playerLimit ? "confirmed" : "waitlist";
-      const waitlistPosition =
-        status === "waitlist" ? waitlisted.length + 1 : null;
-
-      const { error: insertErr } = await supabase
-        .from("registrations")
-        .insert({
-          sheet_id: sheetId,
-          player_id: playerId,
-          status,
-          waitlist_position: waitlistPosition,
-          registered_by: (
-            await supabase.auth.getUser()
-          ).data.user?.id,
-        });
-
-      if (insertErr) throw insertErr;
+      // Route through the signup API so safe_signup_for_sheet is used:
+      // this handles atomic capacity checks, high-priority bumping, and
+      // correct waitlist position assignment.
+      const res = await fetch(`/api/sheets/${sheetId}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player_id: playerId, priority: "high" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to add player");
       setSearchQuery("");
       setSearchResults([]);
       await fetchData();
@@ -261,12 +253,14 @@ export default function AdminSheetDetailPage() {
     });
     if (!ok) return;
     try {
-      const { error: delErr } = await supabase
-        .from("registrations")
-        .update({ status: "withdrawn" })
-        .eq("id", registrationId);
-
-      if (delErr) throw delErr;
+      // Route through the withdraw API so waitlist promotion fires correctly.
+      const res = await fetch(`/api/sheets/${sheetId}/withdraw`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registration_id: registrationId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to remove player");
       await fetchData();
     } catch (err: unknown) {
       const message =
