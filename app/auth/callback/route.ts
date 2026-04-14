@@ -1,4 +1,5 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { sendWelcomeEmail } from "@/lib/send-welcome-email";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -47,6 +48,9 @@ export async function GET(request: NextRequest) {
           },
           { onConflict: "user_id", ignoreDuplicates: true }
         );
+
+        // Send welcome email to new Google OAuth users
+        sendWelcomeEmail(user.email ?? "", fullName).catch(() => {});
       }
 
       return NextResponse.redirect(new URL(next, request.url));

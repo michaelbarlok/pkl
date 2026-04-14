@@ -87,8 +87,8 @@ function EliminationBracketView({
         <h3 className="text-sm font-semibold text-dark-200 mb-2 uppercase tracking-wider">
           {format === "double_elimination" ? "Winners Bracket" : "Bracket"}
         </h3>
-        <div className="relative overflow-x-auto">
-          <div className="flex items-start min-w-max lg:min-w-0 lg:w-full pb-4">
+        <div className="relative sm:overflow-x-auto">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:min-w-max lg:min-w-0 lg:w-full sm:pb-4">
             {Array.from({ length: winnersRounds }, (_, i) => i + 1).map((round, roundIdx) => {
               const roundMatches = winnersMatches
                 .filter((m) => m.round === round)
@@ -98,13 +98,13 @@ function EliminationBracketView({
               return (
                 <Fragment key={round}>
                   {roundIdx > 0 && (
-                    <div className="flex items-center px-1 pt-6 shrink-0 text-surface-border">
+                    <div className="hidden sm:flex items-center px-1 pt-6 shrink-0 text-surface-border">
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                       </svg>
                     </div>
                   )}
-                  <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
+                  <div className="flex flex-col gap-3 w-full sm:w-auto sm:shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
                     <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                       {getRoundLabel(roundMatches.length, isLast)}
                     </p>
@@ -122,7 +122,7 @@ function EliminationBracketView({
               );
             })}
           </div>
-          <div className="lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
+          <div className="hidden sm:block lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
         </div>
       </div>
 
@@ -132,8 +132,8 @@ function EliminationBracketView({
           <h3 className="text-sm font-semibold text-dark-200 mb-2 uppercase tracking-wider">
             Losers Bracket
           </h3>
-          <div className="relative overflow-x-auto">
-            <div className="flex items-start min-w-max lg:min-w-0 lg:w-full pb-4">
+          <div className="relative sm:overflow-x-auto">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:min-w-max lg:min-w-0 lg:w-full sm:pb-4">
               {Array.from(new Set(losersMatches.map((m) => m.round)))
                 .sort((a, b) => a - b)
                 .map((round, roundIdx, arr) => {
@@ -145,13 +145,13 @@ function EliminationBracketView({
                   return (
                     <Fragment key={round}>
                       {roundIdx > 0 && (
-                        <div className="flex items-center px-1 pt-6 shrink-0 text-surface-border">
+                        <div className="hidden sm:flex items-center px-1 pt-6 shrink-0 text-surface-border">
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                           </svg>
                         </div>
                       )}
-                      <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
+                      <div className="flex flex-col gap-3 w-full sm:w-auto sm:shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
                         <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                           {isLast ? "LB Final" : `LB Round ${roundIdx + 1}`}
                         </p>
@@ -169,7 +169,7 @@ function EliminationBracketView({
                   );
                 })}
             </div>
-            <div className="lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
+            <div className="hidden sm:block lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
           </div>
         </div>
       )}
@@ -553,8 +553,8 @@ function PlayoffBracketView({
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider">Playoffs</h3>
-      <div className="relative overflow-x-auto">
-        <div className="flex items-start min-w-max lg:min-w-0 lg:w-full pb-4">
+      <div className="relative sm:overflow-x-auto">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:min-w-max lg:min-w-0 lg:w-full sm:pb-4">
           {rounds.map((round, roundIdx) => {
             const roundMatches = matches
               .filter((m) => m.round === round)
@@ -563,13 +563,13 @@ function PlayoffBracketView({
             return (
               <Fragment key={round}>
                 {roundIdx > 0 && (
-                  <div className="flex items-center px-1 pt-6 shrink-0 text-surface-border">
+                  <div className="hidden sm:flex items-center px-1 pt-6 shrink-0 text-surface-border">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
                       <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                     </svg>
                   </div>
                 )}
-              <div className="flex flex-col gap-3 shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
+              <div className="flex flex-col gap-3 w-full sm:w-auto sm:shrink-0 lg:flex-1" style={{ minWidth: 230 }}>
                 <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
                   {roundLabels(round)}
                 </p>
@@ -606,7 +606,7 @@ function PlayoffBracketView({
             );
           })}
         </div>
-        <div className="lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
+        <div className="hidden sm:block lg:hidden absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
       </div>
     </div>
   );
