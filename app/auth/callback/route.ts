@@ -28,6 +28,11 @@ export async function GET(request: NextRequest) {
           user.email?.split("@")[0] ||
           "Player";
 
+        const avatarUrl =
+          user.user_metadata?.avatar_url ||
+          user.user_metadata?.picture ||
+          null;
+
         // Use upsert so concurrent requests don't cause a duplicate-key error
         await serviceClient.from("profiles").upsert(
           {
@@ -38,6 +43,7 @@ export async function GET(request: NextRequest) {
             role: "player",
             member_since: new Date().toISOString(),
             preferred_notify: ["email"],
+            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
           },
           { onConflict: "user_id", ignoreDuplicates: true }
         );
