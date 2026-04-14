@@ -110,18 +110,46 @@ export async function POST(
     waitlistPosition = (waitlistCount ?? 0) + 1;
   }
 
-  const { data: registration, error } = await auth.supabase
+  // Check for a previously withdrawn registration for this player — the UNIQUE
+  // constraint on (tournament_id, player_id) prevents a fresh INSERT in that case.
+  const { data: withdrawn } = await auth.supabase
     .from("tournament_registrations")
-    .insert({
-      tournament_id: tournamentId,
-      player_id: auth.profile.id,
-      partner_id: partner_id || null,
-      division: division || null,
-      status,
-      waitlist_position: waitlistPosition,
-    })
-    .select()
-    .single();
+    .select("id")
+    .eq("tournament_id", tournamentId)
+    .eq("player_id", auth.profile.id)
+    .eq("status", "withdrawn")
+    .maybeSingle();
+
+  let registration, error;
+  if (withdrawn) {
+    // Reuse the existing withdrawn row to avoid the unique-constraint violation
+    ({ data: registration, error } = await auth.supabase
+      .from("tournament_registrations")
+      .update({
+        partner_id: partner_id || null,
+        division: division || null,
+        status,
+        waitlist_position: waitlistPosition,
+        seed: null,
+        registered_at: new Date().toISOString(),
+      })
+      .eq("id", withdrawn.id)
+      .select()
+      .single());
+  } else {
+    ({ data: registration, error } = await auth.supabase
+      .from("tournament_registrations")
+      .insert({
+        tournament_id: tournamentId,
+        player_id: auth.profile.id,
+        partner_id: partner_id || null,
+        division: division || null,
+        status,
+        waitlist_position: waitlistPosition,
+      })
+      .select()
+      .single());
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -250,7 +278,7 @@ async function promoteTournamentWaitlist(
     query = query.eq("division", division);
   }
 
-  const { data: nextWaitlist } = await query.single();
+  const { data: nextWaitlist } = await query.maybeSingle();
 
   if (!nextWaitlist) return;
 
