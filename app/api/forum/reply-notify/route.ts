@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
   const { data: thread } = await auth.supabase
     .from("forum_threads")
-    .select("author_id, title, group_id")
+    .select("author_id, title, group_id, author:profiles!forum_threads_author_id_fkey(notify_forum_replies)")
     .eq("id", threadId)
     .single();
 
@@ -21,6 +21,11 @@ export async function POST(request: NextRequest) {
 
   // Don't notify if the replier is the thread author
   if (auth.profile.id === thread.author_id) {
+    return NextResponse.json({ status: "skipped" });
+  }
+
+  // Respect the author's opt-in preference (default off)
+  if (!(thread.author as any)?.notify_forum_replies) {
     return NextResponse.json({ status: "skipped" });
   }
 

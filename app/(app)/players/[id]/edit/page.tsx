@@ -32,6 +32,7 @@ export default function EditProfilePage() {
   const [usapExpiration, setUsapExpiration] = useState("");
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyPush, setNotifyPush] = useState(false);
+  const [notifyForumReplies, setNotifyForumReplies] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isStandalone, setIsStandalone] = useState(false);
@@ -86,6 +87,7 @@ export default function EditProfilePage() {
       const prefs: string[] = profile.preferred_notify ?? ["email"];
       setNotifyEmail(prefs.includes("email"));
       setNotifyPush(prefs.includes("push"));
+      setNotifyForumReplies(profile.notify_forum_replies ?? false);
       setDuprId(profile.dupr_id ?? "");
       setDuprSingles(profile.dupr_singles_rating?.toString() ?? "");
       setDuprDoubles(profile.dupr_doubles_rating?.toString() ?? "");
@@ -205,6 +207,7 @@ export default function EditProfilePage() {
       home_court: homeCourt.trim() || null,
       skill_level: skillLevel ? parseFloat(skillLevel) : null,
       preferred_notify: preferredNotify,
+      notify_forum_replies: notifyForumReplies,
       dupr_id: duprId.trim() || null,
       dupr_singles_rating: duprSingles ? parseFloat(duprSingles) : null,
       dupr_doubles_rating: duprDoubles ? parseFloat(duprDoubles) : null,
@@ -453,6 +456,25 @@ export default function EditProfilePage() {
               Choose how you want to receive notifications. In-app notifications are always on.
             </p>
             <div className="space-y-3">
+              {/* ── Forum reply notifications ── */}
+              <div className="rounded-lg border border-surface-border bg-surface-overlay/50 px-4 py-3">
+                <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-2">Forum</p>
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={notifyForumReplies}
+                    onChange={(e) => setNotifyForumReplies(e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-dark-100">Reply notifications</span>
+                    <p className="text-xs text-surface-muted">Notify me when someone replies to a thread I posted</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* ── Delivery channels ── */}
+              <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider pt-1">Delivery channels</p>
               <label className="flex items-center gap-3">
                 <input
                   type="checkbox"
