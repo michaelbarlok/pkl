@@ -1,4 +1,4 @@
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { checkAndAwardBadges } from "@/lib/badges";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -71,6 +71,24 @@ export async function POST(
       return NextResponse.json(
         { error: "Win-by-2 rule requires at least 2 point difference" },
         { status: 400 }
+      );
+    }
+  }
+
+  // Enforce court membership: regular players can only submit for their own court
+  const adminAccess = await isGroupAdmin(auth.supabase, auth.profile.id, session.group_id, auth.profile.role);
+  if (!adminAccess) {
+    const { data: myParticipant } = await auth.supabase
+      .from("session_participants")
+      .select("court_number")
+      .eq("session_id", sessionId)
+      .eq("player_id", auth.profile.id)
+      .maybeSingle();
+
+    if (!myParticipant || myParticipant.court_number !== pool_number) {
+      return NextResponse.json(
+        { error: "You can only submit scores for your own court" },
+        { status: 403 }
       );
     }
   }

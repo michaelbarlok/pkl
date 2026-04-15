@@ -49,6 +49,8 @@ export default function ScoreEntryPage() {
   const { id: sessionId } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const gameParam = searchParams.get("game");
+  // Admins can pass ?court=N to enter scores on any court
+  const courtParam = searchParams.get("court");
   const { supabase } = useSupabase();
   const [session, setSession] = useState<any>(null);
   const [players, setPlayers] = useState<PoolPlayer[]>([]);
@@ -105,8 +107,11 @@ export default function ScoreEntryPage() {
     fetchData();
   }, [sessionId, supabase]);
 
-  const courtPlayers = myCourt != null
-    ? players.filter((p) => p.court_number === myCourt)
+  // Use courtParam when supplied (admin entering for a different court)
+  const activeCourt = courtParam != null ? parseInt(courtParam) : myCourt;
+
+  const courtPlayers = activeCourt != null
+    ? players.filter((p) => p.court_number === activeCourt)
     : [];
 
   // Auto-populate teams from game param
@@ -148,7 +153,7 @@ export default function ScoreEntryPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         round_number: session?.current_round || 1,
-        pool_number: myCourt,
+        pool_number: activeCourt,
         team_a_p1: teamAP1,
         team_a_p2: teamAP2 || null,
         team_b_p1: teamBP1,
@@ -178,7 +183,7 @@ export default function ScoreEntryPage() {
         <h1 className="text-2xl font-bold text-dark-100">Enter Score</h1>
         <p className="text-sm text-surface-muted">
           {session.group?.name} — Round {session.current_round || 1}
-          {myCourt && ` — Court ${myCourt}`}
+          {activeCourt != null && ` — Court ${activeCourt}`}
         </p>
       </div>
 
