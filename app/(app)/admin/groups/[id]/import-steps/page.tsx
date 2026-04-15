@@ -104,7 +104,7 @@ interface PreviewRow extends ParsedRow {
 interface RowResult {
   playerName: string;
   displayName?: string;
-  status: "updated" | "added_to_group" | "pending" | "not_found" | "error";
+  status: "already_member" | "added_to_group" | "pending" | "not_found" | "error";
   error?: string;
 }
 
