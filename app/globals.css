@@ -166,7 +166,10 @@
     @apply bg-surface-raised;
   }
   tbody tr {
-    @apply border-surface-border transition-colors hover:bg-surface-overlay/50;
+    @apply border-surface-border transition-colors;
+  }
+  tbody tr:hover {
+    background-color: color-mix(in srgb, var(--color-surface-overlay) 60%, transparent);
   }
 
   /* ── Skeleton loader ── */
