@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import { US_STATES } from "@/lib/us-states";
+import { ConfirmFormButton } from "@/components/confirm-form-button";
 
 export default async function AdminGroupsPage() {
   const supabase = await createClient();
@@ -295,28 +296,26 @@ export default async function AdminGroupsPage() {
                         >
                           Edit
                         </Link>
-                        <form action={toggleActive} className="inline">
-                          <input
-                            type="hidden"
-                            name="groupId"
-                            value={group.id}
+                        {group.is_active ? (
+                          <ConfirmFormButton
+                            action={toggleActive}
+                            hiddenInputs={{ groupId: group.id, currentActive: "true" }}
+                            label="Deactivate"
+                            confirmTitle={`Deactivate "${group.name}"?`}
+                            confirmDescription="Members will no longer be able to access this group until it is reactivated."
+                            confirmLabel="Deactivate"
+                            variant="danger"
+                            className="text-red-400 hover:text-red-500"
                           />
-                          <input
-                            type="hidden"
-                            name="currentActive"
-                            value={String(group.is_active)}
-                          />
-                          <button
-                            type="submit"
-                            className={
-                              group.is_active
-                                ? "text-red-400 hover:text-red-500"
-                                : "text-teal-300 hover:text-green-500"
-                            }
-                          >
-                            {group.is_active ? "Deactivate" : "Activate"}
-                          </button>
-                        </form>
+                        ) : (
+                          <form action={toggleActive} className="inline">
+                            <input type="hidden" name="groupId" value={group.id} />
+                            <input type="hidden" name="currentActive" value="false" />
+                            <button type="submit" className="text-teal-300 hover:text-green-500">
+                              Activate
+                            </button>
+                          </form>
+                        )}
                         <RenameForm groupId={group.id} currentName={group.name} action={renameGroup} />
                       </div>
                     </td>
