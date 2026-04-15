@@ -123,7 +123,7 @@ export default function ImportStepsPage() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<RowResult[] | null>(null);
-  const [summary, setSummary] = useState<{ updated: number; addedToGroup: number; pending: number; errors: number } | null>(null);
+  const [summary, setSummary] = useState<{ alreadyMember: number; addedToGroup: number; pending: number; errors: number } | null>(null);
 
   // Load group members for matching
   useEffect(() => {
@@ -226,7 +226,7 @@ export default function ImportStepsPage() {
         setParseError(data.error ?? "Import failed");
       } else {
         setResults(data.results);
-        setSummary({ updated: data.updated, addedToGroup: data.addedToGroup ?? 0, pending: data.pending ?? 0, errors: data.errors });
+        setSummary({ alreadyMember: data.alreadyMember ?? 0, addedToGroup: data.addedToGroup ?? 0, pending: data.pending ?? 0, errors: data.errors });
         setRows([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -412,10 +412,10 @@ export default function ImportStepsPage() {
           <div className="card border border-surface-border">
             <h2 className="text-base font-semibold text-dark-100 mb-3">Import complete</h2>
             <div className="flex flex-wrap gap-4 text-sm">
-              {summary.updated > 0 && (
+              {summary.alreadyMember > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 text-xs font-bold">{summary.updated}</span>
-                  <span className="text-dark-200">stats updated</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-surface-overlay text-surface-muted text-xs font-bold">{summary.alreadyMember}</span>
+                  <span className="text-dark-200">already a member (skipped)</span>
                 </div>
               )}
               {summary.addedToGroup > 0 && (
@@ -460,10 +460,10 @@ export default function ImportStepsPage() {
                       <td className="px-3 py-2 text-dark-100">{r.playerName}</td>
                       <td className="px-3 py-2 text-dark-200">{r.displayName ?? <span className="text-surface-muted">—</span>}</td>
                       <td className="px-3 py-2">
-                        {r.status === "updated" && (
-                          <span className="inline-flex items-center gap-1 text-teal-400">
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                            Updated
+                        {r.status === "already_member" && (
+                          <span className="inline-flex items-center gap-1 text-surface-muted">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" /></svg>
+                            Already a member — skipped
                           </span>
                         )}
                         {r.status === "added_to_group" && (

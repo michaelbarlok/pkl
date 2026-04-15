@@ -16,7 +16,7 @@ interface RowResult {
   playerName: string;
   profileId?: string;
   displayName?: string;
-  status: "updated" | "added_to_group" | "pending" | "not_found" | "error";
+  status: "already_member" | "added_to_group" | "pending" | "not_found" | "error";
   error?: string;
 }
 
@@ -112,40 +112,10 @@ export async function POST(
 
       const key = name.toLowerCase();
 
-      // --- Case A: already a group member → update stats ---
+      // --- Case A: already a group member → skip (don't overwrite live stats) ---
       const member = memberMap.get(key);
       if (member) {
-        const update: Record<string, unknown> = {};
-        if (row.step !== undefined && !isNaN(row.step))               update.current_step   = row.step;
-        if (row.winPct !== undefined && !isNaN(row.winPct))           update.win_pct        = row.winPct;
-        if (row.totalSessions !== undefined && !isNaN(row.totalSessions)) update.total_sessions = row.totalSessions;
-        if (row.lastPlayedAt) {
-          const d = new Date(row.lastPlayedAt);
-          if (!isNaN(d.getTime())) update.last_played_at = d.toISOString();
-        }
-        if (row.joinedAt) {
-          const d = new Date(row.joinedAt);
-          if (!isNaN(d.getTime())) update.joined_at = d.toISOString();
-        }
-
-        if (Object.keys(update).length > 0) {
-          const { error: updateError } = await serviceClient
-            .from("group_memberships")
-            .update(update)
-            .eq("group_id", groupId)
-            .eq("player_id", member.playerId);
-
-          if (updateError) {
-            results.push({ playerName: name, displayName: member.displayName, status: "error", error: updateError.message });
-            continue;
-          }
-        }
-
-        if (row.skillLevel !== undefined && !isNaN(row.skillLevel)) {
-          await serviceClient.from("profiles").update({ skill_level: row.skillLevel }).eq("id", member.profileId);
-        }
-
-        results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "updated" });
+        results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "already_member" });
         continue;
       }
 
@@ -213,12 +183,12 @@ export async function POST(
       results.push({ playerName: name, status: "pending" });
     }
 
-    const updated      = results.filter((r) => r.status === "updated").length;
-    const addedToGroup = results.filter((r) => r.status === "added_to_group").length;
-    const pending      = results.filter((r) => r.status === "pending").length;
-    const errors       = results.filter((r) => r.status === "error").length;
+    const alreadyMember = results.filter((r) => r.status === "already_member").length;
+    const addedToGroup  = results.filter((r) => r.status === "added_to_group").length;
+    const pending       = results.filter((r) => r.status === "pending").length;
+    const errors        = results.filter((r) => r.status === "error").length;
 
-    return NextResponse.json({ results, updated, addedToGroup, pending, errors }, { status: 200 });
+    return NextResponse.json({ results, alreadyMember, addedToGroup, pending, errors }, { status: 200 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
