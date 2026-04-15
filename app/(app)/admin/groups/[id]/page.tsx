@@ -49,6 +49,11 @@ export default function AdminGroupDetailPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddPlayer, setShowAddPlayer] = useState(false);
 
+  // Bulk-add state
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkAdding, setBulkAdding] = useState(false);
+
   // ============================================================
   // Data Fetching
   // ============================================================
@@ -126,6 +131,33 @@ export default function AdminGroupDetailPage() {
       setSearchQuery("");
       await fetchData();
     }
+  };
+
+  const addMembersInBulk = async () => {
+    if (bulkSelected.size === 0) return;
+    setBulkAdding(true);
+    const startStep = preferences?.new_player_start_step ?? 5;
+
+    const rows = Array.from(bulkSelected).map((playerId) => ({
+      group_id: id,
+      player_id: playerId,
+      current_step: startStep,
+      win_pct: 0,
+      total_sessions: 0,
+    }));
+
+    const { error } = await supabase.from("group_memberships").insert(rows);
+
+    if (error) {
+      setMessage({ type: "error", text: `Failed to add members: ${error.message}` });
+    } else {
+      setMessage({ type: "success", text: `${bulkSelected.size} member${bulkSelected.size > 1 ? "s" : ""} added.` });
+      setBulkSelected(new Set());
+      setBulkMode(false);
+      setSearchQuery("");
+      await fetchData();
+    }
+    setBulkAdding(false);
   };
 
   const updateStep = async (playerId: string, newStep: number) => {
@@ -399,12 +431,26 @@ export default function AdminGroupDetailPage() {
         <div className="space-y-4">
           {/* Add Member */}
           <div>
-            <div className="flex gap-2 mb-3">
+            <div className="flex flex-wrap gap-2 mb-3">
               <button
-                onClick={() => setShowAddPlayer(!showAddPlayer)}
+                onClick={() => {
+                  setShowAddPlayer(!showAddPlayer);
+                  if (bulkMode) setBulkMode(false);
+                }}
                 className="btn-primary"
               >
                 {showAddPlayer ? "Cancel" : "Add Member"}
+              </button>
+              <button
+                onClick={() => {
+                  setBulkMode(!bulkMode);
+                  if (showAddPlayer) setShowAddPlayer(false);
+                  setBulkSelected(new Set());
+                  setSearchQuery("");
+                }}
+                className="btn-secondary"
+              >
+                {bulkMode ? "Cancel Bulk Add" : "Bulk Add"}
               </button>
               <a
                 href={`/admin/groups/${id}/import-steps`}
@@ -417,6 +463,7 @@ export default function AdminGroupDetailPage() {
               </a>
             </div>
 
+            {/* Single-add panel */}
             {showAddPlayer && (
               <div className="mt-3 card">
                 <input
@@ -470,6 +517,103 @@ export default function AdminGroupDetailPage() {
                     </p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Bulk-add panel */}
+            {bulkMode && (
+              <div className="mt-3 card space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-dark-100">
+                    Select players to add
+                  </p>
+                  {bulkSelected.size > 0 && (
+                    <button
+                      onClick={addMembersInBulk}
+                      disabled={bulkAdding}
+                      className="btn-primary text-sm"
+                    >
+                      {bulkAdding
+                        ? "Adding..."
+                        : `Add ${bulkSelected.size} Player${bulkSelected.size > 1 ? "s" : ""}`}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search players by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input w-full"
+                />
+                <div className="max-h-64 overflow-y-auto space-y-1">
+                  {filteredPlayers.length > 0 ? (
+                    filteredPlayers.map((player) => {
+                      const checked = bulkSelected.has(player.id);
+                      return (
+                        <label
+                          key={player.id}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer transition-colors",
+                            checked ? "bg-brand-900/20" : "hover:bg-surface-overlay"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setBulkSelected((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(player.id)) next.delete(player.id);
+                                else next.add(player.id);
+                                return next;
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 shrink-0"
+                          />
+                          {player.avatar_url ? (
+                            <img
+                              src={player.avatar_url}
+                              alt=""
+                              className="h-8 w-8 rounded-full object-cover shrink-0"
+                            />
+                          ) : (
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted shrink-0">
+                              {player.display_name.charAt(0)}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-dark-100 truncate">
+                              {player.display_name}
+                            </p>
+                            <p className="text-xs text-surface-muted truncate">
+                              {player.email}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })
+                  ) : (
+                    <p className="py-2 text-center text-sm text-surface-muted">
+                      {searchQuery
+                        ? "No matching players found."
+                        : "All active players are already members."}
+                    </p>
+                  )}
+                </div>
+                {bulkSelected.size > 0 && (
+                  <div className="flex justify-end pt-1 border-t border-surface-border">
+                    <button
+                      onClick={addMembersInBulk}
+                      disabled={bulkAdding}
+                      className="btn-primary text-sm"
+                    >
+                      {bulkAdding
+                        ? "Adding..."
+                        : `Add ${bulkSelected.size} Player${bulkSelected.size > 1 ? "s" : ""}`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -61,6 +61,9 @@ export default function ThreadPage() {
   const [myVoteOptionId, setMyVoteOptionId] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
 
+  // Group admin flag
+  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
+
   // Members for mention textarea
   const [members, setMembers] = useState<{ id: string; display_name: string }[]>([]);
 
@@ -74,22 +77,36 @@ export default function ThreadPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-      if (profile) setProfileId(profile.id);
-    }
-
-    // Thread
+    // Thread (fetch first so we have group_id for admin check)
     const { data: t } = await supabase
       .from("forum_threads")
       .select("*, author:profiles(display_name, avatar_url)")
       .eq("id", id)
       .single();
     setThread(t as Thread);
+
+    // Current user profile + admin check
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, role")
+        .eq("user_id", user.id)
+        .single();
+      if (profile) {
+        setProfileId(profile.id);
+        if (profile.role === "admin") {
+          setIsGroupAdmin(true);
+        } else if (t?.group_id) {
+          const { data: membership } = await supabase
+            .from("group_memberships")
+            .select("group_role")
+            .eq("group_id", t.group_id)
+            .eq("player_id", profile.id)
+            .maybeSingle();
+          setIsGroupAdmin(membership?.group_role === "admin");
+        }
+      }
+    }
 
     // Replies
     const { data: r } = await supabase
@@ -180,6 +197,23 @@ export default function ThreadPage() {
         ...data,
       }))
     );
+  }
+
+  async function handleDeleteThread() {
+    if (!thread) return;
+    if (!window.confirm("Delete this thread and all its replies? This cannot be undone.")) return;
+    await supabase
+      .from("forum_threads")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", thread.id);
+    // Navigate back to the forum listing
+    window.location.href = `/groups/${slug}/forum`;
+  }
+
+  async function handleDeleteReply(replyId: string) {
+    if (!window.confirm("Delete this reply?")) return;
+    await supabase.from("forum_replies").delete().eq("id", replyId);
+    setReplies((prev) => prev.filter((r) => r.id !== replyId));
   }
 
   async function handleVote(optionId: string) {
@@ -296,11 +330,24 @@ export default function ThreadPage() {
 
       {/* Thread */}
       <div className="card">
-        <div className="flex items-center gap-2 mb-2">
-          {thread.pinned && (
-            <span className="badge-blue text-xs">Pinned</span>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {thread.pinned && (
+              <span className="badge-blue text-xs">Pinned</span>
+            )}
+            <h1 className="text-xl font-bold text-dark-100">{thread.title}</h1>
+          </div>
+          {isGroupAdmin && (
+            <button
+              onClick={handleDeleteThread}
+              title="Delete thread"
+              className="shrink-0 p-1.5 text-surface-muted hover:text-red-400 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           )}
-          <h1 className="text-xl font-bold text-dark-100">{thread.title}</h1>
         </div>
         <div className="flex items-center gap-2 text-sm text-surface-muted mb-4">
           {thread.author?.avatar_url ? (
@@ -390,25 +437,36 @@ export default function ThreadPage() {
         </h2>
         {replies.map((reply) => (
           <div key={reply.id} className="card">
-            <div className="flex items-center gap-2 text-sm text-surface-muted mb-2">
-              {reply.author?.avatar_url ? (
-                <img
-                  src={reply.author.avatar_url}
-                  alt=""
-                  className="h-5 w-5 rounded-full"
-                />
-              ) : (
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-overlay text-surface-muted text-xs">
-                  {reply.author?.display_name?.charAt(0).toUpperCase()}
-                </div>
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2 text-sm text-surface-muted">
+                {reply.author?.avatar_url ? (
+                  <img
+                    src={reply.author.avatar_url}
+                    alt=""
+                    className="h-5 w-5 rounded-full"
+                  />
+                ) : (
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-overlay text-surface-muted text-xs">
+                    {reply.author?.display_name?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="font-medium text-dark-200">
+                  {reply.author?.display_name}
+                </span>
+                <span>&middot;</span>
+                <span>{formatDateTime(reply.created_at)}</span>
+              </div>
+              {isGroupAdmin && (
+                <button
+                  onClick={() => handleDeleteReply(reply.id)}
+                  title="Delete reply"
+                  className="shrink-0 p-1 text-surface-muted hover:text-red-400 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               )}
-              <span className="font-medium text-dark-200">
-                {reply.author?.display_name}
-              </span>
-              <span>&middot;</span>
-              <span>
-                {formatDateTime(reply.created_at)}
-              </span>
             </div>
             <div className="text-sm text-dark-200 whitespace-pre-wrap">
               <RenderMentions text={reply.body} members={members} />
