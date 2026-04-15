@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import { US_STATES } from "@/lib/us-states";
 import { ConfirmFormButton } from "@/components/confirm-form-button";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 export default async function AdminGroupsPage() {
   const supabase = await createClient();
@@ -149,6 +150,7 @@ export default async function AdminGroupsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: "Admin" }, { label: "Groups" }]} />
       <div>
         <h1 className="text-2xl font-bold text-dark-100">Manage Groups</h1>
         <p className="mt-1 text-surface-muted">

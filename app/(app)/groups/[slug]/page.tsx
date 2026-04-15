@@ -208,7 +208,7 @@ export default async function GroupPage({
       {/* Stats (ladder league only) */}
       {!isFreePlay && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="card">
+          <div className="card card-static">
             <p className="text-sm text-surface-muted">Members</p>
             <p className="mt-1 text-2xl font-bold text-dark-100">
               {members.length}
@@ -216,7 +216,7 @@ export default async function GroupPage({
           </div>
 
           {/* Upcoming Events — list with links instead of just a count */}
-          <div className="card">
+          <div className="card card-static">
             <p className="text-sm text-surface-muted mb-2">Upcoming Events</p>
             {sheets.length === 0 ? (
               <p className="text-sm text-surface-muted italic">None scheduled</p>

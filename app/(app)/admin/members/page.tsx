@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, GroupMembership } from "@/types/database";
 import { MembersTable } from "./members-table";
+import { Breadcrumb } from "@/components/breadcrumb";
 import Link from "next/link";
 
 export default async function AdminMembersPage() {
@@ -45,6 +46,7 @@ export default async function AdminMembersPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: "Admin" }, { label: "Members" }]} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-dark-100">Member Management</h1>

@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/empty-state";
+import { Breadcrumb } from "@/components/breadcrumb";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
@@ -57,10 +58,12 @@ export default async function AdminSheetsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: "Admin" }, { label: "Sign-Up Sheets" }]} />
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-dark-100">
-          Manage Sign-Up Sheets
-        </h1>
+        <div>
+          <h1 className="text-2xl font-bold text-dark-100">Manage Sign-Up Sheets</h1>
+          <p className="mt-1 text-sm text-surface-muted">Create and manage event sign-up sheets for your groups.</p>
+        </div>
         <Link href="/admin/sheets/new" className="btn-primary">
           Create Sheet
         </Link>
