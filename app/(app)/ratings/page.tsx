@@ -158,11 +158,11 @@ export default async function RatingsPage() {
         <table className="min-w-full divide-y divide-surface-border">
           <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted w-10 sm:w-16">Rank</th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Step</th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Pct</th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Last Played</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-10 sm:w-16">Rank</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Pct</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Last Played</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">

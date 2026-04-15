@@ -622,11 +622,11 @@ export default function CheckInPage() {
         <table className="min-w-full divide-y divide-surface-border">
           <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted w-12">Check-in</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Step</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted">Pt %</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-surface-muted w-24">Court</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-12">Check-in</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Name</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Pt %</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-24">Court</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">

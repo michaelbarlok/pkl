@@ -88,7 +88,7 @@ export default async function AdminSheetsPage() {
               <div className="card overflow-x-auto p-0">
                 <table className="min-w-full text-left">
                   <thead>
-                    <tr className="bg-surface-overlay text-xs font-medium uppercase text-surface-muted">
+                    <tr className="bg-surface-overlay text-xs font-medium uppercase tracking-wider text-surface-muted">
                       <th className="py-3 pl-2 sm:pl-4 pr-2">Date</th>
                       <th className="py-3 px-2">Status</th>
                       <th className="hidden sm:table-cell py-3 px-2">Group</th>

@@ -425,11 +425,11 @@ export default function PlayerSessionPage() {
                     <table className="min-w-full divide-y divide-surface-border">
                       <thead className="bg-surface-overlay">
                         <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium uppercase text-surface-muted w-6">#</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-surface-muted">W</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-surface-muted">L</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-surface-muted">+/-</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-6">#</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">W</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">L</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">+/-</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-surface-border bg-surface-raised">
