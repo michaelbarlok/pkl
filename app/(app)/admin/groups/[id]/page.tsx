@@ -690,113 +690,118 @@ export default function AdminGroupDetailPage() {
             )}
           </div>
 
-          {/* Members List */}
-
-          {/* Mobile: card list */}
-          <div className="space-y-2 sm:hidden">
-            {members.map((member) => (
-              <div key={member.player_id} className="card space-y-3">
-                <div className="flex items-center gap-3">
-                  {member.player?.avatar_url ? (
-                    <img
-                      src={member.player.avatar_url}
-                      alt=""
-                      className="h-8 w-8 rounded-full object-cover shrink-0"
-                    />
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted shrink-0">
-                      {member.player?.display_name?.charAt(0) ?? "?"}
-                    </div>
+          {/* Members List — single compact table for all screen sizes */}
+          <div className="card overflow-x-auto p-0">
+            <table className="min-w-full divide-y divide-surface-border text-sm">
+              <thead className="bg-surface-overlay">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
+                  {group?.group_type !== "free_play" && (
+                    <>
+                      <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Step</th>
+                      <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Pt %</th>
+                    </>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-dark-100 truncate">
-                      {member.player?.display_name}
-                      {(member as any).group_role === "admin" && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-yellow-900/30 px-2 py-0.5 text-xs font-medium text-yellow-400">
-                          Admin
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-surface-muted truncate">
-                      {member.player?.email}
-                    </p>
-                  </div>
-                </div>
-                {group?.group_type !== "free_play" && (
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm text-dark-200">
-                      <span className="text-surface-muted font-medium">Step</span>
-                      <input
-                        type="number"
-                        min={1}
-                        value={member.current_step}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          if (!isNaN(val)) {
-                            setMembers((prev) =>
-                              prev.map((m) =>
-                                m.player_id === member.player_id
-                                  ? { ...m, current_step: val }
-                                  : m
-                              )
-                            );
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          if (!isNaN(val) && val >= 1) {
-                            updateStep(member.player_id, val);
-                          }
-                        }}
-                        className="w-16 rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-center text-sm font-semibold focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                      />
-                    </label>
-                    <span className="text-sm font-semibold text-brand-400">{member.win_pct}% Pt</span>
-                  </div>
-                )}
-                {/* Signup Priority */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-surface-muted shrink-0">Signup Priority</span>
-                  <select
-                    value={(member as any).signup_priority ?? "normal"}
-                    onChange={(e) => updateSignupPriority(member.player_id, e.target.value)}
-                    className="flex-1 rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                  >
-                    <option value="high">High — always active list</option>
-                    <option value="normal">Normal — first come, first served</option>
-                    <option value="low">Low — always waitlist</option>
-                  </select>
-                </div>
+                  <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Priority</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border bg-surface-raised">
+                {members.map((member) => (
+                  <tr key={member.player_id} className="hover:bg-surface-overlay/40">
+                    {/* Name + email */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        {member.player?.avatar_url ? (
+                          <img src={member.player.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted shrink-0">
+                            {member.player?.display_name?.charAt(0) ?? "?"}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-dark-100 truncate max-w-[140px]">
+                            {member.player?.display_name}
+                            {(member as any).group_role === "admin" && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-yellow-900/30 px-1.5 py-0.5 text-[10px] font-medium text-yellow-400">A</span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-surface-muted truncate max-w-[140px]">{member.player?.email}</p>
+                        </div>
+                      </div>
+                    </td>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-surface-muted">Joined {formatDate(member.joined_at)}</span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => toggleGroupRole(member.player_id, (member as any).group_role ?? "member")}
-                      className={cn(
-                        "text-xs",
-                        (member as any).group_role === "admin"
-                          ? "text-yellow-400 hover:text-yellow-500"
-                          : "text-brand-500 hover:text-brand-400"
-                      )}
-                    >
-                      {(member as any).group_role === "admin" ? "Demote" : "Promote"}
-                    </button>
-                    <button
-                      onClick={() => removeMember(member.player_id)}
-                      className="text-xs text-red-400 hover:text-red-500"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {members.length === 0 && (
-              <div className="card py-8 text-center text-sm text-surface-muted">
-                No members yet. Add players above.
-              </div>
-            )}
+                    {/* Step (editable) */}
+                    {group?.group_type !== "free_play" && (
+                      <>
+                        <td className="px-3 py-2 text-center whitespace-nowrap">
+                          <input
+                            type="number"
+                            min={1}
+                            value={member.current_step}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              if (!isNaN(val)) setMembers((prev) => prev.map((m) => m.player_id === member.player_id ? { ...m, current_step: val } : m));
+                            }}
+                            onBlur={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              if (!isNaN(val) && val >= 1) updateStep(member.player_id, val);
+                            }}
+                            className="w-14 rounded border border-surface-border bg-surface-raised text-dark-100 px-1.5 py-1 text-center text-xs font-semibold focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-center whitespace-nowrap text-xs text-dark-200">
+                          {member.win_pct}%
+                        </td>
+                      </>
+                    )}
+
+                    {/* Signup Priority */}
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                      <select
+                        value={(member as any).signup_priority ?? "normal"}
+                        onChange={(e) => updateSignupPriority(member.player_id, e.target.value)}
+                        className="rounded border border-surface-border bg-surface-raised text-dark-100 px-1.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="high">High</option>
+                        <option value="normal">Normal</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => toggleGroupRole(member.player_id, (member as any).group_role ?? "member")}
+                          className={cn(
+                            "text-xs",
+                            (member as any).group_role === "admin"
+                              ? "text-yellow-400 hover:text-yellow-500"
+                              : "text-brand-500 hover:text-brand-400"
+                          )}
+                        >
+                          {(member as any).group_role === "admin" ? "Demote" : "Promote"}
+                        </button>
+                        <button
+                          onClick={() => removeMember(member.player_id)}
+                          className="text-xs text-red-400 hover:text-red-500"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {members.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-surface-muted">
+                      No members yet. Add players above.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
 
           {/* Pending Members */}
@@ -923,149 +928,6 @@ export default function AdminGroupDetailPage() {
             </div>
           )}
 
-          {/* Desktop: table */}
-          <div className="card overflow-hidden p-0 hidden sm:block">
-            <table className="min-w-full divide-y divide-surface-border">
-              <thead className="bg-surface-overlay">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Player
-                  </th>
-                  {group?.group_type !== "free_play" && (
-                    <>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                        Step
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                        Pt %
-                      </th>
-                    </>
-                  )}
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Signup Priority
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Joined
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-border bg-surface-raised">
-                {members.map((member) => (
-                  <tr key={member.player_id}>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {member.player?.avatar_url ? (
-                          <img
-                            src={member.player.avatar_url}
-                            alt=""
-                            className="h-8 w-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
-                            {member.player?.display_name?.charAt(0) ?? "?"}
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-sm font-medium text-dark-100">
-                            {member.player?.display_name}
-                            {(member as any).group_role === "admin" && (
-                              <span className="ml-2 inline-flex items-center rounded-full bg-yellow-900/30 px-2 py-0.5 text-xs font-medium text-yellow-400">
-                                Admin
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-surface-muted">
-                            {member.player?.email}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    {group?.group_type !== "free_play" && (
-                      <>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                          <input
-                            type="number"
-                            min={1}
-                            value={member.current_step}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val)) {
-                                setMembers((prev) =>
-                                  prev.map((m) =>
-                                    m.player_id === member.player_id
-                                      ? { ...m, current_step: val }
-                                      : m
-                                  )
-                                );
-                              }
-                            }}
-                            onBlur={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val) && val >= 1) {
-                                updateStep(member.player_id, val);
-                              }
-                            }}
-                            className="w-16 rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-right text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                          />
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
-                          {member.win_pct}%
-                        </td>
-                      </>
-                    )}
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <select
-                        value={(member as any).signup_priority ?? "normal"}
-                        onChange={(e) => updateSignupPriority(member.player_id, e.target.value)}
-                        className="rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                      >
-                        <option value="high">High</option>
-                        <option value="normal">Normal</option>
-                        <option value="low">Low</option>
-                      </select>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-surface-muted">
-                      {formatDate(member.joined_at)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <button
-                          onClick={() => toggleGroupRole(member.player_id, (member as any).group_role ?? "member")}
-                          className={cn(
-                            "text-sm",
-                            (member as any).group_role === "admin"
-                              ? "text-yellow-400 hover:text-yellow-500"
-                              : "text-brand-500 hover:text-brand-400"
-                          )}
-                        >
-                          {(member as any).group_role === "admin" ? "Demote" : "Promote"}
-                        </button>
-                        <button
-                          onClick={() => removeMember(member.player_id)}
-                          className="text-sm text-red-400 hover:text-red-500"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {members.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-8 text-center text-sm text-surface-muted"
-                    >
-                      No members yet. Add players above.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 
