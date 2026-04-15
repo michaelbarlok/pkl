@@ -75,6 +75,7 @@ export default function NewSheetPage() {
           .from("shootout_groups")
           .select("*")
           .eq("is_active", true)
+          .eq("group_type", "ladder_league")
           .order("name", { ascending: true }),
         supabase
           .from("signup_sheets")

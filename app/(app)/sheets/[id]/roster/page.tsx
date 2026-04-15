@@ -38,10 +38,10 @@ export default async function RosterPage({
 
   if (error || !sheet) notFound();
 
-  // Fetch registrations with player profiles
+  // Fetch registrations with player profiles and who signed them up
   const { data: registrations } = await supabase
     .from("registrations")
-    .select("*, player:profiles!registrations_player_id_fkey(*)")
+    .select("*, player:profiles!registrations_player_id_fkey(*), registered_by_profile:profiles!registrations_registered_by_fkey(display_name)")
     .eq("sheet_id", id)
     .in("status", ["confirmed", "waitlist"])
     .order("signed_up_at", { ascending: true });
@@ -69,7 +69,7 @@ export default async function RosterPage({
   });
 
   function renderPlayerRow(
-    reg: Registration & { player?: Profile },
+    reg: Registration & { player?: Profile; registered_by_profile?: { display_name: string } | null },
     index: number,
     showWaitlistNumber: boolean
   ) {
@@ -100,6 +100,11 @@ export default async function RosterPage({
               </span>
               {isGuest && sheet.allow_member_guests && (
                 <span className="ml-2 badge-gray text-xs">Guest</span>
+              )}
+              {isGuest && reg.registered_by_profile?.display_name && (
+                <p className="text-xs text-surface-muted mt-0.5">
+                  Added by {reg.registered_by_profile.display_name}
+                </p>
               )}
             </div>
           </div>
@@ -166,7 +171,7 @@ export default async function RosterPage({
               </thead>
               <tbody>
                 {confirmed.map(
-                  (reg: Registration & { player?: Profile }, idx: number) =>
+                  (reg: Registration & { player?: Profile; registered_by_profile?: { display_name: string } | null }, idx: number) =>
                     renderPlayerRow(reg, idx, false)
                 )}
               </tbody>
@@ -200,7 +205,7 @@ export default async function RosterPage({
               </thead>
               <tbody>
                 {waitlisted.map(
-                  (reg: Registration & { player?: Profile }, idx: number) =>
+                  (reg: Registration & { player?: Profile; registered_by_profile?: { display_name: string } | null }, idx: number) =>
                     renderPlayerRow(reg, idx, true)
                 )}
               </tbody>

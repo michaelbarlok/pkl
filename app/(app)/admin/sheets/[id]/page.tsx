@@ -116,7 +116,7 @@ export default function AdminSheetDetailPage() {
 
       const { data: regData } = await supabase
         .from("registrations")
-        .select("*, player:profiles!registrations_player_id_fkey(*)")
+        .select("*, player:profiles!registrations_player_id_fkey(*), registered_by_profile:profiles!registrations_registered_by_fkey(display_name)")
         .eq("sheet_id", sheetId)
         .in("status", ["confirmed", "waitlist"])
         .order("signed_up_at", { ascending: true });
@@ -703,7 +703,9 @@ export default function AdminSheetDetailPage() {
                     {reg.player?.display_name ?? "Unknown"}
                   </span>
                   {reg.registered_by && reg.registered_by !== reg.player_id && (
-                    <span className="badge-gray text-xs">Admin added</span>
+                    <span className="text-xs text-surface-muted">
+                      Added by {(reg as any).registered_by_profile?.display_name ?? "Admin"}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { AdminDeleteButton } from "@/components/delete-tournament-button";
+import { HideTournamentToggle } from "./hide-toggle";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ export default async function AdminTournamentsPage() {
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Status</th>
               <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Registered</th>
               <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Creator</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Visibility</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase text-surface-muted">Actions</th>
             </tr>
           </thead>
@@ -64,6 +66,12 @@ export default async function AdminTournamentsPage() {
                 <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
                   {t.creator?.display_name ?? "—"}
                 </td>
+                <td className="whitespace-nowrap px-2 sm:px-4 py-3">
+                  <HideTournamentToggle
+                    tournamentId={t.id}
+                    isHidden={t.is_hidden ?? false}
+                  />
+                </td>
                 <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm space-x-3">
                   <Link
                     href={`/tournaments/${t.id}`}
@@ -77,7 +85,7 @@ export default async function AdminTournamentsPage() {
             ))}
             {(!tournaments || tournaments.length === 0) && (
               <tr>
-                <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-surface-muted">
+                <td colSpan={7} className="px-2 sm:px-4 py-8 text-center text-surface-muted">
                   No tournaments yet.
                 </td>
               </tr>
