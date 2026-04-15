@@ -191,6 +191,11 @@ export default async function GroupPage({
               Forum
             </Link>
           )}
+          {isGroupAdmin && group.group_type === "ladder_league" && (
+            <Link href={`/admin/sheets/new?groupId=${group.id}`} className="btn-primary">
+              + Create Sheet
+            </Link>
+          )}
           {isGroupAdmin && (
             <Link href={`/admin/groups/${group.id}?tab=preferences`} className="btn-secondary">
               Group Settings
