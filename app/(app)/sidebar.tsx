@@ -280,7 +280,7 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
             <img
               src={profile.avatar_url}
               alt=""
-              className="h-7 w-7 rounded-full object-cover ring-2 ring-brand-500/20 shrink-0"
+              className="h-7 w-7 rounded-full object-cover ring-2 ring-brand-500/40 shrink-0"
             />
           ) : (
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs font-medium shrink-0">

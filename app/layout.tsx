@@ -50,10 +50,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Apply saved theme before paint so React hydration doesn't strip it */}
+        {/* Apply saved theme before paint so React hydration doesn't strip it.
+            Falls back to system preference (prefers-color-scheme) on first visit. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}})()`,
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.classList.add('light');}else if(!t&&window.matchMedia('(prefers-color-scheme: light)').matches){document.documentElement.classList.add('light');}}catch(e){}})()`,
           }}
         />
         {/* Register SW immediately — before React hydrates — so Chrome sees

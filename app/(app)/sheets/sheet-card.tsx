@@ -352,7 +352,7 @@ export function SheetCard({
         <div className="mt-3 border-t border-surface-border pt-3 space-y-3">
           {confirmedPlayers.length > 0 && (
             <div>
-              <p className="text-xs font-medium uppercase text-surface-muted mb-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-surface-muted mb-2">
                 Confirmed ({confirmedPlayers.length})
               </p>
               <div className="space-y-0.5">
@@ -370,7 +370,7 @@ export function SheetCard({
           )}
           {waitlistedPlayers.length > 0 && (
             <div>
-              <p className="text-xs font-medium uppercase text-surface-muted mb-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-surface-muted mb-2">
                 Waitlist ({waitlistedPlayers.length})
               </p>
               <div className="space-y-0.5">

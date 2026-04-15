@@ -90,7 +90,7 @@ export default async function HomePage() {
           </div>
           <div className="card p-0 overflow-hidden">
             <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
-              <p className="text-xs font-medium uppercase text-surface-muted">Upcoming Events</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-surface-muted">Upcoming Events</p>
             </div>
             <div className="divide-y divide-surface-border">
               <div className="flex items-center justify-between px-4 py-3">
@@ -122,7 +122,7 @@ export default async function HomePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
           <div className="order-2 sm:order-1 card p-0 overflow-hidden">
             <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
-              <p className="text-xs font-medium uppercase text-surface-muted">Session Standings</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-surface-muted">Session Standings</p>
             </div>
             <div className="divide-y divide-surface-border">
               {[
@@ -163,7 +163,7 @@ export default async function HomePage() {
         <div id="rankings" className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center scroll-mt-24">
           <div className="order-2 sm:order-1 card p-0 overflow-hidden">
             <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
-              <p className="text-xs font-medium uppercase text-surface-muted">Rankings</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-surface-muted">Rankings</p>
             </div>
             <div className="divide-y divide-surface-border">
               {[
@@ -219,7 +219,7 @@ export default async function HomePage() {
           </div>
           <div className="card p-0 overflow-hidden">
             <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
-              <p className="text-xs font-medium uppercase text-surface-muted">Your Court</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-surface-muted">Your Court</p>
             </div>
             <div className="px-4 py-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -248,7 +248,7 @@ export default async function HomePage() {
         <div id="tournaments" className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center scroll-mt-24">
           <div className="order-2 sm:order-1 card p-0 overflow-hidden">
             <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
-              <p className="text-xs font-medium uppercase text-surface-muted">Upcoming Tournaments</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-surface-muted">Upcoming Tournaments</p>
             </div>
             <div className="divide-y divide-surface-border">
               <div className="flex items-center justify-between px-4 py-3">
@@ -293,7 +293,7 @@ export default async function HomePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
           <div className="order-2 sm:order-1 card p-0 overflow-hidden">
             <div className="bg-surface-overlay px-4 py-2.5 border-b border-surface-border">
-              <p className="text-xs font-medium uppercase text-surface-muted">Your Groups</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-surface-muted">Your Groups</p>
             </div>
             <div className="divide-y divide-surface-border">
               <div className="px-4 py-3">

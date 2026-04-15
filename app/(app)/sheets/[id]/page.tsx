@@ -343,7 +343,7 @@ export default async function SheetDetailPage({
             {waitlisted.length > 0 && (
               <>
                 <div className="py-2">
-                  <span className="text-xs font-medium uppercase text-surface-muted">
+                  <span className="text-xs font-medium uppercase tracking-wider text-surface-muted">
                     Waitlist
                   </span>
                 </div>

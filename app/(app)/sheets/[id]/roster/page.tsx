@@ -160,7 +160,7 @@ export default async function RosterPage({
           <div className="card overflow-hidden p-0">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-surface-overlay text-xs font-medium uppercase text-surface-muted">
+                <tr className="bg-surface-overlay text-xs font-medium uppercase tracking-wider text-surface-muted">
                   <th className="py-2 pl-4 pr-2">#</th>
                   <th className="py-2 px-2">Player</th>
                   <th className="py-2 px-2">Skill</th>
@@ -194,7 +194,7 @@ export default async function RosterPage({
           <div className="card overflow-hidden p-0">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-surface-overlay text-xs font-medium uppercase text-surface-muted">
+                <tr className="bg-surface-overlay text-xs font-medium uppercase tracking-wider text-surface-muted">
                   <th className="py-2 pl-4 pr-2">#</th>
                   <th className="py-2 px-2">Player</th>
                   <th className="py-2 px-2">Skill</th>

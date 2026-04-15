@@ -6,6 +6,7 @@ export function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
   const [light, setLight] = useState(false);
 
   useEffect(() => {
+    // Read the class the inline layout script already applied (localStorage or system pref)
     setLight(document.documentElement.classList.contains("light"));
   }, []);
 
