@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { AdminDeleteButton } from "@/components/delete-tournament-button";
 import { HideTournamentToggle } from "./hide-toggle";
+import { Breadcrumb } from "@/components/breadcrumb";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 
@@ -23,8 +24,12 @@ export default async function AdminTournamentsPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: "Admin" }, { label: "Tournaments" }]} />
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-dark-100">Manage Tournaments</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-dark-100">Manage Tournaments</h1>
+          <p className="mt-1 text-sm text-surface-muted">View, hide, and delete all tournaments across the platform.</p>
+        </div>
         <Link href="/tournaments/new" className="btn-primary">
           Create
         </Link>

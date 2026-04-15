@@ -112,7 +112,12 @@
 
   /* ── Cards ── */
   .card {
-    @apply rounded-xl bg-surface-raised p-4 ring-1 ring-surface-border transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20 hover:ring-brand-500/30;
+    @apply rounded-xl bg-surface-raised p-3.5 sm:p-4 ring-1 ring-surface-border transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20 hover:ring-brand-500/30;
+  }
+
+  /* Static (non-interactive) card — no lift or pointer change */
+  .card-static {
+    @apply cursor-default hover:translate-y-0 hover:shadow-none hover:ring-surface-border;
   }
 
   /* Left-border accent variants — add alongside .card to indicate status */
@@ -152,7 +157,7 @@
     @apply text-dark-100;
   }
   thead {
-    @apply bg-surface-overlay;
+    @apply bg-surface-overlay sticky top-0 z-10;
   }
   thead th {
     @apply text-surface-muted;
@@ -161,7 +166,10 @@
     @apply bg-surface-raised;
   }
   tbody tr {
-    @apply border-surface-border;
+    @apply border-surface-border transition-colors;
+  }
+  tbody tr:hover {
+    background-color: color-mix(in srgb, var(--color-surface-overlay) 60%, transparent);
   }
 
   /* ── Skeleton loader ── */
@@ -230,4 +238,14 @@
 
 .animate-scale-in {
   animation: scale-in 0.2s ease-out;
+}
+
+/* ── Accessibility: respect reduced-motion preference ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

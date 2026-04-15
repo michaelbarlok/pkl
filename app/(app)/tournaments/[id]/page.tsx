@@ -11,6 +11,7 @@ import { CoOrganizerManager } from "@/components/co-organizer-manager";
 import { getDivisionLabel } from "@/lib/divisions";
 import { DivisionBrackets } from "./division-brackets";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
+import { Breadcrumb } from "@/components/breadcrumb";
 import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import { PaidToggle } from "@/components/paid-toggle";
 import { PaymentReminderButton } from "@/components/payment-reminder-button";
@@ -134,6 +135,7 @@ export default async function TournamentDetailPage({
 
       {/* Header */}
       <div>
+        <Breadcrumb items={[{ label: "Tournaments", href: "/tournaments" }, { label: tournament.title }]} />
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-2xl font-bold text-dark-100">{tournament.title}</h1>
           {canManage && (

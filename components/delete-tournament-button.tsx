@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useConfirm } from "@/components/confirm-modal";
 
 export function DeleteTournamentButton({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
@@ -62,10 +63,17 @@ export function DeleteTournamentButton({ tournamentId }: { tournamentId: string 
  */
 export function AdminDeleteButton({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [pending, setPending] = useState(false);
 
   async function handleDelete() {
-    if (!confirm("Delete this tournament and all its match data?")) return;
+    const ok = await confirm({
+      title: "Delete tournament?",
+      description: "All match data and registrations will be permanently deleted. This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
     setPending(true);
     const res = await fetch(`/api/tournaments/${tournamentId}`, { method: "DELETE" });
     if (res.ok) {
