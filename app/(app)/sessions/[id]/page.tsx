@@ -59,7 +59,6 @@ function computeStandings(
     }
   }
 
-  // Sort: wins DESC, then point differential DESC
   return Array.from(standings.values()).sort((a, b) => {
     if (a.wins !== b.wins) return b.wins - a.wins;
     return b.pointDiff - a.pointDiff;
@@ -75,7 +74,7 @@ interface ScheduledMatch {
   team1: string[];
   team2: string[];
   bye?: string;
-  result?: { scoreA: number; scoreB: number };
+  result?: { id: string; scoreA: number; scoreB: number };
 }
 
 function generateMatchSchedule(
@@ -83,15 +82,13 @@ function generateMatchSchedule(
   playerNames: Map<string, string>,
   scores: GameResult[]
 ): ScheduledMatch[] {
-  // Sort player IDs for deterministic schedule regardless of query order
   playerIds = [...playerIds].sort();
   const n = playerIds.length;
   if (n < 4) return [];
 
-  const matches: ScheduledMatch[] = [];
+  const matches: Omit<ScheduledMatch, "result">[] = [];
 
   if (n === 4) {
-    // Standard 4-player doubles round robin: 3 games
     const [a, b, c, d] = playerIds;
     matches.push(
       { gameNumber: 1, team1: [a, b], team2: [c, d] },
@@ -99,7 +96,6 @@ function generateMatchSchedule(
       { gameNumber: 3, team1: [a, d], team2: [b, c] }
     );
   } else if (n === 5) {
-    // 5-player round robin: 5 games, each player sits out once
     const [a, b, c, d, e] = playerIds;
     matches.push(
       { gameNumber: 1, team1: [a, b], team2: [c, d], bye: e },
@@ -110,35 +106,30 @@ function generateMatchSchedule(
     );
   }
 
-  // Match submitted scores to scheduled matches
-  for (const match of matches) {
-    const team1Set = new Set(match.team1);
-    const team2Set = new Set(match.team2);
+  return (matches as ScheduledMatch[]).map((match) => {
+    const t1Set = new Set(match.team1);
+    const t2Set = new Set(match.team2);
 
     const found = scores.find((s) => {
-      const sTeamA = new Set([s.team_a_p1, s.team_a_p2].filter((v): v is string => !!v));
-      const sTeamB = new Set([s.team_b_p1, s.team_b_p2].filter((v): v is string => !!v));
-
-      // Check both orientations
-      const match1 =
-        setsEqual(sTeamA, team1Set) && setsEqual(sTeamB, team2Set);
-      const match2 =
-        setsEqual(sTeamA, team2Set) && setsEqual(sTeamB, team1Set);
-
-      return match1 || match2;
+      const sA = new Set([s.team_a_p1, s.team_a_p2].filter((v): v is string => !!v));
+      const sB = new Set([s.team_b_p1, s.team_b_p2].filter((v): v is string => !!v));
+      return (setsEqual(sA, t1Set) && setsEqual(sB, t2Set)) || (setsEqual(sA, t2Set) && setsEqual(sB, t1Set));
     });
 
     if (found) {
-      const sTeamA = new Set([found.team_a_p1, found.team_a_p2].filter((v): v is string => !!v));
-      const isTeam1AsA = setsEqual(sTeamA, team1Set);
-      match.result = {
-        scoreA: isTeam1AsA ? found.score_a : found.score_b,
-        scoreB: isTeam1AsA ? found.score_b : found.score_a,
+      const sA = new Set([found.team_a_p1, found.team_a_p2].filter((v): v is string => !!v));
+      const isT1AsA = setsEqual(sA, t1Set);
+      return {
+        ...match,
+        result: {
+          id: found.id,
+          scoreA: isT1AsA ? found.score_a : found.score_b,
+          scoreB: isT1AsA ? found.score_b : found.score_a,
+        },
       };
     }
-  }
-
-  return matches;
+    return match;
+  });
 }
 
 function setsEqual(a: Set<string>, b: Set<string>): boolean {
@@ -158,21 +149,27 @@ function formatTeam(ids: string[], names: Map<string, string>): string {
 export default function PlayerSessionPage() {
   const { id: sessionId } = useParams<{ id: string }>();
   const { supabase } = useSupabase();
-  const [session, setSession] = useState<(ShootoutSession & { group: { name: string }; sheet: { event_date: string; location: string } }) | null>(null);
+  const [session, setSession] = useState<(ShootoutSession & { group: { id: string; name: string }; sheet: { event_date: string; location: string } }) | null>(null);
   const [participants, setParticipants] = useState<(SessionParticipant & { player: { display_name: string; avatar_url: string | null } })[]>([]);
   const [scores, setScores] = useState<GameResult[]>([]);
   const [myPlayerId, setMyPlayerId] = useState<string>("");
   const [myCourt, setMyCourt] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Refetch all data — called on mount and when returning to this page
+  // Inline score editing (admins only)
+  const [editingScoreId, setEditingScoreId] = useState<string | null>(null);
+  const [editScoreA, setEditScoreA] = useState("");
+  const [editScoreB, setEditScoreB] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
   async function refetchAll() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, role")
       .eq("user_id", user.id)
       .single();
 
@@ -180,10 +177,25 @@ export default function PlayerSessionPage() {
 
     const { data: sess } = await supabase
       .from("shootout_sessions")
-      .select("*, group:shootout_groups(name), sheet:signup_sheets(event_date, location)")
+      .select("*, group:shootout_groups(id, name), sheet:signup_sheets(event_date, location)")
       .eq("id", sessionId)
       .single();
     setSession(sess as any);
+
+    // Determine admin status after we know the group
+    if (profile && sess) {
+      if (profile.role === "admin") {
+        setIsAdmin(true);
+      } else {
+        const { data: mem } = await supabase
+          .from("group_memberships")
+          .select("group_role")
+          .eq("group_id", (sess as any).group?.id ?? sess.group_id)
+          .eq("player_id", profile.id)
+          .maybeSingle();
+        setIsAdmin(mem?.group_role === "admin");
+      }
+    }
 
     const { data: parts } = await supabase
       .from("session_participants")
@@ -210,14 +222,12 @@ export default function PlayerSessionPage() {
 
   useEffect(() => {
     refetchAll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, supabase]);
 
-  // Refetch when returning to this page (back navigation, tab switch)
   useEffect(() => {
     function handleVisibility() {
-      if (document.visibilityState === "visible") {
-        refetchAll();
-      }
+      if (document.visibilityState === "visible") refetchAll();
     }
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("focus", refetchAll);
@@ -225,96 +235,79 @@ export default function PlayerSessionPage() {
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("focus", refetchAll);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, supabase]);
 
   // Realtime subscriptions
   useEffect(() => {
-    const sessionChannel = supabase
+    const ch = supabase
       .channel(`session-${sessionId}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "shootout_sessions", filter: `id=eq.${sessionId}` },
-        (payload) => {
-          setSession((prev) => prev ? { ...prev, ...payload.new } : prev);
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` },
-        () => {
-          supabase
-            .from("session_participants")
-            .select("*, player:profiles(display_name, avatar_url)")
-            .eq("session_id", sessionId)
-            .eq("checked_in", true)
-            .order("court_number", { ascending: true })
-            .then(({ data }) => {
-              if (data) {
-                setParticipants(data as any);
-                const me = data.find((p: any) => p.player_id === myPlayerId);
-                if (me) setMyCourt((me as any).court_number);
-              }
-            });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "game_results", filter: `session_id=eq.${sessionId}` },
-        (payload) => {
-          setScores((prev) => [...prev, payload.new as GameResult]);
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "game_results", filter: `session_id=eq.${sessionId}` },
-        (payload) => {
-          setScores((prev) =>
-            prev.map((s) => (s.id === (payload.new as GameResult).id ? (payload.new as GameResult) : s))
-          );
-        }
-      )
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "shootout_sessions", filter: `id=eq.${sessionId}` }, (payload) => {
+        setSession((prev) => prev ? { ...prev, ...payload.new } : prev);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "session_participants", filter: `session_id=eq.${sessionId}` }, () => {
+        supabase
+          .from("session_participants")
+          .select("*, player:profiles(display_name, avatar_url)")
+          .eq("session_id", sessionId)
+          .eq("checked_in", true)
+          .order("court_number", { ascending: true })
+          .then(({ data }) => {
+            if (data) {
+              setParticipants(data as any);
+              const me = data.find((p: any) => p.player_id === myPlayerId);
+              if (me) setMyCourt((me as any).court_number);
+            }
+          });
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "game_results", filter: `session_id=eq.${sessionId}` }, (payload) => {
+        setScores((prev) => [...prev, payload.new as GameResult]);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "game_results", filter: `session_id=eq.${sessionId}` }, (payload) => {
+        setScores((prev) =>
+          prev.map((s) => (s.id === (payload.new as GameResult).id ? (payload.new as GameResult) : s))
+        );
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(sessionChannel);
-    };
+    return () => { supabase.removeChannel(ch); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, supabase, myPlayerId]);
 
-  // Derived data
-  const myCourtPlayers = useMemo(
-    () => participants.filter((p) => p.court_number === myCourt),
-    [participants, myCourt]
-  );
+  // ── Inline score edit ─────────────────────────────────────
+  function startEdit(scoreId: string, currentA: number, currentB: number) {
+    setEditingScoreId(scoreId);
+    setEditScoreA(String(currentA));
+    setEditScoreB(String(currentB));
+  }
 
-  const myCourtScores = useMemo(
-    () => scores.filter((s) => s.pool_number === myCourt),
-    [scores, myCourt]
-  );
+  async function saveEdit(scoreId: string) {
+    const a = parseInt(editScoreA);
+    const b = parseInt(editScoreB);
+    if (isNaN(a) || isNaN(b) || a < 0 || b < 0) return;
+    setSavingEdit(true);
+    await supabase
+      .from("game_results")
+      .update({ score_a: a, score_b: b })
+      .eq("id", scoreId);
+    setScores((prev) =>
+      prev.map((s) => s.id === scoreId ? { ...s, score_a: a, score_b: b } : s)
+    );
+    setEditingScoreId(null);
+    setSavingEdit(false);
+  }
 
-  const standings = useMemo(
-    () => computeStandings(myCourtPlayers as any, myCourtScores),
-    [myCourtPlayers, myCourtScores]
-  );
+  // ── Derived data ──────────────────────────────────────────
+  const allCourts = useMemo(() => {
+    const courts = new Set(participants.map((p) => p.court_number).filter((c): c is number => c != null));
+    return Array.from(courts).sort((a, b) => a - b);
+  }, [participants]);
 
   const playerNames = useMemo(() => {
     const map = new Map<string, string>();
-    for (const p of participants) {
-      map.set(p.player_id, p.player?.display_name ?? "Unknown");
-    }
+    for (const p of participants) map.set(p.player_id, p.player?.display_name ?? "Unknown");
     return map;
   }, [participants]);
-
-  const matchSchedule = useMemo(
-    () =>
-      myCourt != null
-        ? generateMatchSchedule(
-            myCourtPlayers.map((p) => p.player_id),
-            playerNames,
-            myCourtScores
-          )
-        : [],
-    [myCourtPlayers, playerNames, myCourtScores, myCourt]
-  );
 
   if (loading) return <div className="text-center py-12 text-surface-muted">Loading session...</div>;
   if (!session) return <div className="text-center py-12 text-surface-muted">Session not found.</div>;
@@ -332,7 +325,7 @@ export default function PlayerSessionPage() {
         </p>
       </div>
 
-      {/* Status + Round */}
+      {/* Status */}
       <div className="flex items-center gap-4">
         <span className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${STATUS_COLORS[session.status] ?? "bg-surface-overlay text-dark-200"}`}>
           {STATUS_LABELS[session.status] ?? session.status}
@@ -340,186 +333,290 @@ export default function PlayerSessionPage() {
         {session.num_courts > 0 && (
           <span className="text-sm text-surface-muted">{session.num_courts} courts</span>
         )}
+        {isAdmin && (
+          <span className="inline-flex rounded-full bg-yellow-900/30 px-2.5 py-0.5 text-xs font-medium text-yellow-400">
+            Admin
+          </span>
+        )}
       </div>
 
-      {/* My Court Assignment */}
+      {/* Your Court hero (only if assigned) */}
       {myCourt != null && (
-        <div className="card bg-brand-900/40 border border-brand-500/30 space-y-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Your Court</p>
-              <p className="text-4xl font-bold text-brand-100">Court {myCourt}</p>
-            </div>
-            {isActive && matchSchedule.length > 0 && (
-              <div className="text-right shrink-0">
-                <p className="text-2xl font-bold text-brand-100">
-                  {matchSchedule.filter((m) => m.result).length}
-                  <span className="text-base font-normal text-brand-400">/{matchSchedule.length}</span>
-                </p>
-                <p className="text-xs text-brand-400">games scored</p>
-              </div>
-            )}
-          </div>
-          {myCourtPlayers.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {myCourtPlayers.map((p) => {
-                const name = p.player?.display_name ?? "?";
-                const isMe = p.player_id === myPlayerId;
-                return (
-                  <span
-                    key={p.player_id}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${isMe ? "bg-brand-500/30 text-brand-100 ring-1 ring-brand-400/40" : "bg-surface-overlay text-dark-200"}`}
-                  >
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-800 text-[9px] font-bold text-brand-200 shrink-0">
-                      {name.charAt(0).toUpperCase()}
+        <div className="card bg-brand-900/40 border border-brand-500/30">
+          <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider mb-1">Your Court</p>
+          <p className="text-4xl font-bold text-brand-100">Court {myCourt}</p>
+          {participants.filter((p) => p.court_number === myCourt).length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {participants
+                .filter((p) => p.court_number === myCourt)
+                .map((p) => {
+                  const name = p.player?.display_name ?? "?";
+                  const isMe = p.player_id === myPlayerId;
+                  return (
+                    <span
+                      key={p.player_id}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${isMe ? "bg-brand-500/30 text-brand-100 ring-1 ring-brand-400/40" : "bg-surface-overlay text-dark-200"}`}
+                    >
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-800 text-[9px] font-bold text-brand-200 shrink-0">
+                        {name.charAt(0).toUpperCase()}
+                      </span>
+                      {name}
+                      {isMe && <span className="text-brand-400">(you)</span>}
                     </span>
-                    {name}
-                    {isMe && <span className="text-brand-400">(you)</span>}
-                  </span>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
         </div>
       )}
 
-      {/* Live Standings Table */}
-      {isActive && myCourt != null && standings.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold text-dark-100 mb-3">Standings — Court {myCourt}</h2>
-          <div className="card overflow-x-auto p-0">
-            <table className="min-w-full divide-y divide-surface-border">
-              <thead className="bg-surface-overlay">
-                <tr>
-                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted w-8">#</th>
-                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
-                  <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">W</th>
-                  <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">L</th>
-                  <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase text-surface-muted">+/-</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-border bg-surface-raised">
-                {standings.map((s, i) => (
-                  <tr
-                    key={s.playerId}
-                    className={s.playerId === myPlayerId ? "bg-brand-900/40" : ""}
-                  >
-                    <td className="px-2 sm:px-4 py-2 text-sm font-medium text-surface-muted">{i + 1}</td>
-                    <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">
-                      {s.displayName}
-                      {s.playerId === myPlayerId && (
-                        <span className="ml-1 text-xs text-brand-600">(you)</span>
-                      )}
-                    </td>
-                    <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-teal-300">{s.wins}</td>
-                    <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-red-400">{s.losses}</td>
-                    <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold">
-                      <span className={s.pointDiff > 0 ? "text-teal-300" : s.pointDiff < 0 ? "text-red-400" : "text-surface-muted"}>
-                        {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* All-Courts View */}
+      {isActive && allCourts.length > 0 && (
+        <div className="space-y-6">
+          {allCourts.map((courtNum) => {
+            const courtPlayers = participants.filter((p) => p.court_number === courtNum);
+            const courtScores = scores.filter((s) => s.pool_number === courtNum);
+            const standings = computeStandings(courtPlayers as any, courtScores);
+            const schedule = generateMatchSchedule(
+              courtPlayers.map((p) => p.player_id),
+              playerNames,
+              courtScores
+            );
+            const isMyCourtSection = courtNum === myCourt;
+            // A player can enter scores on their own court; admins on any court
+            const canEnter = isAdmin || isMyCourtSection;
 
-      {/* Match Schedule */}
-      {isActive && myCourt != null && matchSchedule.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold text-dark-100 mb-3">Match Schedule</h2>
-          <div className="space-y-2">
-            {matchSchedule.map((match) => {
-              const hasResult = !!match.result;
-              const team1Won = hasResult && match.result!.scoreA > match.result!.scoreB;
-              const team2Won = hasResult && match.result!.scoreB > match.result!.scoreA;
-
-              if (hasResult) {
-                return (
-                  <div key={match.gameNumber} className="rounded-lg overflow-hidden ring-1 ring-surface-border">
-                    <div className="flex items-center justify-between px-3 py-1.5 bg-surface-overlay border-b border-surface-border">
-                      <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
-                      {match.bye && (
-                        <span className="text-xs text-accent-300">Bye: {playerNames.get(match.bye) ?? "?"}</span>
-                      )}
-                    </div>
-                    <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${team1Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-                      <span className={`text-sm truncate ${team1Won ? "font-semibold text-teal-300" : "text-dark-300"}`}>
-                        {team1Won && <span className="mr-1">✓</span>}
-                        {formatTeam(match.team1, playerNames)}
-                      </span>
-                      <span className={`font-mono text-base font-bold shrink-0 ${team1Won ? "text-teal-300" : "text-dark-300"}`}>
-                        {match.result!.scoreA}
-                      </span>
-                    </div>
-                    <div className="h-px bg-surface-border" />
-                    <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${team2Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-                      <span className={`text-sm truncate ${team2Won ? "font-semibold text-teal-300" : "text-dark-300"}`}>
-                        {team2Won && <span className="mr-1">✓</span>}
-                        {formatTeam(match.team2, playerNames)}
-                      </span>
-                      <span className={`font-mono text-base font-bold shrink-0 ${team2Won ? "text-teal-300" : "text-dark-300"}`}>
-                        {match.result!.scoreB}
-                      </span>
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <Link
-                  key={match.gameNumber}
-                  href={`/sessions/${sessionId}/score?game=${match.gameNumber}`}
-                  className="block rounded-lg overflow-hidden ring-1 ring-surface-border hover:ring-brand-500/50 transition-all group"
-                >
-                  <div className="flex items-center justify-between px-3 py-1.5 bg-surface-overlay border-b border-surface-border">
-                    <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
-                    <span className="text-xs font-semibold text-brand-300 group-hover:text-brand-200 transition-colors">Enter score →</span>
-                  </div>
-                  <div className="px-3 py-2.5 bg-surface-raised">
-                    <span className="text-sm text-dark-200">{formatTeam(match.team1, playerNames)}</span>
-                  </div>
-                  <div className="h-px bg-surface-border" />
-                  <div className="px-3 py-2.5 bg-surface-raised">
-                    <span className="text-sm text-dark-200">{formatTeam(match.team2, playerNames)}</span>
-                  </div>
-                  {match.bye && (
-                    <div className="px-3 py-1.5 bg-surface-overlay/60 border-t border-surface-border">
-                      <span className="text-xs text-accent-300">Bye: {playerNames.get(match.bye) ?? "?"}</span>
-                    </div>
+            return (
+              <div key={courtNum} className="space-y-3">
+                {/* Court heading */}
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-dark-100">Court {courtNum}</h2>
+                  {isMyCourtSection && (
+                    <span className="rounded-full bg-brand-900/50 px-2 py-0.5 text-xs font-medium text-brand-300 ring-1 ring-brand-500/50">
+                      Your Court
+                    </span>
                   )}
-                </Link>
-              );
-            })}
-          </div>
+                  {isAdmin && !isMyCourtSection && (
+                    <span className="rounded-full bg-yellow-900/20 px-2 py-0.5 text-xs font-medium text-yellow-500">
+                      Admin access
+                    </span>
+                  )}
+                </div>
+
+                {/* Players row */}
+                <div className="flex flex-wrap gap-1.5">
+                  {courtPlayers.map((p) => {
+                    const name = p.player?.display_name ?? "?";
+                    const isMe = p.player_id === myPlayerId;
+                    return (
+                      <span
+                        key={p.player_id}
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${isMe ? "bg-brand-500/30 text-brand-200 ring-1 ring-brand-400/40" : "bg-surface-overlay text-dark-300"}`}
+                      >
+                        {name}{isMe && " (you)"}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                {/* Standings */}
+                {standings.length > 0 && courtScores.length > 0 && (
+                  <div className="card overflow-x-auto p-0">
+                    <table className="min-w-full divide-y divide-surface-border">
+                      <thead className="bg-surface-overlay">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase text-surface-muted w-6">#</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase text-surface-muted">Player</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-surface-muted">W</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-surface-muted">L</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-surface-muted">+/-</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-surface-border bg-surface-raised">
+                        {standings.map((s, i) => (
+                          <tr key={s.playerId} className={s.playerId === myPlayerId ? "bg-brand-900/40" : ""}>
+                            <td className="px-3 py-2 text-sm text-surface-muted">{i + 1}</td>
+                            <td className="px-3 py-2 text-sm font-medium text-dark-100">
+                              {s.displayName}
+                              {s.playerId === myPlayerId && <span className="ml-1 text-xs text-brand-600">(you)</span>}
+                            </td>
+                            <td className="px-3 py-2 text-center text-sm font-semibold text-teal-300">{s.wins}</td>
+                            <td className="px-3 py-2 text-center text-sm font-semibold text-red-400">{s.losses}</td>
+                            <td className="px-3 py-2 text-center text-sm font-semibold">
+                              <span className={s.pointDiff > 0 ? "text-teal-300" : s.pointDiff < 0 ? "text-red-400" : "text-surface-muted"}>
+                                {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Match schedule */}
+                {schedule.length > 0 && (
+                  <div className="space-y-2">
+                    {schedule.map((match) => {
+                      const hasResult = !!match.result;
+                      const team1Won = hasResult && match.result!.scoreA > match.result!.scoreB;
+                      const team2Won = hasResult && match.result!.scoreB > match.result!.scoreA;
+                      const isEditingThis = editingScoreId === match.result?.id;
+
+                      if (hasResult) {
+                        return (
+                          <div key={match.gameNumber} className="rounded-lg overflow-hidden ring-1 ring-surface-border">
+                            <div className="flex items-center justify-between px-3 py-1.5 bg-surface-overlay border-b border-surface-border">
+                              <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
+                              <div className="flex items-center gap-2">
+                                {match.bye && <span className="text-xs text-accent-300">Bye: {playerNames.get(match.bye) ?? "?"}</span>}
+                                {isAdmin && !isEditingThis && (
+                                  <button
+                                    onClick={() => startEdit(match.result!.id, match.result!.scoreA, match.result!.scoreB)}
+                                    className="text-xs text-yellow-400 hover:text-yellow-300 transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {isEditingThis ? (
+                              /* Inline edit form */
+                              <div className="bg-surface-raised px-3 py-3 space-y-3">
+                                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                                  <div>
+                                    <label className="block text-xs text-surface-muted mb-1 truncate">{formatTeam(match.team1, playerNames)}</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={editScoreA}
+                                      onChange={(e) => setEditScoreA(e.target.value)}
+                                      className="input text-center w-full"
+                                      autoFocus
+                                    />
+                                  </div>
+                                  <span className="text-surface-muted mt-5">—</span>
+                                  <div>
+                                    <label className="block text-xs text-surface-muted mb-1 truncate">{formatTeam(match.team2, playerNames)}</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={editScoreB}
+                                      onChange={(e) => setEditScoreB(e.target.value)}
+                                      className="input text-center w-full"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                  <button onClick={() => setEditingScoreId(null)} className="btn-secondary text-xs">Cancel</button>
+                                  <button onClick={() => saveEdit(match.result!.id)} disabled={savingEdit} className="btn-primary text-xs">
+                                    {savingEdit ? "Saving…" : "Save"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${team1Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+                                  <span className={`text-sm truncate ${team1Won ? "font-semibold text-teal-300" : "text-dark-300"}`}>
+                                    {team1Won && <span className="mr-1">✓</span>}
+                                    {formatTeam(match.team1, playerNames)}
+                                  </span>
+                                  <span className={`font-mono text-base font-bold shrink-0 ${team1Won ? "text-teal-300" : "text-dark-300"}`}>
+                                    {match.result!.scoreA}
+                                  </span>
+                                </div>
+                                <div className="h-px bg-surface-border" />
+                                <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${team2Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+                                  <span className={`text-sm truncate ${team2Won ? "font-semibold text-teal-300" : "text-dark-300"}`}>
+                                    {team2Won && <span className="mr-1">✓</span>}
+                                    {formatTeam(match.team2, playerNames)}
+                                  </span>
+                                  <span className={`font-mono text-base font-bold shrink-0 ${team2Won ? "text-teal-300" : "text-dark-300"}`}>
+                                    {match.result!.scoreB}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // No result yet
+                      if (canEnter) {
+                        const href = isAdmin && !isMyCourtSection
+                          ? `/sessions/${sessionId}/score?court=${courtNum}&game=${match.gameNumber}`
+                          : `/sessions/${sessionId}/score?game=${match.gameNumber}`;
+                        return (
+                          <Link
+                            key={match.gameNumber}
+                            href={href}
+                            className="block rounded-lg overflow-hidden ring-1 ring-surface-border hover:ring-brand-500/50 transition-all group"
+                          >
+                            <div className="flex items-center justify-between px-3 py-1.5 bg-surface-overlay border-b border-surface-border">
+                              <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
+                              <span className="text-xs font-semibold text-brand-300 group-hover:text-brand-200 transition-colors">Enter score →</span>
+                            </div>
+                            <div className="px-3 py-2.5 bg-surface-raised">
+                              <span className="text-sm text-dark-200">{formatTeam(match.team1, playerNames)}</span>
+                            </div>
+                            <div className="h-px bg-surface-border" />
+                            <div className="px-3 py-2.5 bg-surface-raised">
+                              <span className="text-sm text-dark-200">{formatTeam(match.team2, playerNames)}</span>
+                            </div>
+                            {match.bye && (
+                              <div className="px-3 py-1.5 bg-surface-overlay/60 border-t border-surface-border">
+                                <span className="text-xs text-accent-300">Bye: {playerNames.get(match.bye) ?? "?"}</span>
+                              </div>
+                            )}
+                          </Link>
+                        );
+                      }
+
+                      // View-only: awaiting score
+                      return (
+                        <div key={match.gameNumber} className="rounded-lg overflow-hidden ring-1 ring-surface-border opacity-75">
+                          <div className="flex items-center justify-between px-3 py-1.5 bg-surface-overlay border-b border-surface-border">
+                            <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
+                            <span className="text-xs text-surface-muted italic">Awaiting score</span>
+                          </div>
+                          <div className="px-3 py-2.5 bg-surface-raised">
+                            <span className="text-sm text-dark-300">{formatTeam(match.team1, playerNames)}</span>
+                          </div>
+                          <div className="h-px bg-surface-border" />
+                          <div className="px-3 py-2.5 bg-surface-raised">
+                            <span className="text-sm text-dark-300">{formatTeam(match.team2, playerNames)}</span>
+                          </div>
+                          {match.bye && (
+                            <div className="px-3 py-1.5 bg-surface-overlay/60 border-t border-surface-border">
+                              <span className="text-xs text-accent-300">Bye: {playerNames.get(match.bye) ?? "?"}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* Session status messages */}
       {session.status === "created" && (
-        <EmptyState
-          title="Session hasn't started yet"
-          description="Check-in will open soon."
-        />
+        <EmptyState title="Session hasn't started yet" description="Check-in will open soon." />
       )}
       {session.status === "checking_in" && !myCourt && (
-        <EmptyState
-          title="Check-in is open"
-          description="Please check in with the session organizer."
-        />
+        <EmptyState title="Check-in is open" description="Please check in with the session organizer." />
       )}
       {session.status === "seeding" && (
-        <EmptyState
-          title="Courts are being assigned"
-          description="Your court number will appear here shortly."
-        />
+        <EmptyState title="Courts are being assigned" description="Your court number will appear here shortly." />
       )}
       {session.status === "session_complete" && (
         <div className="card text-center">
           <p className="text-dark-200 font-medium">Session complete!</p>
-          {participants.find((p) => p.player_id === myPlayerId) && (() => {
+          {(() => {
             const me = participants.find((p) => p.player_id === myPlayerId);
             if (!me || me.step_after == null) return null;
             const diff = me.step_before - me.step_after;
