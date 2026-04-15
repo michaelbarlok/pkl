@@ -3,13 +3,15 @@
 import { EmptyState } from "@/components/empty-state";
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ShootoutGroup } from "@/types/database";
 
 export default function NewSheetPage() {
   const { supabase } = useSupabase();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedGroupId = searchParams.get("groupId");
 
   const [groups, setGroups] = useState<ShootoutGroup[]>([]);
   const [savedLocations, setSavedLocations] = useState<{ name: string; cityState: string }[]>([]);
@@ -85,9 +87,12 @@ export default function NewSheetPage() {
           .select("location"),
       ]);
 
-      setGroups(groupsRes.data ?? []);
-      if (groupsRes.data && groupsRes.data.length > 0) {
-        setGroupId(groupsRes.data[0].id);
+      const loadedGroups = groupsRes.data ?? [];
+      setGroups(loadedGroups);
+      if (loadedGroups.length > 0) {
+        // Pre-select the group passed via ?groupId=, if it exists in the list
+        const match = preselectedGroupId && loadedGroups.find((g) => g.id === preselectedGroupId);
+        setGroupId(match ? match.id : loadedGroups[0].id);
       }
 
       // Extract unique locations with city/state, sorted alphabetically
