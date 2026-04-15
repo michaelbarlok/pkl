@@ -70,7 +70,8 @@ export default function AdminGroupDetailPage() {
           "*, player:profiles!group_memberships_player_id_fkey(id, full_name, display_name, avatar_url, email)"
         )
         .eq("group_id", id)
-        .order("current_step", { ascending: true }),
+        .order("current_step", { ascending: true })
+        .order("win_pct", { ascending: false }),
       supabase
         .from("profiles")
         .select("*")
