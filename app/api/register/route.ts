@@ -99,6 +99,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Auto-claim any pending group memberships for this player (non-blocking)
+    const { claimPendingMemberships } = await import("@/lib/pending-memberships");
+    claimPendingMemberships(serviceClient, profile.id, fullName, email).catch(() => {});
+
     // Send welcome email in the background (don't block the response)
     sendWelcomeEmail(email, fullName).catch(() => {});
 

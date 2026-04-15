@@ -22,6 +22,16 @@ interface MemberRow extends Omit<GroupMembership, "player"> {
   player: Pick<Profile, "id" | "full_name" | "display_name" | "avatar_url" | "email">;
 }
 
+interface PendingMember {
+  id: string;
+  name: string;
+  step: number | null;
+  win_pct: number | null;
+  total_sessions: number | null;
+  last_played_at: string | null;
+  invite_email: string | null;
+}
+
 type Tab = "members" | "preferences";
 
 // ============================================================
@@ -54,6 +64,11 @@ export default function AdminGroupDetailPage() {
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkAdding, setBulkAdding] = useState(false);
 
+  // Pending members state
+  const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
+  const [linkingPendingId, setLinkingPendingId] = useState<string | null>(null);
+  const [linkSearch, setLinkSearch] = useState("");
+
   // ============================================================
   // Data Fetching
   // ============================================================
@@ -61,7 +76,7 @@ export default function AdminGroupDetailPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
 
-    const [groupRes, prefsRes, membersRes, playersRes] = await Promise.all([
+    const [groupRes, prefsRes, membersRes, playersRes, pendingRes] = await Promise.all([
       supabase.from("shootout_groups").select("*").eq("id", id).single(),
       supabase.from("group_preferences").select("*").eq("group_id", id).single(),
       supabase
@@ -70,18 +85,26 @@ export default function AdminGroupDetailPage() {
           "*, player:profiles!group_memberships_player_id_fkey(id, full_name, display_name, avatar_url, email)"
         )
         .eq("group_id", id)
-        .order("current_step", { ascending: true }),
+        .order("current_step", { ascending: true })
+        .order("win_pct", { ascending: false }),
       supabase
         .from("profiles")
         .select("*")
         .eq("is_active", true)
         .order("display_name", { ascending: true }),
+      supabase
+        .from("pending_group_members")
+        .select("id, name, step, win_pct, total_sessions, last_played_at, invite_email")
+        .eq("group_id", id)
+        .is("claimed_by", null)
+        .order("name", { ascending: true }),
     ]);
 
     if (groupRes.data) setGroup(groupRes.data);
     if (prefsRes.data) setPreferences(prefsRes.data);
     if (membersRes.data) setMembers(membersRes.data as MemberRow[]);
     if (playersRes.data) setAllPlayers(playersRes.data);
+    if (pendingRes.data) setPendingMembers(pendingRes.data as PendingMember[]);
 
     setLoading(false);
   }, [supabase, id]);
@@ -238,6 +261,55 @@ export default function AdminGroupDetailPage() {
       setMessage({ type: "success", text: "Member removed." });
       await fetchData();
     }
+  };
+
+  // ============================================================
+  // Pending Member Actions
+  // ============================================================
+
+  const linkPendingMember = async (pending: PendingMember, playerId: string) => {
+    const now = new Date().toISOString();
+    const membershipPayload: Record<string, unknown> = {
+      group_id: id,
+      player_id: playerId,
+      current_step: pending.step ?? preferences?.new_player_start_step ?? 5,
+      win_pct: pending.win_pct ?? 0,
+      total_sessions: pending.total_sessions ?? 0,
+    };
+    if (pending.last_played_at) membershipPayload.last_played_at = pending.last_played_at;
+
+    const { error: insertErr } = await supabase
+      .from("group_memberships")
+      .upsert(membershipPayload, { onConflict: "group_id,player_id" });
+
+    if (insertErr) {
+      setMessage({ type: "error", text: `Failed to link: ${insertErr.message}` });
+      return;
+    }
+
+    // Mark pending record as claimed
+    await supabase
+      .from("pending_group_members")
+      .update({ claimed_by: playerId, claimed_at: now })
+      .eq("id", pending.id);
+
+    setMessage({ type: "success", text: `${pending.name} linked and added to group.` });
+    setLinkingPendingId(null);
+    setLinkSearch("");
+    await fetchData();
+  };
+
+  const deletePendingMember = async (pendingId: string) => {
+    const ok = await confirm({
+      title: "Remove pending record?",
+      description: "This player's imported stats will be discarded.",
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (!ok) return;
+
+    await supabase.from("pending_group_members").delete().eq("id", pendingId);
+    setPendingMembers((prev) => prev.filter((p) => p.id !== pendingId));
   };
 
   // ============================================================
@@ -618,228 +690,92 @@ export default function AdminGroupDetailPage() {
             )}
           </div>
 
-          {/* Members List */}
-
-          {/* Mobile: card list */}
-          <div className="space-y-2 sm:hidden">
-            {members.map((member) => (
-              <div key={member.player_id} className="card space-y-3">
-                <div className="flex items-center gap-3">
-                  {member.player?.avatar_url ? (
-                    <img
-                      src={member.player.avatar_url}
-                      alt=""
-                      className="h-8 w-8 rounded-full object-cover shrink-0"
-                    />
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted shrink-0">
-                      {member.player?.display_name?.charAt(0) ?? "?"}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-dark-100 truncate">
-                      {member.player?.display_name}
-                      {(member as any).group_role === "admin" && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-yellow-900/30 px-2 py-0.5 text-xs font-medium text-yellow-400">
-                          Admin
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-surface-muted truncate">
-                      {member.player?.email}
-                    </p>
-                  </div>
-                </div>
-                {group?.group_type !== "free_play" && (
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm text-dark-200">
-                      <span className="text-surface-muted font-medium">Step</span>
-                      <input
-                        type="number"
-                        min={1}
-                        value={member.current_step}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          if (!isNaN(val)) {
-                            setMembers((prev) =>
-                              prev.map((m) =>
-                                m.player_id === member.player_id
-                                  ? { ...m, current_step: val }
-                                  : m
-                              )
-                            );
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          if (!isNaN(val) && val >= 1) {
-                            updateStep(member.player_id, val);
-                          }
-                        }}
-                        className="w-16 rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-center text-sm font-semibold focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                      />
-                    </label>
-                    <span className="text-sm font-semibold text-brand-400">{member.win_pct}% Pt</span>
-                  </div>
-                )}
-                {/* Signup Priority */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-surface-muted shrink-0">Signup Priority</span>
-                  <select
-                    value={(member as any).signup_priority ?? "normal"}
-                    onChange={(e) => updateSignupPriority(member.player_id, e.target.value)}
-                    className="flex-1 rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                  >
-                    <option value="high">High — always active list</option>
-                    <option value="normal">Normal — first come, first served</option>
-                    <option value="low">Low — always waitlist</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-surface-muted">Joined {formatDate(member.joined_at)}</span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => toggleGroupRole(member.player_id, (member as any).group_role ?? "member")}
-                      className={cn(
-                        "text-xs",
-                        (member as any).group_role === "admin"
-                          ? "text-yellow-400 hover:text-yellow-500"
-                          : "text-brand-500 hover:text-brand-400"
-                      )}
-                    >
-                      {(member as any).group_role === "admin" ? "Demote" : "Promote"}
-                    </button>
-                    <button
-                      onClick={() => removeMember(member.player_id)}
-                      className="text-xs text-red-400 hover:text-red-500"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {members.length === 0 && (
-              <div className="card py-8 text-center text-sm text-surface-muted">
-                No members yet. Add players above.
-              </div>
-            )}
-          </div>
-
-          {/* Desktop: table */}
-          <div className="card overflow-hidden p-0 hidden sm:block">
-            <table className="min-w-full divide-y divide-surface-border">
+          {/* Members List — single compact table for all screen sizes */}
+          <div className="card overflow-x-auto p-0">
+            <table className="min-w-full divide-y divide-surface-border text-sm">
               <thead className="bg-surface-overlay">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Player
-                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
                   {group?.group_type !== "free_play" && (
                     <>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                        Step
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                        Pt %
-                      </th>
+                      <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Step</th>
+                      <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Pt %</th>
                     </>
                   )}
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Signup Priority
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Joined
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Actions
-                  </th>
+                  <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Priority</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-border bg-surface-raised">
                 {members.map((member) => (
-                  <tr key={member.player_id}>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-3">
+                  <tr key={member.player_id} className="hover:bg-surface-overlay/40">
+                    {/* Name + email */}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
                         {member.player?.avatar_url ? (
-                          <img
-                            src={member.player.avatar_url}
-                            alt=""
-                            className="h-8 w-8 rounded-full object-cover"
-                          />
+                          <img src={member.player.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover shrink-0" />
                         ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-overlay text-xs font-medium text-surface-muted shrink-0">
                             {member.player?.display_name?.charAt(0) ?? "?"}
                           </div>
                         )}
-                        <div>
-                          <p className="text-sm font-medium text-dark-100">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-dark-100 truncate max-w-[140px]">
                             {member.player?.display_name}
                             {(member as any).group_role === "admin" && (
-                              <span className="ml-2 inline-flex items-center rounded-full bg-yellow-900/30 px-2 py-0.5 text-xs font-medium text-yellow-400">
-                                Admin
-                              </span>
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-yellow-900/30 px-1.5 py-0.5 text-[10px] font-medium text-yellow-400">A</span>
                             )}
                           </p>
-                          <p className="text-xs text-surface-muted">
-                            {member.player?.email}
-                          </p>
+                          <p className="text-[10px] text-surface-muted truncate max-w-[140px]">{member.player?.email}</p>
                         </div>
                       </div>
                     </td>
+
+                    {/* Step (editable) */}
                     {group?.group_type !== "free_play" && (
                       <>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
+                        <td className="px-3 py-2 text-center whitespace-nowrap">
                           <input
                             type="number"
                             min={1}
                             value={member.current_step}
                             onChange={(e) => {
                               const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val)) {
-                                setMembers((prev) =>
-                                  prev.map((m) =>
-                                    m.player_id === member.player_id
-                                      ? { ...m, current_step: val }
-                                      : m
-                                  )
-                                );
-                              }
+                              if (!isNaN(val)) setMembers((prev) => prev.map((m) => m.player_id === member.player_id ? { ...m, current_step: val } : m));
                             }}
                             onBlur={(e) => {
                               const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val) && val >= 1) {
-                                updateStep(member.player_id, val);
-                              }
+                              if (!isNaN(val) && val >= 1) updateStep(member.player_id, val);
                             }}
-                            className="w-16 rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-right text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            className="w-14 rounded border border-surface-border bg-surface-raised text-dark-100 px-1.5 py-1 text-center text-xs font-semibold focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                           />
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-dark-100">
+                        <td className="px-3 py-2 text-center whitespace-nowrap text-xs text-dark-200">
                           {member.win_pct}%
                         </td>
                       </>
                     )}
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
+
+                    {/* Signup Priority */}
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
                       <select
                         value={(member as any).signup_priority ?? "normal"}
                         onChange={(e) => updateSignupPriority(member.player_id, e.target.value)}
-                        className="rounded border border-surface-border bg-surface-raised text-dark-100 px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        className="rounded border border-surface-border bg-surface-raised text-dark-100 px-1.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                       >
                         <option value="high">High</option>
                         <option value="normal">Normal</option>
                         <option value="low">Low</option>
                       </select>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-surface-muted">
-                      {formatDate(member.joined_at)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
+
+                    {/* Actions */}
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-3">
                         <button
                           onClick={() => toggleGroupRole(member.player_id, (member as any).group_role ?? "member")}
                           className={cn(
-                            "text-sm",
+                            "text-xs",
                             (member as any).group_role === "admin"
                               ? "text-yellow-400 hover:text-yellow-500"
                               : "text-brand-500 hover:text-brand-400"
@@ -849,7 +785,7 @@ export default function AdminGroupDetailPage() {
                         </button>
                         <button
                           onClick={() => removeMember(member.player_id)}
-                          className="text-sm text-red-400 hover:text-red-500"
+                          className="text-xs text-red-400 hover:text-red-500"
                         >
                           Remove
                         </button>
@@ -859,10 +795,7 @@ export default function AdminGroupDetailPage() {
                 ))}
                 {members.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-8 text-center text-sm text-surface-muted"
-                    >
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-surface-muted">
                       No members yet. Add players above.
                     </td>
                   </tr>
@@ -870,6 +803,131 @@ export default function AdminGroupDetailPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pending Members */}
+          {pendingMembers.length > 0 && (
+            <div className="card border border-amber-900/40 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-dark-100">
+                  Pending Members ({pendingMembers.length})
+                </h3>
+                <p className="text-xs text-surface-muted mt-0.5">
+                  These players were imported but haven't created an account yet. They'll be auto-added
+                  when they sign up. Use "Link" if they signed up with a different name.
+                </p>
+              </div>
+              <div className="overflow-x-auto rounded border border-surface-border">
+                <table className="text-xs w-full min-w-max">
+                  <thead>
+                    <tr className="border-b border-surface-border bg-surface-overlay">
+                      <th className="text-left px-3 py-2 text-dark-200 font-medium">Name (from CSV)</th>
+                      {group?.group_type !== "free_play" && (
+                        <>
+                          <th className="text-right px-3 py-2 text-dark-200 font-medium">Step</th>
+                          <th className="text-right px-3 py-2 text-dark-200 font-medium">Win %</th>
+                        </>
+                      )}
+                      <th className="text-right px-3 py-2 text-dark-200 font-medium">Last Played</th>
+                      <th className="text-right px-3 py-2 text-dark-200 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingMembers.map((pending) => (
+                      <tr key={pending.id} className="border-b border-surface-border/50 last:border-0">
+                        <td className="px-3 py-2 text-dark-100">
+                          <div>{pending.name}</div>
+                          {pending.invite_email && (
+                            <div className="text-surface-muted">{pending.invite_email}</div>
+                          )}
+                        </td>
+                        {group?.group_type !== "free_play" && (
+                          <>
+                            <td className="px-3 py-2 text-right text-dark-200">
+                              {pending.step ?? <span className="text-surface-muted">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-right text-dark-200">
+                              {pending.win_pct != null ? `${pending.win_pct}%` : <span className="text-surface-muted">—</span>}
+                            </td>
+                          </>
+                        )}
+                        <td className="px-3 py-2 text-right text-dark-200">
+                          {pending.last_played_at
+                            ? formatDate(pending.last_played_at)
+                            : <span className="text-surface-muted">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {linkingPendingId === pending.id ? (
+                            <div className="flex items-center gap-2 justify-end">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Search player..."
+                                  value={linkSearch}
+                                  onChange={(e) => setLinkSearch(e.target.value)}
+                                  className="input text-xs w-40"
+                                  autoFocus
+                                />
+                                {linkSearch.length > 0 && (
+                                  <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                                    {allPlayers
+                                      .filter((p) =>
+                                        !members.some((m) => m.player_id === p.id) &&
+                                        (p.display_name.toLowerCase().includes(linkSearch.toLowerCase()) ||
+                                         p.full_name.toLowerCase().includes(linkSearch.toLowerCase()))
+                                      )
+                                      .slice(0, 10)
+                                      .map((p) => (
+                                        <button
+                                          key={p.id}
+                                          onClick={() => linkPendingMember(pending, p.id)}
+                                          className="w-full text-left px-3 py-2 text-xs hover:bg-surface-overlay"
+                                        >
+                                          <div className="font-medium text-dark-100">{p.display_name}</div>
+                                          <div className="text-surface-muted">{p.email}</div>
+                                        </button>
+                                      ))}
+                                    {allPlayers.filter((p) =>
+                                      !members.some((m) => m.player_id === p.id) &&
+                                      (p.display_name.toLowerCase().includes(linkSearch.toLowerCase()) ||
+                                       p.full_name.toLowerCase().includes(linkSearch.toLowerCase()))
+                                    ).length === 0 && (
+                                      <p className="px-3 py-2 text-surface-muted">No match found</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => { setLinkingPendingId(null); setLinkSearch(""); }}
+                                className="text-surface-muted hover:text-dark-200"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3 justify-end">
+                              <button
+                                onClick={() => setLinkingPendingId(pending.id)}
+                                className="text-brand-400 hover:text-brand-300"
+                              >
+                                Link
+                              </button>
+                              <button
+                                onClick={() => deletePendingMember(pending.id)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 

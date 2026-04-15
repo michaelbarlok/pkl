@@ -214,12 +214,33 @@ export default async function GroupPage({
               {members.length}
             </p>
           </div>
+
+          {/* Upcoming Events — list with links instead of just a count */}
           <div className="card">
-            <p className="text-sm text-surface-muted">Upcoming Events</p>
-            <p className="mt-1 text-2xl font-bold text-dark-100">
-              {sheets.length}
-            </p>
+            <p className="text-sm text-surface-muted mb-2">Upcoming Events</p>
+            {sheets.length === 0 ? (
+              <p className="text-sm text-surface-muted italic">None scheduled</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {sheets.map((sheet) => (
+                  <li key={sheet.id}>
+                    <Link
+                      href={`/sheets/${sheet.id}`}
+                      className="flex flex-col hover:text-brand-400 transition-colors group"
+                    >
+                      <span className="text-sm font-medium text-dark-100 group-hover:text-brand-400">
+                        {formatDate(sheet.event_date)}
+                      </span>
+                      <span className="text-xs text-surface-muted">
+                        {formatTime(sheet.event_time)} · {sheet.location}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
+
           <Link
             href={`/groups/${slug}/ladder`}
             className="card hover:ring-brand-500/30 hover:ring-2 transition-shadow flex flex-col items-center justify-center text-center"
@@ -302,33 +323,6 @@ export default async function GroupPage({
         </section>
       )}
 
-      {/* Upcoming Sheets */}
-      {!isFreePlay && sheets.length > 0 && (
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-dark-100">
-            Upcoming Events
-          </h2>
-          <div className="space-y-3">
-            {sheets.map((sheet) => (
-              <Link
-                key={sheet.id}
-                href={`/sheets/${sheet.id}`}
-                className="card flex items-center justify-between hover:ring-brand-500/30 transition-shadow"
-              >
-                <div>
-                  <p className="font-medium text-dark-100">
-                    {formatDate(sheet.event_date)}
-                  </p>
-                  <p className="text-sm text-surface-muted">
-                    {formatTime(sheet.event_time)} at {sheet.location}
-                  </p>
-                </div>
-                <span className="badge-green">Open</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* Members */}
       <CollapsibleMembers
@@ -359,29 +353,69 @@ function JoinButton({
     "use server";
 
     const supabase = await createClient();
+    const serviceClient = await createServiceClient();
 
-    let startStep = 5;
-    if (groupType === "ladder_league") {
-      const { data: prefs } = await supabase
-        .from("group_preferences")
-        .select("new_player_start_step")
+    // Check if there's a pending record for this player in this group.
+    // If so, use those stats instead of defaults so imported history is preserved.
+    const { data: playerProfile } = await supabase
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", playerId)
+      .single();
+
+    let usedPending = false;
+    if (playerProfile) {
+      const { claimPendingMemberships } = await import("@/lib/pending-memberships");
+      const before = await serviceClient
+        .from("group_memberships")
+        .select("player_id")
         .eq("group_id", groupId)
-        .single();
-      startStep = prefs?.new_player_start_step ?? 5;
+        .eq("player_id", playerId)
+        .maybeSingle();
+
+      if (!before.data) {
+        // Not yet a member — claimPendingMemberships will insert with pending stats
+        await claimPendingMemberships(
+          serviceClient,
+          playerId,
+          playerProfile.display_name,
+          playerProfile.email,
+          groupId
+        );
+        // Check if the claim created the membership
+        const after = await serviceClient
+          .from("group_memberships")
+          .select("player_id")
+          .eq("group_id", groupId)
+          .eq("player_id", playerId)
+          .maybeSingle();
+        usedPending = !!after.data;
+      }
     }
 
-    // Use service client to bypass RLS for membership insert
-    const serviceClient = await createServiceClient();
-    await serviceClient.from("group_memberships").upsert(
-      {
-        group_id: groupId,
-        player_id: playerId,
-        current_step: startStep,
-        win_pct: 0,
-        total_sessions: 0,
-      },
-      { onConflict: "group_id,player_id" }
-    );
+    // If no pending record handled the join, fall back to default insert
+    if (!usedPending) {
+      let startStep = 5;
+      if (groupType === "ladder_league") {
+        const { data: prefs } = await supabase
+          .from("group_preferences")
+          .select("new_player_start_step")
+          .eq("group_id", groupId)
+          .single();
+        startStep = prefs?.new_player_start_step ?? 5;
+      }
+
+      await serviceClient.from("group_memberships").upsert(
+        {
+          group_id: groupId,
+          player_id: playerId,
+          current_step: startStep,
+          win_pct: 0,
+          total_sessions: 0,
+        },
+        { onConflict: "group_id,player_id" }
+      );
+    }
 
     // Check community badges (non-blocking)
     const { checkAndAwardBadges } = await import("@/lib/badges");

@@ -16,7 +16,7 @@ interface RowResult {
   playerName: string;
   profileId?: string;
   displayName?: string;
-  status: "updated" | "not_found" | "not_member" | "error";
+  status: "already_member" | "added_to_group" | "pending" | "not_found" | "error";
   error?: string;
 }
 
@@ -25,9 +25,11 @@ interface RowResult {
  *
  * Body: { rows: StepRow[] }
  *
- * Requires group admin (or global admin) role.
- * Matches each row's playerName against group_memberships (display_name).
- * Updates group_memberships + optionally profiles.skill_level.
+ * Three outcomes per row:
+ *   A. Player is already a group member → update their stats
+ *   B. Player has a profile but isn't a member → add to group with imported stats
+ *   C. Player has no profile (not signed up yet) → create a pending_group_members record;
+ *      stats will be applied automatically when they sign up
  */
 export async function POST(
   request: NextRequest,
@@ -52,7 +54,7 @@ export async function POST(
 
     const serviceClient = await createServiceClient();
 
-    // Fetch all members of this group with their display_name
+    // --- Build member map (existing group members) ---
     const { data: memberships, error: membersError } = await serviceClient
       .from("group_memberships")
       .select("player_id, profiles!group_memberships_player_id_fkey(id, display_name)")
@@ -62,20 +64,42 @@ export async function POST(
       return NextResponse.json({ error: membersError.message }, { status: 500 });
     }
 
-    // Build map: normalized display_name -> { player_id, profile_id, display_name }
     type MemberInfo = { playerId: string; profileId: string; displayName: string };
     const memberMap = new Map<string, MemberInfo>();
     for (const m of memberships ?? []) {
       const profile = m.profiles as unknown as { id: string; display_name: string } | null;
       if (profile) {
-        const key = profile.display_name.toLowerCase().trim();
-        memberMap.set(key, {
+        memberMap.set(profile.display_name.toLowerCase().trim(), {
           playerId: m.player_id,
           profileId: profile.id,
           displayName: profile.display_name,
         });
       }
     }
+
+    // --- Build all-profiles map (players with accounts but not yet members) ---
+    const { data: allProfiles } = await serviceClient
+      .from("profiles")
+      .select("id, display_name")
+      .eq("is_active", true);
+
+    const profileMap = new Map<string, { id: string; displayName: string }>();
+    for (const p of allProfiles ?? []) {
+      if (p.display_name) {
+        profileMap.set(p.display_name.toLowerCase().trim(), {
+          id: p.id,
+          displayName: p.display_name,
+        });
+      }
+    }
+
+    // --- Get group preferences (start step fallback) ---
+    const { data: prefs } = await serviceClient
+      .from("group_preferences")
+      .select("new_player_start_step")
+      .eq("group_id", groupId)
+      .maybeSingle();
+    const defaultStep = prefs?.new_player_start_step ?? 5;
 
     const results: RowResult[] = [];
 
@@ -86,55 +110,85 @@ export async function POST(
         continue;
       }
 
-      const info = memberMap.get(name.toLowerCase());
-      if (!info) {
-        results.push({ playerName: name, status: "not_found" });
+      const key = name.toLowerCase();
+
+      // --- Case A: already a group member → skip (don't overwrite live stats) ---
+      const member = memberMap.get(key);
+      if (member) {
+        results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "already_member" });
         continue;
       }
 
-      // Build membership update
-      const membershipUpdate: Record<string, unknown> = {};
-      if (row.step !== undefined && !isNaN(row.step)) membershipUpdate.current_step = row.step;
-      if (row.winPct !== undefined && !isNaN(row.winPct)) membershipUpdate.win_pct = row.winPct;
-      if (row.totalSessions !== undefined && !isNaN(row.totalSessions)) membershipUpdate.total_sessions = row.totalSessions;
+      // --- Case B: has a profile but not yet a member → add to group ---
+      const profile = profileMap.get(key);
+      if (profile) {
+        const insertPayload: Record<string, unknown> = {
+          group_id:       groupId,
+          player_id:      profile.id,
+          current_step:   row.step ?? defaultStep,
+          win_pct:        row.winPct ?? 0,
+          total_sessions: row.totalSessions ?? 0,
+        };
+        if (row.lastPlayedAt) {
+          const d = new Date(row.lastPlayedAt);
+          if (!isNaN(d.getTime())) insertPayload.last_played_at = d.toISOString();
+        }
+        if (row.joinedAt) {
+          const d = new Date(row.joinedAt);
+          if (!isNaN(d.getTime())) insertPayload.joined_at = d.toISOString();
+        }
+
+        const { error: insertError } = await serviceClient
+          .from("group_memberships")
+          .insert(insertPayload);
+
+        if (insertError) {
+          results.push({ playerName: name, displayName: profile.displayName, status: "error", error: insertError.message });
+          continue;
+        }
+
+        if (row.skillLevel !== undefined && !isNaN(row.skillLevel)) {
+          await serviceClient.from("profiles").update({ skill_level: row.skillLevel }).eq("id", profile.id);
+        }
+
+        results.push({ playerName: name, profileId: profile.id, displayName: profile.displayName, status: "added_to_group" });
+        continue;
+      }
+
+      // --- Case C: no profile → create pending record ---
+      const pendingPayload: Record<string, unknown> = { group_id: groupId, name };
+      if (row.step !== undefined && !isNaN(row.step))               pendingPayload.step           = row.step;
+      if (row.winPct !== undefined && !isNaN(row.winPct))           pendingPayload.win_pct        = row.winPct;
+      if (row.totalSessions !== undefined && !isNaN(row.totalSessions)) pendingPayload.total_sessions = row.totalSessions;
+      if (row.skillLevel !== undefined && !isNaN(row.skillLevel))   pendingPayload.skill_level    = row.skillLevel;
       if (row.lastPlayedAt) {
         const d = new Date(row.lastPlayedAt);
-        if (!isNaN(d.getTime())) membershipUpdate.last_played_at = d.toISOString();
+        if (!isNaN(d.getTime())) pendingPayload.last_played_at = d.toISOString();
       }
       if (row.joinedAt) {
         const d = new Date(row.joinedAt);
-        if (!isNaN(d.getTime())) membershipUpdate.joined_at = d.toISOString();
+        if (!isNaN(d.getTime())) pendingPayload.joined_at = d.toISOString();
       }
 
-      if (Object.keys(membershipUpdate).length > 0) {
-        const { error: updateError } = await serviceClient
-          .from("group_memberships")
-          .update(membershipUpdate)
-          .eq("group_id", groupId)
-          .eq("player_id", info.playerId);
+      // Upsert: re-importing same name updates the record
+      const { error: pendingError } = await serviceClient
+        .from("pending_group_members")
+        .upsert(pendingPayload, { onConflict: "group_id,name" });
 
-        if (updateError) {
-          results.push({ playerName: name, profileId: info.profileId, displayName: info.displayName, status: "error", error: updateError.message });
-          continue;
-        }
+      if (pendingError) {
+        results.push({ playerName: name, status: "error", error: pendingError.message });
+        continue;
       }
 
-      // Optionally update profile skill_level
-      if (row.skillLevel !== undefined && !isNaN(row.skillLevel)) {
-        await serviceClient
-          .from("profiles")
-          .update({ skill_level: row.skillLevel })
-          .eq("id", info.profileId);
-      }
-
-      results.push({ playerName: name, profileId: info.profileId, displayName: info.displayName, status: "updated" });
+      results.push({ playerName: name, status: "pending" });
     }
 
-    const updated = results.filter((r) => r.status === "updated").length;
-    const notFound = results.filter((r) => r.status === "not_found").length;
-    const errors = results.filter((r) => r.status === "error").length;
+    const alreadyMember = results.filter((r) => r.status === "already_member").length;
+    const addedToGroup  = results.filter((r) => r.status === "added_to_group").length;
+    const pending       = results.filter((r) => r.status === "pending").length;
+    const errors        = results.filter((r) => r.status === "error").length;
 
-    return NextResponse.json({ results, updated, notFound, errors }, { status: 200 });
+    return NextResponse.json({ results, alreadyMember, addedToGroup, pending, errors }, { status: 200 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -143,9 +197,7 @@ export async function POST(
 
 /**
  * GET /api/admin/groups/[id]/import-steps
- *
- * Returns the list of current group members (display_name + current_step)
- * so the import page can show a preview match.
+ * Returns the list of current group members for the preview match UI.
  */
 export async function GET(
   request: NextRequest,
