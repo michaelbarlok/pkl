@@ -77,6 +77,9 @@ export default async function TournamentDetailPage({
   const isCoOrganizer = profile ? coOrganizers.some((o: any) => o.profile_id === profile.id) : false;
   const canManage = isCreator || isAdmin || isCoOrganizer;
 
+  // Hidden tournaments are invisible to non-managers
+  if ((tournament as any).is_hidden && !canManage) notFound();
+
   const myDivision = (myRegistration as any)?.division as string | undefined;
   const isInProgress = tournament.status === "in_progress" || tournament.status === "completed";
 
@@ -143,6 +146,11 @@ export default async function TournamentDetailPage({
           <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[tournament.status]}`}>
             {STATUS_LABELS[tournament.status]}
           </span>
+          {(tournament as any).is_hidden && canManage && (
+            <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-300">
+              Hidden from public
+            </span>
+          )}
           <span className="text-xs text-surface-muted">
             {FORMAT_LABELS[tournament.format]} &middot; {tournament.type === "doubles" ? "Doubles" : "Singles"}
             &middot; {tournament.divisions?.length ?? 0} division{(tournament.divisions?.length ?? 0) !== 1 ? "s" : ""}

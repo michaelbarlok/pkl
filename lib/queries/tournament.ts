@@ -37,6 +37,7 @@ export type TournamentMatchWithPlayers = TournamentMatch & {
 /**
  * List tournaments visible to the current user.
  * Includes registration count for display.
+ * Hidden tournaments are excluded unless the caller is a global admin.
  */
 export async function listTournaments(filters?: {
   status?: string;
@@ -44,10 +45,27 @@ export async function listTournaments(filters?: {
 }): Promise<TournamentWithCounts[]> {
   const supabase = await createClient();
 
+  // Determine if the current user is a global admin
+  const { data: { user } } = await supabase.auth.getUser();
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+    isAdmin = profile?.role === "admin";
+  }
+
   let query = supabase
     .from("tournaments")
     .select("*, creator:profiles!created_by(id, display_name, avatar_url), registrations:tournament_registrations(count)")
     .order("start_date", { ascending: true });
+
+  // Non-admins only see visible tournaments
+  if (!isAdmin) {
+    query = query.eq("is_hidden", false);
+  }
 
   if (filters?.status) {
     query = query.eq("status", filters.status);
