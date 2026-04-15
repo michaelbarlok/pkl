@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
           null;
 
         // Use upsert so concurrent requests don't cause a duplicate-key error
-        await serviceClient.from("profiles").upsert(
+        const { data: newProfile } = await serviceClient.from("profiles").upsert(
           {
             user_id: user.id,
             full_name: fullName,
@@ -48,7 +48,13 @@ export async function GET(request: NextRequest) {
             ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
           },
           { onConflict: "user_id", ignoreDuplicates: true }
-        );
+        ).select("id").maybeSingle();
+
+        // Auto-claim any pending group memberships (non-blocking)
+        if (newProfile?.id) {
+          const { claimPendingMemberships } = await import("@/lib/pending-memberships");
+          claimPendingMemberships(serviceClient, newProfile.id, fullName, user.email ?? "").catch(() => {});
+        }
 
         // Send welcome email to new Google OAuth users
         sendWelcomeEmail(user.email ?? "", fullName).catch(() => {});

@@ -104,7 +104,7 @@ interface PreviewRow extends ParsedRow {
 interface RowResult {
   playerName: string;
   displayName?: string;
-  status: "updated" | "not_found" | "not_member" | "error";
+  status: "updated" | "added_to_group" | "pending" | "not_found" | "error";
   error?: string;
 }
 
@@ -123,7 +123,7 @@ export default function ImportStepsPage() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<RowResult[] | null>(null);
-  const [summary, setSummary] = useState<{ updated: number; notFound: number; errors: number } | null>(null);
+  const [summary, setSummary] = useState<{ updated: number; addedToGroup: number; pending: number; errors: number } | null>(null);
 
   // Load group members for matching
   useEffect(() => {
@@ -226,7 +226,7 @@ export default function ImportStepsPage() {
         setParseError(data.error ?? "Import failed");
       } else {
         setResults(data.results);
-        setSummary({ updated: data.updated, notFound: data.notFound, errors: data.errors });
+        setSummary({ updated: data.updated, addedToGroup: data.addedToGroup ?? 0, pending: data.pending ?? 0, errors: data.errors });
         setRows([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -412,14 +412,22 @@ export default function ImportStepsPage() {
           <div className="card border border-surface-border">
             <h2 className="text-base font-semibold text-dark-100 mb-3">Import complete</h2>
             <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 text-xs font-bold">{summary.updated}</span>
-                <span className="text-dark-200">player{summary.updated !== 1 ? "s" : ""} updated</span>
-              </div>
-              {summary.notFound > 0 && (
+              {summary.updated > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">{summary.notFound}</span>
-                  <span className="text-dark-200">not found</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 text-xs font-bold">{summary.updated}</span>
+                  <span className="text-dark-200">stats updated</span>
+                </div>
+              )}
+              {summary.addedToGroup > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold">{summary.addedToGroup}</span>
+                  <span className="text-dark-200">added to group</span>
+                </div>
+              )}
+              {summary.pending > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">{summary.pending}</span>
+                  <span className="text-dark-200">pending (no account yet)</span>
                 </div>
               )}
               {summary.errors > 0 && (
@@ -429,6 +437,11 @@ export default function ImportStepsPage() {
                 </div>
               )}
             </div>
+            {summary.pending > 0 && (
+              <p className="mt-3 text-xs text-surface-muted">
+                Pending players will be automatically added to the group with their imported stats when they create an account.
+              </p>
+            )}
           </div>
 
           {results && results.length > 0 && (
@@ -453,11 +466,20 @@ export default function ImportStepsPage() {
                             Updated
                           </span>
                         )}
-                        {r.status === "not_found" && (
-                          <span className="text-amber-400">Not found in group</span>
+                        {r.status === "added_to_group" && (
+                          <span className="inline-flex items-center gap-1 text-blue-400">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3M13.5 4.5 12 3m0 0-1.5 1.5M12 3v13.5" /></svg>
+                            Added to group
+                          </span>
                         )}
-                        {r.status === "not_member" && (
-                          <span className="text-amber-400">Not a member</span>
+                        {r.status === "pending" && (
+                          <span className="inline-flex items-center gap-1 text-amber-400">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                            Pending signup
+                          </span>
+                        )}
+                        {r.status === "not_found" && (
+                          <span className="text-amber-400">Not found</span>
                         )}
                         {r.status === "error" && (
                           <span className="text-red-400">Error: {r.error}</span>

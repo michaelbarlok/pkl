@@ -22,6 +22,16 @@ interface MemberRow extends Omit<GroupMembership, "player"> {
   player: Pick<Profile, "id" | "full_name" | "display_name" | "avatar_url" | "email">;
 }
 
+interface PendingMember {
+  id: string;
+  name: string;
+  step: number | null;
+  win_pct: number | null;
+  total_sessions: number | null;
+  last_played_at: string | null;
+  invite_email: string | null;
+}
+
 type Tab = "members" | "preferences";
 
 // ============================================================
@@ -54,6 +64,11 @@ export default function AdminGroupDetailPage() {
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkAdding, setBulkAdding] = useState(false);
 
+  // Pending members state
+  const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
+  const [linkingPendingId, setLinkingPendingId] = useState<string | null>(null);
+  const [linkSearch, setLinkSearch] = useState("");
+
   // ============================================================
   // Data Fetching
   // ============================================================
@@ -61,7 +76,7 @@ export default function AdminGroupDetailPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
 
-    const [groupRes, prefsRes, membersRes, playersRes] = await Promise.all([
+    const [groupRes, prefsRes, membersRes, playersRes, pendingRes] = await Promise.all([
       supabase.from("shootout_groups").select("*").eq("id", id).single(),
       supabase.from("group_preferences").select("*").eq("group_id", id).single(),
       supabase
@@ -77,12 +92,19 @@ export default function AdminGroupDetailPage() {
         .select("*")
         .eq("is_active", true)
         .order("display_name", { ascending: true }),
+      supabase
+        .from("pending_group_members")
+        .select("id, name, step, win_pct, total_sessions, last_played_at, invite_email")
+        .eq("group_id", id)
+        .is("claimed_by", null)
+        .order("name", { ascending: true }),
     ]);
 
     if (groupRes.data) setGroup(groupRes.data);
     if (prefsRes.data) setPreferences(prefsRes.data);
     if (membersRes.data) setMembers(membersRes.data as MemberRow[]);
     if (playersRes.data) setAllPlayers(playersRes.data);
+    if (pendingRes.data) setPendingMembers(pendingRes.data as PendingMember[]);
 
     setLoading(false);
   }, [supabase, id]);
@@ -239,6 +261,55 @@ export default function AdminGroupDetailPage() {
       setMessage({ type: "success", text: "Member removed." });
       await fetchData();
     }
+  };
+
+  // ============================================================
+  // Pending Member Actions
+  // ============================================================
+
+  const linkPendingMember = async (pending: PendingMember, playerId: string) => {
+    const now = new Date().toISOString();
+    const membershipPayload: Record<string, unknown> = {
+      group_id: id,
+      player_id: playerId,
+      current_step: pending.step ?? preferences?.new_player_start_step ?? 5,
+      win_pct: pending.win_pct ?? 0,
+      total_sessions: pending.total_sessions ?? 0,
+    };
+    if (pending.last_played_at) membershipPayload.last_played_at = pending.last_played_at;
+
+    const { error: insertErr } = await supabase
+      .from("group_memberships")
+      .upsert(membershipPayload, { onConflict: "group_id,player_id" });
+
+    if (insertErr) {
+      setMessage({ type: "error", text: `Failed to link: ${insertErr.message}` });
+      return;
+    }
+
+    // Mark pending record as claimed
+    await supabase
+      .from("pending_group_members")
+      .update({ claimed_by: playerId, claimed_at: now })
+      .eq("id", pending.id);
+
+    setMessage({ type: "success", text: `${pending.name} linked and added to group.` });
+    setLinkingPendingId(null);
+    setLinkSearch("");
+    await fetchData();
+  };
+
+  const deletePendingMember = async (pendingId: string) => {
+    const ok = await confirm({
+      title: "Remove pending record?",
+      description: "This player's imported stats will be discarded.",
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (!ok) return;
+
+    await supabase.from("pending_group_members").delete().eq("id", pendingId);
+    setPendingMembers((prev) => prev.filter((p) => p.id !== pendingId));
   };
 
   // ============================================================
@@ -727,6 +798,130 @@ export default function AdminGroupDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Pending Members */}
+          {pendingMembers.length > 0 && (
+            <div className="card border border-amber-900/40 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-dark-100">
+                  Pending Members ({pendingMembers.length})
+                </h3>
+                <p className="text-xs text-surface-muted mt-0.5">
+                  These players were imported but haven't created an account yet. They'll be auto-added
+                  when they sign up. Use "Link" if they signed up with a different name.
+                </p>
+              </div>
+              <div className="overflow-x-auto rounded border border-surface-border">
+                <table className="text-xs w-full min-w-max">
+                  <thead>
+                    <tr className="border-b border-surface-border bg-surface-overlay">
+                      <th className="text-left px-3 py-2 text-dark-200 font-medium">Name (from CSV)</th>
+                      {group?.group_type !== "free_play" && (
+                        <>
+                          <th className="text-right px-3 py-2 text-dark-200 font-medium">Step</th>
+                          <th className="text-right px-3 py-2 text-dark-200 font-medium">Win %</th>
+                        </>
+                      )}
+                      <th className="text-right px-3 py-2 text-dark-200 font-medium">Last Played</th>
+                      <th className="text-right px-3 py-2 text-dark-200 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingMembers.map((pending) => (
+                      <tr key={pending.id} className="border-b border-surface-border/50 last:border-0">
+                        <td className="px-3 py-2 text-dark-100">
+                          <div>{pending.name}</div>
+                          {pending.invite_email && (
+                            <div className="text-surface-muted">{pending.invite_email}</div>
+                          )}
+                        </td>
+                        {group?.group_type !== "free_play" && (
+                          <>
+                            <td className="px-3 py-2 text-right text-dark-200">
+                              {pending.step ?? <span className="text-surface-muted">—</span>}
+                            </td>
+                            <td className="px-3 py-2 text-right text-dark-200">
+                              {pending.win_pct != null ? `${pending.win_pct}%` : <span className="text-surface-muted">—</span>}
+                            </td>
+                          </>
+                        )}
+                        <td className="px-3 py-2 text-right text-dark-200">
+                          {pending.last_played_at
+                            ? formatDate(pending.last_played_at)
+                            : <span className="text-surface-muted">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {linkingPendingId === pending.id ? (
+                            <div className="flex items-center gap-2 justify-end">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Search player..."
+                                  value={linkSearch}
+                                  onChange={(e) => setLinkSearch(e.target.value)}
+                                  className="input text-xs w-40"
+                                  autoFocus
+                                />
+                                {linkSearch.length > 0 && (
+                                  <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                                    {allPlayers
+                                      .filter((p) =>
+                                        !members.some((m) => m.player_id === p.id) &&
+                                        (p.display_name.toLowerCase().includes(linkSearch.toLowerCase()) ||
+                                         p.full_name.toLowerCase().includes(linkSearch.toLowerCase()))
+                                      )
+                                      .slice(0, 10)
+                                      .map((p) => (
+                                        <button
+                                          key={p.id}
+                                          onClick={() => linkPendingMember(pending, p.id)}
+                                          className="w-full text-left px-3 py-2 text-xs hover:bg-surface-overlay"
+                                        >
+                                          <div className="font-medium text-dark-100">{p.display_name}</div>
+                                          <div className="text-surface-muted">{p.email}</div>
+                                        </button>
+                                      ))}
+                                    {allPlayers.filter((p) =>
+                                      !members.some((m) => m.player_id === p.id) &&
+                                      (p.display_name.toLowerCase().includes(linkSearch.toLowerCase()) ||
+                                       p.full_name.toLowerCase().includes(linkSearch.toLowerCase()))
+                                    ).length === 0 && (
+                                      <p className="px-3 py-2 text-surface-muted">No match found</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => { setLinkingPendingId(null); setLinkSearch(""); }}
+                                className="text-surface-muted hover:text-dark-200"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3 justify-end">
+                              <button
+                                onClick={() => setLinkingPendingId(pending.id)}
+                                className="text-brand-400 hover:text-brand-300"
+                              >
+                                Link
+                              </button>
+                              <button
+                                onClick={() => deletePendingMember(pending.id)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Desktop: table */}
           <div className="card overflow-hidden p-0 hidden sm:block">

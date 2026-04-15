@@ -57,6 +57,14 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  // Account merge
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeSearchPrimary, setMergeSearchPrimary] = useState("");
+  const [mergeSearchSecondary, setMergeSearchSecondary] = useState("");
+  const [mergePrimary, setMergePrimary] = useState<Profile | null>(null);
+  const [mergeSecondary, setMergeSecondary] = useState<Profile | null>(null);
+  const [merging, setMerging] = useState(false);
+
   const filtered = useMemo(() => {
     let result = profiles;
 
@@ -262,6 +270,42 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
     }
   }
 
+  async function handleMerge() {
+    if (!mergePrimary || !mergeSecondary) return;
+    const ok = await confirm({
+      title: "Merge accounts?",
+      description: `All data from "${mergeSecondary.display_name}" will be transferred to "${mergePrimary.display_name}". The secondary account will be deactivated. This cannot be undone.`,
+      confirmLabel: "Merge",
+      variant: "danger",
+    });
+    if (!ok) return;
+
+    setMerging(true);
+    try {
+      const res = await fetch("/api/admin/merge-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ primaryId: mergePrimary.id, secondaryId: mergeSecondary.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.error || "Merge failed.", "error");
+      } else {
+        toast(data.message || "Accounts merged.", "success");
+        setMergeOpen(false);
+        setMergePrimary(null);
+        setMergeSecondary(null);
+        setMergeSearchPrimary("");
+        setMergeSearchSecondary("");
+        router.refresh();
+      }
+    } catch {
+      toast("Merge failed.", "error");
+    } finally {
+      setMerging(false);
+    }
+  }
+
   function exportCSV() {
     const headers = [
       "Name",
@@ -359,6 +403,13 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         <div className="flex gap-2">
           <button
             type="button"
+            onClick={() => setMergeOpen(true)}
+            className="btn-secondary text-sm"
+          >
+            Merge Accounts
+          </button>
+          <button
+            type="button"
             onClick={exportCSV}
             className="btn-secondary text-sm"
           >
@@ -369,6 +420,133 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
           </Link>
         </div>
       </div>
+
+      {/* Merge Accounts Modal */}
+      {mergeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl bg-surface-raised border border-surface-border shadow-2xl p-6 space-y-5">
+            <div>
+              <h2 className="text-base font-semibold text-dark-100">Merge Accounts</h2>
+              <p className="mt-1 text-xs text-surface-muted">
+                All data from the secondary account is transferred to the primary, then the secondary is deactivated.
+              </p>
+            </div>
+
+            {/* Primary (keep) */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-dark-200">Keep (primary)</label>
+              {mergePrimary ? (
+                <div className="flex items-center justify-between rounded-lg border border-teal-700/40 bg-teal-900/10 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-dark-100">{mergePrimary.display_name}</p>
+                    <p className="text-xs text-surface-muted">{mergePrimary.email}</p>
+                  </div>
+                  <button onClick={() => setMergePrimary(null)} className="text-xs text-surface-muted hover:text-dark-200">Change</button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by name or email…"
+                    value={mergeSearchPrimary}
+                    onChange={(e) => setMergeSearchPrimary(e.target.value)}
+                    className="input w-full"
+                  />
+                  {mergeSearchPrimary.length > 0 && (
+                    <div className="absolute left-0 top-full mt-1 w-full bg-surface-raised border border-surface-border rounded-lg shadow-xl z-10 max-h-48 overflow-y-auto">
+                      {profiles
+                        .filter((p) =>
+                          p.id !== mergeSecondary?.id &&
+                          (p.display_name.toLowerCase().includes(mergeSearchPrimary.toLowerCase()) ||
+                           p.email.toLowerCase().includes(mergeSearchPrimary.toLowerCase()))
+                        )
+                        .slice(0, 8)
+                        .map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => { setMergePrimary(p); setMergeSearchPrimary(""); }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-surface-overlay"
+                          >
+                            <div className="font-medium text-dark-100">{p.display_name}</div>
+                            <div className="text-xs text-surface-muted">{p.email}</div>
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Secondary (remove) */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-dark-200">Remove (secondary)</label>
+              {mergeSecondary ? (
+                <div className="flex items-center justify-between rounded-lg border border-red-700/40 bg-red-900/10 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-dark-100">{mergeSecondary.display_name}</p>
+                    <p className="text-xs text-surface-muted">{mergeSecondary.email}</p>
+                  </div>
+                  <button onClick={() => setMergeSecondary(null)} className="text-xs text-surface-muted hover:text-dark-200">Change</button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by name or email…"
+                    value={mergeSearchSecondary}
+                    onChange={(e) => setMergeSearchSecondary(e.target.value)}
+                    className="input w-full"
+                  />
+                  {mergeSearchSecondary.length > 0 && (
+                    <div className="absolute left-0 top-full mt-1 w-full bg-surface-raised border border-surface-border rounded-lg shadow-xl z-10 max-h-48 overflow-y-auto">
+                      {profiles
+                        .filter((p) =>
+                          p.id !== mergePrimary?.id &&
+                          (p.display_name.toLowerCase().includes(mergeSearchSecondary.toLowerCase()) ||
+                           p.email.toLowerCase().includes(mergeSearchSecondary.toLowerCase()))
+                        )
+                        .slice(0, 8)
+                        .map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => { setMergeSecondary(p); setMergeSearchSecondary(""); }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-surface-overlay"
+                          >
+                            <div className="font-medium text-dark-100">{p.display_name}</div>
+                            <div className="text-xs text-surface-muted">{p.email}</div>
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={handleMerge}
+                disabled={!mergePrimary || !mergeSecondary || merging}
+                className="btn-primary flex-1"
+              >
+                {merging ? "Merging…" : "Merge Accounts"}
+              </button>
+              <button
+                onClick={() => {
+                  setMergeOpen(false);
+                  setMergePrimary(null);
+                  setMergeSecondary(null);
+                  setMergeSearchPrimary("");
+                  setMergeSearchSecondary("");
+                }}
+                className="btn-secondary flex-1"
+                disabled={merging}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Results count */}
       <p className="text-sm text-surface-muted">

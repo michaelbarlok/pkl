@@ -359,29 +359,69 @@ function JoinButton({
     "use server";
 
     const supabase = await createClient();
+    const serviceClient = await createServiceClient();
 
-    let startStep = 5;
-    if (groupType === "ladder_league") {
-      const { data: prefs } = await supabase
-        .from("group_preferences")
-        .select("new_player_start_step")
+    // Check if there's a pending record for this player in this group.
+    // If so, use those stats instead of defaults so imported history is preserved.
+    const { data: playerProfile } = await supabase
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", playerId)
+      .single();
+
+    let usedPending = false;
+    if (playerProfile) {
+      const { claimPendingMemberships } = await import("@/lib/pending-memberships");
+      const before = await serviceClient
+        .from("group_memberships")
+        .select("player_id")
         .eq("group_id", groupId)
-        .single();
-      startStep = prefs?.new_player_start_step ?? 5;
+        .eq("player_id", playerId)
+        .maybeSingle();
+
+      if (!before.data) {
+        // Not yet a member — claimPendingMemberships will insert with pending stats
+        await claimPendingMemberships(
+          serviceClient,
+          playerId,
+          playerProfile.display_name,
+          playerProfile.email,
+          groupId
+        );
+        // Check if the claim created the membership
+        const after = await serviceClient
+          .from("group_memberships")
+          .select("player_id")
+          .eq("group_id", groupId)
+          .eq("player_id", playerId)
+          .maybeSingle();
+        usedPending = !!after.data;
+      }
     }
 
-    // Use service client to bypass RLS for membership insert
-    const serviceClient = await createServiceClient();
-    await serviceClient.from("group_memberships").upsert(
-      {
-        group_id: groupId,
-        player_id: playerId,
-        current_step: startStep,
-        win_pct: 0,
-        total_sessions: 0,
-      },
-      { onConflict: "group_id,player_id" }
-    );
+    // If no pending record handled the join, fall back to default insert
+    if (!usedPending) {
+      let startStep = 5;
+      if (groupType === "ladder_league") {
+        const { data: prefs } = await supabase
+          .from("group_preferences")
+          .select("new_player_start_step")
+          .eq("group_id", groupId)
+          .single();
+        startStep = prefs?.new_player_start_step ?? 5;
+      }
+
+      await serviceClient.from("group_memberships").upsert(
+        {
+          group_id: groupId,
+          player_id: playerId,
+          current_step: startStep,
+          win_pct: 0,
+          total_sessions: 0,
+        },
+        { onConflict: "group_id,player_id" }
+      );
+    }
 
     // Check community badges (non-blocking)
     const { checkAndAwardBadges } = await import("@/lib/badges");
