@@ -1,11 +1,11 @@
 /** Shared status badge colors for tournaments */
 export const TOURNAMENT_STATUS_COLORS: Record<string, string> = {
   draft: "bg-surface-overlay text-dark-200",
-  registration_open: "bg-teal-900/30 text-teal-300",
-  registration_closed: "bg-brand-900/40 text-brand-300",
+  registration_open: "bg-teal-900/30 text-teal-vivid",
+  registration_closed: "bg-brand-900/40 text-brand-vivid",
   in_progress: "bg-accent-900/40 text-accent-300",
   completed: "bg-surface-overlay text-dark-200",
-  cancelled: "bg-red-900/30 text-red-400",
+  cancelled: "bg-red-900/30 text-adaptive-red",
 };
 
 export const TOURNAMENT_STATUS_LABELS: Record<string, string> = {
@@ -30,8 +30,8 @@ export const SESSION_STATUS_LABELS: Record<string, string> = {
 export const SESSION_STATUS_COLORS: Record<string, string> = {
   created: "bg-surface-overlay text-dark-200",
   checking_in: "bg-accent-900/40 text-accent-300",
-  seeding: "bg-brand-900/40 text-brand-300",
-  round_active: "bg-teal-900/30 text-teal-300",
-  round_complete: "bg-brand-900/40 text-brand-300",
+  seeding: "bg-brand-900/40 text-brand-vivid",
+  round_active: "bg-teal-900/30 text-teal-vivid",
+  round_complete: "bg-brand-900/40 text-brand-vivid",
   session_complete: "bg-surface-overlay text-dark-200",
 };
