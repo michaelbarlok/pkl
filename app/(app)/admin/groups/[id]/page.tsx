@@ -1082,9 +1082,10 @@ export default function AdminGroupDetailPage() {
 
           {/* Ladder Mode */}
           <div className="border-t border-surface-border pt-4">
-            <p className="text-sm font-medium text-dark-200 mb-3">Ladder Mode</p>
-            <div className="flex flex-wrap gap-6">
-              <label className="flex items-start gap-3 cursor-pointer">
+            <p className="text-sm font-medium text-dark-200 mb-1">Ladder Mode</p>
+            <p className="text-xs text-surface-muted mb-3">Controls how players are placed on courts between sessions on the same sign-up sheet.</p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
+              <label className="flex items-start gap-3 cursor-pointer flex-1 rounded-lg border border-surface-border p-3 hover:border-brand-500/40 transition-colors has-[:checked]:border-brand-500/60 has-[:checked]:bg-brand-500/5">
                 <input
                   type="radio"
                   name="ladder_type"
@@ -1094,10 +1095,10 @@ export default function AdminGroupDetailPage() {
                 />
                 <div>
                   <p className="text-sm font-medium text-dark-100">Court Promotion</p>
-                  <p className="text-xs text-surface-muted">Players who finish 1st move up a court, last place moves down. Court assignments carry forward between sessions.</p>
+                  <p className="text-xs text-surface-muted mt-0.5">1st place on each court moves up one court, last place moves down. Players carry their specific court assignment forward between sessions — position is earned game by game.</p>
                 </div>
               </label>
-              <label className="flex items-start gap-3 cursor-pointer">
+              <label className="flex items-start gap-3 cursor-pointer flex-1 rounded-lg border border-surface-border p-3 hover:border-brand-500/40 transition-colors has-[:checked]:border-brand-500/60 has-[:checked]:bg-brand-500/5">
                 <input
                   type="radio"
                   name="ladder_type"
@@ -1107,10 +1108,11 @@ export default function AdminGroupDetailPage() {
                 />
                 <div>
                   <p className="text-sm font-medium text-dark-100">Dynamic Ranking</p>
-                  <p className="text-xs text-surface-muted">Steps and win % are recalculated after each session, then all players are re-seeded from scratch by updated rankings.</p>
+                  <p className="text-xs text-surface-muted mt-0.5">After each session, everyone's step and win % are updated, then all players are re-seeded from scratch by overall ranking. No court carries forward — the full standings reset determines placement.</p>
                 </div>
               </label>
             </div>
+            <p className="mt-2 text-xs text-amber-400/80">Changing this setting takes effect on the next session started for this group.</p>
           </div>
 
           <div className="flex justify-end">
