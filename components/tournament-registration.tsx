@@ -114,7 +114,7 @@ export function TournamentRegistrationButton({
       <div className="card">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-teal-300">
+            <p className="text-sm font-medium text-teal-vivid">
               {myRegistration.status === "confirmed" ? "You're registered!" : "You're on the waitlist"}
             </p>
             {myRegistration.division && (

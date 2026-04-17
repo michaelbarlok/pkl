@@ -21,6 +21,10 @@
   --color-surface-overlay: #393b45;
   --color-surface-border:  #444753;
   --color-surface-muted:   #737685;
+  /* Adaptive accent text — bright on dark surfaces, dark on light surfaces */
+  --color-teal-vivid:  #5dead8;  /* teal-300 */
+  --color-brand-vivid: #2dd4c5;  /* brand-400 */
+  --color-red-vivid:   #f87171;  /* red-400 */
 }
 
 /* Light theme — toggled by adding `.light` to <html> */
@@ -41,6 +45,10 @@
   --color-surface-overlay: #f5f6fa;
   --color-surface-border:  #b8bdc9;
   --color-surface-muted:   #8992a3;
+  /* Adaptive accent text — dark values for light surfaces */
+  --color-teal-vivid:  #0f766e;  /* teal-700 */
+  --color-brand-vivid: #0d9490;  /* brand-600 */
+  --color-red-vivid:   #dc2626;  /* red-600 */
 }
 
 @layer base {

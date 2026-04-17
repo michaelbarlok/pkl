@@ -311,7 +311,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                 <div className="flex items-center gap-2 shrink-0">
                   <span
                     className={`text-sm font-semibold ${
-                      isSmall ? "text-red-400" : "text-teal-300"
+                      isSmall ? "text-adaptive-red" : "text-teal-vivid"
                     }`}
                   >
                     {d.count} player{d.count !== 1 ? "s" : ""}
@@ -321,7 +321,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                       onClick={() => toggleSeedPanel(d.division)}
                       className={`text-xs font-medium px-1.5 py-0.5 rounded transition-colors ${
                         isSeedOpen
-                          ? "text-brand-300 bg-brand-900/20"
+                          ? "text-brand-vivid bg-brand-900/20"
                           : "text-surface-muted hover:text-dark-200"
                       }`}
                     >
@@ -330,7 +330,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                   )}
                   <button
                     onClick={() => handleCancel(d.division)}
-                    className="text-xs text-red-400 hover:text-red-300 font-medium"
+                    className="text-xs text-adaptive-red hover:text-red-500 font-medium"
                     title="Cancel this division"
                   >
                     Cancel
@@ -364,7 +364,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                     <button
                       onClick={() => clearSeeds(d.division)}
                       disabled={loadingSeeds[d.division] || savingSeeds[d.division]}
-                      className="text-xs text-surface-muted hover:text-red-400 disabled:opacity-40"
+                      className="text-xs text-surface-muted hover:text-adaptive-red disabled:opacity-40"
                     >
                       Clear
                     </button>
@@ -382,7 +382,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                   </div>
 
                   {seedError[d.division] && (
-                    <p className="text-xs text-red-400 mb-2">{seedError[d.division]}</p>
+                    <p className="text-xs text-adaptive-red mb-2">{seedError[d.division]}</p>
                   )}
 
                   {loadingSeeds[d.division] ? (
@@ -502,7 +502,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
       {/* Merge controls */}
       {selectedForMerge.length >= 2 && (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-brand-900/20 border border-brand-500/30">
-          <p className="text-xs text-brand-300 flex-1">
+          <p className="text-xs text-brand-vivid flex-1">
             Merge {selectedForMerge.length} selected divisions into &quot;{getDivisionLabel(selectedForMerge[0])}&quot;
           </p>
           <button
@@ -529,7 +529,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
             : `Generate Brackets (${divisions.length} division${divisions.length !== 1 ? "s" : ""})`}
         </button>
         {hasSmallDivisions && (
-          <p className="text-xs text-red-400 self-center">
+          <p className="text-xs text-adaptive-red self-center">
             Some divisions have fewer than {MIN_PLAYERS} players
           </p>
         )}

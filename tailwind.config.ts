@@ -21,6 +21,7 @@ const config: Config = {
           700: "#0f766e",
           800: "#115e59",
           900: "#134e4a",
+          vivid: "var(--color-brand-vivid)",
         },
         // Accent — amber (ball color)
         accent: {
@@ -47,6 +48,7 @@ const config: Config = {
           700: "#0f766e",
           800: "#115e59",
           900: "#134e4a",
+          vivid: "var(--color-teal-vivid)",
         },
         // Neutral dark scale — carbon gray (CSS-variable driven for light mode)
         dark: {
@@ -69,6 +71,7 @@ const config: Config = {
           border:  "var(--color-surface-border)",
           muted:   "var(--color-surface-muted)",
         },
+        "adaptive-red": "var(--color-red-vivid)",
       },
     },
   },
