@@ -7,6 +7,7 @@ import {
   computePoolStandings,
   getPoolBrackets,
 } from "@/lib/tournament-bracket";
+import { getDivision, SKILLS } from "@/lib/divisions";
 import { getTournamentManager } from "@/lib/tournament-auth";
 
 /**
@@ -30,6 +31,22 @@ export async function PUT(
     if (!target || !sources || sources.length === 0) {
       return NextResponse.json({ error: "target and sources required" }, { status: 400 });
     }
+
+    const allDivisions = [target, ...sources];
+
+    // Fetch registration IDs per division before moving, so we can seed by source division
+    const divisionRegs: Record<string, { id: string }[]> = {};
+    await Promise.all(
+      allDivisions.map(async (div) => {
+        const { data } = await supabase
+          .from("tournament_registrations")
+          .select("id")
+          .eq("tournament_id", tournamentId)
+          .eq("division", div)
+          .neq("status", "withdrawn");
+        divisionRegs[div] = data ?? [];
+      })
+    );
 
     // Move all registrations from source divisions into target division
     for (const source of sources) {
@@ -57,6 +74,36 @@ export async function PUT(
         .update({ divisions: updatedDivisions })
         .eq("id", tournamentId);
     }
+
+    // Auto-seed by skill level (highest first), random within each tier.
+    // SKILLS is ordered 3.0 → 3.5 → 4.0 → 4.5+ so higher index = higher skill.
+    const skillRank = (divCode: string): number =>
+      SKILLS.findIndex((s) => s.value === getDivision(divCode)?.skill);
+
+    const sortedDivisions = allDivisions
+      .filter((div) => divisionRegs[div]?.length > 0)
+      .sort((a, b) => skillRank(b) - skillRank(a)); // highest skill → seed 1
+
+    // Build ordered list: shuffle within each tier then concatenate
+    const seededIds: string[] = [];
+    for (const div of sortedDivisions) {
+      const ids = divisionRegs[div].map((r) => r.id);
+      // Fisher-Yates shuffle within tier
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      seededIds.push(...ids);
+    }
+
+    await Promise.all(
+      seededIds.map((id, i) =>
+        supabase
+          .from("tournament_registrations")
+          .update({ seed: i + 1 })
+          .eq("id", id)
+      )
+    );
 
     return NextResponse.json({ ok: true });
   }
