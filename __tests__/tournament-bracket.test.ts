@@ -352,11 +352,11 @@ describe("generateRoundRobin — medium divisions (7-12 teams → 2 pools)", () 
   test("7 teams → 2 pools [4, 3], correct real match count", () => {
     const ids = makeIds(7);
     const m = generateRoundRobin(ids);
-    // Pool of 4 (even, default=3 games): 3 rounds × 2 matches = 6 real
-    // Pool of 3 (odd, default=3 games based on maxPoolSize=4):
-    //   laps = ceil(3/2) = 2, totalRounds = 2*3 = 6, 6×1 real = 6 real
-    // Total = 12 real matches
-    expect(m.filter((x) => x.status !== "bye")).toHaveLength(12);
+    // Default = full RR per pool (each team plays every opponent once)
+    // Pool of 4 (even): 3 rounds × 2 matches = 6 real
+    // Pool of 3 (odd, perPoolGames=2): laps=1, totalRounds=3, 3×1 real = 3 real
+    // Total = 9 real matches
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(9);
   });
 
   test("8 teams → pool sizes [4, 4], each pool is full RR", () => {

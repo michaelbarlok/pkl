@@ -32,7 +32,6 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
   const [merging, setMerging] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
-  const [numPools, setNumPools] = useState<Record<string, string>>({});
   const [gamesPerTeam, setGamesPerTeam] = useState<Record<string, string>>({});
 
   // Seeding state
@@ -132,15 +131,11 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
     setGenerating(true);
     setError("");
 
-    const divisionSettings: Record<string, { num_pools?: number; games_per_team?: number }> = {};
+    const divisionSettings: Record<string, { games_per_team?: number }> = {};
     if (isRoundRobin) {
       for (const d of divisions) {
-        const np = parseInt(numPools[d.division] ?? "");
         const gpt = parseInt(gamesPerTeam[d.division] ?? "");
-        const entry: { num_pools?: number; games_per_team?: number } = {};
-        if (np > 0) entry.num_pools = np;
-        if (gpt > 0) entry.games_per_team = gpt;
-        if (Object.keys(entry).length > 0) divisionSettings[d.division] = entry;
+        if (gpt > 0) divisionSettings[d.division] = { games_per_team: gpt };
       }
     }
 
@@ -274,9 +269,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
           const hasPoolPanel = isRoundRobin && !isSmall;
           const hasAnyPanelBelow = isSeedOpen || hasPoolPanel;
 
-          // Compute pool structure based on user-chosen pool count (or default)
-          const chosenNumPools = parseInt(numPools[d.division] ?? "") || undefined;
-          const poolStructure = isRoundRobin ? getPoolStructure(d.count, chosenNumPools) : null;
+          const poolStructure = isRoundRobin ? getPoolStructure(d.count) : null;
 
           return (
             <div key={d.division} className="space-y-0">
@@ -432,46 +425,46 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
               {/* Pool play configuration (round robin only) */}
               {hasPoolPanel && poolStructure && (
                 <div className="rounded-b-lg border border-t-0 border-surface-border bg-surface-overlay px-3 py-2.5 space-y-2">
-                  {/* Pool count row */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs font-medium text-dark-200">Pools:</label>
-                    <input
-                      type="number"
-                      min={poolStructure.minNumPools}
-                      max={poolStructure.maxNumPools}
-                      value={numPools[d.division] ?? String(poolStructure.numPools)}
-                      onChange={(e) =>
-                        setNumPools((prev) => ({ ...prev, [d.division]: e.target.value }))
+                  {/* Pool layout (automatic, read-only) */}
+                  <p className="text-xs text-surface-muted">
+                    {(() => {
+                      const { numPools: np, poolSizes } = poolStructure;
+                      const uniqueSizes = [...new Set(poolSizes)];
+                      if (uniqueSizes.length === 1) {
+                        return `${np} pool${np > 1 ? "s" : ""} of ${uniqueSizes[0]} team${uniqueSizes[0] > 1 ? "s" : ""}`;
                       }
-                      className="input w-16 py-1 text-center text-xs"
-                    />
-                    <span className="text-xs text-surface-muted">
-                      {(() => {
-                        const { numPools: np, poolSizes } = poolStructure;
-                        const uniqueSizes = [...new Set(poolSizes)];
-                        if (uniqueSizes.length === 1) {
-                          return `${np} pool${np > 1 ? "s" : ""} of ${uniqueSizes[0]} team${uniqueSizes[0] > 1 ? "s" : ""}`;
-                        }
-                        return `${np} pools (${poolSizes.join(", ")} teams)`;
-                      })()}
-                    </span>
-                  </div>
+                      return `${np} pools (${poolSizes.join(", ")} teams)`;
+                    })()}
+                    {poolStructure.numPools >= 3 && " · top 2 per pool advance to bracket"}
+                  </p>
 
-                  {/* Games per team row */}
+                  {/* Games per team */}
                   {(() => {
-                    const maxPoolSize = Math.max(...poolStructure.poolSizes);
-                    const defaultGames = maxPoolSize - 1;
-                    const gpt = parseInt(gamesPerTeam[d.division] ?? "") || defaultGames;
-                    const info = poolGamesInfo(maxPoolSize, gpt);
-                    const roundedUp = info.actualGamesPerTeam !== gpt;
-
+                    const gpt = parseInt(gamesPerTeam[d.division] ?? "") || null;
+                    // Build description based on what each pool will actually do
                     let description: string;
-                    if (info.timesVsEachOpponent === 1) {
-                      description = "each team plays every opponent once";
-                    } else if (info.timesVsEachOpponent) {
-                      description = `each team plays every opponent ${info.timesVsEachOpponent}×`;
+                    if (gpt === null) {
+                      description = "default: each team plays every opponent once";
                     } else {
-                      description = `${info.actualGamesPerTeam} games per team`;
+                      const maxPoolSize = Math.max(...poolStructure.poolSizes);
+                      const info = poolGamesInfo(maxPoolSize, gpt);
+                      if (info.timesVsEachOpponent === 1) {
+                        description = "each team plays every opponent once";
+                      } else if (info.timesVsEachOpponent) {
+                        description = `each team plays every opponent ${info.timesVsEachOpponent}×`;
+                      } else {
+                        description = `${gpt} games per team`;
+                      }
+                      // Note if any smaller odd pools will round up
+                      const smallerOddPools = [...new Set(poolStructure.poolSizes)].filter(
+                        (sz) => sz < maxPoolSize && sz % 2 === 1
+                      );
+                      if (smallerOddPools.length > 0) {
+                        const smallInfo = poolGamesInfo(smallerOddPools[0], gpt);
+                        if (smallInfo.actualGamesPerTeam !== gpt) {
+                          description += ` (smaller pools round up to ${smallInfo.actualGamesPerTeam})`;
+                        }
+                      }
                     }
 
                     return (
@@ -481,27 +474,17 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                           type="number"
                           min={1}
                           max={poolStructure.maxGamesPerTeam}
-                          value={gamesPerTeam[d.division] ?? String(defaultGames)}
+                          placeholder="default"
+                          value={gamesPerTeam[d.division] ?? ""}
                           onChange={(e) =>
                             setGamesPerTeam((prev) => ({ ...prev, [d.division]: e.target.value }))
                           }
-                          className="input w-16 py-1 text-center text-xs"
+                          className="input w-20 py-1 text-center text-xs"
                         />
-                        <span className="text-xs text-surface-muted">
-                          {description}
-                          {roundedUp && (
-                            <span className="text-yellow-400 ml-1">
-                              (rounds up to {info.actualGamesPerTeam} for balanced pools)
-                            </span>
-                          )}
-                        </span>
+                        <span className="text-xs text-surface-muted">{description}</span>
                       </div>
                     );
                   })()}
-
-                  {poolStructure.numPools >= 3 && (
-                    <p className="text-xs text-brand-300">Top 2 per pool advance to bracket</p>
-                  )}
                 </div>
               )}
             </div>

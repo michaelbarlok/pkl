@@ -258,7 +258,7 @@ export async function POST(
 
   // Parse division_settings from request body
   const body = await request.json().catch(() => ({}));
-  const divisionSettings: Record<string, { num_pools?: number; games_per_team?: number }> = body.division_settings ?? {};
+  const divisionSettings: Record<string, { games_per_team?: number }> = body.division_settings ?? {};
 
   // Save division_settings to tournament
   if (Object.keys(divisionSettings).length > 0) {
@@ -294,7 +294,7 @@ export async function POST(
     const hasSeeds = registrations.some((r) => r.seed != null);
 
     // Get pool settings for this division
-    const { num_pools: numPools, games_per_team: gamesPerTeam } = divisionSettings[division] ?? {};
+    const { games_per_team: gamesPerTeam } = divisionSettings[division] ?? {};
 
     // Generate bracket
     let bracketMatches;
@@ -307,7 +307,7 @@ export async function POST(
         bracketMatches = generateDoubleElimination(playerIds);
         break;
       case "round_robin":
-        bracketMatches = generateRoundRobin(playerIds, { numPools, gamesPerTeam, seeded: hasSeeds });
+        bracketMatches = generateRoundRobin(playerIds, { gamesPerTeam, seeded: hasSeeds });
         break;
       default:
         continue;

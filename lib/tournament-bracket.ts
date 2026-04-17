@@ -156,25 +156,15 @@ export function generateDoubleElimination(playerIds: string[]): BracketMatch[] {
 /**
  * Determine pool structure for a given team count.
  *
- * Enforces a maximum of 6 teams per pool. The organizer may request a specific
- * number of pools; the value is clamped to a valid range.
+ * Pools are sized automatically: as few pools as possible with at most 6 teams each,
+ * distributed as evenly as possible (larger pools first).
  */
-export function getPoolStructure(
-  teamCount: number,
-  requestedNumPools?: number
-): {
+export function getPoolStructure(teamCount: number): {
   numPools: number;
   poolSizes: number[];
   maxGamesPerTeam: number;
-  minNumPools: number;
-  maxNumPools: number;
 } {
-  const minNumPools = Math.max(1, Math.ceil(teamCount / 6)); // max 6 per pool
-  const maxNumPools = Math.max(1, Math.floor(teamCount / 2)); // min 2 per pool
-
-  const numPools = requestedNumPools
-    ? Math.min(Math.max(requestedNumPools, minNumPools), maxNumPools)
-    : minNumPools;
+  const numPools = Math.max(1, Math.ceil(teamCount / 6)); // as few pools as possible, max 6/pool
 
   // Distribute as evenly as possible (larger pools first)
   const baseSize = Math.floor(teamCount / numPools);
@@ -187,7 +177,7 @@ export function getPoolStructure(
   const maxPoolSize = Math.max(...poolSizes);
   const maxGamesPerTeam = 2 * (maxPoolSize - 1);
 
-  return { numPools, poolSizes, maxGamesPerTeam, minNumPools, maxNumPools };
+  return { numPools, poolSizes, maxGamesPerTeam };
 }
 
 /**
@@ -220,24 +210,24 @@ export function poolGamesInfo(
 /**
  * Generate round robin pool play matches.
  *
+ * Pools are sized automatically (max 6/pool, as few pools as possible).
+ *
  * @param playerIds All players in this division (pre-sorted by seed when seeded=true)
- * @param options.numPools  Organizer-specified pool count (clamped to valid range, max 6/pool)
- * @param options.gamesPerTeam  Games each team plays in pool play. Supports values > (poolSize-1)
- *   for multiple round robins (e.g. 4 games in a 3-team pool → each pair plays twice).
- *   For odd pools, rounded up to the next complete lap to guarantee equal game counts.
+ * @param options.gamesPerTeam  Games each team plays in pool play.
+ *   Omit to default to a full round robin (each team plays every opponent once).
+ *   Supports values > (poolSize-1) for multi-lap scheduling.
+ *   Odd pools round up to the next complete lap to guarantee equal game counts.
  * @param options.seeded  Use snake seeding for pool distribution instead of random shuffle.
  */
 export function generateRoundRobin(
   playerIds: string[],
-  options?: { numPools?: number; gamesPerTeam?: number; seeded?: boolean }
+  options?: { gamesPerTeam?: number; seeded?: boolean }
 ): BracketMatch[] {
-  const { numPools: requestedNumPools, gamesPerTeam, seeded } = options ?? {};
+  const { gamesPerTeam, seeded } = options ?? {};
   const n = playerIds.length;
   if (n < 2) return [];
 
-  const structure = getPoolStructure(n, requestedNumPools);
-  const maxPoolSize = Math.max(...structure.poolSizes);
-  const targetGames = gamesPerTeam ?? (maxPoolSize - 1);
+  const structure = getPoolStructure(n);
 
   // Distribute players into pools
   let pools: string[][];
@@ -263,7 +253,9 @@ export function generateRoundRobin(
 
   const allMatches: BracketMatch[] = [];
   for (let i = 0; i < structure.numPools; i++) {
-    allMatches.push(...generatePoolMatches(pools[i], bracketNames[i], targetGames));
+    // Default: full round robin for this specific pool (each team plays every opponent once)
+    const perPoolGames = gamesPerTeam ?? (pools[i].length - 1);
+    allMatches.push(...generatePoolMatches(pools[i], bracketNames[i], perPoolGames));
   }
   return allMatches;
 }
