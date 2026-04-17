@@ -31,11 +31,12 @@ export default async function SheetsPage() {
     } else {
       const { data: adminMemberships } = await supabase
         .from("group_memberships")
-        .select("group_id")
+        .select("group_id, group:shootout_groups!inner(group_type)")
         .eq("player_id", profile.id)
-        .eq("group_role", "admin")
-        .limit(1);
-      isAnyGroupAdmin = (adminMemberships?.length ?? 0) > 0;
+        .eq("group_role", "admin");
+      isAnyGroupAdmin = (adminMemberships ?? []).some(
+        (m: any) => m.group?.group_type === "ladder_league"
+      );
     }
   }
 
