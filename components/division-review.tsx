@@ -1,7 +1,7 @@
 "use client";
 
 import { FormError } from "@/components/form-error";
-import { getDivisionLabel } from "@/lib/divisions";
+import { getDivision, getDivisionLabel, SKILLS } from "@/lib/divisions";
 import { getPoolStructure, poolGamesInfo } from "@/lib/tournament-bracket";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -58,8 +58,10 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
     setMerging(true);
     setError("");
 
-    const target = selectedForMerge[0];
-    const sources = selectedForMerge.slice(1);
+    const skillRank = (code: string) =>
+      SKILLS.findIndex((s) => s.value === getDivision(code)?.skill);
+    const target = [...selectedForMerge].sort((a, b) => skillRank(b) - skillRank(a))[0];
+    const sources = selectedForMerge.filter((d) => d !== target);
 
     const res = await fetch(`/api/tournaments/${tournamentId}/divisions`, {
       method: "PUT",
@@ -503,7 +505,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
       {selectedForMerge.length >= 2 && (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-brand-900/20 border border-brand-500/30">
           <p className="text-xs text-brand-vivid flex-1">
-            Merge {selectedForMerge.length} selected divisions into &quot;{getDivisionLabel(selectedForMerge[0])}&quot;
+            Merge {selectedForMerge.length} selected divisions into &quot;{getDivisionLabel([...selectedForMerge].sort((a, b) => SKILLS.findIndex(s => s.value === getDivision(b)?.skill) - SKILLS.findIndex(s => s.value === getDivision(a)?.skill))[0])}&quot;
           </p>
           <button
             onClick={handleMerge}
