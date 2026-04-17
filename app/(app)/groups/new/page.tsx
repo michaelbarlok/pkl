@@ -82,8 +82,8 @@ export default function CreateGroupPage() {
         max_step: Number(formData.get("max_step")) || 10,
         step_move_up: Number(formData.get("step_move_up")) || 1,
         step_move_down: Number(formData.get("step_move_down")) || 1,
-        game_limit_4p: Number(formData.get("game_limit_4p")) || 3,
-        game_limit_5p: Number(formData.get("game_limit_5p")) || 4,
+        ...(formData.get("game_limit_4p") ? { game_limit_4p: Number(formData.get("game_limit_4p")) } : {}),
+        ...(formData.get("game_limit_5p") ? { game_limit_5p: Number(formData.get("game_limit_5p")) } : {}),
         win_by_2: formData.get("win_by_2") === "on",
       });
       if (prefsError) console.error("Create group preferences error:", prefsError);

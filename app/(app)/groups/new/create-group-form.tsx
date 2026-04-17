@@ -312,7 +312,6 @@ export function CreateGroupForm({
                 type="number"
                 id="game_limit_4p"
                 name="game_limit_4p"
-                defaultValue={3}
                 min={1}
                 className="input w-full"
               />
@@ -329,7 +328,6 @@ export function CreateGroupForm({
                 type="number"
                 id="game_limit_5p"
                 name="game_limit_5p"
-                defaultValue={4}
                 min={1}
                 className="input w-full"
               />
