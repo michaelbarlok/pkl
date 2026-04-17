@@ -28,6 +28,8 @@ export default function NewSheetFromSheetsPage() {
   const [allowMemberGuests, setAllowMemberGuests] = useState(false);
   const [notifyOnCreate, setNotifyOnCreate] = useState(true);
   const [notes, setNotes] = useState("");
+  // Group timezone (from recurring schedule, falls back to ET)
+  const [groupTimezone, setGroupTimezone] = useState("America/New_York");
 
   // Generate 15-min time options
   const timeOptions: string[] = [];
@@ -62,8 +64,18 @@ export default function NewSheetFromSheetsPage() {
     }
     const hh = h.toString().padStart(2, "0");
     const mm = m.toString().padStart(2, "0");
-    // Parse as local time, then convert to UTC ISO string so Supabase stores the correct value
-    return new Date(`${date}T${hh}:${mm}:00`).toISOString();
+    // Convert the local event time in the group's IANA timezone to UTC, so the
+    // close time is correct regardless of the admin's browser timezone.
+    return localToUtc(`${date}T${hh}:${mm}:00`, groupTimezone).toISOString();
+  }
+
+  function localToUtc(localStr: string, tz: string): Date {
+    const candidate = new Date(localStr + "Z");
+    const utcParts = Intl.DateTimeFormat("en-US", { timeZone: "UTC", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(candidate);
+    const tzParts  = Intl.DateTimeFormat("en-US", { timeZone: tz,    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(candidate);
+    const get = (parts: Intl.DateTimeFormatPart[], type: string) => parseInt(parts.find(p => p.type === type)?.value ?? "0", 10);
+    const toMs = (parts: Intl.DateTimeFormatPart[]) => Date.UTC(get(parts,"year"), get(parts,"month")-1, get(parts,"day"), get(parts,"hour"), get(parts,"minute"), get(parts,"second"));
+    return new Date(candidate.getTime() - (toMs(tzParts) - toMs(utcParts)));
   }
 
   useEffect(() => {
@@ -122,6 +134,13 @@ export default function NewSheetFromSheetsPage() {
       setAdminGroups(groups);
       if (groups.length > 0) {
         setGroupId(groups[0].id);
+        // Load timezone for the first group
+        const { data: sched } = await supabase
+          .from("group_recurring_schedules")
+          .select("timezone")
+          .eq("group_id", groups[0].id)
+          .maybeSingle();
+        if (sched?.timezone) setGroupTimezone(sched.timezone);
       }
 
       // Load saved locations
@@ -313,7 +332,15 @@ export default function NewSheetFromSheetsPage() {
             <select
               id="group"
               value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
+              onChange={async (e) => {
+                setGroupId(e.target.value);
+                const { data: sched } = await supabase
+                  .from("group_recurring_schedules")
+                  .select("timezone")
+                  .eq("group_id", e.target.value)
+                  .maybeSingle();
+                setGroupTimezone(sched?.timezone ?? "America/New_York");
+              }}
               className="input w-full"
               required
             >

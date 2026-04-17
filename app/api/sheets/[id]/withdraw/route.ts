@@ -23,9 +23,27 @@ export async function POST(
       // No body — self-withdrawal
     }
 
+    // For self-withdrawals (non-admin), enforce sheet status and deadline server-side.
+    // Admins removing other players bypass these checks intentionally.
+    const isAdminRemoval = !!registrationId && auth.profile.role === "admin";
+    if (!isAdminRemoval) {
+      const { data: sheet } = await auth.supabase
+        .from("signup_sheets")
+        .select("status, withdraw_closes_at")
+        .eq("id", sheetId)
+        .single();
+
+      if (sheet?.status !== "open") {
+        return NextResponse.json({ error: "Sheet is not open" }, { status: 400 });
+      }
+      if (sheet?.withdraw_closes_at && new Date(sheet.withdraw_closes_at) < new Date()) {
+        return NextResponse.json({ error: "Withdrawal deadline has passed" }, { status: 400 });
+      }
+    }
+
     let registration: { id: string; status: string } | null = null;
 
-    if (registrationId && auth.profile.role === "admin") {
+    if (isAdminRemoval) {
       // Admin removing a specific player by registration id
       const { data: reg } = await auth.supabase
         .from("registrations")
