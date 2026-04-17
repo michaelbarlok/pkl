@@ -23,7 +23,6 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: payload.body ?? "",
-    icon: "/TriStarPB-light-minimal.jpg",
     badge: "/ic_notification_xxxhdpi_96px.png",
     data: { url: payload.link ?? "/" },
     vibrate: [100, 50, 100],
