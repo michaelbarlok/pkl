@@ -188,7 +188,7 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
       >
         {collapsed ? (
           <Link href="/">
-            <Logo className="h-8 w-8 object-contain shrink-0" />
+            <img src="/TriStarPB-light-minimal.jpg" alt="Tri-Star Pickleball" className="h-8 w-8 object-contain shrink-0 rounded" />
           </Link>
         ) : (
           <Link href="/" className="flex items-center gap-2 min-w-0">
