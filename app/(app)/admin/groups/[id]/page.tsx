@@ -334,11 +334,14 @@ export default function AdminGroupDetailPage() {
       win_by_2: form.get("win_by_2") === "on",
     };
 
-    const { error } = await supabase
-      .from("group_preferences")
-      .update(updates)
-      .eq("group_id", id);
+    const ladderType = form.get("ladder_type") as string;
 
+    const [prefsResult, groupResult] = await Promise.all([
+      supabase.from("group_preferences").update(updates).eq("group_id", id),
+      supabase.from("shootout_groups").update({ ladder_type: ladderType }).eq("id", id),
+    ]);
+
+    const error = prefsResult.error ?? groupResult.error;
     if (error) {
       setMessage({ type: "error", text: `Failed to save: ${error.message}` });
     } else {
@@ -1075,6 +1078,41 @@ export default function AdminGroupDetailPage() {
                 Win by 2 required
               </label>
             </div>
+          </div>
+
+          {/* Ladder Mode */}
+          <div className="border-t border-surface-border pt-4">
+            <p className="text-sm font-medium text-dark-200 mb-1">Ladder Mode</p>
+            <p className="text-xs text-surface-muted mb-3">Controls how players are placed on courts between sessions on the same sign-up sheet.</p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
+              <label className="flex items-start gap-3 cursor-pointer flex-1 rounded-lg border border-surface-border p-3 hover:border-brand-500/40 transition-colors has-[:checked]:border-brand-500/60 has-[:checked]:bg-brand-500/5">
+                <input
+                  type="radio"
+                  name="ladder_type"
+                  value="court_promotion"
+                  defaultChecked={group?.ladder_type !== "dynamic_ranking"}
+                  className="mt-0.5 text-brand-600 focus:ring-brand-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-dark-100">Court Promotion</p>
+                  <p className="text-xs text-surface-muted mt-0.5">1st place on each court moves up one court, last place moves down. Players carry their specific court assignment forward between sessions — position is earned game by game.</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer flex-1 rounded-lg border border-surface-border p-3 hover:border-brand-500/40 transition-colors has-[:checked]:border-brand-500/60 has-[:checked]:bg-brand-500/5">
+                <input
+                  type="radio"
+                  name="ladder_type"
+                  value="dynamic_ranking"
+                  defaultChecked={group?.ladder_type === "dynamic_ranking"}
+                  className="mt-0.5 text-brand-600 focus:ring-brand-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-dark-100">Dynamic Ranking</p>
+                  <p className="text-xs text-surface-muted mt-0.5">After each session, everyone's step and win % are updated, then all players are re-seeded from scratch by overall ranking. No court carries forward — the full standings reset determines placement.</p>
+                </div>
+              </label>
+            </div>
+            <p className="mt-2 text-xs text-amber-400/80">Changing this setting takes effect on the next session started for this group.</p>
           </div>
 
           <div className="flex justify-end">

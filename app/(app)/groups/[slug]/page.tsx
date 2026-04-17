@@ -212,6 +212,7 @@ export default async function GroupPage({
 
       {/* Stats (ladder league only) */}
       {!isFreePlay && (
+        <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="card card-static">
             <p className="text-sm text-surface-muted">Members</p>
@@ -257,6 +258,19 @@ export default async function GroupPage({
               View Rankings
             </p>
           </Link>
+        </div>
+
+        {/* Ladder mode note */}
+        <div className="flex items-center gap-2 text-xs text-surface-muted">
+          <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0-3.75-3.75M17.25 21 21 17.25" />
+          </svg>
+          {group.ladder_type === "dynamic_ranking" ? (
+            <span><span className="font-medium text-dark-300">Dynamic Ranking</span> — courts reset each session based on updated overall standings</span>
+          ) : (
+            <span><span className="font-medium text-dark-300">Court Promotion</span> — finish 1st to move up a court, last place moves down</span>
+          )}
+        </div>
         </div>
       )}
 

@@ -180,13 +180,12 @@ export default function CheckInPage() {
       let positions;
 
       const isSessionContinuation = session.is_same_day_continuation && session.prev_session_id;
+      const isDynamicRanking = session?.group?.ladder_type === "dynamic_ranking";
 
-      if (isSessionContinuation) {
-        // Session 2+ seeding: players who finished the previous round are anchored
-        // to their target_court_next. Players added fresh (no target court — e.g.
-        // a waitlist member subbing in) are sorted by the standard ranking sheet
-        // order (Step → Pt% → Last Played → Sessions) and slotted into available
-        // court space. seedSameDaySession handles the mixed case correctly.
+      if (isSessionContinuation && !isDynamicRanking) {
+        // Court Promotion: players who finished the previous round are anchored to
+        // their target_court_next. Players added fresh (no target court — e.g. a
+        // waitlist member subbing in) are sorted by ranking and slotted into space.
         const seedablePlayers: SeedablePlayer[] = checkedIn.map((p) => ({
           id: p.player_id,
           currentStep: p.current_step,
@@ -198,7 +197,9 @@ export default function CheckInPage() {
         }));
         positions = seedSameDaySession(seedablePlayers, session.num_courts);
       } else {
-        // Standard ranking sheet sort: Step ASC → Pt% DESC → Last Played → Sessions
+        // Dynamic Ranking continuation OR session 1: ignore any target_court_next and
+        // re-seed all players from scratch using their current (freshly updated) step
+        // and win %. This reflects post-round step changes in the new court order.
         const rankedPlayers: RankedPlayer[] = checkedIn.map((p) => ({
           id: p.player_id,
           currentStep: p.current_step,
