@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
 
-const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_NAMES_FULL = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 
 function fmt12h(time: string) {
   const [hStr, mStr] = time.split(":");
@@ -20,7 +20,7 @@ function formatPlayTime(pt: GroupCardData["playTime"], tz: string): string {
   const tzAbbr = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" })
     .formatToParts(new Date())
     .find((p) => p.type === "timeZoneName")?.value ?? "";
-  return `${DAY_SHORT[pt.day_of_week]}s · ${localTime} ${tzAbbr}`;
+  return `${DAY_NAMES_FULL[pt.day_of_week]} · ${localTime} ${tzAbbr}`;
 }
 
 export interface GroupCardData {
