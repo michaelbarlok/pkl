@@ -469,7 +469,7 @@ describe("Edge cases that could break during a real tournament", () => {
     expect(ids).toContain(champion);
   });
 
-  test("poolRounds=3 for a 12-team division still produces 6 qualifiers", () => {
+  test("gamesPerTeam=3 for a 12-team division still produces 6 qualifiers", () => {
     const ids = Array.from({ length: 12 }, (_, i) => `p${i}`);
     const generated = generateRoundRobin(ids, { gamesPerTeam: 3 });
     const matches = makeSimMatches(generated, "test");

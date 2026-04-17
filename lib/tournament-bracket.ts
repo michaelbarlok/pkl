@@ -4,16 +4,17 @@
  * Generates match structures for single elimination, double elimination,
  * and round robin formats.
  *
- * Round Robin Format:
- *   3-7 teams:  Single pool, organizer-configured rounds (max = teams-1)
- *   8-14 teams: 2 pools (split evenly), organizer-configured rounds
- *   15+ teams:  Split into pools of ~5 (target size 5, distributed evenly).
- *               Top 2 from each pool advance to a seeded single-elim bracket
- *               ranked by record then point differential.
+ * Round Robin Format (max 6 teams per pool, pools sized automatically):
+ *   3-6 teams:  Single pool.
+ *   7-12 teams: 2 pools (split as evenly as possible).
+ *   13+ teams:  3+ pools of ~5 teams each.
  *
- *   For 3-7: top 4 advance to playoff (or all if fewer than 4).
- *   For 8-14: top 3 per pool (6 total) advance to 6-team playoff.
- *   For 15+: top 2 per pool advance to single-elim bracket.
+ *   Organizer optionally specifies games_per_team (default = full round robin per pool).
+ *
+ *   Playoff qualifiers:
+ *     1 pool:  top 4 advance (or all if fewer).
+ *     2 pools: top 3 per pool (6-team playoff).
+ *     3+ pools: top 2 per pool, re-seeded by record then point differential.
  *
  *   Playoffs always include a 3rd place game.
  *   Pool matches are generated upfront; playoff matches are created when

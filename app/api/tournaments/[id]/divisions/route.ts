@@ -124,9 +124,10 @@ export async function PUT(
       );
     }
 
-    // Detect pool structure from bracket labels
+    // Detect pool structure from bracket labels.
+    // With max 6 teams per pool: 3-6 teams → 1 pool, 7-12 → 2 pools, 13+ → 3+ pools.
     const poolBrackets = getPoolBrackets(poolMatches);
-    const isMultiPool = poolBrackets.length >= 3; // 3+ pools (15+ team scenario)
+    const isMultiPool = poolBrackets.length >= 3;
 
     // Use organizer-provided seeding if given, otherwise compute from standings
     let seededPlayerIds: string[];
@@ -134,7 +135,7 @@ export async function PUT(
     if (seeded_players && seeded_players.length >= 2) {
       seededPlayerIds = seeded_players;
     } else if (isMultiPool) {
-      // 15+ teams: top 2 from each pool, ranked across all pools
+      // 3+ pools (13+ teams): top 2 from each pool, ranked across all pools
       const allQualifiers: { id: string; wins: number; losses: number; pointDiff: number }[] = [];
       for (const bracket of poolBrackets) {
         const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
@@ -144,7 +145,7 @@ export async function PUT(
       allQualifiers.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
       seededPlayerIds = allQualifiers.map((s) => s.id);
     } else if (poolBrackets.length === 2) {
-      // 8-14 teams: 2 pools, top 3 from each
+      // 2 pools (7-12 teams): top 3 from each (slice naturally caps if a pool has fewer)
       const poolAMatches = poolMatches.filter((m) => m.bracket === poolBrackets[0]);
       const poolBMatches = poolMatches.filter((m) => m.bracket === poolBrackets[1]);
 
