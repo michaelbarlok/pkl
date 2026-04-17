@@ -310,6 +310,7 @@ export default function CreateTournamentPage() {
             </label>
             <input
               type="time"
+              step="900"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
               className="input"
@@ -495,6 +496,7 @@ export default function CreateTournamentPage() {
             </label>
             <input
               type="datetime-local"
+              step="900"
               value={registrationOpensAt}
               onChange={(e) => setRegistrationOpensAt(e.target.value)}
               className="input"
@@ -506,6 +508,7 @@ export default function CreateTournamentPage() {
             </label>
             <input
               type="datetime-local"
+              step="900"
               value={registrationClosesAt}
               onChange={(e) => setRegistrationClosesAt(e.target.value)}
               className="input"

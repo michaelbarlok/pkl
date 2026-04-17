@@ -83,6 +83,7 @@ export interface Profile {
   usap_member_id?: string | null;
   usap_tier?: string | null;
   usap_expiration?: string | null;
+  is_test: boolean;
   created_at: string;
   updated_at: string;
 }
