@@ -165,12 +165,16 @@ export function getPoolStructure(teamCount: number): {
   maxRoundsPerPool: number;
 } {
   if (teamCount <= 7) {
-    return { numPools: 1, poolSizes: [teamCount], maxRoundsPerPool: teamCount - 1 };
+    return { numPools: 1, poolSizes: [teamCount], maxRoundsPerPool: fullRoundRobinRounds(teamCount) };
   }
   if (teamCount <= 14) {
     const half = Math.ceil(teamCount / 2);
     const other = teamCount - half;
-    return { numPools: 2, poolSizes: [half, other], maxRoundsPerPool: half - 1 };
+    return {
+      numPools: 2,
+      poolSizes: [half, other],
+      maxRoundsPerPool: Math.max(fullRoundRobinRounds(half), fullRoundRobinRounds(other)),
+    };
   }
   // 15+ teams: pools of ~5
   const numPools = Math.round(teamCount / 5);
@@ -181,7 +185,16 @@ export function getPoolStructure(teamCount: number): {
     poolSizes.push(baseSize + (i < remainder ? 1 : 0));
   }
   const maxPoolSize = Math.max(...poolSizes);
-  return { numPools, poolSizes, maxRoundsPerPool: maxPoolSize - 1 };
+  return { numPools, poolSizes, maxRoundsPerPool: fullRoundRobinRounds(maxPoolSize) };
+}
+
+/**
+ * Number of rounds needed for a full round robin in a pool of n teams.
+ * Even pools: n-1 rounds (each round, every team plays).
+ * Odd pools: n rounds (circle method adds a BYE, one team sits out each round).
+ */
+function fullRoundRobinRounds(n: number): number {
+  return n % 2 === 0 ? n - 1 : n;
 }
 
 /**
@@ -232,10 +245,9 @@ export function generateRoundRobin(
   const allMatches: BracketMatch[] = [];
   for (let i = 0; i < structure.numPools; i++) {
     const pool = pools[i];
-    const maxR = poolRounds
-      ? Math.min(poolRounds, pool.length - 1)
-      : pool.length - 1;
-    allMatches.push(...generatePoolMatches(pool, bracketNames[i], maxR));
+    // Pass poolRounds directly; generatePoolMatches caps at totalRounds internally,
+    // which correctly accounts for odd pools (where totalRounds = pool.length, not pool.length-1).
+    allMatches.push(...generatePoolMatches(pool, bracketNames[i], poolRounds));
   }
   return allMatches;
 }
