@@ -329,16 +329,18 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
                 key={tab.href}
                 href={tab.href}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors",
-                  active
-                    ? "text-brand-400"
-                    : "text-dark-300 active:text-dark-100"
+                  "flex flex-1 flex-col items-center pt-2 pb-1.5 text-xs font-medium transition-colors",
+                  active ? "text-brand-400" : "text-dark-300 active:text-dark-100"
                 )}
               >
-                {active && (
-                  <span className="absolute top-0 inset-x-1/4 h-0.5 rounded-b-full bg-brand-400" />
-                )}
-                {tab.icon}
+                <span
+                  className={cn(
+                    "mb-0.5 flex items-center justify-center rounded-2xl px-5 py-0.5 transition-colors",
+                    active && "bg-brand-500/15"
+                  )}
+                >
+                  {tab.icon}
+                </span>
                 <span>{tab.name}</span>
               </Link>
             );
@@ -347,18 +349,20 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
           <button
             onClick={() => setMoreOpen(!moreOpen)}
             className={cn(
-              "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors",
-              moreOpen || isMoreActive
-                ? "text-brand-400"
-                : "text-dark-300 active:text-dark-100"
+              "flex flex-1 flex-col items-center pt-2 pb-1.5 text-xs font-medium transition-colors",
+              moreOpen || isMoreActive ? "text-brand-400" : "text-dark-300 active:text-dark-100"
             )}
           >
-            {(moreOpen || isMoreActive) && (
-              <span className="absolute top-0 inset-x-1/4 h-0.5 rounded-b-full bg-brand-400" />
-            )}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
+            <span
+              className={cn(
+                "mb-0.5 flex items-center justify-center rounded-2xl px-5 py-0.5 transition-colors",
+                (moreOpen || isMoreActive) && "bg-brand-500/15"
+              )}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </span>
             <span>More</span>
           </button>
         </div>

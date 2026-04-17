@@ -107,7 +107,7 @@ export default async function DashboardPage() {
       {/* Active now */}
       {hasActive && (
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-muted mb-3">Active Now</h2>
+          <h2 className="text-base font-semibold text-dark-100 mb-3">Active Now</h2>
           <div className="space-y-3">
             {activeSessions.map((ap: any) => (
               <Link
@@ -156,33 +156,60 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="card">
-          <p className="text-xs text-surface-muted">Sessions</p>
-          <p className="mt-1 text-2xl font-bold text-dark-100">{totalSessions}</p>
+        <div className="card flex items-start gap-3">
+          <div className="rounded-lg bg-brand-500/10 p-2 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-brand-vivid">
+              <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-xs text-surface-muted">Sessions</p>
+            <p className="text-2xl font-bold text-dark-100">{totalSessions}</p>
+          </div>
         </div>
-        <div className="card">
-          <p className="text-xs text-surface-muted">Pt Win %</p>
-          <p className="mt-1 text-2xl font-bold text-dark-100">
-            {weightedWinPct !== null ? `${weightedWinPct}%` : "—"}
-          </p>
+        <div className="card flex items-start gap-3">
+          <div className="rounded-lg bg-green-500/10 p-2 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-green-400">
+              <path fillRule="evenodd" d="M15.22 6.268a.75.75 0 01.968-.431l5.942 2.28a.75.75 0 01.431.97l-2.28 5.941a.75.75 0 11-1.4-.537l1.63-4.251-1.086.484a11.2 11.2 0 00-5.45 5.173.75.75 0 01-1.199.19L9 12.31l-6.22 6.22a.75.75 0 11-1.06-1.06l6.75-6.75a.75.75 0 011.06 0l3.606 3.605a12.694 12.694 0 015.68-4.973l1.086-.484-4.251-1.632a.75.75 0 01-.432-.968z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-xs text-surface-muted">Pt Win %</p>
+            <p className="text-2xl font-bold text-dark-100">{weightedWinPct !== null ? `${weightedWinPct}%` : "—"}</p>
+          </div>
         </div>
-        <div className="card">
-          <p className="text-xs text-surface-muted">Groups</p>
-          <p className="mt-1 text-2xl font-bold text-dark-100">{groupCount}</p>
+        <div className="card flex items-start gap-3">
+          <div className="rounded-lg bg-indigo-500/10 p-2 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-indigo-400">
+              <path fillRule="evenodd" d="M8.25 6.75a3.75 3.75 0 117.5 0 3.75 3.75 0 01-7.5 0zM15.75 9.75a3 3 0 116 0 3 3 0 01-6 0zM2.25 9.75a3 3 0 116 0 3 3 0 01-6 0zM6.31 15.117A6.745 6.745 0 0112 12a6.745 6.745 0 016.709 7.498.75.75 0 01-.372.568A12.696 12.696 0 0112 21.75c-2.305 0-4.47-.612-6.337-1.684a.75.75 0 01-.372-.568 6.787 6.787 0 011.019-4.38z" clipRule="evenodd" />
+              <path d="M5.082 14.254a8.287 8.287 0 00-1.308 5.135 9.687 9.687 0 01-1.764-.44l-.115-.04a.563.563 0 01-.373-.487l-.01-.121a3.75 3.75 0 013.57-4.047zM20.226 19.389a8.287 8.287 0 00-1.308-5.135 3.75 3.75 0 013.57 4.047l-.01.121a.563.563 0 01-.373.486l-.115.04c-.567.2-1.156.349-1.764.441z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-xs text-surface-muted">Groups</p>
+            <p className="text-2xl font-bold text-dark-100">{groupCount}</p>
+          </div>
         </div>
-        <Link href="/badges" className="card hover:ring-brand-500/30 transition-shadow">
-          <p className="text-xs text-surface-muted">Badges</p>
-          <p className="mt-1 text-2xl font-bold text-dark-100">
-            {badgeStats.earned}
-            <span className="text-sm font-normal text-surface-muted"> / {badgeStats.total}</span>
-          </p>
+        <Link href="/badges" className="card flex items-start gap-3 hover:ring-brand-500/30 transition-shadow">
+          <div className="rounded-lg bg-amber-500/10 p-2 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-amber-400">
+              <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-xs text-surface-muted">Badges</p>
+            <p className="text-2xl font-bold text-dark-100">
+              {badgeStats.earned}
+              <span className="text-sm font-normal text-surface-muted"> / {badgeStats.total}</span>
+            </p>
+          </div>
         </Link>
       </div>
 
       {/* My Groups */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-muted">My Groups</h2>
+          <h2 className="text-base font-semibold text-dark-100">My Groups</h2>
           <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300">Browse all</Link>
         </div>
         {memberships && memberships.length > 0 ? (
@@ -218,6 +245,12 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <EmptyState
+            inline
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-8 w-8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+              </svg>
+            }
             title="No groups yet"
             description="Find a group that matches your schedule."
             actionLabel="Browse groups"
@@ -229,7 +262,7 @@ export default async function DashboardPage() {
       {/* Upcoming Schedule */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-muted">Upcoming</h2>
+          <h2 className="text-base font-semibold text-dark-100">Upcoming</h2>
           <Link href="/sheets" className="text-sm text-brand-400 hover:text-brand-300">View sheets</Link>
         </div>
         {upcoming.length > 0 ? (
@@ -285,6 +318,12 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <EmptyState
+            inline
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-8 w-8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+              </svg>
+            }
             title="Nothing scheduled"
             description="Check back soon for upcoming events and tournaments."
             actionLabel="View all sheets"
