@@ -55,9 +55,9 @@ export async function GET(request: NextRequest) {
     // Parse the configured post time (stored as "HH:MM:SS")
     const [postH, postM] = ((sched.post_time as string) ?? "08:00:00").split(":").map(Number);
 
-    // Match: same weekday AND same hour AND within the same 15-min window as the post time
+    // Match: exact weekday, exact hour, exact minute (cron runs every 15 min)
     const hourMatches = localHour === postH;
-    const minuteMatches = localMinute >= postM && localMinute < postM + 60;
+    const minuteMatches = localMinute === postM;
     const dayMatches = localDayOfWeek === (sched.post_day_of_week as number);
 
     if (!dayMatches || !hourMatches || !minuteMatches) continue;
