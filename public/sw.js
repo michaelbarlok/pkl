@@ -2,6 +2,10 @@
 
 // Tri-Star Pickleball Push Notification Service Worker
 
+// Activate immediately and take control of all open tabs without waiting
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
 // Fetch handler required for PWA installability
 self.addEventListener("fetch", (event) => {
   event.respondWith(fetch(event.request));
@@ -19,7 +23,6 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: payload.body ?? "",
-    icon: "/TriStarPB-light-minimal.jpg",
     badge: "/ic_notification_xxxhdpi_96px.png",
     data: { url: payload.link ?? "/" },
     vibrate: [100, 50, 100],
