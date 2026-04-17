@@ -291,6 +291,7 @@ export async function POST(
     if (!registrations || registrations.length < 2) continue;
 
     const playerIds = registrations.map((r) => r.player_id);
+    const hasSeeds = registrations.some((r) => r.seed != null);
 
     // Get pool rounds for this division
     const poolRounds = divisionSettings[division]?.pool_rounds;
@@ -299,13 +300,14 @@ export async function POST(
     let bracketMatches;
     switch (tournament.format) {
       case "single_elimination":
+        // playerIds are already sorted by seed (SQL order above)
         bracketMatches = generateSingleElimination(playerIds);
         break;
       case "double_elimination":
         bracketMatches = generateDoubleElimination(playerIds);
         break;
       case "round_robin":
-        bracketMatches = generateRoundRobin(playerIds, poolRounds);
+        bracketMatches = generateRoundRobin(playerIds, poolRounds, hasSeeds);
         break;
       default:
         continue;

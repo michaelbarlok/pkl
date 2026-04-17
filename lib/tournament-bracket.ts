@@ -187,47 +187,80 @@ export function getPoolStructure(teamCount: number): {
 /**
  * Generate round robin pool play matches.
  *
- * @param playerIds - All players in this division
+ * @param playerIds - All players in this division (pre-sorted by seed if seeded=true)
  * @param poolRounds - Organizer-configured number of rounds (optional; defaults to max)
+ * @param seeded - If true, use snake seeding for pool distribution instead of random shuffle.
+ *                 Snake seeding spreads the top seeds evenly across pools (1→A, 2→B, 3→B, 4→A…).
  */
-export function generateRoundRobin(playerIds: string[], poolRounds?: number): BracketMatch[] {
+export function generateRoundRobin(
+  playerIds: string[],
+  poolRounds?: number,
+  seeded?: boolean
+): BracketMatch[] {
   const n = playerIds.length;
   if (n < 2) return [];
 
-  // Shuffle for randomization
-  const shuffled = shuffle([...playerIds]);
   const structure = getPoolStructure(n);
 
+  // Distribute players into pools
+  let pools: string[][];
   if (structure.numPools === 1) {
-    // Single pool
-    const maxRounds = poolRounds ? Math.min(poolRounds, n - 1) : n - 1;
-    return generatePoolMatches(shuffled, "winners", maxRounds);
+    // Single pool — shuffle unless seeded (order within pool doesn't affect matchups)
+    pools = [seeded ? [...playerIds] : shuffle([...playerIds])];
+  } else if (seeded) {
+    // Snake-distribute seeded players so each pool gets an equal spread of top seeds
+    pools = snakeDistribute([...playerIds], structure.poolSizes);
+  } else {
+    // Random: shuffle then slice sequentially
+    const shuffled = shuffle([...playerIds]);
+    let offset = 0;
+    pools = structure.poolSizes.map((size) => {
+      const pool = shuffled.slice(offset, offset + size);
+      offset += size;
+      return pool;
+    });
   }
 
-  if (structure.numPools === 2) {
-    // Two pools — use "winners" and "losers" bracket labels for backward compat
-    const poolA = shuffled.slice(0, structure.poolSizes[0]);
-    const poolB = shuffled.slice(structure.poolSizes[0]);
-    const maxA = poolRounds ? Math.min(poolRounds, poolA.length - 1) : poolA.length - 1;
-    const maxB = poolRounds ? Math.min(poolRounds, poolB.length - 1) : poolB.length - 1;
-    return [
-      ...generatePoolMatches(poolA, "winners", maxA),
-      ...generatePoolMatches(poolB, "losers", maxB),
-    ];
-  }
+  // Bracket label per pool (preserve "winners"/"losers" naming for 2-pool backward compat)
+  const bracketNames =
+    structure.numPools === 1
+      ? ["winners"]
+      : structure.numPools === 2
+      ? ["winners", "losers"]
+      : pools.map((_, i) => `pool_${i + 1}`);
 
-  // 3+ pools — use "pool_1", "pool_2", etc.
   const allMatches: BracketMatch[] = [];
-  let offset = 0;
   for (let i = 0; i < structure.numPools; i++) {
-    const poolPlayers = shuffled.slice(offset, offset + structure.poolSizes[i]);
-    offset += structure.poolSizes[i];
+    const pool = pools[i];
     const maxR = poolRounds
-      ? Math.min(poolRounds, poolPlayers.length - 1)
-      : poolPlayers.length - 1;
-    allMatches.push(...generatePoolMatches(poolPlayers, `pool_${i + 1}`, maxR));
+      ? Math.min(poolRounds, pool.length - 1)
+      : pool.length - 1;
+    allMatches.push(...generatePoolMatches(pool, bracketNames[i], maxR));
   }
   return allMatches;
+}
+
+/**
+ * Snake-distribute players across pools so the top seeds are spread evenly.
+ * E.g. for 3 pools: #1→A, #2→B, #3→C, #4→C, #5→B, #6→A, #7→A, …
+ */
+function snakeDistribute(playerIds: string[], poolSizes: number[]): string[][] {
+  const numPools = poolSizes.length;
+  const pools: string[][] = Array.from({ length: numPools }, () => []);
+  let direction = 1;
+  let pool = 0;
+  for (const pid of playerIds) {
+    pools[pool].push(pid);
+    pool += direction;
+    if (pool >= numPools) {
+      pool = numPools - 1;
+      direction = -1;
+    } else if (pool < 0) {
+      pool = 0;
+      direction = 1;
+    }
+  }
+  return pools;
 }
 
 /**
