@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { distributeCourts, seedSession1, seedSameDaySession } from "@/lib/shootout-engine";
 import type { RankedPlayer, SeedablePlayer } from "@/lib/shootout-engine";
@@ -33,6 +34,7 @@ export default function CheckInPage() {
   const { id: sessionId } = useParams<{ id: string }>();
   const { supabase } = useSupabase();
   const router = useRouter();
+  const confirm = useConfirm();
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -161,6 +163,21 @@ export default function CheckInPage() {
     if (checkedIn.length === 0) {
       setSeeding(false);
       return;
+    }
+
+    // Confirm before removing no-show players
+    if (unchecked.length > 0) {
+      const names = unchecked.map((p) => p.display_name).join(", ");
+      const ok = await confirm({
+        title: `Remove ${unchecked.length} no-show player${unchecked.length > 1 ? "s" : ""}?`,
+        description: `${names} ${unchecked.length > 1 ? "are" : "is"} not checked in and will be removed from this session. This cannot be undone.`,
+        confirmLabel: "Remove & Seed",
+        variant: "danger",
+      });
+      if (!ok) {
+        setSeeding(false);
+        return;
+      }
     }
 
     try {
