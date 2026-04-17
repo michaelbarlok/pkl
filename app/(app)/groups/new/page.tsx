@@ -15,6 +15,7 @@ export default function CreateGroupPage() {
     const city = (formData.get("city") as string)?.trim() || null;
     const state = (formData.get("state") as string)?.trim() || null;
     const groupType = (formData.get("group_type") as string) || "ladder_league";
+    const ladderType = (formData.get("ladder_type") as string) || "court_promotion";
     const visibility = (formData.get("visibility") as string) || "public";
 
     const baseSlug = name
@@ -60,6 +61,7 @@ export default function CreateGroupPage() {
         created_by: profile.id,
         is_active: true,
         group_type: groupType,
+        ladder_type: groupType === "ladder_league" ? ladderType : "court_promotion",
         visibility,
       })
       .select("id, slug")
@@ -80,8 +82,8 @@ export default function CreateGroupPage() {
         max_step: Number(formData.get("max_step")) || 10,
         step_move_up: Number(formData.get("step_move_up")) || 1,
         step_move_down: Number(formData.get("step_move_down")) || 1,
-        game_limit_4p: Number(formData.get("game_limit_4p")) || 3,
-        game_limit_5p: Number(formData.get("game_limit_5p")) || 4,
+        ...(formData.get("game_limit_4p") ? { game_limit_4p: Number(formData.get("game_limit_4p")) } : {}),
+        ...(formData.get("game_limit_5p") ? { game_limit_5p: Number(formData.get("game_limit_5p")) } : {}),
         win_by_2: formData.get("win_by_2") === "on",
       });
       if (prefsError) console.error("Create group preferences error:", prefsError);

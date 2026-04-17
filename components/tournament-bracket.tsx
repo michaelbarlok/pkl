@@ -356,7 +356,7 @@ function RoundRobinView({
           <div className="space-y-1 mb-4">
             {editableSeeds.map((team, i) => (
               <div key={team.id} className="flex items-center gap-2 rounded-lg bg-surface-overlay px-3 py-2">
-                <span className="text-xs font-bold text-brand-300 w-5">#{i + 1}</span>
+                <span className="text-xs font-bold text-brand-vivid w-5">#{i + 1}</span>
                 <span className="text-sm font-medium text-dark-100 flex-1">{team.name}</span>
                 <span className="text-xs text-surface-muted">
                   {team.wins}W-{team.losses}L ({team.pointDiff > 0 ? "+" : ""}{team.pointDiff})
@@ -480,10 +480,10 @@ function PoolSection({
                 <tr key={s.id}>
                   <td className="px-2 sm:px-4 py-2 text-sm text-surface-muted">{i + 1}</td>
                   <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">{s.name}</td>
-                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-teal-300">{s.wins}</td>
-                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-red-400">{s.losses}</td>
+                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-teal-vivid">{s.wins}</td>
+                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-adaptive-red">{s.losses}</td>
                   <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold">
-                    <span className={s.pointDiff > 0 ? "text-teal-300" : s.pointDiff < 0 ? "text-red-400" : "text-surface-muted"}>
+                    <span className={s.pointDiff > 0 ? "text-teal-vivid" : s.pointDiff < 0 ? "text-adaptive-red" : "text-surface-muted"}>
                       {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
                     </span>
                   </td>
@@ -889,13 +889,13 @@ function MatchCard({
                   <tbody>
                     {/* Player 1 row */}
                     <tr>
-                      <td className={`pr-2 text-sm break-words leading-snug min-w-0 w-full ${p1MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                      <td className={`pr-2 text-sm break-words leading-snug min-w-0 w-full ${p1MatchWinner ? "font-semibold text-teal-vivid" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
                         {p1Name}
                       </td>
                       {match.score1.map((s1Val, i) => {
                         const won = s1Val > (match.score2[i] ?? 0);
                         return (
-                          <td key={i} className={`text-center px-1.5 font-mono whitespace-nowrap ${won ? "text-teal-300 font-semibold" : "text-dark-200"}`}>
+                          <td key={i} className={`text-center px-1.5 font-mono whitespace-nowrap ${won ? "text-teal-vivid font-semibold" : "text-dark-200"}`}>
                             {s1Val}
                           </td>
                         );
@@ -903,13 +903,13 @@ function MatchCard({
                     </tr>
                     {/* Player 2 row */}
                     <tr>
-                      <td className={`pr-2 text-sm break-words leading-snug min-w-0 w-full ${p2MatchWinner ? "font-semibold text-teal-300" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
+                      <td className={`pr-2 text-sm break-words leading-snug min-w-0 w-full ${p2MatchWinner ? "font-semibold text-teal-vivid" : isCompleted ? "text-surface-muted" : "text-dark-100"}`}>
                         {p2Name}
                       </td>
                       {match.score2.map((s2Val, i) => {
                         const won = s2Val > (match.score1[i] ?? 0);
                         return (
-                          <td key={i} className={`text-center px-1.5 font-mono ${won ? "text-teal-300 font-semibold" : "text-dark-200"}`}>
+                          <td key={i} className={`text-center px-1.5 font-mono ${won ? "text-teal-vivid font-semibold" : "text-dark-200"}`}>
                             {s2Val}
                           </td>
                         );
@@ -922,7 +922,7 @@ function MatchCard({
               {canEdit && !scoring && (
                 <button
                   onClick={openEdit}
-                  className="shrink-0 self-center rounded-md bg-surface-raised px-3 py-2 text-xs font-medium text-surface-muted hover:text-brand-300 transition-colors"
+                  className="shrink-0 self-center rounded-md bg-surface-raised px-3 py-2 text-xs font-medium text-surface-muted hover:text-brand-vivid transition-colors"
                 >
                   Edit
                 </button>
@@ -932,12 +932,12 @@ function MatchCard({
           <>
             {/* Player 1 row */}
             <div className={`flex items-center justify-between gap-2 px-3 py-2 ${p1Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-              <span className={`text-sm min-w-0 break-words leading-snug ${p1Won ? "font-semibold text-teal-300" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
+              <span className={`text-sm min-w-0 break-words leading-snug ${p1Won ? "font-semibold text-teal-vivid" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
                 {p1Won && <span className="mr-1 text-teal-400">✓</span>}
                 {p1Name}
               </span>
               {isCompleted && match.score1.length > 0 && (
-                <span className={`font-mono text-sm font-semibold shrink-0 ml-2 ${p1Won ? "text-teal-300" : "text-dark-300"}`}>
+                <span className={`font-mono text-sm font-semibold shrink-0 ml-2 ${p1Won ? "text-teal-vivid" : "text-dark-300"}`}>
                   {match.score1[0]}
                 </span>
               )}
@@ -948,12 +948,12 @@ function MatchCard({
 
             {/* Player 2 row */}
             <div className={`flex items-center justify-between gap-2 px-3 py-2 ${p2Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-              <span className={`text-sm min-w-0 break-words leading-snug ${p2Won ? "font-semibold text-teal-300" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
+              <span className={`text-sm min-w-0 break-words leading-snug ${p2Won ? "font-semibold text-teal-vivid" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
                 {p2Won && <span className="mr-1 text-teal-400">✓</span>}
                 {p2Name}
               </span>
               {isCompleted && match.score2.length > 0 && (
-                <span className={`font-mono text-sm font-semibold shrink-0 ml-2 ${p2Won ? "text-teal-300" : "text-dark-300"}`}>
+                <span className={`font-mono text-sm font-semibold shrink-0 ml-2 ${p2Won ? "text-teal-vivid" : "text-dark-300"}`}>
                   {match.score2[0]}
                 </span>
               )}
@@ -973,7 +973,7 @@ function MatchCard({
                 )}
                 <div className="flex-1" />
                 {canEnterNew && (
-                  <button onClick={openNew} className="text-xs font-semibold text-brand-300 hover:text-brand-200 transition-colors">
+                  <button onClick={openNew} className="text-xs font-semibold text-brand-vivid hover:text-brand-200 transition-colors">
                     Enter Score
                   </button>
                 )}
@@ -997,7 +997,7 @@ function MatchCard({
                       {gameScores.length > 1 && (
                         <button
                           onClick={() => removeGame(i)}
-                          className="text-xs text-red-400 hover:text-red-300"
+                          className="text-xs text-adaptive-red hover:text-red-500"
                         >
                           Remove
                         </button>
@@ -1031,7 +1031,7 @@ function MatchCard({
               {bestOf3 && gameScores.length < 3 && (
                 <button
                   onClick={addGame}
-                  className="text-xs text-brand-300 hover:text-brand-200 font-medium"
+                  className="text-xs text-brand-vivid hover:text-brand-200 font-medium"
                 >
                   + Add Game {gameScores.length + 1}
                 </button>

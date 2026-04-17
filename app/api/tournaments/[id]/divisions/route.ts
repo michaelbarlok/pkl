@@ -7,6 +7,7 @@ import {
   computePoolStandings,
   getPoolBrackets,
 } from "@/lib/tournament-bracket";
+import { getDivision, SKILLS } from "@/lib/divisions";
 import { getTournamentManager } from "@/lib/tournament-auth";
 
 /**
@@ -30,6 +31,22 @@ export async function PUT(
     if (!target || !sources || sources.length === 0) {
       return NextResponse.json({ error: "target and sources required" }, { status: 400 });
     }
+
+    const allDivisions = [target, ...sources];
+
+    // Fetch registration IDs per division before moving, so we can seed by source division
+    const divisionRegs: Record<string, { id: string }[]> = {};
+    await Promise.all(
+      allDivisions.map(async (div) => {
+        const { data } = await supabase
+          .from("tournament_registrations")
+          .select("id")
+          .eq("tournament_id", tournamentId)
+          .eq("division", div)
+          .neq("status", "withdrawn");
+        divisionRegs[div] = data ?? [];
+      })
+    );
 
     // Move all registrations from source divisions into target division
     for (const source of sources) {
@@ -57,6 +74,36 @@ export async function PUT(
         .update({ divisions: updatedDivisions })
         .eq("id", tournamentId);
     }
+
+    // Auto-seed by skill level (highest first), random within each tier.
+    // SKILLS is ordered 3.0 → 3.5 → 4.0 → 4.5+ so higher index = higher skill.
+    const skillRank = (divCode: string): number =>
+      SKILLS.findIndex((s) => s.value === getDivision(divCode)?.skill);
+
+    const sortedDivisions = allDivisions
+      .filter((div) => divisionRegs[div]?.length > 0)
+      .sort((a, b) => skillRank(b) - skillRank(a)); // highest skill → seed 1
+
+    // Build ordered list: shuffle within each tier then concatenate
+    const seededIds: string[] = [];
+    for (const div of sortedDivisions) {
+      const ids = divisionRegs[div].map((r) => r.id);
+      // Fisher-Yates shuffle within tier
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      seededIds.push(...ids);
+    }
+
+    await Promise.all(
+      seededIds.map((id, i) =>
+        supabase
+          .from("tournament_registrations")
+          .update({ seed: i + 1 })
+          .eq("id", id)
+      )
+    );
 
     return NextResponse.json({ ok: true });
   }
@@ -124,9 +171,10 @@ export async function PUT(
       );
     }
 
-    // Detect pool structure from bracket labels
+    // Detect pool structure from bracket labels.
+    // With max 6 teams per pool: 3-6 teams → 1 pool, 7-12 → 2 pools, 13+ → 3+ pools.
     const poolBrackets = getPoolBrackets(poolMatches);
-    const isMultiPool = poolBrackets.length >= 3; // 3+ pools (15+ team scenario)
+    const isMultiPool = poolBrackets.length >= 3;
 
     // Use organizer-provided seeding if given, otherwise compute from standings
     let seededPlayerIds: string[];
@@ -134,7 +182,7 @@ export async function PUT(
     if (seeded_players && seeded_players.length >= 2) {
       seededPlayerIds = seeded_players;
     } else if (isMultiPool) {
-      // 15+ teams: top 2 from each pool, ranked across all pools
+      // 3+ pools (13+ teams): top 2 from each pool, ranked across all pools
       const allQualifiers: { id: string; wins: number; losses: number; pointDiff: number }[] = [];
       for (const bracket of poolBrackets) {
         const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
@@ -144,7 +192,7 @@ export async function PUT(
       allQualifiers.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
       seededPlayerIds = allQualifiers.map((s) => s.id);
     } else if (poolBrackets.length === 2) {
-      // 8-14 teams: 2 pools, top 3 from each
+      // 2 pools (7-12 teams): top 3 from each (slice naturally caps if a pool has fewer)
       const poolAMatches = poolMatches.filter((m) => m.bracket === poolBrackets[0]);
       const poolBMatches = poolMatches.filter((m) => m.bracket === poolBrackets[1]);
 
@@ -258,7 +306,7 @@ export async function POST(
 
   // Parse division_settings from request body
   const body = await request.json().catch(() => ({}));
-  const divisionSettings: Record<string, { pool_rounds?: number }> = body.division_settings ?? {};
+  const divisionSettings: Record<string, { games_per_team?: number }> = body.division_settings ?? {};
 
   // Save division_settings to tournament
   if (Object.keys(divisionSettings).length > 0) {
@@ -291,21 +339,23 @@ export async function POST(
     if (!registrations || registrations.length < 2) continue;
 
     const playerIds = registrations.map((r) => r.player_id);
+    const hasSeeds = registrations.some((r) => r.seed != null);
 
-    // Get pool rounds for this division
-    const poolRounds = divisionSettings[division]?.pool_rounds;
+    // Get pool settings for this division
+    const { games_per_team: gamesPerTeam } = divisionSettings[division] ?? {};
 
     // Generate bracket
     let bracketMatches;
     switch (tournament.format) {
       case "single_elimination":
+        // playerIds are already sorted by seed (SQL order above)
         bracketMatches = generateSingleElimination(playerIds);
         break;
       case "double_elimination":
         bracketMatches = generateDoubleElimination(playerIds);
         break;
       case "round_robin":
-        bracketMatches = generateRoundRobin(playerIds, poolRounds);
+        bracketMatches = generateRoundRobin(playerIds, { gamesPerTeam, seeded: hasSeeds });
         break;
       default:
         continue;

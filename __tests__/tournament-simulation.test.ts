@@ -180,10 +180,10 @@ function runSingleElimDivision(playerIds: string[], division: string): string {
 function runRoundRobinDivision(
   playerIds: string[],
   division: string,
-  poolRounds?: number
+  gamesPerTeam?: number
 ): string {
   // ── Pool play ──
-  const generated = generateRoundRobin(playerIds, poolRounds);
+  const generated = generateRoundRobin(playerIds, gamesPerTeam ? { gamesPerTeam } : undefined);
   const matches = makeSimMatches(generated, division);
 
   // Complete all pool matches
@@ -469,9 +469,9 @@ describe("Edge cases that could break during a real tournament", () => {
     expect(ids).toContain(champion);
   });
 
-  test("poolRounds=3 for a 12-team division still produces 6 qualifiers", () => {
+  test("gamesPerTeam=3 for a 12-team division still produces 6 qualifiers", () => {
     const ids = Array.from({ length: 12 }, (_, i) => `p${i}`);
-    const generated = generateRoundRobin(ids, 3);
+    const generated = generateRoundRobin(ids, { gamesPerTeam: 3 });
     const matches = makeSimMatches(generated, "test");
     for (const m of matches) {
       if (m.status === "pending" && m.player1_id && m.player2_id) simulateMatchResult(m);

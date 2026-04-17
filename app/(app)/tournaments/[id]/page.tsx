@@ -26,11 +26,11 @@ const FORMAT_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-surface-overlay text-dark-200",
-  registration_open: "bg-teal-900/30 text-teal-300",
-  registration_closed: "bg-brand-900/40 text-brand-300",
+  registration_open: "bg-teal-900/30 text-teal-vivid",
+  registration_closed: "bg-brand-900/40 text-brand-vivid",
   in_progress: "bg-accent-900/40 text-accent-300",
   completed: "bg-surface-overlay text-dark-200",
-  cancelled: "bg-red-900/30 text-red-400",
+  cancelled: "bg-red-900/30 text-adaptive-red",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -216,7 +216,7 @@ export default async function TournamentDetailPage({
                       <span className="text-dark-200">
                         {" — "}
                         {opt.method === "paypal" || opt.method === "other"
-                          ? <a href={opt.detail.startsWith("http") ? opt.detail : `https://${opt.detail}`} target="_blank" rel="noopener noreferrer" className="text-brand-300 hover:underline">{opt.detail}</a>
+                          ? <a href={opt.detail.startsWith("http") ? opt.detail : `https://${opt.detail}`} target="_blank" rel="noopener noreferrer" className="text-brand-vivid hover:underline">{opt.detail}</a>
                           : opt.detail}
                       </span>
                     )}
@@ -232,7 +232,7 @@ export default async function TournamentDetailPage({
                 href={(tournament as any).payment_link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-brand-300 hover:underline break-all"
+                className="text-sm text-brand-vivid hover:underline break-all"
               >
                 {(tournament as any).payment_link}
               </a>

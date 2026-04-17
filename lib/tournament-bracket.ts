@@ -4,16 +4,17 @@
  * Generates match structures for single elimination, double elimination,
  * and round robin formats.
  *
- * Round Robin Format:
- *   3-7 teams:  Single pool, organizer-configured rounds (max = teams-1)
- *   8-14 teams: 2 pools (split evenly), organizer-configured rounds
- *   15+ teams:  Split into pools of ~5 (target size 5, distributed evenly).
- *               Top 2 from each pool advance to a seeded single-elim bracket
- *               ranked by record then point differential.
+ * Round Robin Format (max 6 teams per pool, pools sized automatically):
+ *   3-6 teams:  Single pool.
+ *   7-12 teams: 2 pools (split as evenly as possible).
+ *   13+ teams:  3+ pools of ~5 teams each.
  *
- *   For 3-7: top 4 advance to playoff (or all if fewer than 4).
- *   For 8-14: top 3 per pool (6 total) advance to 6-team playoff.
- *   For 15+: top 2 per pool advance to single-elim bracket.
+ *   Organizer optionally specifies games_per_team (default = full round robin per pool).
+ *
+ *   Playoff qualifiers:
+ *     1 pool:  top 4 advance (or all if fewer).
+ *     2 pools: top 3 per pool (6-team playoff).
+ *     3+ pools: top 2 per pool, re-seeded by record then point differential.
  *
  *   Playoffs always include a 3rd place game.
  *   Pool matches are generated upfront; playoff matches are created when
@@ -155,114 +156,177 @@ export function generateDoubleElimination(playerIds: string[]): BracketMatch[] {
 
 /**
  * Determine pool structure for a given team count.
- *   3-7 teams:  1 pool
- *   8-14 teams: 2 pools
- *   15+ teams:  pools of ~5 (Math.round(n/5) pools, distributed evenly)
+ *
+ * Pools are sized automatically: as few pools as possible with at most 6 teams each,
+ * distributed as evenly as possible (larger pools first).
  */
 export function getPoolStructure(teamCount: number): {
   numPools: number;
   poolSizes: number[];
-  maxRoundsPerPool: number;
+  maxGamesPerTeam: number;
 } {
-  if (teamCount <= 7) {
-    return { numPools: 1, poolSizes: [teamCount], maxRoundsPerPool: teamCount - 1 };
-  }
-  if (teamCount <= 14) {
-    const half = Math.ceil(teamCount / 2);
-    const other = teamCount - half;
-    return { numPools: 2, poolSizes: [half, other], maxRoundsPerPool: half - 1 };
-  }
-  // 15+ teams: pools of ~5
-  const numPools = Math.round(teamCount / 5);
+  const numPools = Math.max(1, Math.ceil(teamCount / 6)); // as few pools as possible, max 6/pool
+
+  // Distribute as evenly as possible (larger pools first)
   const baseSize = Math.floor(teamCount / numPools);
   const remainder = teamCount % numPools;
-  const poolSizes: number[] = [];
-  for (let i = 0; i < numPools; i++) {
-    poolSizes.push(baseSize + (i < remainder ? 1 : 0));
-  }
+  const poolSizes = Array.from({ length: numPools }, (_, i) =>
+    baseSize + (i < remainder ? 1 : 0)
+  );
+
+  // UI cap: double round robin of the largest pool
   const maxPoolSize = Math.max(...poolSizes);
-  return { numPools, poolSizes, maxRoundsPerPool: maxPoolSize - 1 };
+  const maxGamesPerTeam = 2 * (maxPoolSize - 1);
+
+  return { numPools, poolSizes, maxGamesPerTeam };
+}
+
+/**
+ * Describe what a given games-per-team value means for a pool of poolSize teams.
+ *
+ * For even pools: any value is valid; games per team = rounds played.
+ * For odd pools: games are rounded up to the next complete lap so every player
+ *   finishes with the same number of real games.
+ *
+ * Returns:
+ *   actualGamesPerTeam – real games each team will play (may exceed requested for odd pools)
+ *   timesVsEachOpponent – how many times teams face each other (null = not uniform)
+ */
+export function poolGamesInfo(
+  poolSize: number,
+  gamesPerTeam: number
+): { actualGamesPerTeam: number; timesVsEachOpponent: number | null } {
+  const opponents = poolSize - 1;
+  if (poolSize % 2 === 1) {
+    // Odd pool: round up to complete laps so balance is guaranteed
+    const laps = Math.ceil(gamesPerTeam / opponents);
+    return { actualGamesPerTeam: laps * opponents, timesVsEachOpponent: laps };
+  } else {
+    // Even pool: exactly gamesPerTeam games per team
+    const times = gamesPerTeam % opponents === 0 ? gamesPerTeam / opponents : null;
+    return { actualGamesPerTeam: gamesPerTeam, timesVsEachOpponent: times };
+  }
 }
 
 /**
  * Generate round robin pool play matches.
  *
- * @param playerIds - All players in this division
- * @param poolRounds - Organizer-configured number of rounds (optional; defaults to max)
+ * Pools are sized automatically (max 6/pool, as few pools as possible).
+ *
+ * @param playerIds All players in this division (pre-sorted by seed when seeded=true)
+ * @param options.gamesPerTeam  Games each team plays in pool play.
+ *   Omit to default to a full round robin (each team plays every opponent once).
+ *   Supports values > (poolSize-1) for multi-lap scheduling.
+ *   Odd pools round up to the next complete lap to guarantee equal game counts.
+ * @param options.seeded  Use snake seeding for pool distribution instead of random shuffle.
  */
-export function generateRoundRobin(playerIds: string[], poolRounds?: number): BracketMatch[] {
+export function generateRoundRobin(
+  playerIds: string[],
+  options?: { gamesPerTeam?: number; seeded?: boolean }
+): BracketMatch[] {
+  const { gamesPerTeam, seeded } = options ?? {};
   const n = playerIds.length;
   if (n < 2) return [];
 
-  // Shuffle for randomization
-  const shuffled = shuffle([...playerIds]);
   const structure = getPoolStructure(n);
 
-  if (structure.numPools === 1) {
-    // Single pool
-    const maxRounds = poolRounds ? Math.min(poolRounds, n - 1) : n - 1;
-    return generatePoolMatches(shuffled, "winners", maxRounds);
+  // Distribute players into pools
+  let pools: string[][];
+  if (seeded) {
+    pools = snakeDistribute([...playerIds], structure.poolSizes);
+  } else {
+    const shuffled = shuffle([...playerIds]);
+    let offset = 0;
+    pools = structure.poolSizes.map((size) => {
+      const pool = shuffled.slice(offset, offset + size);
+      offset += size;
+      return pool;
+    });
   }
 
-  if (structure.numPools === 2) {
-    // Two pools — use "winners" and "losers" bracket labels for backward compat
-    const poolA = shuffled.slice(0, structure.poolSizes[0]);
-    const poolB = shuffled.slice(structure.poolSizes[0]);
-    const maxA = poolRounds ? Math.min(poolRounds, poolA.length - 1) : poolA.length - 1;
-    const maxB = poolRounds ? Math.min(poolRounds, poolB.length - 1) : poolB.length - 1;
-    return [
-      ...generatePoolMatches(poolA, "winners", maxA),
-      ...generatePoolMatches(poolB, "losers", maxB),
-    ];
-  }
+  // Bracket label per pool (preserve "winners"/"losers" for 2-pool backward compat)
+  const bracketNames =
+    structure.numPools === 1
+      ? ["winners"]
+      : structure.numPools === 2
+      ? ["winners", "losers"]
+      : pools.map((_, i) => `pool_${i + 1}`);
 
-  // 3+ pools — use "pool_1", "pool_2", etc.
   const allMatches: BracketMatch[] = [];
-  let offset = 0;
   for (let i = 0; i < structure.numPools; i++) {
-    const poolPlayers = shuffled.slice(offset, offset + structure.poolSizes[i]);
-    offset += structure.poolSizes[i];
-    const maxR = poolRounds
-      ? Math.min(poolRounds, poolPlayers.length - 1)
-      : poolPlayers.length - 1;
-    allMatches.push(...generatePoolMatches(poolPlayers, `pool_${i + 1}`, maxR));
+    // Default: full round robin for this specific pool (each team plays every opponent once)
+    const perPoolGames = gamesPerTeam ?? (pools[i].length - 1);
+    allMatches.push(...generatePoolMatches(pools[i], bracketNames[i], perPoolGames));
   }
   return allMatches;
 }
 
 /**
+ * Snake-distribute players across pools so the top seeds are spread evenly.
+ * E.g. for 3 pools: #1→A, #2→B, #3→C, #4→C, #5→B, #6→A, #7→A, …
+ */
+function snakeDistribute(playerIds: string[], poolSizes: number[]): string[][] {
+  const numPools = poolSizes.length;
+  const pools: string[][] = Array.from({ length: numPools }, () => []);
+  let direction = 1;
+  let pool = 0;
+  for (const pid of playerIds) {
+    pools[pool].push(pid);
+    pool += direction;
+    if (pool >= numPools) {
+      pool = numPools - 1;
+      direction = -1;
+    } else if (pool < 0) {
+      pool = 0;
+      direction = 1;
+    }
+  }
+  return pools;
+}
+
+/**
  * Generate round robin matches for a single pool using the circle method.
+ * Supports multiple laps (gamesPerTeam > poolSize-1).
+ * For odd-sized pools the BYE-padded schedule wraps correctly across laps.
+ *
  * @param playerIds - Players in this pool
- * @param bracket - Pool identifier ("winners", "losers", "pool_1", "pool_2", etc.)
- * @param maxRounds - Number of rounds to play
+ * @param bracket   - Pool identifier ("winners", "losers", "pool_1", …)
+ * @param gamesPerTeam - Target games each real player should play.
+ *   Even pools: exactly this many rounds are generated.
+ *   Odd pools:  rounded up to the next complete lap so every player
+ *               plays the same number of real games.
  */
 function generatePoolMatches(
   playerIds: string[],
   bracket: string,
-  maxRounds?: number
+  gamesPerTeam: number
 ): BracketMatch[] {
   const n = playerIds.length;
   if (n < 2) return [];
 
   const players = [...playerIds];
-  // If odd number, add a dummy player for byes
-  if (n % 2 === 1) {
-    players.push("BYE");
-  }
+  const isOdd = n % 2 === 1;
+  if (isOdd) players.push("BYE");
 
-  const numPlayers = players.length;
-  const totalRounds = numPlayers - 1;
-  const roundLimit = maxRounds ? Math.min(maxRounds, totalRounds) : totalRounds;
+  const numPlayers = players.length; // always even
+  const roundsPerLap = numPlayers - 1; // rounds in one full round robin
   const matchesPerRound = numPlayers / 2;
+
+  // Odd pools must complete whole laps to keep real game counts equal
+  const totalRounds = isOdd
+    ? Math.ceil(gamesPerTeam / (n - 1)) * roundsPerLap
+    : gamesPerTeam;
 
   const matches: BracketMatch[] = [];
 
-  // Circle method: fix player 0, rotate the rest
-  for (let round = 0; round < roundLimit; round++) {
-    // Build pairings for this round
+  for (let round = 0; round < totalRounds; round++) {
+    // lapRound wraps back to 0 at the start of each new lap
+    const lapRound = round % roundsPerLap;
+
+    // Circle method: fix slot 0, rotate the rest by lapRound positions
     const rotated = [players[0]];
     for (let i = 1; i < numPlayers; i++) {
-      const idx = ((i - 1 + round) % (numPlayers - 1)) + 1;
+      const idx = ((i - 1 + lapRound) % (numPlayers - 1)) + 1;
       rotated.push(players[idx]);
     }
 
@@ -273,7 +337,6 @@ function generatePoolMatches(
       if (p1 === p2) continue;
 
       const isBye = p1 === "BYE" || p2 === "BYE";
-
       matches.push({
         round: round + 1,
         match_number: matchNumber++,
