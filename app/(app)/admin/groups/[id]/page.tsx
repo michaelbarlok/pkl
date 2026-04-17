@@ -11,6 +11,7 @@ import type {
   GroupPreferences,
   GroupMembership,
   Profile,
+  GroupRecurringSchedule,
 } from "@/types/database";
 import { US_STATES } from "@/lib/us-states";
 
@@ -32,7 +33,25 @@ interface PendingMember {
   invite_email: string | null;
 }
 
-type Tab = "members" | "preferences";
+type Tab = "members" | "preferences" | "schedule";
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function timeOptions(): string[] {
+  const opts: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      opts.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+    }
+  }
+  return opts;
+}
+
+function formatTime12h(t: string) {
+  const [hStr, mStr] = t.split(":");
+  const h = parseInt(hStr, 10);
+  return `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${mStr} ${h >= 12 ? "pm" : "am"}`;
+}
 
 // ============================================================
 // Page Component
@@ -68,6 +87,20 @@ export default function AdminGroupDetailPage() {
   const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
   const [linkingPendingId, setLinkingPendingId] = useState<string | null>(null);
   const [linkSearch, setLinkSearch] = useState("");
+
+  // Schedule state
+  const [schedule, setSchedule] = useState<GroupRecurringSchedule | null>(null);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [schedDayOfWeek, setSchedDayOfWeek] = useState(6);
+  const [schedTime, setSchedTime] = useState("09:00");
+  const [schedLocation, setSchedLocation] = useState("");
+  const [schedPlayerLimit, setSchedPlayerLimit] = useState(16);
+  const [schedOpensDays, setSchedOpensDays] = useState(7);
+  const [schedClosesHours, setSchedClosesHours] = useState(2);
+  const [schedWithdrawHours, setSchedWithdrawHours] = useState<string>("");
+  const [schedGuests, setSchedGuests] = useState(false);
+  const [schedNotes, setSchedNotes] = useState("");
+  const [schedActive, setSchedActive] = useState(true);
 
   // ============================================================
   // Data Fetching
@@ -105,6 +138,28 @@ export default function AdminGroupDetailPage() {
     if (membersRes.data) setMembers(membersRes.data as MemberRow[]);
     if (playersRes.data) setAllPlayers(playersRes.data);
     if (pendingRes.data) setPendingMembers(pendingRes.data as PendingMember[]);
+
+    // Fetch schedule
+    const { data: schedData } = await supabase
+      .from("group_recurring_schedules")
+      .select("*")
+      .eq("group_id", id)
+      .maybeSingle();
+
+    const s = schedData as GroupRecurringSchedule | null;
+    setSchedule(s);
+    if (s) {
+      setSchedDayOfWeek(s.day_of_week);
+      setSchedTime(s.event_time.slice(0, 5));
+      setSchedLocation(s.location);
+      setSchedPlayerLimit(s.player_limit);
+      setSchedOpensDays(s.signup_opens_days_before);
+      setSchedClosesHours(s.signup_closes_hours_before);
+      setSchedWithdrawHours(s.withdraw_closes_hours_before != null ? String(s.withdraw_closes_hours_before) : "");
+      setSchedGuests(s.allow_member_guests);
+      setSchedNotes(s.notes ?? "");
+      setSchedActive(s.is_active);
+    }
 
     setLoading(false);
   }, [supabase, id]);
@@ -352,6 +407,54 @@ export default function AdminGroupDetailPage() {
     setSaving(false);
   };
 
+  const saveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setScheduleSaving(true);
+    const body = {
+      day_of_week: schedDayOfWeek,
+      event_time: `${schedTime}:00`,
+      location: schedLocation.trim(),
+      player_limit: schedPlayerLimit,
+      signup_opens_days_before: schedOpensDays,
+      signup_closes_hours_before: schedClosesHours,
+      withdraw_closes_hours_before: schedWithdrawHours ? parseInt(schedWithdrawHours, 10) : null,
+      allow_member_guests: schedGuests,
+      notes: schedNotes.trim() || null,
+      is_active: schedActive,
+    };
+    const res = await fetch(`/api/groups/${id}/schedule`, {
+      method: schedule ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      setMessage({ type: "success", text: "Schedule saved." });
+      await fetchData();
+    } else {
+      const data = await res.json();
+      setMessage({ type: "error", text: data.error ?? "Failed to save schedule." });
+    }
+    setScheduleSaving(false);
+  };
+
+  const deleteSchedule = async () => {
+    const ok = await confirm({
+      title: "Delete recurring schedule?",
+      description: "Sheets already created won't be affected, but no new sheets will be auto-generated.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
+    const res = await fetch(`/api/groups/${id}/schedule`, { method: "DELETE" });
+    if (res.ok) {
+      setMessage({ type: "success", text: "Schedule deleted." });
+      setSchedule(null);
+    } else {
+      const data = await res.json();
+      setMessage({ type: "error", text: data.error ?? "Failed to delete schedule." });
+    }
+  };
+
   // ============================================================
   // Derived data
   // ============================================================
@@ -497,6 +600,19 @@ export default function AdminGroupDetailPage() {
             )}
           >
             Preferences
+          </button>
+        )}
+        {group?.group_type === "ladder_league" && (
+          <button
+            onClick={() => setActiveTab("schedule")}
+            className={cn(
+              "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+              activeTab === "schedule"
+                ? "border-brand-600 text-brand-600"
+                : "border-transparent text-surface-muted hover:text-dark-200"
+            )}
+          >
+            Schedule
           </button>
         )}
       </div>
@@ -1121,6 +1237,176 @@ export default function AdminGroupDetailPage() {
             </button>
           </div>
         </form>
+      )}
+
+      {/* Schedule Tab */}
+      {activeTab === "schedule" && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-dark-100">Recurring Sign-Up Schedule</h2>
+            <p className="text-sm text-surface-muted mt-1">
+              When active, a sign-up sheet is automatically created the specified number of days before each matching event.
+            </p>
+          </div>
+
+          <form onSubmit={saveSchedule} className="card space-y-5">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="schedActive"
+                checked={schedActive}
+                onChange={(e) => setSchedActive(e.target.checked)}
+                className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
+              />
+              <label htmlFor="schedActive" className="text-sm font-medium text-dark-200">
+                Schedule active
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-1">Day of Week</label>
+                <select
+                  value={schedDayOfWeek}
+                  onChange={(e) => setSchedDayOfWeek(Number(e.target.value))}
+                  className="input w-full"
+                  required
+                >
+                  {DAY_NAMES.map((name, i) => (
+                    <option key={i} value={i}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-1">Event Time</label>
+                <select
+                  value={schedTime}
+                  onChange={(e) => setSchedTime(e.target.value)}
+                  className="input w-full"
+                  required
+                >
+                  {timeOptions().map((t) => (
+                    <option key={t} value={t}>{formatTime12h(t)}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-dark-200 mb-1">Location</label>
+                <input
+                  type="text"
+                  value={schedLocation}
+                  onChange={(e) => setSchedLocation(e.target.value)}
+                  className="input w-full"
+                  placeholder="e.g. Athens Community Center"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-1">Player Limit</label>
+                <input
+                  type="number"
+                  min={4}
+                  value={schedPlayerLimit}
+                  onChange={(e) => setSchedPlayerLimit(Number(e.target.value))}
+                  className="input w-full"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-1">Open Sign-Up</label>
+                <select
+                  value={schedOpensDays}
+                  onChange={(e) => setSchedOpensDays(Number(e.target.value))}
+                  className="input w-full"
+                  required
+                >
+                  {[1, 2, 3, 5, 7, 10, 14].map((d) => (
+                    <option key={d} value={d}>{d} day{d !== 1 ? "s" : ""} before</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-1">Sign-Up Closes</label>
+                <select
+                  value={schedClosesHours}
+                  onChange={(e) => setSchedClosesHours(Number(e.target.value))}
+                  className="input w-full"
+                  required
+                >
+                  {[1, 2, 3, 12].map((h) => (
+                    <option key={h} value={h}>{h} hour{h !== 1 ? "s" : ""} before</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-1">Withdraw Closes</label>
+                <select
+                  value={schedWithdrawHours}
+                  onChange={(e) => setSchedWithdrawHours(e.target.value)}
+                  className="input w-full"
+                >
+                  <option value="">No withdraw deadline</option>
+                  {[1, 2, 3, 12].map((h) => (
+                    <option key={h} value={String(h)}>{h} hour{h !== 1 ? "s" : ""} before</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">Notes (optional)</label>
+              <textarea
+                value={schedNotes}
+                onChange={(e) => setSchedNotes(e.target.value)}
+                className="input w-full"
+                rows={2}
+                placeholder="Any recurring notes to include on each sheet..."
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="schedGuests"
+                checked={schedGuests}
+                onChange={(e) => setSchedGuests(e.target.checked)}
+                className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
+              />
+              <label htmlFor="schedGuests" className="text-sm font-medium text-dark-200">
+                Allow members to add other members
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                {schedule && (
+                  <button
+                    type="button"
+                    onClick={deleteSchedule}
+                    className="text-sm text-adaptive-red hover:text-red-500"
+                  >
+                    Delete schedule
+                  </button>
+                )}
+              </div>
+              <button type="submit" disabled={scheduleSaving} className="btn-primary">
+                {scheduleSaving ? "Saving..." : schedule ? "Update Schedule" : "Create Schedule"}
+              </button>
+            </div>
+          </form>
+
+          {schedule && (
+            <p className="text-xs text-surface-muted">
+              Next auto-created sheet: {DAY_NAMES[schedule.day_of_week]}s at {formatTime12h(schedule.event_time.slice(0, 5))}, sign-up opens {schedule.signup_opens_days_before} day{schedule.signup_opens_days_before !== 1 ? "s" : ""} before.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

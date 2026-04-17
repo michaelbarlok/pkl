@@ -180,6 +180,24 @@ export interface GroupMembership {
   group?: ShootoutGroup;
 }
 
+export interface GroupRecurringSchedule {
+  id: string;
+  group_id: string;
+  day_of_week: number; // 0=Sun 6=Sat
+  event_time: string; // "HH:MM:SS"
+  location: string;
+  player_limit: number;
+  signup_opens_days_before: number;
+  signup_closes_hours_before: number;
+  withdraw_closes_hours_before: number | null;
+  allow_member_guests: boolean;
+  notes: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ============================================================
 // Sessions & Participants
 // ============================================================
