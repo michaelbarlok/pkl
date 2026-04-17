@@ -103,7 +103,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NotificationBell profileId={profile.id} />
         </header>
         <main className="flex-1 px-3 py-4 pb-20 sm:px-6 md:pb-6 lg:px-8">
-          {children}
+          <div className="mx-auto w-full max-w-5xl">
+            {children}
+          </div>
         </main>
       </div>
       <MobileNav profile={profile} isGroupAdmin={isGroupAdmin} />
