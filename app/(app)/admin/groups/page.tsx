@@ -214,7 +214,7 @@ export default async function AdminGroupsPage() {
               Private
             </label>
           </div>
-          <div className="flex flex-wrap items-center gap-4 pt-1 border-t border-surface-border">
+          <div className="ladder-mode flex flex-wrap items-center gap-4 pt-1 border-t border-surface-border">
             <span className="text-sm font-medium text-dark-200">Ladder Mode:</span>
             <label className="flex items-start gap-2 cursor-pointer">
               <input type="radio" name="ladder_type" value="court_promotion" defaultChecked className="mt-0.5 text-brand-600 focus:ring-brand-500" />
@@ -230,7 +230,6 @@ export default async function AdminGroupsPage() {
                 <span className="text-surface-muted"> — After each session, steps and win % are recalculated for all players. The next session re-seeds everyone from scratch by updated rankings, ignoring which court they were on.</span>
               </span>
             </label>
-            <p className="w-full text-xs text-surface-muted">Applies to Ladder League groups only.</p>
           </div>
         </form>
       </div>

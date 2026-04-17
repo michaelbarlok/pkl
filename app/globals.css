@@ -172,6 +172,11 @@
     background-color: color-mix(in srgb, var(--color-surface-overlay) 60%, transparent);
   }
 
+  /* ── Hide ladder mode section when Free Play is selected in group creation form ── */
+  form:has([name="group_type"][value="free_play"]:checked) .ladder-mode {
+    display: none;
+  }
+
   /* ── Skeleton loader ── */
   .skeleton {
     @apply rounded bg-surface-overlay;
