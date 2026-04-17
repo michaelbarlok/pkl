@@ -56,6 +56,7 @@ export type TournamentBracket = "winners" | "losers" | "grand_final" | "playoff"
 
 export type GroupType = "ladder_league" | "free_play";
 export type GroupVisibility = "public" | "private";
+export type LadderType = "court_promotion" | "dynamic_ranking";
 
 // ============================================================
 // Core Tables
@@ -134,6 +135,7 @@ export interface ShootoutGroup {
   slug: string;
   description?: string | null;
   group_type: GroupType;
+  ladder_type: LadderType;
   visibility: GroupVisibility;
   city?: string | null;
   state?: string | null;

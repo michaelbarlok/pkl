@@ -334,11 +334,14 @@ export default function AdminGroupDetailPage() {
       win_by_2: form.get("win_by_2") === "on",
     };
 
-    const { error } = await supabase
-      .from("group_preferences")
-      .update(updates)
-      .eq("group_id", id);
+    const ladderType = form.get("ladder_type") as string;
 
+    const [prefsResult, groupResult] = await Promise.all([
+      supabase.from("group_preferences").update(updates).eq("group_id", id),
+      supabase.from("shootout_groups").update({ ladder_type: ladderType }).eq("id", id),
+    ]);
+
+    const error = prefsResult.error ?? groupResult.error;
     if (error) {
       setMessage({ type: "error", text: `Failed to save: ${error.message}` });
     } else {
@@ -1073,6 +1076,39 @@ export default function AdminGroupDetailPage() {
               />
               <label htmlFor="win_by_2" className="text-sm font-medium text-dark-200">
                 Win by 2 required
+              </label>
+            </div>
+          </div>
+
+          {/* Ladder Mode */}
+          <div className="border-t border-surface-border pt-4">
+            <p className="text-sm font-medium text-dark-200 mb-3">Ladder Mode</p>
+            <div className="flex flex-wrap gap-6">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="ladder_type"
+                  value="court_promotion"
+                  defaultChecked={group?.ladder_type !== "dynamic_ranking"}
+                  className="mt-0.5 text-brand-600 focus:ring-brand-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-dark-100">Court Promotion</p>
+                  <p className="text-xs text-surface-muted">Players who finish 1st move up a court, last place moves down. Court assignments carry forward between sessions.</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="ladder_type"
+                  value="dynamic_ranking"
+                  defaultChecked={group?.ladder_type === "dynamic_ranking"}
+                  className="mt-0.5 text-brand-600 focus:ring-brand-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-dark-100">Dynamic Ranking</p>
+                  <p className="text-xs text-surface-muted">Steps and win % are recalculated after each session, then all players are re-seeded from scratch by updated rankings.</p>
+                </div>
               </label>
             </div>
           </div>

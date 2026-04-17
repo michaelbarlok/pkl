@@ -66,6 +66,7 @@ export default async function AdminGroupsPage() {
 
     const groupType = (formData.get("group_type") as string) || "ladder_league";
     const visibility = (formData.get("visibility") as string) || "public";
+    const ladderType = (formData.get("ladder_type") as string) || "court_promotion";
 
     const { data: newGroup, error } = await supabase
       .from("shootout_groups")
@@ -77,6 +78,7 @@ export default async function AdminGroupsPage() {
         created_by: profile.id,
         is_active: true,
         group_type: groupType,
+        ladder_type: groupType === "ladder_league" ? ladderType : "court_promotion",
         visibility,
       })
       .select("id")
@@ -211,6 +213,18 @@ export default async function AdminGroupsPage() {
               <input type="radio" name="visibility" value="private" className="text-brand-600 focus:ring-brand-500" />
               Private
             </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-4 pt-1 border-t border-surface-border">
+            <span className="text-sm font-medium text-dark-200">Ladder Mode:</span>
+            <label className="flex items-center gap-2 text-sm text-dark-100">
+              <input type="radio" name="ladder_type" value="court_promotion" defaultChecked className="text-brand-600 focus:ring-brand-500" />
+              Court Promotion
+            </label>
+            <label className="flex items-center gap-2 text-sm text-dark-100">
+              <input type="radio" name="ladder_type" value="dynamic_ranking" className="text-brand-600 focus:ring-brand-500" />
+              Dynamic Ranking
+            </label>
+            <span className="text-xs text-surface-muted">(Ladder League only)</span>
           </div>
         </form>
       </div>
