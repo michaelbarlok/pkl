@@ -514,6 +514,7 @@ export default function AdminSheetDetailPage() {
             </label>
             <input
               type="time"
+              step="900"
               value={eventTime}
               onChange={(e) => setEventTime(e.target.value)}
               className="input"
@@ -580,6 +581,7 @@ export default function AdminSheetDetailPage() {
             </label>
             <input
               type="datetime-local"
+              step="900"
               value={signupClosesAt}
               onChange={(e) => setSignupClosesAt(e.target.value)}
               className="input"
@@ -591,6 +593,7 @@ export default function AdminSheetDetailPage() {
             </label>
             <input
               type="datetime-local"
+              step="900"
               value={withdrawClosesAt}
               onChange={(e) => setWithdrawClosesAt(e.target.value)}
               className="input"

@@ -249,7 +249,7 @@ export default function EditTournamentPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Start Time</label>
-            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="input" />
+            <input type="time" step="900" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="input" />
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Location *</label>
@@ -396,11 +396,11 @@ export default function EditTournamentPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Registration Opens</label>
-            <input type="datetime-local" value={registrationOpensAt} onChange={(e) => setRegistrationOpensAt(e.target.value)} className="input" />
+            <input type="datetime-local" step="900" value={registrationOpensAt} onChange={(e) => setRegistrationOpensAt(e.target.value)} className="input" />
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Registration Closes</label>
-            <input type="datetime-local" value={registrationClosesAt} onChange={(e) => setRegistrationClosesAt(e.target.value)} className="input" />
+            <input type="datetime-local" step="900" value={registrationClosesAt} onChange={(e) => setRegistrationClosesAt(e.target.value)} className="input" />
           </div>
         </div>
 
