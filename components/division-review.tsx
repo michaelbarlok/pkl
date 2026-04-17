@@ -2,7 +2,7 @@
 
 import { FormError } from "@/components/form-error";
 import { getDivisionLabel } from "@/lib/divisions";
-import { getPoolStructure } from "@/lib/tournament-bracket";
+import { getPoolStructure, poolGamesInfo } from "@/lib/tournament-bracket";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -32,7 +32,8 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
   const [merging, setMerging] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
-  const [poolRounds, setPoolRounds] = useState<Record<string, string>>({});
+  const [numPools, setNumPools] = useState<Record<string, string>>({});
+  const [gamesPerTeam, setGamesPerTeam] = useState<Record<string, string>>({});
 
   // Seeding state
   const [seedingOpen, setSeedingOpen] = useState<Record<string, boolean>>({});
@@ -131,13 +132,15 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
     setGenerating(true);
     setError("");
 
-    const divisionSettings: Record<string, { pool_rounds: number }> = {};
+    const divisionSettings: Record<string, { num_pools?: number; games_per_team?: number }> = {};
     if (isRoundRobin) {
       for (const d of divisions) {
-        const val = parseInt(poolRounds[d.division] ?? "");
-        if (val > 0) {
-          divisionSettings[d.division] = { pool_rounds: val };
-        }
+        const np = parseInt(numPools[d.division] ?? "");
+        const gpt = parseInt(gamesPerTeam[d.division] ?? "");
+        const entry: { num_pools?: number; games_per_team?: number } = {};
+        if (np > 0) entry.num_pools = np;
+        if (gpt > 0) entry.games_per_team = gpt;
+        if (Object.keys(entry).length > 0) divisionSettings[d.division] = entry;
       }
     }
 
@@ -267,10 +270,13 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
         {divisions.map((d) => {
           const isSmall = d.count < MIN_PLAYERS;
           const isSelected = selectedForMerge.includes(d.division);
-          const poolStructure = isRoundRobin ? getPoolStructure(d.count) : null;
           const isSeedOpen = seedingOpen[d.division] ?? false;
-          const hasPoolRoundsPanel = isRoundRobin && !isSmall;
-          const hasAnyPanelBelow = isSeedOpen || hasPoolRoundsPanel;
+          const hasPoolPanel = isRoundRobin && !isSmall;
+          const hasAnyPanelBelow = isSeedOpen || hasPoolPanel;
+
+          // Compute pool structure based on user-chosen pool count (or default)
+          const chosenNumPools = parseInt(numPools[d.division] ?? "") || undefined;
+          const poolStructure = isRoundRobin ? getPoolStructure(d.count, chosenNumPools) : null;
 
           return (
             <div key={d.division} className="space-y-0">
@@ -336,7 +342,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
               {isSeedOpen && (
                 <div
                   className={`border border-t-0 border-surface-border bg-surface-overlay px-3 py-3 ${
-                    hasPoolRoundsPanel ? "" : "rounded-b-lg"
+                    hasPoolPanel ? "" : "rounded-b-lg"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -423,37 +429,79 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                 </div>
               )}
 
-              {/* Pool rounds configuration (round robin only) */}
-              {hasPoolRoundsPanel && poolStructure && (
-                <div className="rounded-b-lg border border-t-0 border-surface-border bg-surface-overlay px-3 py-2.5">
-                  <div className="flex items-center gap-3 flex-wrap">
+              {/* Pool play configuration (round robin only) */}
+              {hasPoolPanel && poolStructure && (
+                <div className="rounded-b-lg border border-t-0 border-surface-border bg-surface-overlay px-3 py-2.5 space-y-2">
+                  {/* Pool count row */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs font-medium text-dark-200">Pools:</label>
+                    <input
+                      type="number"
+                      min={poolStructure.minNumPools}
+                      max={poolStructure.maxNumPools}
+                      value={numPools[d.division] ?? String(poolStructure.numPools)}
+                      onChange={(e) =>
+                        setNumPools((prev) => ({ ...prev, [d.division]: e.target.value }))
+                      }
+                      className="input w-16 py-1 text-center text-xs"
+                    />
                     <span className="text-xs text-surface-muted">
-                      {poolStructure.numPools === 1
-                        ? "1 pool"
-                        : `${poolStructure.numPools} pools (${poolStructure.poolSizes.join(", ")} teams)`}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <label className="text-xs font-medium text-dark-200">Pool games:</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={poolStructure.maxRoundsPerPool}
-                        value={poolRounds[d.division] ?? String(poolStructure.maxRoundsPerPool)}
-                        onChange={(e) =>
-                          setPoolRounds((prev) => ({ ...prev, [d.division]: e.target.value }))
+                      {(() => {
+                        const { numPools: np, poolSizes } = poolStructure;
+                        const uniqueSizes = [...new Set(poolSizes)];
+                        if (uniqueSizes.length === 1) {
+                          return `${np} pool${np > 1 ? "s" : ""} of ${uniqueSizes[0]} team${uniqueSizes[0] > 1 ? "s" : ""}`;
                         }
-                        className="input w-16 py-1 text-center text-xs"
-                      />
-                      <span className="text-xs text-surface-muted">
-                        per team (max {poolStructure.maxRoundsPerPool} = full round robin)
-                      </span>
-                    </div>
-                    {poolStructure.numPools >= 3 && (
-                      <span className="text-xs text-brand-300">
-                        Top 2 per pool advance to bracket
-                      </span>
-                    )}
+                        return `${np} pools (${poolSizes.join(", ")} teams)`;
+                      })()}
+                    </span>
                   </div>
+
+                  {/* Games per team row */}
+                  {(() => {
+                    const maxPoolSize = Math.max(...poolStructure.poolSizes);
+                    const defaultGames = maxPoolSize - 1;
+                    const gpt = parseInt(gamesPerTeam[d.division] ?? "") || defaultGames;
+                    const info = poolGamesInfo(maxPoolSize, gpt);
+                    const roundedUp = info.actualGamesPerTeam !== gpt;
+
+                    let description: string;
+                    if (info.timesVsEachOpponent === 1) {
+                      description = "each team plays every opponent once";
+                    } else if (info.timesVsEachOpponent) {
+                      description = `each team plays every opponent ${info.timesVsEachOpponent}×`;
+                    } else {
+                      description = `${info.actualGamesPerTeam} games per team`;
+                    }
+
+                    return (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <label className="text-xs font-medium text-dark-200">Games per team:</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={poolStructure.maxGamesPerTeam}
+                          value={gamesPerTeam[d.division] ?? String(defaultGames)}
+                          onChange={(e) =>
+                            setGamesPerTeam((prev) => ({ ...prev, [d.division]: e.target.value }))
+                          }
+                          className="input w-16 py-1 text-center text-xs"
+                        />
+                        <span className="text-xs text-surface-muted">
+                          {description}
+                          {roundedUp && (
+                            <span className="text-yellow-400 ml-1">
+                              (rounds up to {info.actualGamesPerTeam} for balanced pools)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                  {poolStructure.numPools >= 3 && (
+                    <p className="text-xs text-brand-300">Top 2 per pool advance to bracket</p>
+                  )}
                 </div>
               )}
             </div>

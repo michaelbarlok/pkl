@@ -89,55 +89,62 @@ function assertUniqueMatchups(
 // ─── getPoolStructure ────────────────────────────────────────────────────────
 
 describe("getPoolStructure", () => {
+  // 3-6 teams fit in a single pool (max 6/pool)
   test.each([
-    [3, { numPools: 1, poolSizes: [3], maxRoundsPerPool: 2 }],
-    [4, { numPools: 1, poolSizes: [4], maxRoundsPerPool: 3 }],
-    [5, { numPools: 1, poolSizes: [5], maxRoundsPerPool: 4 }],
-    [6, { numPools: 1, poolSizes: [6], maxRoundsPerPool: 5 }],
-    [7, { numPools: 1, poolSizes: [7], maxRoundsPerPool: 6 }],
+    [3, { numPools: 1, poolSizes: [3], maxGamesPerTeam: 4 }],
+    [4, { numPools: 1, poolSizes: [4], maxGamesPerTeam: 6 }],
+    [5, { numPools: 1, poolSizes: [5], maxGamesPerTeam: 8 }],
+    [6, { numPools: 1, poolSizes: [6], maxGamesPerTeam: 10 }],
   ])("%i teams → 1 pool", (n, expected) => {
-    expect(getPoolStructure(n)).toEqual(expected);
+    expect(getPoolStructure(n)).toMatchObject(expected);
+  });
+
+  test("7 teams → 2 pools [4, 3] (max 6/pool)", () => {
+    const s = getPoolStructure(7);
+    expect(s.numPools).toBe(2);
+    expect(s.poolSizes).toEqual([4, 3]);
+    expect(s.maxGamesPerTeam).toBe(6); // 2*(4-1)
   });
 
   test("8 teams → 2 pools [4, 4]", () => {
     const s = getPoolStructure(8);
     expect(s.numPools).toBe(2);
     expect(s.poolSizes).toEqual([4, 4]);
-    expect(s.maxRoundsPerPool).toBe(3);
+    expect(s.maxGamesPerTeam).toBe(6); // 2*(4-1)
   });
 
   test("9 teams → 2 pools [5, 4]", () => {
     const s = getPoolStructure(9);
     expect(s.numPools).toBe(2);
     expect(s.poolSizes).toEqual([5, 4]);
-    expect(s.maxRoundsPerPool).toBe(4);
+    expect(s.maxGamesPerTeam).toBe(8); // 2*(5-1)
   });
 
   test("10 teams → 2 pools [5, 5]", () => {
     const s = getPoolStructure(10);
     expect(s.numPools).toBe(2);
     expect(s.poolSizes).toEqual([5, 5]);
-    expect(s.maxRoundsPerPool).toBe(4);
+    expect(s.maxGamesPerTeam).toBe(8);
   });
 
   test("11 teams → 2 pools [6, 5]", () => {
     const s = getPoolStructure(11);
     expect(s.numPools).toBe(2);
     expect(s.poolSizes).toEqual([6, 5]);
-    expect(s.maxRoundsPerPool).toBe(5);
+    expect(s.maxGamesPerTeam).toBe(10); // 2*(6-1)
   });
 
   test("12 teams → 2 pools [6, 6]", () => {
     const s = getPoolStructure(12);
     expect(s.numPools).toBe(2);
     expect(s.poolSizes).toEqual([6, 6]);
-    expect(s.maxRoundsPerPool).toBe(5);
+    expect(s.maxGamesPerTeam).toBe(10);
   });
 
-  test("14 teams → 2 pools [7, 7]", () => {
+  test("14 teams → 3 pools totalling 14 (max 6/pool)", () => {
     const s = getPoolStructure(14);
-    expect(s.numPools).toBe(2);
-    expect(s.poolSizes[0] + s.poolSizes[1]).toBe(14);
+    expect(s.numPools).toBe(3);
+    expect(s.poolSizes.reduce((a, b) => a + b, 0)).toBe(14);
   });
 
   test("15 teams → 3 pools totalling 15", () => {
@@ -277,21 +284,22 @@ describe("generateDoubleElimination", () => {
 
 // ─── generateRoundRobin ───────────────────────────────────────────────────────
 
-describe("generateRoundRobin — small divisions (3-7 teams → single pool)", () => {
-  test.each([3, 4, 5, 6, 7])("%i teams → single pool, bracket = 'winners'", (n) => {
+describe("generateRoundRobin — small divisions (3-6 teams → single pool)", () => {
+  // 7+ teams require 2+ pools due to max 6/pool rule
+  test.each([3, 4, 5, 6])("%i teams → single pool, bracket = 'winners'", (n) => {
     const ids = makeIds(n);
     const m = generateRoundRobin(ids);
     expect(m.every((x) => x.bracket === "winners")).toBe(true);
   });
 
-  test("3 teams → 2 real matches across 2 rounds (odd pool: maxRounds = n-1 = 2)", () => {
+  test("3 teams → 3 real matches across 3 rounds (odd pool: 1 full lap)", () => {
     const ids = makeIds(3);
     const m = generateRoundRobin(ids);
-    // With 3 teams (odd), padded to 4. maxRounds = n-1 = 2.
-    // Each round: 1 bye + 1 real match = 2 real matches total (1 pair never plays)
+    // Odd pool (3→padded to 4): 3 rounds per lap, gamesPerTeam default=2, laps=1 → 3 rounds
+    // Each round: 1 bye + 1 real → 3 real matches total; each team plays 2 real games
     const real = m.filter((x) => x.status !== "bye");
-    expect(real).toHaveLength(2);
-    expect(Math.max(...m.map((x) => x.round))).toBe(2);
+    expect(real).toHaveLength(3);
+    expect(Math.max(...m.map((x) => x.round))).toBe(3);
   });
 
   test("4 teams → 6 matches across 3 rounds, no byes", () => {
@@ -302,12 +310,13 @@ describe("generateRoundRobin — small divisions (3-7 teams → single pool)", (
     expect(Math.max(...m.map((x) => x.round))).toBe(3);
   });
 
-  test("5 teams → 8 real matches, 4 rounds (odd pool: (n-1)×(n-1)/2)", () => {
+  test("5 teams → 10 real matches, 5 rounds (odd pool: 1 full lap × 5 rounds)", () => {
     const ids = makeIds(5);
     const m = generateRoundRobin(ids);
-    // Odd pool: padded to 6, maxRounds=4, each round has 1 bye → 4×2=8 real matches
-    expect(m.filter((x) => x.status !== "bye")).toHaveLength(8);
-    expect(Math.max(...m.map((x) => x.round))).toBe(4);
+    // Odd pool (5→padded to 6): 5 rounds per lap, gamesPerTeam default=4, laps=1 → 5 rounds
+    // Each round: 2 real + 1 bye → 5×2=10 real matches; each team plays 4 real games
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(10);
+    expect(Math.max(...m.map((x) => x.round))).toBe(5);
   });
 
   test("6 teams → 15 matches, 5 rounds, no byes", () => {
@@ -317,15 +326,7 @@ describe("generateRoundRobin — small divisions (3-7 teams → single pool)", (
     expect(m.filter((x) => x.status === "bye")).toHaveLength(0);
   });
 
-  test("7 teams → 18 real matches, 6 rounds (odd pool: 6×3=18)", () => {
-    const ids = makeIds(7);
-    const m = generateRoundRobin(ids);
-    // Odd pool: padded to 8, maxRounds=6, each round 3 real + 1 bye → 18 real matches
-    expect(m.filter((x) => x.status !== "bye")).toHaveLength(18);
-    expect(Math.max(...m.map((x) => x.round))).toBe(6);
-  });
-
-  test.each([3, 4, 5, 6, 7])("%i teams → no self-play", (n) => {
+  test.each([3, 4, 5, 6])("%i teams → no self-play", (n) => {
     assertNoSelfPlay(generateRoundRobin(makeIds(n)));
   });
 
@@ -335,8 +336,8 @@ describe("generateRoundRobin — small divisions (3-7 teams → single pool)", (
   });
 });
 
-describe("generateRoundRobin — medium divisions (8-12 teams → 2 pools)", () => {
-  test.each([8, 9, 10, 11, 12])("%i teams → 2 pools", (n) => {
+describe("generateRoundRobin — medium divisions (7-12 teams → 2 pools)", () => {
+  test.each([7, 8, 9, 10, 11, 12])("%i teams → 2 pools", (n) => {
     const m = generateRoundRobin(makeIds(n));
     const brackets = new Set(m.map((x) => x.bracket));
     expect(brackets.has("winners")).toBe(true);
@@ -344,8 +345,18 @@ describe("generateRoundRobin — medium divisions (8-12 teams → 2 pools)", () 
     expect(brackets.size).toBe(2);
   });
 
-  test.each([8, 9, 10, 11, 12])("%i teams → no self-play in either pool", (n) => {
+  test.each([7, 8, 9, 10, 11, 12])("%i teams → no self-play in either pool", (n) => {
     assertNoSelfPlay(generateRoundRobin(makeIds(n)));
+  });
+
+  test("7 teams → 2 pools [4, 3], correct real match count", () => {
+    const ids = makeIds(7);
+    const m = generateRoundRobin(ids);
+    // Pool of 4 (even, default=3 games): 3 rounds × 2 matches = 6 real
+    // Pool of 3 (odd, default=3 games based on maxPoolSize=4):
+    //   laps = ceil(3/2) = 2, totalRounds = 2*3 = 6, 6×1 real = 6 real
+    // Total = 12 real matches
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(12);
   });
 
   test("8 teams → pool sizes [4, 4], each pool is full RR", () => {
@@ -361,9 +372,10 @@ describe("generateRoundRobin — medium divisions (8-12 teams → 2 pools)", () 
   test("10 teams → 2 pools of 5, correct total real matches (odd pools)", () => {
     const ids = makeIds(10);
     const m = generateRoundRobin(ids);
-    // Odd pool of 5: maxRounds=4, each round 2 real → 8 per pool × 2 pools = 16
+    // Odd pool of 5 (padded to 6): 5 rounds per lap, default gamesPerTeam=4, laps=1 → 5 rounds
+    // Each round: 2 real + 1 bye → 5×2=10 real per pool × 2 pools = 20
     const real = m.filter((x) => x.status !== "bye");
-    expect(real).toHaveLength(16);
+    expect(real).toHaveLength(20);
   });
 
   test("12 teams → 2 pools of 6, correct total real matches", () => {
@@ -406,28 +418,37 @@ describe("generateRoundRobin — medium divisions (8-12 teams → 2 pools)", () 
   });
 });
 
-describe("generateRoundRobin — pool_rounds cap", () => {
-  test("poolRounds = 2 caps rounds for a 6-team division", () => {
+describe("generateRoundRobin — gamesPerTeam option", () => {
+  test("gamesPerTeam=2 produces 2 rounds for a 6-team division", () => {
     const ids = makeIds(6);
-    const m = generateRoundRobin(ids, 2);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 2 });
     const maxRound = Math.max(...m.map((x) => x.round));
     expect(maxRound).toBe(2);
   });
 
-  test("poolRounds > max does not produce extra rounds", () => {
-    const ids = makeIds(4); // max 3 rounds
-    const m = generateRoundRobin(ids, 99);
+  test("gamesPerTeam=6 (double RR) for a 4-team pool produces 6 rounds", () => {
+    const ids = makeIds(4); // 1 pool of 4
+    const m = generateRoundRobin(ids, { gamesPerTeam: 6 });
     const maxRound = Math.max(...m.map((x) => x.round));
-    expect(maxRound).toBe(3); // capped at n-1
+    expect(maxRound).toBe(6); // 6 rounds, each pair plays twice
+    // 6 rounds × 2 matches/round = 12 real matches
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(12);
   });
 
-  test("poolRounds = 3 for a 12-team division (2 pools of 6)", () => {
+  test("gamesPerTeam=3 for a 12-team division (2 pools of 6)", () => {
     const ids = makeIds(12);
-    const m = generateRoundRobin(ids, 3);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 3 });
     const maxRound = Math.max(...m.map((x) => x.round));
     expect(maxRound).toBe(3);
     // 2 pools × 3 rounds × 3 matches/round = 18 real matches
     expect(m.filter((x) => x.status !== "bye")).toHaveLength(18);
+  });
+
+  test("gamesPerTeam=4 for a 3-team pool → rounds up to 4 (2 full laps)", () => {
+    const ids = makeIds(3);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 4 });
+    // 3-team pool (odd): 2 laps × 3 rounds = 6 total rounds, 4 real games per player
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(6); // 3 pairs × 2 times
   });
 });
 
