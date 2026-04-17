@@ -13,6 +13,48 @@ import { CollapsibleMembers } from "./collapsible-members";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import type { GroupWithPreferences } from "@/lib/queries/group";
 
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function PlayTimeDisplay({ playTime }: {
+  playTime: { day_of_week: number; event_time: string; timezone: string; location: string; player_limit: number };
+}) {
+  const [hStr, mStr] = playTime.event_time.slice(0, 5).split(":");
+  const h = parseInt(hStr, 10);
+  const time12 = `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${mStr} ${h >= 12 ? "pm" : "am"}`;
+  const tzAbbr = new Intl.DateTimeFormat("en-US", { timeZone: playTime.timezone, timeZoneName: "short" })
+    .formatToParts(new Date())
+    .find((p) => p.type === "timeZoneName")?.value ?? "";
+
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-surface-muted">
+      <span className="flex items-center gap-1.5">
+        <svg className="h-4 w-4 text-brand-vivid shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+        </svg>
+        <span className="font-medium text-dark-200">{DAY_NAMES[playTime.day_of_week]}s</span>
+        <span>{time12} {tzAbbr}</span>
+      </span>
+      {playTime.location && (
+        <span className="flex items-center gap-1.5">
+          <svg className="h-4 w-4 text-brand-vivid shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+          </svg>
+          {playTime.location}
+        </span>
+      )}
+      {playTime.player_limit && (
+        <span className="flex items-center gap-1.5">
+          <svg className="h-4 w-4 text-brand-vivid shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+          </svg>
+          Max {playTime.player_limit} players
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default async function GroupPage({
   params,
   searchParams,
@@ -97,6 +139,15 @@ export default async function GroupPage({
   const sheets = await getGroupSheets(group.id);
   const isFreePlay = group.group_type === "free_play";
 
+  // Fetch play time schedule for display
+  const { data: playTimeData } = await supabase
+    .from("group_recurring_schedules")
+    .select("day_of_week, event_time, timezone, location, player_limit, is_active")
+    .eq("group_id", group.id)
+    .eq("is_active", true)
+    .maybeSingle();
+  const playTime = playTimeData ?? null;
+
   const recentMatches = isFreePlay ? await getRecentMatches(group.id, 10) : [];
   const playerStats = isFreePlay ? await getPlayerStats(group.id) : [];
 
@@ -147,6 +198,13 @@ export default async function GroupPage({
           )}
           {group.description && (
             <p className="mt-1 text-surface-muted">{group.description}</p>
+          )}
+
+          {/* Play Time */}
+          {playTime && (
+            <div className="mt-2 space-y-1">
+              <PlayTimeDisplay playTime={playTime} />
+            </div>
           )}
         </div>
 

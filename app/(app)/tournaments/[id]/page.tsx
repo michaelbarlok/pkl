@@ -15,6 +15,7 @@ import { Breadcrumb } from "@/components/breadcrumb";
 import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import { PaidToggle } from "@/components/paid-toggle";
 import { PaymentReminderButton } from "@/components/payment-reminder-button";
+import { ShareBracketButton } from "@/components/share-bracket-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -138,11 +139,16 @@ export default async function TournamentDetailPage({
         <Breadcrumb items={[{ label: "Tournaments", href: "/tournaments" }, { label: tournament.title }]} />
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-2xl font-bold text-dark-100">{tournament.title}</h1>
-          {canManage && (
-            <Link href={`/tournaments/${id}/edit`} className="btn-secondary text-xs shrink-0">
-              Edit
-            </Link>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {matches.length > 0 && !(tournament as any).is_hidden && (
+              <ShareBracketButton tournamentId={id} />
+            )}
+            {canManage && (
+              <Link href={`/tournaments/${id}/edit`} className="btn-secondary text-xs shrink-0">
+                Edit
+              </Link>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-2">
           <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[tournament.status]}`}>

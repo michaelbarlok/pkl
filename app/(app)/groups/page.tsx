@@ -20,10 +20,10 @@ export default async function GroupsPage() {
     profile = data;
   }
 
-  // Fetch all active groups with member counts
+  // Fetch all active groups with member counts and recurring schedule
   const { data: groups } = await supabase
     .from("shootout_groups")
-    .select("*, group_memberships(count)")
+    .select("*, group_memberships(count), group_recurring_schedules(day_of_week, event_time, timezone, location, is_active)")
     .eq("is_active", true)
     .order("name", { ascending: true });
 
@@ -37,20 +37,28 @@ export default async function GroupsPage() {
     joinedGroupIds = new Set(myMemberships?.map((m) => m.group_id) ?? []);
   }
 
-  const groupCards: GroupCardData[] = (groups ?? []).map((group) => ({
-    id: group.id,
-    name: group.name,
-    slug: group.slug,
-    description: group.description,
-    group_type: group.group_type,
-    visibility: group.visibility,
-    city: group.city,
-    state: group.state,
-    memberCount:
-      (group.group_memberships as unknown as { count: number }[])?.[0]?.count ??
-      0,
-    isJoined: joinedGroupIds.has(group.id),
-  }));
+  const groupCards: GroupCardData[] = (groups ?? []).map((group) => {
+    const sched = (group.group_recurring_schedules as any)?.[0] ?? null;
+    return {
+      id: group.id,
+      name: group.name,
+      slug: group.slug,
+      description: group.description,
+      group_type: group.group_type,
+      visibility: group.visibility,
+      city: group.city,
+      state: group.state,
+      memberCount:
+        (group.group_memberships as unknown as { count: number }[])?.[0]?.count ?? 0,
+      isJoined: joinedGroupIds.has(group.id),
+      playTime: sched && sched.is_active ? {
+        day_of_week: sched.day_of_week,
+        event_time: sched.event_time,
+        timezone: sched.timezone ?? "America/New_York",
+        location: sched.location,
+      } : null,
+    };
+  });
 
   async function joinGroup(groupId: string, groupType: string) {
     "use server";
