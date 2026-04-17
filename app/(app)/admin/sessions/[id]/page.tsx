@@ -606,9 +606,15 @@ export default function AdminSessionDetailPage() {
             </button>
           </div>
 
-          <p className="text-xs text-surface-muted">
-            Court assignments below are based on each player's finish in this round.
-          </p>
+          {session.group.ladder_type === "dynamic_ranking" ? (
+            <p className="text-xs text-surface-muted">
+              <span className="font-medium text-dark-200">Dynamic Ranking</span> — Courts will be assigned at check-in based on each player&apos;s updated step and win %. No fixed court carries forward.
+            </p>
+          ) : (
+            <p className="text-xs text-surface-muted">
+              Court assignments below are based on each player&apos;s finish in this round.
+            </p>
+          )}
 
           {/* Court count selector */}
           <div className="flex items-center gap-3">
@@ -628,57 +634,59 @@ export default function AdminSessionDetailPage() {
             )}
           </div>
 
-          {/* Court assignment grid */}
-          {nextCourtGroups.length > 0 && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {nextCourtGroups.map(([courtNum, courtPlayers]) => (
-                <div key={courtNum} className="rounded-lg border border-surface-border bg-surface-raised p-3">
-                  <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-2">
-                    Court {courtNum}
-                  </p>
+          {/* Court Promotion: show target court preview grid */}
+          {session.group.ladder_type !== "dynamic_ranking" && (
+            <>
+              {nextCourtGroups.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {nextCourtGroups.map(([courtNum, courtPlayers]) => (
+                    <div key={courtNum} className="rounded-lg border border-surface-border bg-surface-raised p-3">
+                      <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-2">
+                        Court {courtNum}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {courtPlayers.map((p) => {
+                          const prev = p.court_number;
+                          const next = p.target_court_next;
+                          const moved = prev != null && next != null && prev !== next
+                            ? next < prev ? "up" : "down"
+                            : null;
+                          return (
+                            <span
+                              key={p.player_id}
+                              className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                moved === "up"
+                                  ? "bg-teal-900/40 text-teal-300"
+                                  : moved === "down"
+                                  ? "bg-red-900/30 text-red-400"
+                                  : "bg-surface-overlay text-dark-100"
+                              }`}
+                            >
+                              {(p as any).player?.display_name ?? "?"}
+                              {moved === "up" && " ↑"}
+                              {moved === "down" && " ↓"}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {unassignedPlayers.length > 0 && (
+                <div>
+                  <p className="text-xs text-surface-muted mb-1">No court assignment yet:</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {courtPlayers.map((p) => {
-                      const prev = p.court_number;
-                      const next = p.target_court_next;
-                      // Lower court number = higher/better court (court 1 is top)
-                      const moved = prev != null && next != null && prev !== next
-                        ? next < prev ? "up" : "down"
-                        : null;
-                      return (
-                        <span
-                          key={p.player_id}
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            moved === "up"
-                              ? "bg-teal-900/40 text-teal-300"
-                              : moved === "down"
-                              ? "bg-red-900/30 text-red-400"
-                              : "bg-surface-overlay text-dark-100"
-                          }`}
-                        >
-                          {(p as any).player?.display_name ?? "?"}
-                          {moved === "up" && " ↑"}
-                          {moved === "down" && " ↓"}
-                        </span>
-                      );
-                    })}
+                    {unassignedPlayers.map((p) => (
+                      <span key={p.player_id} className="badge-gray text-xs">
+                        {(p as any).player?.display_name ?? "?"}
+                      </span>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Players without a target court assignment */}
-          {unassignedPlayers.length > 0 && (
-            <div>
-              <p className="text-xs text-surface-muted mb-1">No court assignment yet:</p>
-              <div className="flex flex-wrap gap-1.5">
-                {unassignedPlayers.map((p) => (
-                  <span key={p.player_id} className="badge-gray text-xs">
-                    {(p as any).player?.display_name ?? "?"}
-                  </span>
-                ))}
-              </div>
-            </div>
+              )}
+            </>
           )}
 
           <div className="flex gap-3 pt-1">
