@@ -283,7 +283,7 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
               className="h-7 w-7 rounded-full object-cover ring-2 ring-brand-500/40 shrink-0"
             />
           ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs font-medium shrink-0">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-vivid text-xs font-medium shrink-0">
               {profile.display_name?.charAt(0).toUpperCase()}
             </div>
           )}
@@ -333,7 +333,7 @@ function NavItem({
         "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
         collapsed && "justify-center w-10 mx-auto px-0",
         active
-          ? "bg-brand-500/20 text-brand-300 shadow-[inset_2px_0_0_#2dd4c5]"
+          ? "bg-brand-500/20 text-brand-vivid shadow-[inset_2px_0_0_var(--color-brand-vivid)]"
           : "text-dark-200 hover:bg-surface-overlay hover:text-dark-100"
       )}
     >
