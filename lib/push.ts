@@ -50,7 +50,12 @@ export async function sendPushNotification(
       try {
         await webpush.sendNotification(
           sub.subscription as any,
-          JSON.stringify(payload)
+          JSON.stringify(payload),
+          {
+            urgency: "high",   // skip battery-saving delivery delays on Android/iOS
+            TTL: 3600,         // expire after 1 hour instead of 4-week default
+            timeout: 10000,    // don't hang indefinitely on a slow push endpoint
+          }
         );
       } catch (err: any) {
         // 410 Gone or 404 = subscription expired, clean it up
