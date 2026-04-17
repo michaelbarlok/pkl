@@ -92,6 +92,13 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
         );
       return updated;
     });
+    // Invalidate seed cache for the target so it reloads the full merged player list
+    setSeedPlayers((prev) => {
+      const updated = { ...prev };
+      delete updated[target];
+      return updated;
+    });
+    setSeedingOpen((prev) => ({ ...prev, [target]: false }));
     setSelectedForMerge([]);
     setMerging(false);
   }
