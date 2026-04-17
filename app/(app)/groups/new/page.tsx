@@ -15,6 +15,7 @@ export default function CreateGroupPage() {
     const city = (formData.get("city") as string)?.trim() || null;
     const state = (formData.get("state") as string)?.trim() || null;
     const groupType = (formData.get("group_type") as string) || "ladder_league";
+    const ladderType = (formData.get("ladder_type") as string) || "court_promotion";
     const visibility = (formData.get("visibility") as string) || "public";
 
     const baseSlug = name
@@ -60,6 +61,7 @@ export default function CreateGroupPage() {
         created_by: profile.id,
         is_active: true,
         group_type: groupType,
+        ladder_type: groupType === "ladder_league" ? ladderType : "court_promotion",
         visibility,
       })
       .select("id, slug")

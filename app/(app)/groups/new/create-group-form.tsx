@@ -10,6 +10,7 @@ export function CreateGroupForm({
   createAction: (formData: FormData) => Promise<{ error: string } | void>;
 }) {
   const [groupType, setGroupType] = useState("ladder_league");
+  const [ladderType, setLadderType] = useState("court_promotion");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -164,6 +165,42 @@ export function CreateGroupForm({
           <h2 className="text-sm font-semibold text-dark-100">
             Ladder Settings
           </h2>
+
+          {/* Court Movement Type */}
+          <div>
+            <span className="block text-sm font-medium text-dark-200 mb-2">Court Movement</span>
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="ladder_type"
+                  value="court_promotion"
+                  checked={ladderType === "court_promotion"}
+                  onChange={() => setLadderType("court_promotion")}
+                  className="mt-0.5 text-brand-600 focus:ring-brand-500"
+                />
+                <span className="text-sm">
+                  <span className="font-medium text-dark-100">Court Promotion</span>
+                  <span className="text-surface-muted"> — 1st place moves up a court, last place moves down. Court assignments carry forward between sessions.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="ladder_type"
+                  value="dynamic_ranking"
+                  checked={ladderType === "dynamic_ranking"}
+                  onChange={() => setLadderType("dynamic_ranking")}
+                  className="mt-0.5 text-brand-600 focus:ring-brand-500"
+                />
+                <span className="text-sm">
+                  <span className="font-medium text-dark-100">Dynamic Ranking</span>
+                  <span className="text-surface-muted"> — After each session, steps and win % are recalculated for all players. The next session re-seeds everyone from scratch by updated rankings.</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="pct_window_sessions" className="block text-sm font-medium text-dark-200 mb-1">
