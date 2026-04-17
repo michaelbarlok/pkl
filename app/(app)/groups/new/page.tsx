@@ -89,6 +89,32 @@ export default function CreateGroupPage() {
       if (prefsError) console.error("Create group preferences error:", prefsError);
     }
 
+    // Create play time / recurring schedule if enabled
+    const enablePlayTime = formData.get("enable_play_time") === "on";
+    if (enablePlayTime && groupType === "ladder_league") {
+      const enableAutoPost = formData.get("enable_auto_post") === "on";
+      const postDow = enableAutoPost ? Number(formData.get("post_day_of_week")) : null;
+      const postT = enableAutoPost ? (formData.get("post_time") as string) || null : null;
+      const withdrawHours = formData.get("play_withdraw_closes_hours") as string;
+
+      await serviceClient.from("group_recurring_schedules").insert({
+        group_id: newGroup.id,
+        created_by: profile.id,
+        day_of_week: Number(formData.get("play_day_of_week")) || 6,
+        event_time: `${(formData.get("play_time") as string) || "09:00"}:00`,
+        timezone: (formData.get("play_timezone") as string) || "America/New_York",
+        location: (formData.get("play_location") as string)?.trim() || "",
+        player_limit: Number(formData.get("play_player_limit")) || 16,
+        signup_closes_hours_before: Number(formData.get("play_signup_closes_hours")) || 2,
+        withdraw_closes_hours_before: withdrawHours ? Number(withdrawHours) : null,
+        allow_member_guests: formData.get("play_allow_members") === "on",
+        notes: (formData.get("play_notes") as string)?.trim() || null,
+        is_active: true,
+        post_day_of_week: postDow,
+        post_time: postT ? `${postT}:00` : null,
+      });
+    }
+
     // Add creator as group admin (use service client to bypass RLS)
     const startStep = Number(formData.get("new_player_start_step")) || 5;
     await serviceClient.from("group_memberships").upsert(

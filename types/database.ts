@@ -183,16 +183,19 @@ export interface GroupMembership {
 export interface GroupRecurringSchedule {
   id: string;
   group_id: string;
-  day_of_week: number; // 0=Sun 6=Sat
-  event_time: string; // "HH:MM:SS"
+  day_of_week: number; // 0=Sun 6=Sat — when the event happens
+  event_time: string; // "HH:MM:SS" in the group's timezone
+  timezone: string; // IANA timezone, e.g. "America/New_York"
   location: string;
   player_limit: number;
-  signup_opens_days_before: number;
+  signup_opens_days_before: number | null; // legacy — superseded by post_day_of_week
   signup_closes_hours_before: number;
   withdraw_closes_hours_before: number | null;
   allow_member_guests: boolean;
   notes: string | null;
   is_active: boolean;
+  post_day_of_week: number | null; // 0=Sun 6=Sat — when to post the sheet
+  post_time: string | null; // "HH:MM:SS" in the group's timezone
   created_by: string | null;
   created_at: string;
   updated_at: string;

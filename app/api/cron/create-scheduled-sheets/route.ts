@@ -8,10 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/cron/create-scheduled-sheets
  *
- * Runs daily. For each active group_recurring_schedule, checks whether today
- * is exactly `signup_opens_days_before` days before an upcoming matching
- * day_of_week event. If so, creates the signup_sheet (if one doesn't already
- * exist for that group + event_date) and notifies group members.
+ * Runs every hour. For each active group_recurring_schedule that has
+ * post_day_of_week + post_time set, converts the current UTC time into the
+ * schedule's timezone and checks whether the hour/day matches the post
+ * schedule. When it does — and no sheet already exists for the upcoming play
+ * day — it creates the sheet and notifies all group members.
  */
 export async function GET(request: NextRequest) {
   const authError = verifyCronSecret(request);
@@ -22,37 +23,60 @@ export async function GET(request: NextRequest) {
   const { data: schedules, error: schedErr } = await supabase
     .from("group_recurring_schedules")
     .select("*, group:shootout_groups(id, name)")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .not("post_day_of_week", "is", null)
+    .not("post_time", "is", null);
 
-  if (schedErr) {
-    return NextResponse.json({ error: schedErr.message }, { status: 500 });
-  }
-  if (!schedules || schedules.length === 0) {
-    return NextResponse.json({ created: 0 });
-  }
+  if (schedErr) return NextResponse.json({ error: schedErr.message }, { status: 500 });
+  if (!schedules || schedules.length === 0) return NextResponse.json({ created: 0 });
 
-  // Today's date in local server time (UTC)
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-
+  const now = new Date();
   let created = 0;
 
   for (const sched of schedules) {
-    const daysAhead = sched.signup_opens_days_before as number;
+    const tz = (sched.timezone as string) || "America/New_York";
 
-    // The event date that opens today = today + daysAhead days
-    const eventDate = new Date(today);
-    eventDate.setUTCDate(eventDate.getUTCDate() + daysAhead);
+    // Convert current UTC time to the schedule's local timezone
+    const localParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "numeric",
+      minute: "numeric",
+      weekday: "short",
+      hour12: false,
+    }).formatToParts(now);
 
-    // Check the day_of_week matches (0=Sun, 6=Sat)
-    if (eventDate.getUTCDay() !== sched.day_of_week) {
-      continue;
-    }
+    const localHour = parseInt(localParts.find((p) => p.type === "hour")?.value ?? "0", 10);
+    const localMinute = parseInt(localParts.find((p) => p.type === "minute")?.value ?? "0", 10);
+    const localWeekdayShort = localParts.find((p) => p.type === "weekday")?.value ?? "";
 
-    const eventDateStr = eventDate.toISOString().split("T")[0]; // YYYY-MM-DD
+    const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const localDayOfWeek = WEEKDAY_SHORT.findIndex((d) => localWeekdayShort.startsWith(d));
+
+    // Parse the configured post time (stored as "HH:MM:SS")
+    const [postH, postM] = ((sched.post_time as string) ?? "08:00:00").split(":").map(Number);
+
+    // Match: same weekday AND same hour AND within the same 15-min window as the post time
+    const hourMatches = localHour === postH;
+    const minuteMatches = localMinute >= postM && localMinute < postM + 60;
+    const dayMatches = localDayOfWeek === (sched.post_day_of_week as number);
+
+    if (!dayMatches || !hourMatches || !minuteMatches) continue;
+
+    // Find the next occurrence of the play day_of_week in the local timezone
+    const playDow = sched.day_of_week as number;
+    const localDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now); // YYYY-MM-DD
+    const localDate = new Date(localDateStr + "T00:00:00Z"); // midnight UTC = local date
+
+    let daysUntilPlay = (playDow - localDayOfWeek + 7) % 7;
+    if (daysUntilPlay === 0) daysUntilPlay = 7; // always schedule the next upcoming day, not today if posting today
+
+    const eventDate = new Date(localDate);
+    eventDate.setUTCDate(eventDate.getUTCDate() + daysUntilPlay);
+    const eventDateStr = eventDate.toISOString().split("T")[0];
+
     const groupId = sched.group_id as string;
 
-    // Check if a sheet already exists for this group + event date
+    // Skip if sheet already exists for this group + event date
     const { data: existing } = await supabase
       .from("signup_sheets")
       .select("id")
@@ -62,23 +86,22 @@ export async function GET(request: NextRequest) {
 
     if (existing) continue;
 
-    // Compute signup_closes_at: event_time minus signup_closes_hours_before
-    const eventTimeStr = sched.event_time as string; // "HH:MM:SS" or "HH:MM"
-    const [hh, mm] = eventTimeStr.split(":").map(Number);
+    // Compute signup_closes_at in UTC
+    const eventTimeStr = (sched.event_time as string).slice(0, 5); // "HH:MM"
+    const [evH, evM] = eventTimeStr.split(":").map(Number);
     const closeHours = sched.signup_closes_hours_before as number;
 
-    const signupCloseDt = new Date(eventDate);
-    signupCloseDt.setUTCHours(hh, mm, 0, 0);
+    // Build the event datetime in local time, then convert to UTC via Intl trick
+    const localEventStr = `${eventDateStr}T${eventTimeStr.padStart(5, "0")}:00`;
+    const signupCloseDt = localToUtc(localEventStr, tz);
     signupCloseDt.setUTCHours(signupCloseDt.getUTCHours() - closeHours);
     const signupClosesAt = signupCloseDt.toISOString();
 
-    // Compute withdraw_closes_at (optional)
     let withdrawClosesAt: string | null = null;
     if (sched.withdraw_closes_hours_before != null) {
-      const withdrawCloseDt = new Date(eventDate);
-      withdrawCloseDt.setUTCHours(hh, mm, 0, 0);
-      withdrawCloseDt.setUTCHours(withdrawCloseDt.getUTCHours() - sched.withdraw_closes_hours_before);
-      withdrawClosesAt = withdrawCloseDt.toISOString();
+      const withdrawDt = localToUtc(localEventStr, tz);
+      withdrawDt.setUTCHours(withdrawDt.getUTCHours() - sched.withdraw_closes_hours_before);
+      withdrawClosesAt = withdrawDt.toISOString();
     }
 
     const { data: sheet, error: insertErr } = await supabase
@@ -86,7 +109,7 @@ export async function GET(request: NextRequest) {
       .insert({
         group_id: groupId,
         event_date: eventDateStr,
-        event_time: `${eventDateStr}T${eventTimeStr.slice(0, 5)}:00`,
+        event_time: `${eventDateStr}T${eventTimeStr}:00`,
         location: sched.location,
         player_limit: sched.player_limit,
         signup_closes_at: signupClosesAt,
@@ -113,15 +136,63 @@ export async function GET(request: NextRequest) {
     const memberIds = (members ?? []).map((m) => m.player_id as string);
     if (memberIds.length > 0) {
       const groupName = (sched.group as any)?.name ?? "your group";
+      // Format local event time for notification copy
+      const h = evH === 0 ? 12 : evH > 12 ? evH - 12 : evH;
+      const ampm = evH >= 12 ? "pm" : "am";
+      const displayTime = `${h}:${String(evM).padStart(2, "0")} ${ampm}`;
+
       await notifyMany(memberIds, {
         type: "new_sheet",
-        title: "Sign-up sheet posted!",
-        body: `A new sign-up sheet for ${groupName} is open for ${eventDateStr}.`,
+        title: `Sign-up open — ${groupName}`,
+        body: `A new sign-up sheet is open for ${groupName} on ${eventDateStr} at ${displayTime}.`,
         link: `/sheets/${sheet.id}`,
         groupId,
+        emailTemplate: "NewSheet",
+        emailData: {
+          groupName,
+          eventDate: eventDateStr,
+          eventTime: `${eventDateStr}T${eventTimeStr}:00`,
+          location: sched.location,
+          sheetId: sheet.id,
+        },
       });
     }
   }
 
   return NextResponse.json({ created });
+}
+
+/**
+ * Convert a local datetime string (YYYY-MM-DDTHH:MM:SS) in the given IANA
+ * timezone to a UTC Date object.
+ */
+function localToUtc(localStr: string, tz: string): Date {
+  // Format: find the UTC offset at that moment using Intl
+  // We iterate by adjusting until the local representation matches.
+  const candidate = new Date(localStr + "Z"); // initial guess treating as UTC
+  const offsetMs = getUtcOffsetMs(candidate, tz);
+  return new Date(candidate.getTime() - offsetMs);
+}
+
+function getUtcOffsetMs(utcDate: Date, tz: string): number {
+  const utcParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).formatToParts(utcDate);
+
+  const localParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).formatToParts(utcDate);
+
+  const toMs = (parts: Intl.DateTimeFormatPart[]) => {
+    const get = (t: string) => parseInt(parts.find((p) => p.type === t)?.value ?? "0", 10);
+    return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  };
+
+  return toMs(localParts) - toMs(utcParts);
 }
