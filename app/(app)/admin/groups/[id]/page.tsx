@@ -466,6 +466,25 @@ export default function AdminGroupDetailPage() {
     }
   };
 
+  const deleteGroup = async () => {
+    const ok = await confirm({
+      title: `Delete "${group?.name}"?`,
+      description:
+        "This will permanently delete the group, cancel all upcoming sign-up sheets (stopping all related notifications), and remove all members. This cannot be undone.",
+      confirmLabel: "Delete Group",
+      variant: "danger",
+    });
+    if (!ok) return;
+
+    const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/admin/groups");
+    } else {
+      const data = await res.json();
+      setMessage({ type: "error", text: data.error ?? "Failed to delete group." });
+    }
+  };
+
   // ============================================================
   // Derived data
   // ============================================================
@@ -1384,6 +1403,26 @@ export default function AdminGroupDetailPage() {
           )}
         </div>
       )}
+
+      {/* Danger Zone */}
+      <div className="card border border-red-900/40 space-y-3">
+        <h3 className="text-sm font-semibold text-red-400">Danger Zone</h3>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-dark-200">Delete this group</p>
+            <p className="text-xs text-surface-muted">
+              Permanently deletes the group, cancels all upcoming sign-up sheets, and stops all notifications. This cannot be undone.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={deleteGroup}
+            className="shrink-0 rounded-lg border border-red-700 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-900/20 transition-colors"
+          >
+            Delete Group
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
