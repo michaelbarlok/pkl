@@ -61,7 +61,9 @@ export default async function SheetsPage() {
   // Drop any sheet whose event started more than 12 hours ago
   const now = Date.now();
   const filteredSheets = (sheets ?? []).filter((s) => {
-    const eventStart = new Date(`${s.event_date}T${s.event_time ?? "00:00"}`).getTime();
+    const eventStart = s.event_time
+      ? new Date(s.event_time).getTime()
+      : new Date(`${s.event_date}T00:00`).getTime();
     return now < eventStart + 12 * 60 * 60 * 1000;
   });
 
