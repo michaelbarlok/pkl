@@ -65,13 +65,26 @@ export async function POST(
     );
   }
 
-  // Generate first round
-  const round = generateRound(playerIds, [], {});
+  // Generate first round (no prior history)
+  const round = generateRound(playerIds, [], {}, {}, {});
+
   const partnerHistory: Record<string, number> = {};
+  const opponentHistory: Record<string, number> = {};
+
   for (const m of round.matches) {
     partnerHistory[pairKey(m.teamA[0], m.teamA[1])] = 1;
     partnerHistory[pairKey(m.teamB[0], m.teamB[1])] = 1;
+
+    const [a, b] = m.teamA;
+    const [c, d] = m.teamB;
+    for (const [x, y] of [[a, c], [a, d], [b, c], [b, d]] as [string, string][]) {
+      const k = pairKey(x, y);
+      opponentHistory[k] = (opponentHistory[k] ?? 0) + 1;
+    }
   }
+
+  // byeHistory starts empty — next-round will populate it from sitting before each generation
+  const byeHistory: Record<string, number> = {};
 
   const currentRound = {
     roundNumber: 1,
@@ -83,7 +96,8 @@ export async function POST(
     })),
     sitting: round.sitting,
     partnerHistory,
-    previousSitting: round.sitting,
+    opponentHistory,
+    byeHistory,
   };
 
   // Create session
