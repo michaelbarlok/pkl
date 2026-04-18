@@ -1,4 +1,5 @@
 import { requireAuth, isGroupAdmin } from "@/lib/auth";
+import { pairKey } from "@/lib/free-play-engine";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -106,8 +107,49 @@ export async function PATCH(
     );
   }
 
-  // Build updated round — preserve round number and all history, reset scores
   const round = session.current_round as any;
+
+  // Update partnerHistory and opponentHistory to reflect the edited assignments.
+  // Strategy: decrement the original round's contributions, then add the new ones.
+  // byeHistory is left alone — next-round will add this round's sitters when advancing.
+  const partnerHistory: Record<string, number> = { ...(round.partnerHistory ?? {}) };
+  const opponentHistory: Record<string, number> = { ...(round.opponentHistory ?? {}) };
+
+  // Remove original match partnerships
+  for (const m of (round.matches ?? []) as { teamA: [string, string]; teamB: [string, string] }[]) {
+    const pk1 = pairKey(m.teamA[0], m.teamA[1]);
+    partnerHistory[pk1] = Math.max(0, (partnerHistory[pk1] ?? 0) - 1);
+    if (partnerHistory[pk1] === 0) delete partnerHistory[pk1];
+
+    const pk2 = pairKey(m.teamB[0], m.teamB[1]);
+    partnerHistory[pk2] = Math.max(0, (partnerHistory[pk2] ?? 0) - 1);
+    if (partnerHistory[pk2] === 0) delete partnerHistory[pk2];
+
+    const [a, b] = m.teamA;
+    const [c, d] = m.teamB;
+    for (const [x, y] of [[a, c], [a, d], [b, c], [b, d]] as [string, string][]) {
+      const ok = pairKey(x, y);
+      opponentHistory[ok] = Math.max(0, (opponentHistory[ok] ?? 0) - 1);
+      if (opponentHistory[ok] === 0) delete opponentHistory[ok];
+    }
+  }
+
+  // Add new match partnerships
+  for (const m of matches) {
+    const pk1 = pairKey(m.teamA[0], m.teamA[1]);
+    partnerHistory[pk1] = (partnerHistory[pk1] ?? 0) + 1;
+
+    const pk2 = pairKey(m.teamB[0], m.teamB[1]);
+    partnerHistory[pk2] = (partnerHistory[pk2] ?? 0) + 1;
+
+    const [a, b] = m.teamA;
+    const [c, d] = m.teamB;
+    for (const [x, y] of [[a, c], [a, d], [b, c], [b, d]] as [string, string][]) {
+      const ok = pairKey(x, y);
+      opponentHistory[ok] = (opponentHistory[ok] ?? 0) + 1;
+    }
+  }
+
   const updatedRound = {
     ...round,
     matches: matches.map((m) => ({
@@ -117,6 +159,8 @@ export async function PATCH(
       scoreB: null as number | null,
     })),
     sitting,
+    partnerHistory,
+    opponentHistory,
   };
 
   const { data: updated, error: updateError } = await auth.supabase
