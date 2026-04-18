@@ -116,6 +116,9 @@ export default async function SheetDetailPage({
   const isCancelled = sheet.status === "cancelled";
   const isFull = confirmed.length >= sheet.player_limit;
   const isAdmin = profile.role === "admin";
+  const myWaitlistPosition = myRegistration?.status === "waitlist"
+    ? waitlisted.findIndex((r: Registration) => r.player_id === profile.id) + 1
+    : null;
 
   // Check for an active (non-complete) session on this sheet
   const { data: activeSessions } = await supabase
@@ -254,6 +257,13 @@ export default async function SheetDetailPage({
           endpoint={`/api/groups/${sheet.group_id}/contact-admins`}
           label="Contact Group Admins"
         />
+      )}
+
+      {/* Waitlist position banner */}
+      {myWaitlistPosition && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
+          You&apos;re <strong className="text-amber-100">#{myWaitlistPosition}</strong> on the waitlist — we&apos;ll notify you if a spot opens.
+        </div>
       )}
 
       {/* Sign-Up / Withdraw Actions */}
