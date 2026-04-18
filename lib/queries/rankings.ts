@@ -1,16 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-/**
- * Recalculate point percentage for a player in a group using the rolling window.
- * Point percentage = points scored / points possible across the last N sessions.
- * Points possible per game = the higher score (accounts for win-by-2).
- * Only counts the last N sessions per group_preferences.pct_window_sessions.
- */
 export async function recalculateWinPct(
   groupId: string,
-  playerId: string
+  playerId: string,
+  client?: SupabaseClient
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
 
   // Get the window size
   const { data: prefs } = await supabase
@@ -21,18 +17,20 @@ export async function recalculateWinPct(
 
   const windowSize = prefs?.pct_window_sessions ?? 6;
 
-  // Get the last N completed sessions this player participated in
-  const { data: recentSessions } = await supabase
-    .from("shootout_sessions")
-    .select("id")
-    .eq("group_id", groupId)
-    .eq("status", "session_complete")
-    .order("created_at", { ascending: false })
+  // Get the last N completed sessions this player actually checked into
+  const { data: recentParticipations } = await supabase
+    .from("session_participants")
+    .select("session_id, shootout_sessions!inner(group_id, status)")
+    .eq("player_id", playerId)
+    .eq("checked_in", true)
+    .eq("shootout_sessions.group_id", groupId)
+    .eq("shootout_sessions.status", "session_complete")
+    .order("session_id", { ascending: false })
     .limit(windowSize);
 
-  if (!recentSessions || recentSessions.length === 0) return 0;
+  if (!recentParticipations || recentParticipations.length === 0) return 0;
 
-  const sessionIds = recentSessions.map((s) => s.id);
+  const sessionIds = recentParticipations.map((p) => p.session_id);
 
   // Get game results for this player in those sessions
   const { data: games } = await supabase
@@ -78,8 +76,11 @@ export async function recalculateWinPct(
  * Recalculate point percentage for ALL players in a group.
  * Called after a session completes.
  */
-export async function recalculateAllWinPcts(groupId: string): Promise<void> {
-  const supabase = await createClient();
+export async function recalculateAllWinPcts(
+  groupId: string,
+  client?: SupabaseClient
+): Promise<void> {
+  const supabase = client ?? (await createClient());
 
   const { data: members } = await supabase
     .from("group_memberships")
@@ -89,6 +90,6 @@ export async function recalculateAllWinPcts(groupId: string): Promise<void> {
   if (!members) return;
 
   await Promise.allSettled(
-    members.map((m) => recalculateWinPct(groupId, m.player_id))
+    members.map((m) => recalculateWinPct(groupId, m.player_id, supabase))
   );
 }

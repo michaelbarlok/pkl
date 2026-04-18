@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
+import { recalculateAllWinPcts } from "@/lib/queries/rankings";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -14,39 +15,23 @@ export async function POST(
 
   const admin = await createServiceClient();
 
-  // Delete all registrations for this sheet first
+  // Capture group_id before deleting so we can recalculate win% afterwards
+  const { data: sheet } = await admin
+    .from("signup_sheets")
+    .select("group_id")
+    .eq("id", sheetId)
+    .single();
+
+  const groupId = sheet?.group_id ?? null;
+
+  // Delete registrations (no cascade from signup_sheets)
   await admin
     .from("registrations")
     .delete()
     .eq("sheet_id", sheetId);
 
-  // Delete any sessions tied to this sheet
-  const { data: sessions } = await admin
-    .from("shootout_sessions")
-    .select("id")
-    .eq("sheet_id", sheetId);
-
-  if (sessions && sessions.length > 0) {
-    const sessionIds = sessions.map((s) => s.id);
-
-    // Delete session participants and game results
-    await admin
-      .from("session_participants")
-      .delete()
-      .in("session_id", sessionIds);
-
-    await admin
-      .from("game_results")
-      .delete()
-      .in("session_id", sessionIds);
-
-    await admin
-      .from("shootout_sessions")
-      .delete()
-      .eq("sheet_id", sheetId);
-  }
-
-  // Delete the sheet itself
+  // Delete the sheet — cascades to shootout_sessions → session_participants
+  // and game_results (via FK added in migration 068)
   const { error } = await admin
     .from("signup_sheets")
     .delete()
@@ -54,6 +39,13 @@ export async function POST(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Recalculate win% for all group members so stored values reflect the deletion
+  if (groupId) {
+    recalculateAllWinPcts(groupId, admin).catch((e) =>
+      console.error("win% recalc after sheet delete failed:", e)
+    );
   }
 
   revalidatePath("/sheets");

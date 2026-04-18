@@ -1,6 +1,7 @@
 "use client";
 
 import { NotificationBell } from "@/components/notification-bell";
+import { SuggestFeatureButton } from "@/components/suggest-feature-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/components/logo";
 import { useSupabase } from "@/components/providers/supabase-provider";
@@ -291,6 +292,8 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
             <span className="truncate font-medium">{profile.display_name}</span>
           )}
         </Link>
+
+        <SuggestFeatureButton collapsed={collapsed} />
 
         <ThemeToggle collapsed={collapsed} />
 

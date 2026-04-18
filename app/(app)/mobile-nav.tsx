@@ -1,6 +1,7 @@
 "use client";
 
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { SuggestFeatureButton } from "@/components/suggest-feature-button";
 import type { Profile } from "@/types/database";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -300,9 +301,10 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
             </>
           )}
 
-          {/* Invite + Sign out */}
+          {/* Invite + Suggest + Sign out */}
           <div className="border-t border-surface-border py-1">
             <InviteButton displayName={profile.display_name} onDone={() => setMoreOpen(false)} />
+            <SuggestFeatureButton onDone={() => setMoreOpen(false)} />
             <button
               onClick={handleSignOut}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-dark-200 active:bg-surface-overlay"
