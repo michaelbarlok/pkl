@@ -1,6 +1,6 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getGroupMembers, getGroupSheets, isGroupMember } from "@/lib/queries/group";
-import { getRecentMatches, getPlayerStats } from "@/lib/queries/free-play";
+import { getRecentMatches, getPlayerStats, getRecentSessions } from "@/lib/queries/free-play";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -157,6 +157,7 @@ export default async function GroupPage({
 
   const recentMatches = isFreePlay ? await getRecentMatches(group.id, 10) : [];
   const playerStats = isFreePlay ? await getPlayerStats(group.id) : [];
+  const recentSessions = isFreePlay ? await getRecentSessions(group.id, 10) : [];
 
   // Check for active free play session
   let activeSessionId: string | null = null;
@@ -406,6 +407,38 @@ export default async function GroupPage({
         </section>
       )}
 
+
+      {isFreePlay && isMember && recentSessions.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-dark-100">Past Sessions</h2>
+          <div className="space-y-2">
+            {recentSessions.map((s) => {
+              const date = new Date(s.created_at).toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              });
+              return (
+                <Link
+                  key={s.id}
+                  href={`/groups/${slug}/sessions/${s.id}`}
+                  className="card flex items-center justify-between hover:bg-surface-overlay transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-dark-100">{date}</p>
+                    <p className="text-xs text-surface-muted mt-0.5">
+                      {s.round_number} round{s.round_number !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <svg className="h-4 w-4 text-surface-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+                  </svg>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Members */}
       <CollapsibleMembers

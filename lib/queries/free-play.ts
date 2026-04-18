@@ -17,6 +17,24 @@ export interface FreePlayMatchWithPlayers extends Omit<FreePlayMatch, 'team_a_p1
 // ============================================================
 
 /**
+ * Fetch recent completed free play sessions for a group.
+ */
+export async function getRecentSessions(
+  groupId: string,
+  limit = 10
+): Promise<{ id: string; created_at: string; round_number: number }[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("free_play_sessions")
+    .select("id, created_at, round_number")
+    .eq("group_id", groupId)
+    .eq("status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return data ?? [];
+}
+
+/**
  * Fetch recent free play matches for a group with player profiles.
  */
 export async function getRecentMatches(
