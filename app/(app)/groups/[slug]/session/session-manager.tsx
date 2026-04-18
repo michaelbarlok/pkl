@@ -389,6 +389,7 @@ function ActivePhase({
         return;
       }
       setEditMode(false);
+      setLoading(false);
       onUpdate();
     } catch {
       setError("Something went wrong.");
