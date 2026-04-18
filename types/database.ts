@@ -80,6 +80,7 @@ export interface Profile {
   is_active: boolean;
   member_since: string;
   preferred_notify: string[];
+  notification_preferences?: Record<string, { email?: boolean; push?: boolean }> | null;
   role: UserRole;
   dupr_id?: string | null;
   dupr_singles_rating?: number | null;

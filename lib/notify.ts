@@ -55,7 +55,7 @@ export async function notify({
   // 2. Fetch user preferences
   const { data: profile, error: profileErr } = await supabase
     .from("profiles")
-    .select("email, phone, preferred_notify, display_name")
+    .select("email, phone, preferred_notify, notification_preferences, display_name")
     .eq("id", profileId)
     .single();
 
@@ -65,9 +65,12 @@ export async function notify({
   }
 
   const prefs: string[] = profile.preferred_notify ?? ["email"];
+  const typePrefs: Record<string, { email?: boolean; push?: boolean }> =
+    (profile.notification_preferences as Record<string, { email?: boolean; push?: boolean }>) ?? {};
+  const typePref = typePrefs[type] ?? {};
 
   // 3. Email via Resend
-  if (prefs.includes("email") && emailTemplate && profile.email &&
+  if (prefs.includes("email") && typePref.email !== false && emailTemplate && profile.email &&
       !isTestUser(profile.email, profile.display_name)) {
     try {
       await sendEmail({
@@ -94,7 +97,7 @@ export async function notify({
   }
 
   // 5. Web Push notification
-  if (prefs.includes("push")) {
+  if (prefs.includes("push") && typePref.push !== false) {
     try {
       await sendPushNotification(supabase, profileId, {
         title,
