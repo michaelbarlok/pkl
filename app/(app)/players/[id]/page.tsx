@@ -37,6 +37,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
     { data: { user } },
     playerBadges,
     badgeStats,
+    { data: sessionParticipations },
   ] = await Promise.all([
     supabase.from("group_memberships").select("*, group:shootout_groups(*)").eq("player_id", id).returns<(GroupMembership & { group: NonNullable<GroupMembership["group"]> })[]>(),
     supabase.from("game_results").select("*").or(`team_a_p1.eq.${id},team_a_p2.eq.${id},team_b_p1.eq.${id},team_b_p2.eq.${id}`).order("created_at", { ascending: false }).limit(10).returns<GameResult[]>(),
@@ -44,6 +45,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
     supabase.auth.getUser(),
     getPlayerBadges(id),
     getBadgeStats(id),
+    supabase.from("session_participants").select("checked_in, shootout_sessions!inner(created_at)").eq("player_id", id).order("created_at", { ascending: false, referencedTable: "shootout_sessions" }).limit(50),
   ]);
 
   const { data: currentProfile } = await supabase
@@ -60,6 +62,13 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
   const weightedWinPct = totalSessions > 0
     ? Math.round((memberships ?? []).reduce((s, m) => s + (m.win_pct ?? 0) * (m.total_sessions ?? 0), 0) / totalSessions)
     : null;
+
+  // Attendance streak (consecutive checked-in sessions, most recent first)
+  let streak = 0;
+  for (const p of sessionParticipations ?? []) {
+    if ((p as any).checked_in) streak++;
+    else break;
+  }
 
   // Recent game W/L
   const recentWins = (recentGames ?? []).filter((g) => {
@@ -132,7 +141,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
           </div>
 
           {/* Stat strip */}
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-surface-border pt-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5 border-t border-surface-border pt-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-dark-100">{totalSessions}</p>
               <p className="text-[11px] uppercase tracking-wide text-surface-muted">Sessions</p>
@@ -159,6 +168,12 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
             <div className="text-center">
               <p className="text-2xl font-bold text-dark-100">{badgeStats.earned}</p>
               <p className="text-[11px] uppercase tracking-wide text-surface-muted">Badges</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-dark-100">
+                {streak > 0 ? `🔥 ${streak}` : "—"}
+              </p>
+              <p className="text-[11px] uppercase tracking-wide text-surface-muted">Streak</p>
             </div>
           </div>
         </div>

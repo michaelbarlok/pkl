@@ -45,7 +45,9 @@ export async function GET(request: NextRequest) {
       hour12: false,
     }).formatToParts(now);
 
-    const localHour = parseInt(localParts.find((p) => p.type === "hour")?.value ?? "0", 10);
+    // Normalize hour: some Intl implementations return 24 for midnight instead of 0
+    const rawHour = parseInt(localParts.find((p) => p.type === "hour")?.value ?? "0", 10);
+    const localHour = rawHour === 24 ? 0 : rawHour;
     const localMinute = parseInt(localParts.find((p) => p.type === "minute")?.value ?? "0", 10);
     const localWeekdayShort = localParts.find((p) => p.type === "weekday")?.value ?? "";
 
@@ -55,10 +57,15 @@ export async function GET(request: NextRequest) {
     // Parse the configured post time (stored as "HH:MM:SS")
     const [postH, postM] = ((sched.post_time as string) ?? "08:00:00").split(":").map(Number);
 
-    // Match: exact weekday, exact hour, exact minute (cron runs every 15 min)
+    // Round localMinute down to the nearest 15-min mark so cron jitter (1-2 min late)
+    // doesn't cause us to miss the window entirely. Post times are restricted to :00/:15/:30/:45.
+    const roundedMinute = Math.floor(localMinute / 15) * 15;
+
     const hourMatches = localHour === postH;
-    const minuteMatches = localMinute === postM;
+    const minuteMatches = roundedMinute === postM;
     const dayMatches = localDayOfWeek === (sched.post_day_of_week as number);
+
+    console.log(`[cron] schedule ${sched.id}: local=${WEEKDAY_SHORT[localDayOfWeek]} ${localHour}:${String(localMinute).padStart(2,"0")} (rounded min=${roundedMinute}), target=${WEEKDAY_SHORT[sched.post_day_of_week as number]} ${postH}:${String(postM).padStart(2,"0")}, match=${dayMatches && hourMatches && minuteMatches}`);
 
     if (!dayMatches || !hourMatches || !minuteMatches) continue;
 
