@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     badgeStats,
   ] = await Promise.all([
     supabase.from("group_memberships").select("*, group:shootout_groups(*)").eq("player_id", profile.id),
-    supabase.from("signup_sheets").select("*, group:shootout_groups(name, slug)").eq("status", "open").order("event_date", { ascending: true }).limit(5),
+    supabase.from("signup_sheets").select("*, group:shootout_groups(name, slug, is_active)").eq("status", "open").order("event_date", { ascending: true }).limit(5),
     supabase.from("tournament_registrations").select("tournament_id, division, status, tournament:tournaments(id, title, start_date, start_time, location, status)").eq("player_id", profile.id).neq("status", "withdrawn"),
     supabase.from("tournaments").select("id, title, start_date, start_time, location, status").eq("created_by", profile.id).not("status", "in", '("completed","cancelled")'),
     supabase.from("tournament_organizers").select("tournament:tournaments(id, title, start_date, start_time, location, status)").eq("profile_id", profile.id),
@@ -35,11 +35,15 @@ export default async function DashboardPage() {
     getBadgeStats(profile.id),
   ]);
 
+  // Filter to active groups only
+  const activeGroupMemberships = (memberships ?? []).filter((m) => (m as any).group?.is_active !== false);
+  const activeSheets = (sheets ?? []).filter((s: any) => s.group?.is_active !== false);
+
   // Aggregate stats
-  const totalSessions = (memberships ?? []).reduce((s, m) => s + (m.total_sessions ?? 0), 0);
-  const groupCount = (memberships ?? []).length;
+  const totalSessions = activeGroupMemberships.reduce((s, m) => s + (m.total_sessions ?? 0), 0);
+  const groupCount = activeGroupMemberships.length;
   const weightedWinPct = totalSessions > 0
-    ? Math.round((memberships ?? []).reduce((s, m) => s + (m.win_pct ?? 0) * (m.total_sessions ?? 0), 0) / totalSessions)
+    ? Math.round(activeGroupMemberships.reduce((s, m) => s + (m.win_pct ?? 0) * (m.total_sessions ?? 0), 0) / totalSessions)
     : null;
 
   // Build tournament lists
@@ -85,7 +89,7 @@ export default async function DashboardPage() {
       time: r.tournament.start_time,
       status: r.status,
     }))),
-    ...((sheets ?? []).map((s: any) => ({
+    ...(activeSheets.map((s: any) => ({
       kind: "sheet" as const,
       date: s.event_date,
       id: s.id,
@@ -212,9 +216,9 @@ export default async function DashboardPage() {
           <h2 className="text-base font-semibold text-dark-100">My Groups</h2>
           <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300">Browse all</Link>
         </div>
-        {memberships && memberships.length > 0 ? (
+        {activeGroupMemberships.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {memberships.map((m) => (
+            {activeGroupMemberships.map((m) => (
               <Link
                 key={m.group_id}
                 href={`/groups/${(m as any).group?.slug}`}
