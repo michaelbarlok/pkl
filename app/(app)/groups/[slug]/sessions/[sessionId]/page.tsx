@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { SessionRecapAdmin } from "./session-recap-client";
 
 export default async function FreePlaySessionRecapPage({
   params,
@@ -15,7 +16,7 @@ export default async function FreePlaySessionRecapPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, display_name")
+    .select("id, display_name, role")
     .eq("user_id", user.id)
     .single();
   if (!profile) notFound();
@@ -30,17 +31,45 @@ export default async function FreePlaySessionRecapPage({
 
   const group = session.group as { id: string; name: string; slug: string };
 
-  const { data: matches } = await supabase
+  // Admin check
+  const { data: membership } = await supabase
+    .from("group_memberships")
+    .select("group_role")
+    .eq("group_id", group.id)
+    .eq("player_id", profile.id)
+    .maybeSingle();
+  const isAdmin = profile.role === "admin" || membership?.group_role === "admin";
+
+  // Fetch ALL matches for the session
+  const { data: allMatches } = await supabase
     .from("free_play_matches")
-    .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, round_number")
+    .select("id, team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b, round_number")
     .eq("session_id", sessionId)
-    .or(
-      `team_a_p1.eq.${profile.id},team_a_p2.eq.${profile.id},team_b_p1.eq.${profile.id},team_b_p2.eq.${profile.id}`
-    )
-    .order("round_number", { ascending: true });
+    .order("round_number", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  // Fetch session players with display names
+  const { data: sessionPlayers } = await supabase
+    .from("free_play_session_players")
+    .select("player_id, profiles(id, display_name)")
+    .eq("session_id", sessionId);
+
+  const players = (sessionPlayers ?? []).map((sp) => ({
+    id: sp.player_id as string,
+    displayName: (sp.profiles as any)?.display_name ?? "Unknown",
+  }));
+
+  // Current user's personal stats (from their own matches)
+  const myMatches = (allMatches ?? []).filter(
+    (m) =>
+      m.team_a_p1 === profile.id ||
+      m.team_a_p2 === profile.id ||
+      m.team_b_p1 === profile.id ||
+      m.team_b_p2 === profile.id
+  );
 
   let wins = 0, losses = 0, gamesPlayed = 0, pointsWon = 0, pointsPossible = 0, pointDiff = 0;
-  for (const m of matches ?? []) {
+  for (const m of myMatches) {
     const onTeamA = m.team_a_p1 === profile.id || m.team_a_p2 === profile.id;
     const myScore = onTeamA ? m.score_a : m.score_b;
     const theirScore = onTeamA ? m.score_b : m.score_a;
@@ -81,7 +110,7 @@ export default async function FreePlaySessionRecapPage({
         </div>
       ) : (
         <>
-          {/* Stats tiles */}
+          {/* Personal stats tiles */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="card text-center">
               <p className="text-2xl font-bold text-dark-100">
@@ -114,13 +143,13 @@ export default async function FreePlaySessionRecapPage({
             </div>
           </div>
 
-          {/* Match breakdown */}
+          {/* Personal match breakdown */}
           <div className="card">
             <h2 className="text-sm font-semibold text-dark-100 mb-3">
-              Match Breakdown
+              My Matches
             </h2>
             <div className="space-y-2">
-              {(matches ?? []).map((m, i) => {
+              {myMatches.map((m, i) => {
                 const onTeamA =
                   m.team_a_p1 === profile.id || m.team_a_p2 === profile.id;
                 const myScore = onTeamA ? m.score_a : m.score_b;
@@ -155,6 +184,17 @@ export default async function FreePlaySessionRecapPage({
             </div>
           </div>
         </>
+      )}
+
+      {/* All matches — with admin editing */}
+      {(allMatches ?? []).length > 0 && (
+        <SessionRecapAdmin
+          groupId={group.id}
+          sessionId={sessionId}
+          initialMatches={allMatches ?? []}
+          sessionPlayers={players}
+          isAdmin={isAdmin}
+        />
       )}
 
       <div className="text-center pb-4">
