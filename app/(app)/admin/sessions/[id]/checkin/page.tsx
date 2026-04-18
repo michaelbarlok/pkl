@@ -19,6 +19,7 @@ interface ParticipantRow {
   last_played_at: string | null;
   total_sessions: number;
   target_court_next: number | null;
+  prev_court_number: number | null;
   is_guest: boolean;
 }
 
@@ -91,6 +92,19 @@ export default function CheckInPage() {
         (memberships ?? []).map((m: any) => [m.player_id, m])
       );
 
+      // For same-day continuations, fetch previous session courts so we can show movement direction
+      const prevCourtMap = new Map<string, number>();
+      if (sess.is_same_day_continuation && sess.prev_session_id) {
+        const { data: prevParts } = await supabase
+          .from("session_participants")
+          .select("player_id, court_number")
+          .eq("session_id", sess.prev_session_id)
+          .not("court_number", "is", null);
+        for (const pp of prevParts ?? []) {
+          if (pp.court_number != null) prevCourtMap.set(pp.player_id, pp.court_number);
+        }
+      }
+
       const rows: ParticipantRow[] = parts.map((p: any) => {
         const membership = memberMap.get(p.player_id);
         return {
@@ -105,6 +119,7 @@ export default function CheckInPage() {
           last_played_at: membership?.last_played_at ?? null,
           total_sessions: membership?.total_sessions ?? 0,
           target_court_next: p.target_court_next,
+          prev_court_number: prevCourtMap.get(p.player_id) ?? null,
           is_guest: p.player?.is_guest ?? false,
         };
       });
@@ -645,6 +660,9 @@ export default function CheckInPage() {
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Pt %</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-24">Court</th>
+              {session.is_same_day_continuation && (
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Move</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">
@@ -691,6 +709,18 @@ export default function CheckInPage() {
                     placeholder="—"
                   />
                 </td>
+                {session.is_same_day_continuation && (
+                  <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap">
+                    {(() => {
+                      const prev = p.prev_court_number;
+                      const next = p.target_court_next ?? p.court_number;
+                      if (prev == null || next == null) return <span className="text-surface-muted">—</span>;
+                      if (next < prev) return <span className="text-teal-300">↑ C{prev}→{next}</span>;
+                      if (next > prev) return <span className="text-red-400">↓ C{prev}→{next}</span>;
+                      return <span className="text-surface-muted">→ C{next}</span>;
+                    })()}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
