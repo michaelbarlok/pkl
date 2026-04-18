@@ -93,11 +93,10 @@ export default function AdminSessionDetailPage() {
   async function endSession() {
     if (!session) return;
     setUpdating(true);
-    await supabase
-      .from("shootout_sessions")
-      .update({ status: "session_complete" })
-      .eq("id", id);
-    setSession({ ...session, status: "session_complete" });
+    const res = await fetch(`/api/sessions/${id}/end`, { method: "POST" });
+    if (res.ok) {
+      setSession({ ...session, status: "session_complete" });
+    }
     setUpdating(false);
   }
 
