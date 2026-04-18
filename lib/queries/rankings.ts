@@ -21,18 +21,20 @@ export async function recalculateWinPct(
 
   const windowSize = prefs?.pct_window_sessions ?? 6;
 
-  // Get the last N completed sessions this player participated in
-  const { data: recentSessions } = await supabase
-    .from("shootout_sessions")
-    .select("id")
-    .eq("group_id", groupId)
-    .eq("status", "session_complete")
-    .order("created_at", { ascending: false })
+  // Get the last N completed sessions this player actually checked into
+  const { data: recentParticipations } = await supabase
+    .from("session_participants")
+    .select("session_id, shootout_sessions!inner(group_id, status)")
+    .eq("player_id", playerId)
+    .eq("checked_in", true)
+    .eq("shootout_sessions.group_id", groupId)
+    .eq("shootout_sessions.status", "session_complete")
+    .order("session_id", { ascending: false })
     .limit(windowSize);
 
-  if (!recentSessions || recentSessions.length === 0) return 0;
+  if (!recentParticipations || recentParticipations.length === 0) return 0;
 
-  const sessionIds = recentSessions.map((s) => s.id);
+  const sessionIds = recentParticipations.map((p) => p.session_id);
 
   // Get game results for this player in those sessions
   const { data: games } = await supabase
