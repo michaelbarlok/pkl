@@ -177,7 +177,7 @@ export default function PlayerSessionPage() {
 
     const { data: sess } = await supabase
       .from("shootout_sessions")
-      .select("*, group:shootout_groups(id, name), sheet:signup_sheets(event_date, location)")
+      .select("*, group:shootout_groups(id, name, ladder_type), sheet:signup_sheets(event_date, location)")
       .eq("id", sessionId)
       .single();
     setSession(sess as any);
@@ -312,7 +312,14 @@ export default function PlayerSessionPage() {
   if (loading) return <div className="text-center py-12 text-surface-muted">Loading session...</div>;
   if (!session) return <div className="text-center py-12 text-surface-muted">Session not found.</div>;
 
-  const isActive = session.status === "round_active" || session.status === "round_complete";
+  const isActive = session.status === "round_active" || session.status === "round_complete" || session.status === "session_complete";
+  const isComplete = session.status === "session_complete";
+
+  const ordinal = (n: number) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -613,24 +620,74 @@ export default function PlayerSessionPage() {
       {session.status === "seeding" && (
         <EmptyState title="Courts are being assigned" description="Your court number will appear here shortly." />
       )}
-      {session.status === "session_complete" && (
-        <div className="card text-center">
-          <p className="text-dark-200 font-medium">Session complete!</p>
-          {(() => {
-            const me = participants.find((p) => p.player_id === myPlayerId);
-            if (!me || me.step_after == null) return null;
-            const diff = me.step_before - me.step_after;
-            return (
-              <p className="mt-2 text-sm text-surface-muted">
-                Your step: {me.step_before} → {me.step_after}
-                {diff > 0 && <span className="text-teal-300 font-medium"> (moved up {diff})</span>}
-                {diff < 0 && <span className="text-red-400 font-medium"> (moved down {Math.abs(diff)})</span>}
-                {diff === 0 && <span className="text-surface-muted"> (no change)</span>}
-              </p>
-            );
-          })()}
-        </div>
-      )}
+      {isComplete && (() => {
+        const me = participants.find((p) => p.player_id === myPlayerId);
+        if (!me) return null;
+
+        const myCourtPlayers = participants.filter((p) => p.court_number === me.court_number);
+        const myCourtScores = scores.filter((s) => s.pool_number === me.court_number);
+        const myStanding = computeStandings(myCourtPlayers as any, myCourtScores)
+          .find((s) => s.playerId === myPlayerId);
+
+        const finish = (me as any).pool_finish as number | null;
+        const stepBefore = me.step_before;
+        const stepAfter = me.step_after ?? null;
+        const courtNum = me.court_number ?? null;
+        const targetCourtNext = (me as any).target_court_next as number | null;
+        const isCourtPromotion = (session as any).group?.ladder_type === "court_promotion";
+        const stepUp = stepAfter != null && stepBefore != null && stepAfter < stepBefore;
+        const stepDown = stepAfter != null && stepBefore != null && stepAfter > stepBefore;
+
+        return (
+          <div className="card space-y-4 border border-brand-500/20 bg-brand-950/20">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-brand-400">Your Results</p>
+              <p className="text-xl font-bold text-dark-100 mt-0.5">Session Complete</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {finish != null && courtNum != null && (
+                <div className="rounded-lg bg-surface-overlay px-3 py-2.5">
+                  <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Finish</p>
+                  <p className="text-xl font-bold text-dark-100">{ordinal(finish)}</p>
+                  <p className="text-xs text-surface-muted">Court {courtNum}</p>
+                </div>
+              )}
+              {myStanding && (
+                <div className="rounded-lg bg-surface-overlay px-3 py-2.5">
+                  <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Record</p>
+                  <p className="text-xl font-bold text-dark-100">
+                    <span className="text-teal-300">{myStanding.wins}W</span>
+                    <span className="text-surface-muted text-sm mx-0.5">–</span>
+                    <span className="text-red-400">{myStanding.losses}L</span>
+                  </p>
+                </div>
+              )}
+              {stepBefore != null && stepAfter != null && (
+                <div className="rounded-lg bg-surface-overlay px-3 py-2.5">
+                  <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Step</p>
+                  <p className={`text-xl font-bold ${stepUp ? "text-teal-300" : stepDown ? "text-red-400" : "text-dark-100"}`}>
+                    {stepBefore}→{stepAfter}
+                    {stepUp && " ↑"}
+                    {stepDown && " ↓"}
+                  </p>
+                </div>
+              )}
+              {isCourtPromotion && targetCourtNext != null && courtNum != null && (
+                <div className="rounded-lg bg-surface-overlay px-3 py-2.5">
+                  <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Next Session</p>
+                  <p className={`text-xl font-bold ${targetCourtNext < courtNum ? "text-teal-300" : targetCourtNext > courtNum ? "text-red-400" : "text-dark-100"}`}>
+                    Court {targetCourtNext}
+                    {targetCourtNext < courtNum && " ↑"}
+                    {targetCourtNext > courtNum && " ↓"}
+                    {targetCourtNext === courtNum && " →"}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
