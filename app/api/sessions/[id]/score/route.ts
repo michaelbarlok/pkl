@@ -93,30 +93,25 @@ export async function POST(
     }
   }
 
-  // Check for duplicate submission (must match full team composition)
-  let dupQuery = auth.supabase
+  // Check for duplicate submission in both team orders (A vs B and B vs A)
+  const { data: allRoundScores } = await auth.supabase
     .from("game_results")
-    .select("id")
+    .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2")
     .eq("session_id", sessionId)
     .eq("round_number", round_number)
-    .eq("pool_number", pool_number)
-    .eq("team_a_p1", team_a_p1)
-    .eq("team_b_p1", team_b_p1);
+    .eq("pool_number", pool_number);
 
-  if (team_a_p2) {
-    dupQuery = dupQuery.eq("team_a_p2", team_a_p2);
-  } else {
-    dupQuery = dupQuery.is("team_a_p2", null);
-  }
-  if (team_b_p2) {
-    dupQuery = dupQuery.eq("team_b_p2", team_b_p2);
-  } else {
-    dupQuery = dupQuery.is("team_b_p2", null);
-  }
+  const newTeamA = [team_a_p1, team_a_p2 ?? null].filter(Boolean).sort().join(",");
+  const newTeamB = [team_b_p1, team_b_p2 ?? null].filter(Boolean).sort().join(",");
+  const newMatchup = [newTeamA, newTeamB].sort().join("|");
 
-  const { data: existing } = await dupQuery.limit(1);
+  const isDuplicate = (allRoundScores ?? []).some((g) => {
+    const existingA = [g.team_a_p1, g.team_a_p2 ?? null].filter(Boolean).sort().join(",");
+    const existingB = [g.team_b_p1, g.team_b_p2 ?? null].filter(Boolean).sort().join(",");
+    return [existingA, existingB].sort().join("|") === newMatchup;
+  });
 
-  if (existing && existing.length > 0) {
+  if (isDuplicate) {
     return NextResponse.json(
       { error: "A score already exists for this matchup in this round" },
       { status: 409 }

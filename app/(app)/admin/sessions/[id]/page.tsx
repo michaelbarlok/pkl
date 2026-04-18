@@ -93,11 +93,10 @@ export default function AdminSessionDetailPage() {
   async function endSession() {
     if (!session) return;
     setUpdating(true);
-    await supabase
-      .from("shootout_sessions")
-      .update({ status: "session_complete" })
-      .eq("id", id);
-    setSession({ ...session, status: "session_complete" });
+    const res = await fetch(`/api/sessions/${id}/end`, { method: "POST" });
+    if (res.ok) {
+      setSession({ ...session, status: "session_complete" });
+    }
     setUpdating(false);
   }
 
@@ -389,6 +388,14 @@ export default function AdminSessionDetailPage() {
     const map = new Map<string, string>();
     for (const p of participants) {
       map.set(p.player_id, (p as any).player?.display_name ?? "?");
+    }
+    return map;
+  }, [participants]);
+
+  const playerTargetCourtMap = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const p of participants) {
+      map.set(p.player_id, p.target_court_next ?? null);
     }
     return map;
   }, [participants]);
@@ -737,6 +744,9 @@ export default function AdminSessionDetailPage() {
                     <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">W</th>
                     <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">L</th>
                     <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">+/-</th>
+                    {session.status === "round_complete" && session.group?.ladder_type !== "dynamic_ranking" && (
+                      <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Next Court</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-border bg-surface-raised">
@@ -751,6 +761,17 @@ export default function AdminSessionDetailPage() {
                           {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
                         </span>
                       </td>
+                      {session.status === "round_complete" && session.group?.ladder_type !== "dynamic_ranking" && (
+                        <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold">
+                          {(() => {
+                            const next = playerTargetCourtMap.get(s.playerId);
+                            if (next == null) return <span className="text-surface-muted">—</span>;
+                            if (next < selectedCourt) return <span className="text-teal-300">↑ {next}</span>;
+                            if (next > selectedCourt) return <span className="text-red-400">↓ {next}</span>;
+                            return <span className="text-surface-muted">→ {next}</span>;
+                          })()}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -938,6 +959,7 @@ export default function AdminSessionDetailPage() {
               <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step Before</th>
               <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step After</th>
               <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Finish</th>
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Next Court</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">
@@ -972,6 +994,16 @@ export default function AdminSessionDetailPage() {
                 </td>
                 <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
                   {p.pool_finish != null ? `${p.pool_finish}${["st","nd","rd"][p.pool_finish-1] ?? "th"}` : "—"}
+                </td>
+                <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm font-medium">
+                  {(() => {
+                    const next = p.target_court_next;
+                    const curr = p.court_number;
+                    if (next == null) return <span className="text-surface-muted">—</span>;
+                    if (curr == null || next === curr) return <span className="text-surface-muted">→ {next}</span>;
+                    if (next < curr) return <span className="text-teal-300 font-semibold">↑ Court {next}</span>;
+                    return <span className="text-red-400 font-semibold">↓ Court {next}</span>;
+                  })()}
                 </td>
               </tr>
             ))}

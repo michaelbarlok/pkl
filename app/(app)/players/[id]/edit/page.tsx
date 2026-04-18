@@ -33,6 +33,7 @@ export default function EditProfilePage() {
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyPush, setNotifyPush] = useState(false);
   const [notifyForumReplies, setNotifyForumReplies] = useState(false);
+  const [notificationPrefs, setNotificationPrefs] = useState<Record<string, "email" | "push" | "off">>({});
   const [pushSupported, setPushSupported] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isStandalone, setIsStandalone] = useState(false);
@@ -88,6 +89,7 @@ export default function EditProfilePage() {
       setNotifyEmail(prefs.includes("email"));
       setNotifyPush(prefs.includes("push"));
       setNotifyForumReplies(profile.notify_forum_replies ?? false);
+      setNotificationPrefs((profile.notification_preferences as Record<string, "email" | "push" | "off">) ?? {});
       setDuprId(profile.dupr_id ?? "");
       setDuprSingles(profile.dupr_singles_rating?.toString() ?? "");
       setDuprDoubles(profile.dupr_doubles_rating?.toString() ?? "");
@@ -194,9 +196,8 @@ export default function EditProfilePage() {
     setSuccess("");
     setSaving(true);
 
-    // Build notification preferences array
-    const preferredNotify: string[] = [];
-    if (notifyEmail) preferredNotify.push("email");
+    // preferred_notify is the fallback for types without an explicit per-type setting
+    const preferredNotify: string[] = ["email"];
     if (notifyPush) preferredNotify.push("push");
 
     const updates: Record<string, unknown> = {
@@ -208,6 +209,7 @@ export default function EditProfilePage() {
       skill_level: skillLevel ? parseFloat(skillLevel) : null,
       preferred_notify: preferredNotify,
       notify_forum_replies: notifyForumReplies,
+      notification_preferences: notificationPrefs,
       dupr_id: duprId.trim() || null,
       dupr_singles_rating: duprSingles ? parseFloat(duprSingles) : null,
       dupr_doubles_rating: duprDoubles ? parseFloat(duprDoubles) : null,
@@ -450,91 +452,177 @@ export default function EditProfilePage() {
           </div>
 
           {/* Notification Preferences */}
-          <div className="border-t border-surface-border pt-4 mt-4">
-            <h3 className="text-sm font-semibold text-dark-100 mb-1">Notification Preferences</h3>
-            <p className="text-xs text-surface-muted mb-3">
-              Choose how you want to receive notifications. In-app notifications are always on.
-            </p>
-            <div className="space-y-3">
-              {/* ── Forum reply notifications ── */}
-              <div className="rounded-lg border border-surface-border bg-surface-overlay/50 px-4 py-3">
-                <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-2">Forum</p>
-                <label className="flex items-center gap-3">
+          <div className="border-t border-surface-border pt-4 mt-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-dark-100 mb-0.5">Notification Preferences</h3>
+              <p className="text-xs text-surface-muted">
+                Choose how each notification type reaches you: email, push, or turn it off entirely.
+              </p>
+            </div>
+
+            {/* ── Push device toggle ── */}
+            {pushSupported ? (
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={notifyForumReplies}
-                    onChange={(e) => setNotifyForumReplies(e.target.checked)}
-                    className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
+                    checked={notifyPush}
+                    disabled={togglingPush || pushPermission === "denied"}
+                    onChange={(e) => handlePushToggle(e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-50"
                   />
-                  <div>
-                    <span className="text-sm font-medium text-dark-100">Reply notifications</span>
-                    <p className="text-xs text-surface-muted">Notify me when someone replies to a thread I posted</p>
-                  </div>
+                  <span className={`text-sm font-medium ${pushPermission === "denied" ? "text-surface-muted" : "text-dark-100"}`}>
+                    Enable push notifications on this device
+                    {togglingPush ? " (setting up…)" : pushPermission === "denied" ? " (blocked)" : ""}
+                  </span>
                 </label>
               </div>
+            ) : null}
 
-              {/* ── Delivery channels ── */}
-              <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider pt-1">Delivery channels</p>
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={notifyEmail}
-                  onChange={(e) => setNotifyEmail(e.target.checked)}
-                  className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
-                />
-                <div>
-                  <span className="text-sm font-medium text-dark-100">Email</span>
-                  <p className="text-xs text-surface-muted">Receive notifications via email</p>
+            {pushPermission === "denied" && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3 text-xs text-amber-200 space-y-2">
+                <p className="font-semibold text-amber-100">How to re-enable push notifications:</p>
+                {isStandalone ? (
+                  <ol className="list-decimal list-inside space-y-1 text-amber-200/90">
+                    <li>Long-press the <strong>Tri-Star Pickleball</strong> icon on your home screen</li>
+                    <li>Tap <strong>App info → Permissions → Notifications</strong></li>
+                    <li>Select <strong>Allow</strong>, then return here and refresh</li>
+                  </ol>
+                ) : (
+                  <ol className="list-decimal list-inside space-y-1 text-amber-200/90">
+                    <li>Tap the <strong>lock icon</strong> (or ⓘ) in the address bar</li>
+                    <li>Tap <strong>Permissions → Notifications → Allow</strong></li>
+                    <li>Reload this page</li>
+                  </ol>
+                )}
+              </div>
+            )}
+
+            {/* ── Per-type selectors ── */}
+            {(() => {
+              const notifGroups = [
+                {
+                  label: "Sign-Up Sheets",
+                  types: [
+                    { type: "new_sheet", label: "New sheet posted" },
+                    { type: "signup_reminder", label: "Sign-up closing soon" },
+                    { type: "sheet_updated", label: "Sheet details changed" },
+                    { type: "sheet_cancelled", label: "Event cancelled" },
+                    { type: "withdraw_closing", label: "Withdrawal deadline soon" },
+                  ],
+                },
+                {
+                  label: "Registration",
+                  types: [
+                    { type: "waitlist_promoted", label: "Moved off waitlist" },
+                    { type: "bumped_to_waitlist", label: "Bumped to waitlist" },
+                  ],
+                },
+                {
+                  label: "Sessions",
+                  types: [
+                    { type: "session_starting", label: "Session starting soon" },
+                    { type: "pool_assigned", label: "Court assigned" },
+                    { type: "session_recap", label: "Post-session recap" },
+                  ],
+                },
+                {
+                  label: "Ladder & Ratings",
+                  types: [
+                    { type: "step_changed", label: "Ladder step changed" },
+                    { type: "rating_updated", label: "Rating updated" },
+                    { type: "score_confirmed", label: "Score confirmed" },
+                  ],
+                },
+                {
+                  label: "Tournaments",
+                  types: [
+                    { type: "tournament_registration", label: "Tournament registration" },
+                    { type: "tournament_reminder", label: "Tournament reminder" },
+                    { type: "tournament_cancelled", label: "Tournament cancelled" },
+                    { type: "tournament_withdrawal", label: "Withdrawal confirmed" },
+                  ],
+                },
+                {
+                  label: "Community",
+                  types: [
+                    { type: "forum_reply", label: "Reply to your post" },
+                    { type: "forum_mention", label: "Mentioned in forum" },
+                    { type: "group_announcement", label: "Group announcement" },
+                    { type: "badge_earned", label: "Badge earned" },
+                    { type: "invite_sent", label: "Group invite" },
+                  ],
+                },
+              ] as const;
+
+              const getVal = (t: string): "email" | "push" | "off" =>
+                (notificationPrefs[t] as "email" | "push" | "off" | undefined) ?? "email";
+
+              const setVal = (t: string, val: "email" | "push" | "off") =>
+                setNotificationPrefs((prev) => ({ ...prev, [t]: val }));
+
+              const OPTIONS: { value: "email" | "push" | "off"; label: string }[] = [
+                { value: "email", label: "Email" },
+                { value: "push",  label: "Push" },
+                { value: "off",   label: "Off"  },
+              ];
+
+              return (
+                <div className="rounded-lg border border-surface-border overflow-hidden">
+                  {/* Column headers */}
+                  <div className="grid grid-cols-[1fr_auto] bg-surface-overlay border-b border-surface-border px-3 py-2">
+                    <span className="text-xs font-medium text-surface-muted uppercase tracking-wider">Notification</span>
+                    <span className="text-xs font-medium text-surface-muted uppercase tracking-wider pr-1">Deliver via</span>
+                  </div>
+
+                  {notifGroups.map((group, gi) => (
+                    <div key={group.label}>
+                      <div className="px-3 py-1.5 bg-surface-overlay/60 border-b border-surface-border">
+                        <span className="text-[11px] font-semibold text-brand-400 uppercase tracking-wider">{group.label}</span>
+                      </div>
+
+                      {group.types.map(({ type, label }, ri) => {
+                        const current = getVal(type);
+                        const isLast = gi === notifGroups.length - 1 && ri === group.types.length - 1;
+                        return (
+                          <div
+                            key={type}
+                            className={`flex items-center justify-between gap-3 px-3 py-2.5 ${!isLast ? "border-b border-surface-border/50" : ""} hover:bg-surface-overlay/30`}
+                          >
+                            <span className={`text-sm ${current === "off" ? "text-surface-muted" : "text-dark-200"}`}>{label}</span>
+                            <div className="flex rounded-md overflow-hidden border border-surface-border shrink-0">
+                              {OPTIONS.map(({ value, label: optLabel }) => {
+                                const isActive = current === value;
+                                const isPushDisabled = value === "push" && (!pushSupported || !notifyPush);
+                                return (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    disabled={isPushDisabled}
+                                    onClick={() => setVal(type, value)}
+                                    className={[
+                                      "px-2.5 py-1 text-xs font-medium transition-colors border-r border-surface-border last:border-r-0",
+                                      isActive
+                                        ? value === "off"
+                                          ? "bg-red-900/50 text-red-300"
+                                          : "bg-brand-600 text-white"
+                                        : "bg-surface-overlay text-surface-muted hover:bg-surface-overlay/80",
+                                      isPushDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer",
+                                    ].join(" ")}
+                                  >
+                                    {optLabel}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-              </label>
-
-              {pushSupported && (
-                <>
-                  <label className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={notifyPush}
-                      disabled={togglingPush || pushPermission === "denied"}
-                      onChange={(e) => handlePushToggle(e.target.checked)}
-                      className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-50"
-                    />
-                    <div>
-                      <span className="text-sm font-medium text-dark-100">Push Notifications</span>
-                      <p className="text-xs text-surface-muted">
-                        {pushPermission === "denied"
-                          ? "Notifications are blocked — see steps below to re-enable."
-                          : togglingPush
-                            ? "Setting up..."
-                            : "Receive push notifications on this device"}
-                      </p>
-                    </div>
-                  </label>
-
-                  {pushPermission === "denied" && (
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3 text-xs text-amber-200 space-y-2">
-                      <p className="font-semibold text-amber-100">How to re-enable notifications:</p>
-                      {isStandalone ? (
-                        // Installed PWA — Android path
-                        <ol className="list-decimal list-inside space-y-1 text-amber-200/90">
-                          <li>Long-press the <strong>Tri-Star Pickleball</strong> icon on your home screen</li>
-                          <li>Tap <strong>App info</strong></li>
-                          <li>Tap <strong>Permissions → Notifications</strong></li>
-                          <li>Select <strong>Allow</strong>, then return here and refresh</li>
-                        </ol>
-                      ) : (
-                        // Browser tab path
-                        <ol className="list-decimal list-inside space-y-1 text-amber-200/90">
-                          <li>Tap the <strong>lock icon</strong> (or ⓘ) in the address bar</li>
-                          <li>Tap <strong>Permissions</strong> or <strong>Site settings</strong></li>
-                          <li>Find <strong>Notifications</strong> and set it to <strong>Allow</strong></li>
-                          <li>Reload this page</li>
-                        </ol>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+              );
+            })()}
           </div>
 
           <FormError message={error} />

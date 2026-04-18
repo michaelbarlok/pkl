@@ -42,7 +42,11 @@ export type NotificationType =
   | "tournament_withdrawal"
   | "tournament_reminder"
   | "tournament_cancelled"
-  | "badge_earned";
+  | "badge_earned"
+  | "session_recap"
+  | "group_announcement";
+
+export type CancellationReason = "lack_of_interest" | "inclement_weather" | "other";
 
 export type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
 export type TournamentType = "singles" | "doubles";
@@ -76,6 +80,7 @@ export interface Profile {
   is_active: boolean;
   member_since: string;
   preferred_notify: string[];
+  notification_preferences?: Record<string, "email" | "push" | "off"> | null;
   role: UserRole;
   dupr_id?: string | null;
   dupr_singles_rating?: number | null;
@@ -102,6 +107,8 @@ export interface SignupSheet {
   notify_on_create: boolean;
   status: SheetStatus;
   notes?: string | null;
+  cancellation_reason?: CancellationReason | null;
+  cancellation_message?: string | null;
   signup_reminder_sent: boolean;
   withdraw_reminder_sent: boolean;
   created_by: string;
