@@ -23,13 +23,17 @@ export function pairKey(a: string, b: string): string {
  * Generate a round of doubles matches.
  *
  * Guarantees:
- *  - Nobody sits twice in a row (unless unavoidable with < 5 players).
+ *  - Nobody sits twice in a row (unless unavoidable with ≤4 players per court).
+ *  - Players with fewer total byes are preferred for the sit-out slot.
  *  - Partners rotate — minimises repeat partnerships across rounds.
+ *  - Opponents rotate — secondarily minimises facing the same opponents.
  */
 export function generateRound(
   players: string[],
   previousSitting: string[],
-  partnerHistory: Record<string, number>
+  partnerHistory: Record<string, number>,
+  byeHistory: Record<string, number> = {},
+  opponentHistory: Record<string, number> = {},
 ): RoundResult {
   const n = players.length;
 
@@ -41,9 +45,9 @@ export function generateRound(
   const numPlaying = numCourts * 4;
   const numSitting = n - numPlaying;
 
-  const sitting = pickSitters(players, numSitting, new Set(previousSitting));
+  const sitting = pickSitters(players, numSitting, new Set(previousSitting), byeHistory);
   const playing = players.filter((p) => !sitting.includes(p));
-  const matches = formMatches(playing, partnerHistory);
+  const matches = formMatches(playing, partnerHistory, opponentHistory);
 
   return { matches, sitting };
 }
@@ -55,45 +59,46 @@ export function generateRound(
 function pickSitters(
   players: string[],
   count: number,
-  previouslySat: Set<string>
+  previouslySat: Set<string>,
+  byeHistory: Record<string, number>
 ): string[] {
   if (count === 0) return [];
 
-  // Prefer players who did NOT sit last round
+  // Split: didn't sit last round (eligible) vs. sat last round (ineligible)
   const eligible = players.filter((p) => !previouslySat.has(p));
   const ineligible = players.filter((p) => previouslySat.has(p));
 
-  const sitters: string[] = [];
-  const shuffledEligible = shuffle([...eligible]);
-  for (const p of shuffledEligible) {
-    if (sitters.length >= count) break;
-    sitters.push(p);
-  }
+  // Within eligible, prefer players with the fewest total byes.
+  // Pre-shuffle so ties are broken randomly (JS sort is stable, so
+  // equal-bye-count players maintain their shuffled order).
+  const sortedEligible = shuffle([...eligible]).sort(
+    (a, b) => (byeHistory[a] ?? 0) - (byeHistory[b] ?? 0)
+  );
 
-  // Only add players who sat last round if we still need more
+  const sitters = sortedEligible.slice(0, count);
+
+  // Only use players who sat last round if we still need more sitters
   if (sitters.length < count) {
-    const shuffledIneligible = shuffle([...ineligible]);
-    for (const p of shuffledIneligible) {
-      if (sitters.length >= count) break;
-      sitters.push(p);
-    }
+    const extra = shuffle([...ineligible]).slice(0, count - sitters.length);
+    sitters.push(...extra);
   }
 
   return sitters;
 }
 
 /**
- * Try several random shuffles and pick the assignment with the fewest
- * repeat partnerships.
+ * Try several random shuffles and pick the assignment that minimises
+ * both repeat partnerships (weight ×2) and repeat opponents (weight ×1).
  */
 function formMatches(
   players: string[],
-  partnerHistory: Record<string, number>
+  partnerHistory: Record<string, number>,
+  opponentHistory: Record<string, number>
 ): MatchAssignment[] {
   let bestMatches: MatchAssignment[] = [];
   let bestScore = Infinity;
 
-  const attempts = Math.min(50, players.length * 10);
+  const attempts = Math.min(200, Math.max(50, players.length * 20));
 
   for (let i = 0; i < attempts; i++) {
     const shuffled = shuffle([...players]);
@@ -101,13 +106,22 @@ function formMatches(
     let score = 0;
 
     for (let j = 0; j < shuffled.length; j += 4) {
-      const teamA: [string, string] = [shuffled[j], shuffled[j + 1]];
-      const teamB: [string, string] = [shuffled[j + 2], shuffled[j + 3]];
+      const a = shuffled[j];
+      const b = shuffled[j + 1];
+      const c = shuffled[j + 2];
+      const d = shuffled[j + 3];
 
-      score += partnerHistory[pairKey(teamA[0], teamA[1])] ?? 0;
-      score += partnerHistory[pairKey(teamB[0], teamB[1])] ?? 0;
+      // Partner penalty (×2) — strongly avoid same partner
+      score += (partnerHistory[pairKey(a, b)] ?? 0) * 2;
+      score += (partnerHistory[pairKey(c, d)] ?? 0) * 2;
 
-      matches.push({ teamA, teamB });
+      // Opponent penalty (×1) — mildly avoid facing same opponents
+      score += opponentHistory[pairKey(a, c)] ?? 0;
+      score += opponentHistory[pairKey(a, d)] ?? 0;
+      score += opponentHistory[pairKey(b, c)] ?? 0;
+      score += opponentHistory[pairKey(b, d)] ?? 0;
+
+      matches.push({ teamA: [a, b], teamB: [c, d] });
     }
 
     if (score < bestScore) {
@@ -115,7 +129,7 @@ function formMatches(
       bestMatches = matches;
     }
 
-    if (score === 0) break; // No repeats — can't do better
+    if (bestScore === 0) break; // Perfect — no repeats at all
   }
 
   return bestMatches;

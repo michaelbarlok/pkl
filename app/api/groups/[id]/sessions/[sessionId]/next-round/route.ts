@@ -72,18 +72,33 @@ export async function POST(
 
   const playerIds = (sessionPlayers ?? []).map((sp) => sp.player_id);
 
-  // Generate next round
+  // Restore histories from stored round state
   const partnerHistory: Record<string, number> = { ...(round.partnerHistory ?? {}) };
+  const opponentHistory: Record<string, number> = { ...(round.opponentHistory ?? {}) };
   const previousSitting: string[] = round.sitting ?? [];
 
-  const nextRound = generateRound(playerIds, previousSitting, partnerHistory);
+  // Update bye history with this round's sitters BEFORE generating next round
+  // so the algorithm can prefer players who've had fewer total byes
+  const byeHistory: Record<string, number> = { ...(round.byeHistory ?? {}) };
+  for (const p of previousSitting) {
+    byeHistory[p] = (byeHistory[p] ?? 0) + 1;
+  }
 
-  // Update partner history
+  const nextRound = generateRound(playerIds, previousSitting, partnerHistory, byeHistory, opponentHistory);
+
+  // Update partner and opponent history for the newly generated round
   for (const m of nextRound.matches) {
-    const k = pairKey(m.teamA[0], m.teamA[1]);
-    partnerHistory[k] = (partnerHistory[k] ?? 0) + 1;
-    const k2 = pairKey(m.teamB[0], m.teamB[1]);
-    partnerHistory[k2] = (partnerHistory[k2] ?? 0) + 1;
+    const pk1 = pairKey(m.teamA[0], m.teamA[1]);
+    partnerHistory[pk1] = (partnerHistory[pk1] ?? 0) + 1;
+    const pk2 = pairKey(m.teamB[0], m.teamB[1]);
+    partnerHistory[pk2] = (partnerHistory[pk2] ?? 0) + 1;
+
+    const [a, b] = m.teamA;
+    const [c, d] = m.teamB;
+    for (const [x, y] of [[a, c], [a, d], [b, c], [b, d]] as [string, string][]) {
+      const k = pairKey(x, y);
+      opponentHistory[k] = (opponentHistory[k] ?? 0) + 1;
+    }
   }
 
   const newRoundNumber = round.roundNumber + 1;
@@ -97,7 +112,8 @@ export async function POST(
     })),
     sitting: nextRound.sitting,
     partnerHistory,
-    previousSitting: nextRound.sitting,
+    opponentHistory,
+    byeHistory,
   };
 
   const { data: updated, error: updateError } = await auth.supabase
