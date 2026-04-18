@@ -48,6 +48,17 @@ interface SessionData {
   createdAt: string;
 }
 
+interface PastMatch {
+  id: string;
+  round_number: number;
+  team_a_p1: string;
+  team_a_p2: string;
+  team_b_p1: string;
+  team_b_p2: string;
+  score_a: number;
+  score_b: number;
+}
+
 interface Props {
   group: { id: string; name: string; slug: string };
   members: Member[];
@@ -296,6 +307,16 @@ function ActivePhase({
   >([]);
   const [draftSitting, setDraftSitting] = useState<string[]>([]);
 
+  // Past-match editing (admin)
+  const [pastMatches, setPastMatches] = useState<PastMatch[]>([]);
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  const [matchEditDraft, setMatchEditDraft] = useState({
+    scoreA: "", scoreB: "",
+    teamAP1: "", teamAP2: "", teamBP1: "", teamBP2: "",
+  });
+  const [matchEditLoading, setMatchEditLoading] = useState(false);
+  const [matchEditError, setMatchEditError] = useState("");
+
   function enterEditMode() {
     if (!round) return;
     setDraftMatches(
@@ -312,6 +333,58 @@ function ActivePhase({
   function cancelEditMode() {
     setEditMode(false);
     setError("");
+  }
+
+  function enterMatchEdit(m: PastMatch) {
+    setEditingMatchId(m.id);
+    setMatchEditDraft({
+      scoreA: String(m.score_a),
+      scoreB: String(m.score_b),
+      teamAP1: m.team_a_p1,
+      teamAP2: m.team_a_p2,
+      teamBP1: m.team_b_p1,
+      teamBP2: m.team_b_p2,
+    });
+    setMatchEditError("");
+  }
+
+  function cancelMatchEdit() {
+    setEditingMatchId(null);
+    setMatchEditError("");
+  }
+
+  async function saveMatchEdit(matchId: string) {
+    setMatchEditLoading(true);
+    setMatchEditError("");
+    try {
+      const res = await fetch(
+        `/api/groups/${group.id}/sessions/${session.id}/matches/${matchId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scoreA: parseInt(matchEditDraft.scoreA, 10),
+            scoreB: parseInt(matchEditDraft.scoreB, 10),
+            teamAP1: matchEditDraft.teamAP1,
+            teamAP2: matchEditDraft.teamAP2,
+            teamBP1: matchEditDraft.teamBP1,
+            teamBP2: matchEditDraft.teamBP2,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json();
+        setMatchEditError(data.error ?? "Failed to save");
+        setMatchEditLoading(false);
+        return;
+      }
+      setEditingMatchId(null);
+      await fetchPastMatches();
+      fetchStandings();
+    } catch {
+      setMatchEditError("Something went wrong.");
+      setMatchEditLoading(false);
+    }
   }
 
   function setDraftPlayer(
@@ -414,9 +487,24 @@ function ActivePhase({
     }
   }, [group.id, session.id]);
 
+  const fetchPastMatches = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/groups/${group.id}/sessions/${session.id}/matches`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setPastMatches(data.matches ?? []);
+      }
+    } catch {
+      // Silently fail
+    }
+  }, [group.id, session.id]);
+
   useEffect(() => {
     fetchStandings();
-  }, [fetchStandings]);
+    fetchPastMatches();
+  }, [fetchStandings, fetchPastMatches]);
 
   const allScored = scores.every((s) => s.scoreA !== "" && s.scoreB !== "");
 
@@ -849,6 +937,156 @@ function ActivePhase({
           </div>
         </div>
       )}
+
+      {/* Previous Rounds */}
+      {pastMatches.length > 0 && (() => {
+        const byRound: Record<number, PastMatch[]> = {};
+        for (const m of pastMatches) {
+          (byRound[m.round_number] ??= []).push(m);
+        }
+        const roundNums = Object.keys(byRound).map(Number).sort((a, b) => b - a);
+        return (
+          <div>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-muted">
+              Previous Rounds
+            </h2>
+            <div className="space-y-4">
+              {roundNums.map((rn) => (
+                <div key={rn}>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-surface-muted">
+                    Round {rn}
+                  </p>
+                  <div className="space-y-2">
+                    {byRound[rn].map((m) => {
+                      const isEditing = editingMatchId === m.id;
+                      return (
+                        <div key={m.id} className="card space-y-3">
+                          {isEditing ? (
+                            <>
+                              <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
+                                {/* Team A editable */}
+                                <div className="space-y-1">
+                                  <select
+                                    value={matchEditDraft.teamAP1}
+                                    onChange={(e) => setMatchEditDraft((p) => ({ ...p, teamAP1: e.target.value }))}
+                                    className="input text-sm w-full"
+                                  >
+                                    {checkedInPlayerIds.map((id) => (
+                                      <option key={id} value={id}>{getName(id)}</option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={matchEditDraft.teamAP2}
+                                    onChange={(e) => setMatchEditDraft((p) => ({ ...p, teamAP2: e.target.value }))}
+                                    className="input text-sm w-full"
+                                  >
+                                    {checkedInPlayerIds.map((id) => (
+                                      <option key={id} value={id}>{getName(id)}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                {/* Score inputs */}
+                                <div className="flex items-center gap-2 pt-1">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    inputMode="numeric"
+                                    value={matchEditDraft.scoreA}
+                                    onChange={(e) => setMatchEditDraft((p) => ({ ...p, scoreA: e.target.value }))}
+                                    className="input w-16 py-2 text-center text-xl font-bold"
+                                  />
+                                  <span className="text-surface-muted font-bold">:</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    inputMode="numeric"
+                                    value={matchEditDraft.scoreB}
+                                    onChange={(e) => setMatchEditDraft((p) => ({ ...p, scoreB: e.target.value }))}
+                                    className="input w-16 py-2 text-center text-xl font-bold"
+                                  />
+                                </div>
+                                {/* Team B editable */}
+                                <div className="space-y-1">
+                                  <select
+                                    value={matchEditDraft.teamBP1}
+                                    onChange={(e) => setMatchEditDraft((p) => ({ ...p, teamBP1: e.target.value }))}
+                                    className="input text-sm w-full"
+                                  >
+                                    {checkedInPlayerIds.map((id) => (
+                                      <option key={id} value={id}>{getName(id)}</option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={matchEditDraft.teamBP2}
+                                    onChange={(e) => setMatchEditDraft((p) => ({ ...p, teamBP2: e.target.value }))}
+                                    className="input text-sm w-full"
+                                  >
+                                    {checkedInPlayerIds.map((id) => (
+                                      <option key={id} value={id}>{getName(id)}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              {matchEditError && (
+                                <p className="text-sm text-red-400">{matchEditError}</p>
+                              )}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => saveMatchEdit(m.id)}
+                                  disabled={matchEditLoading}
+                                  className="btn-primary flex-1 text-sm py-1.5"
+                                >
+                                  {matchEditLoading ? "Saving..." : "Save"}
+                                </button>
+                                <button
+                                  onClick={cancelMatchEdit}
+                                  disabled={matchEditLoading}
+                                  className="btn-secondary flex-1 text-sm py-1.5"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                              <div className="text-right space-y-0.5">
+                                <p className="text-sm font-medium text-dark-100">{getName(m.team_a_p1)}</p>
+                                <p className="text-sm text-surface-muted">{getName(m.team_a_p2)}</p>
+                              </div>
+                              <div className="flex items-center gap-1 text-lg font-bold">
+                                <span className={cn(m.score_a > m.score_b ? "text-teal-300" : "text-dark-100")}>
+                                  {m.score_a}
+                                </span>
+                                <span className="text-surface-muted text-sm">:</span>
+                                <span className={cn(m.score_b > m.score_a ? "text-teal-300" : "text-dark-100")}>
+                                  {m.score_b}
+                                </span>
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => enterMatchEdit(m)}
+                                    className="ml-2 text-xs text-brand-400 hover:text-brand-300 font-normal"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                              </div>
+                              <div className="space-y-0.5">
+                                <p className="text-sm font-medium text-dark-100">{getName(m.team_b_p1)}</p>
+                                <p className="text-sm text-surface-muted">{getName(m.team_b_p2)}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
