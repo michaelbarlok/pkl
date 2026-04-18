@@ -33,7 +33,7 @@ export default function EditProfilePage() {
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyPush, setNotifyPush] = useState(false);
   const [notifyForumReplies, setNotifyForumReplies] = useState(false);
-  const [notificationPrefs, setNotificationPrefs] = useState<Record<string, { email: boolean; push: boolean }>>({});
+  const [notificationPrefs, setNotificationPrefs] = useState<Record<string, "email" | "push" | "off">>({});
   const [pushSupported, setPushSupported] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isStandalone, setIsStandalone] = useState(false);
@@ -89,7 +89,7 @@ export default function EditProfilePage() {
       setNotifyEmail(prefs.includes("email"));
       setNotifyPush(prefs.includes("push"));
       setNotifyForumReplies(profile.notify_forum_replies ?? false);
-      setNotificationPrefs((profile.notification_preferences as Record<string, { email: boolean; push: boolean }>) ?? {});
+      setNotificationPrefs((profile.notification_preferences as Record<string, "email" | "push" | "off">) ?? {});
       setDuprId(profile.dupr_id ?? "");
       setDuprSingles(profile.dupr_singles_rating?.toString() ?? "");
       setDuprDoubles(profile.dupr_doubles_rating?.toString() ?? "");
@@ -196,9 +196,8 @@ export default function EditProfilePage() {
     setSuccess("");
     setSaving(true);
 
-    // Build notification preferences array
-    const preferredNotify: string[] = [];
-    if (notifyEmail) preferredNotify.push("email");
+    // preferred_notify is the fallback for types without an explicit per-type setting
+    const preferredNotify: string[] = ["email"];
     if (notifyPush) preferredNotify.push("push");
 
     const updates: Record<string, unknown> = {
@@ -457,23 +456,13 @@ export default function EditProfilePage() {
             <div>
               <h3 className="text-sm font-semibold text-dark-100 mb-0.5">Notification Preferences</h3>
               <p className="text-xs text-surface-muted">
-                In-app notifications are always on. Control which types reach your email and device.
+                Choose how each notification type reaches you: email, push, or turn it off entirely.
               </p>
             </div>
 
-            {/* ── Master channel switches ── */}
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifyEmail}
-                  onChange={(e) => setNotifyEmail(e.target.checked)}
-                  className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500"
-                />
-                <span className="text-sm font-medium text-dark-100">Email</span>
-              </label>
-
-              {pushSupported ? (
+            {/* ── Push device toggle ── */}
+            {pushSupported ? (
+              <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
@@ -483,11 +472,12 @@ export default function EditProfilePage() {
                     className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-50"
                   />
                   <span className={`text-sm font-medium ${pushPermission === "denied" ? "text-surface-muted" : "text-dark-100"}`}>
-                    Push {togglingPush ? "(setting up…)" : pushPermission === "denied" ? "(blocked)" : ""}
+                    Enable push notifications on this device
+                    {togglingPush ? " (setting up…)" : pushPermission === "denied" ? " (blocked)" : ""}
                   </span>
                 </label>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
             {pushPermission === "denied" && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3 text-xs text-amber-200 space-y-2">
@@ -508,9 +498,9 @@ export default function EditProfilePage() {
               </div>
             )}
 
-            {/* ── Per-type table ── */}
+            {/* ── Per-type selectors ── */}
             {(() => {
-              const groups = [
+              const notifGroups = [
                 {
                   label: "Sign-Up Sheets",
                   types: [
@@ -565,59 +555,65 @@ export default function EditProfilePage() {
                 },
               ] as const;
 
-              const getVal = (t: string, ch: "email" | "push") =>
-                notificationPrefs[t]?.[ch] ?? true;
+              const getVal = (t: string): "email" | "push" | "off" =>
+                (notificationPrefs[t] as "email" | "push" | "off" | undefined) ?? "email";
 
-              const setVal = (t: string, ch: "email" | "push", val: boolean) =>
-                setNotificationPrefs((prev) => ({
-                  ...prev,
-                  [t]: { ...prev[t], email: getVal(t, "email"), push: getVal(t, "push"), [ch]: val },
-                }));
+              const setVal = (t: string, val: "email" | "push" | "off") =>
+                setNotificationPrefs((prev) => ({ ...prev, [t]: val }));
+
+              const OPTIONS: { value: "email" | "push" | "off"; label: string }[] = [
+                { value: "email", label: "Email" },
+                { value: "push",  label: "Push" },
+                { value: "off",   label: "Off"  },
+              ];
 
               return (
                 <div className="rounded-lg border border-surface-border overflow-hidden">
                   {/* Column headers */}
-                  <div className="grid grid-cols-[1fr_56px_56px] bg-surface-overlay border-b border-surface-border px-3 py-2">
+                  <div className="grid grid-cols-[1fr_auto] bg-surface-overlay border-b border-surface-border px-3 py-2">
                     <span className="text-xs font-medium text-surface-muted uppercase tracking-wider">Notification</span>
-                    <span className={`text-xs font-medium uppercase tracking-wider text-center ${notifyEmail ? "text-surface-muted" : "text-surface-muted/40"}`}>Email</span>
-                    <span className={`text-xs font-medium uppercase tracking-wider text-center ${notifyPush && pushSupported ? "text-surface-muted" : "text-surface-muted/40"}`}>Push</span>
+                    <span className="text-xs font-medium text-surface-muted uppercase tracking-wider pr-1">Deliver via</span>
                   </div>
 
-                  {groups.map((group, gi) => (
+                  {notifGroups.map((group, gi) => (
                     <div key={group.label}>
-                      {/* Group header */}
                       <div className="px-3 py-1.5 bg-surface-overlay/60 border-b border-surface-border">
                         <span className="text-[11px] font-semibold text-brand-400 uppercase tracking-wider">{group.label}</span>
                       </div>
 
-                      {/* Rows */}
                       {group.types.map(({ type, label }, ri) => {
-                        const emailVal = getVal(type, "email");
-                        const pushVal = getVal(type, "push");
-                        const isLast = gi === groups.length - 1 && ri === group.types.length - 1;
+                        const current = getVal(type);
+                        const isLast = gi === notifGroups.length - 1 && ri === group.types.length - 1;
                         return (
                           <div
                             key={type}
-                            className={`grid grid-cols-[1fr_56px_56px] items-center px-3 py-2.5 ${!isLast ? "border-b border-surface-border/50" : ""} hover:bg-surface-overlay/30`}
+                            className={`flex items-center justify-between gap-3 px-3 py-2.5 ${!isLast ? "border-b border-surface-border/50" : ""} hover:bg-surface-overlay/30`}
                           >
-                            <span className="text-sm text-dark-200">{label}</span>
-                            <div className="flex justify-center">
-                              <input
-                                type="checkbox"
-                                checked={emailVal}
-                                disabled={!notifyEmail}
-                                onChange={(e) => setVal(type, "email", e.target.checked)}
-                                className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-30 cursor-pointer disabled:cursor-default"
-                              />
-                            </div>
-                            <div className="flex justify-center">
-                              <input
-                                type="checkbox"
-                                checked={pushVal}
-                                disabled={!notifyPush || !pushSupported}
-                                onChange={(e) => setVal(type, "push", e.target.checked)}
-                                className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-500 disabled:opacity-30 cursor-pointer disabled:cursor-default"
-                              />
+                            <span className={`text-sm ${current === "off" ? "text-surface-muted" : "text-dark-200"}`}>{label}</span>
+                            <div className="flex rounded-md overflow-hidden border border-surface-border shrink-0">
+                              {OPTIONS.map(({ value, label: optLabel }) => {
+                                const isActive = current === value;
+                                const isPushDisabled = value === "push" && (!pushSupported || !notifyPush);
+                                return (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    disabled={isPushDisabled}
+                                    onClick={() => setVal(type, value)}
+                                    className={[
+                                      "px-2.5 py-1 text-xs font-medium transition-colors border-r border-surface-border last:border-r-0",
+                                      isActive
+                                        ? value === "off"
+                                          ? "bg-red-900/50 text-red-300"
+                                          : "bg-brand-600 text-white"
+                                        : "bg-surface-overlay text-surface-muted hover:bg-surface-overlay/80",
+                                      isPushDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer",
+                                    ].join(" ")}
+                                  >
+                                    {optLabel}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                         );

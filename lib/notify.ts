@@ -31,11 +31,28 @@ export async function notify({
   emailTemplate,
   emailData,
 }: NotifyParams): Promise<void> {
-  // Use service client to bypass RLS — we need to insert notifications
-  // for other users and read their profile/preferences
   const supabase = await createServiceClient();
 
-  // 1. Always write in-app notification (best-effort, don't block email)
+  // 1. Fetch user preferences first so we can respect "off" before writing in-app
+  const { data: profile, error: profileErr } = await supabase
+    .from("profiles")
+    .select("email, phone, preferred_notify, notification_preferences, display_name")
+    .eq("id", profileId)
+    .single();
+
+  if (!profile) {
+    console.error("Profile not found for notification:", profileId, profileErr?.message);
+    return;
+  }
+
+  const prefs: string[] = profile.preferred_notify ?? ["email"];
+  const typePrefs = (profile.notification_preferences as Record<string, "email" | "push" | "off">) ?? {};
+  const typePref = typePrefs[type] as "email" | "push" | "off" | undefined;
+
+  // If the user turned this notification type off entirely, do nothing
+  if (typePref === "off") return;
+
+  // 2. Write in-app notification
   try {
     const { error: insertErr } = await supabase.from("notifications").insert({
       user_id: profileId,
@@ -52,26 +69,12 @@ export async function notify({
     console.error("Notification insert threw:", e);
   }
 
-  // 2. Fetch user preferences
-  const { data: profile, error: profileErr } = await supabase
-    .from("profiles")
-    .select("email, phone, preferred_notify, notification_preferences, display_name")
-    .eq("id", profileId)
-    .single();
-
-  if (!profile) {
-    console.error("Profile not found for notification:", profileId, profileErr?.message);
-    return;
-  }
-
-  const prefs: string[] = profile.preferred_notify ?? ["email"];
-  const typePrefs: Record<string, { email?: boolean; push?: boolean }> =
-    (profile.notification_preferences as Record<string, { email?: boolean; push?: boolean }>) ?? {};
-  const typePref = typePrefs[type] ?? {};
+  // Per-type value determines channel; unset falls back to global preferred_notify
+  const shouldEmail = typePref === "email" || (typePref === undefined && prefs.includes("email"));
+  const shouldPush  = typePref === "push"  || (typePref === undefined && prefs.includes("push"));
 
   // 3. Email via Resend
-  if (prefs.includes("email") && typePref.email !== false && emailTemplate && profile.email &&
-      !isTestUser(profile.email, profile.display_name)) {
+  if (shouldEmail && emailTemplate && profile.email && !isTestUser(profile.email, profile.display_name)) {
     try {
       await sendEmail({
         to: profile.email,
@@ -84,7 +87,7 @@ export async function notify({
     }
   }
 
-  // 4. SMS via Twilio (optional)
+  // 4. SMS via Twilio (uses global prefs only)
   if (prefs.includes("sms") && profile.phone) {
     try {
       await sendSMS({
@@ -97,7 +100,7 @@ export async function notify({
   }
 
   // 5. Web Push notification
-  if (prefs.includes("push") && typePref.push !== false) {
+  if (shouldPush) {
     try {
       await sendPushNotification(supabase, profileId, {
         title,
