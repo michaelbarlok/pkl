@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { notify } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -20,10 +21,10 @@ export async function POST(
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
-  // Get session
+  // Get session with group info
   const { data: session } = await auth.supabase
     .from("free_play_sessions")
-    .select("*")
+    .select("*, group:shootout_groups(name, slug)")
     .eq("id", sessionId)
     .eq("group_id", groupId)
     .eq("status", "active")
@@ -69,5 +70,107 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  // Send recap notifications non-blocking
+  const group = session.group as { name: string; slug: string } | null;
+  if (group) {
+    sendFreePlayRecapNotifications(
+      auth.supabase,
+      sessionId,
+      groupId,
+      group.slug,
+      group.name,
+      session.created_at,
+    ).catch((e) => console.error("Free play recap notifications failed:", e));
+  }
+
   return NextResponse.json(updated);
+}
+
+async function sendFreePlayRecapNotifications(
+  supabase: any,
+  sessionId: string,
+  groupId: string,
+  groupSlug: string,
+  groupName: string,
+  createdAt: string,
+) {
+  const [{ data: sessionPlayers }, { data: matches }] = await Promise.all([
+    supabase
+      .from("free_play_session_players")
+      .select("player_id, player:profiles(id, display_name)")
+      .eq("session_id", sessionId),
+    supabase
+      .from("free_play_matches")
+      .select("team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b")
+      .eq("session_id", sessionId),
+  ]);
+
+  if (!sessionPlayers || sessionPlayers.length === 0) return;
+
+  // Compute per-player session stats
+  type Stats = { wins: number; losses: number; gamesPlayed: number; pointsWon: number; pointsPossible: number; pointDiff: number };
+  const statsMap = new Map<string, Stats>();
+  for (const p of sessionPlayers) {
+    statsMap.set(p.player_id, { wins: 0, losses: 0, gamesPlayed: 0, pointsWon: 0, pointsPossible: 0, pointDiff: 0 });
+  }
+
+  for (const m of matches ?? []) {
+    const teamA = [m.team_a_p1, m.team_a_p2].filter(Boolean) as string[];
+    const teamB = [m.team_b_p1, m.team_b_p2].filter(Boolean) as string[];
+    const possible = Math.max(m.score_a, m.score_b);
+    const aWon = m.score_a > m.score_b;
+
+    for (const pid of teamA) {
+      const s = statsMap.get(pid);
+      if (!s) continue;
+      s.gamesPlayed++;
+      s.pointsWon += m.score_a;
+      s.pointsPossible += possible;
+      s.pointDiff += m.score_a - m.score_b;
+      if (m.score_a !== m.score_b) aWon ? s.wins++ : s.losses++;
+    }
+    for (const pid of teamB) {
+      const s = statsMap.get(pid);
+      if (!s) continue;
+      s.gamesPlayed++;
+      s.pointsWon += m.score_b;
+      s.pointsPossible += possible;
+      s.pointDiff += m.score_b - m.score_a;
+      if (m.score_a !== m.score_b) !aWon ? s.wins++ : s.losses++;
+    }
+  }
+
+  const sessionDate = new Date(createdAt).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+
+  for (const sp of sessionPlayers) {
+    const s = statsMap.get(sp.player_id);
+    if (!s) continue;
+    const playerName = (sp.player as any)?.display_name ?? "Player";
+    const bodyParts = [`Record: ${s.wins}W – ${s.losses}L.`, `Pt diff: ${s.pointDiff >= 0 ? "+" : ""}${s.pointDiff}.`];
+
+    notify({
+      profileId: sp.player_id,
+      type: "session_recap",
+      title: `${groupName} recap — ${sessionDate}`,
+      body: bodyParts.join(" "),
+      link: `/groups/${groupSlug}/sessions/${sessionId}`,
+      groupId,
+      emailTemplate: "FreePlayRecap",
+      emailData: {
+        playerName,
+        groupName,
+        sessionDate,
+        wins: s.wins,
+        losses: s.losses,
+        gamesPlayed: s.gamesPlayed,
+        pointsWon: s.pointsWon,
+        pointsPossible: s.pointsPossible,
+        pointDiff: s.pointDiff,
+        sessionId,
+        groupSlug,
+      },
+    }).catch((e) => console.error(`Recap failed for ${sp.player_id}:`, e));
+  }
 }

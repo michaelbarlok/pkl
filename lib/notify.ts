@@ -171,6 +171,7 @@ const EMAIL_TEMPLATES: Record<string, () => Promise<{ default: (props: any) => R
   TournamentWithdrawal: () => import("@/emails/TournamentWithdrawal"),
   BadgeEarned: () => import("@/emails/BadgeEarned"),
   SessionRecap: () => import("@/emails/SessionRecap"),
+  FreePlayRecap: () => import("@/emails/FreePlayRecap"),
   GroupAnnouncement: () => import("@/emails/GroupAnnouncement"),
 };
 
