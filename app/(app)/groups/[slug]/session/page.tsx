@@ -19,7 +19,7 @@ export default async function SessionPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, role")
     .eq("user_id", user.id)
     .single();
 
@@ -31,8 +31,10 @@ export default async function SessionPage({
   const members = await getGroupMembers(group.id);
 
   // Check if caller is a member
-  const isMember = members.some((m) => m.player_id === profile.id);
-  if (!isMember) redirect(`/groups/${slug}`);
+  const myMembership = members.find((m) => m.player_id === profile.id);
+  if (!myMembership) redirect(`/groups/${slug}`);
+
+  const isAdmin = profile.role === "admin" || myMembership.group_role === "admin";
 
   // Check for an active session
   const { data: activeSession } = await supabase
@@ -73,6 +75,7 @@ export default async function SessionPage({
       }
       checkedInPlayerIds={checkedInPlayerIds}
       currentPlayerId={profile.id}
+      isAdmin={isAdmin}
     />
   );
 }
