@@ -248,7 +248,7 @@ export default function NewSheetFromSheetsPage() {
         .insert({
           group_id: groupId,
           event_date: eventDate,
-          event_time: `${eventDate}T${eventTime}:00`,
+          event_time: new Date(`${eventDate}T${eventTime}:00`).toISOString(),
           location: location.trim(),
           player_limit: playerLimit,
           signup_closes_at: signupClosesAt,

@@ -98,15 +98,20 @@ export async function GET(request: NextRequest) {
     const [evH, evM] = eventTimeStr.split(":").map(Number);
     const closeHours = sched.signup_closes_hours_before as number;
 
-    // Build the event datetime in local time, then convert to UTC via Intl trick
+    // Build the event datetime in local time, then convert to UTC via Intl trick.
+    // event_time is a timestamptz column — writing a naive local string would be
+    // interpreted as UTC by Postgres and display at the wrong hour on clients.
     const localEventStr = `${eventDateStr}T${eventTimeStr.padStart(5, "0")}:00`;
-    const signupCloseDt = localToUtc(localEventStr, tz);
+    const eventTimeUtc = localToUtc(localEventStr, tz);
+    const eventTimeIso = eventTimeUtc.toISOString();
+
+    const signupCloseDt = new Date(eventTimeUtc.getTime());
     signupCloseDt.setUTCHours(signupCloseDt.getUTCHours() - closeHours);
     const signupClosesAt = signupCloseDt.toISOString();
 
     let withdrawClosesAt: string | null = null;
     if (sched.withdraw_closes_hours_before != null) {
-      const withdrawDt = localToUtc(localEventStr, tz);
+      const withdrawDt = new Date(eventTimeUtc.getTime());
       withdrawDt.setUTCHours(withdrawDt.getUTCHours() - sched.withdraw_closes_hours_before);
       withdrawClosesAt = withdrawDt.toISOString();
     }
@@ -116,7 +121,7 @@ export async function GET(request: NextRequest) {
       .insert({
         group_id: groupId,
         event_date: eventDateStr,
-        event_time: `${eventDateStr}T${eventTimeStr}:00`,
+        event_time: eventTimeIso,
         location: sched.location,
         player_limit: sched.player_limit,
         signup_closes_at: signupClosesAt,
@@ -158,7 +163,7 @@ export async function GET(request: NextRequest) {
         emailData: {
           groupName,
           eventDate: eventDateStr,
-          eventTime: `${eventDateStr}T${eventTimeStr}:00`,
+          eventTime: eventTimeIso,
           location: sched.location,
           sheetId: sheet.id,
         },
