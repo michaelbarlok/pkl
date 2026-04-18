@@ -54,6 +54,7 @@ interface Props {
   activeSession: SessionData | null;
   checkedInPlayerIds: string[];
   currentPlayerId: string;
+  isAdmin?: boolean;
 }
 
 // ------------------------------------------------------------------
@@ -66,6 +67,7 @@ export function SessionManager({
   activeSession,
   checkedInPlayerIds,
   currentPlayerId,
+  isAdmin = false,
 }: Props) {
   const router = useRouter();
 
@@ -87,6 +89,7 @@ export function SessionManager({
       session={activeSession}
       checkedInPlayerIds={checkedInPlayerIds}
       currentPlayerId={currentPlayerId}
+      isAdmin={isAdmin}
       onUpdate={() => router.refresh()}
     />
   );
@@ -263,6 +266,7 @@ function ActivePhase({
   session,
   checkedInPlayerIds,
   currentPlayerId,
+  isAdmin,
   onUpdate,
 }: {
   group: { id: string; name: string; slug: string };
@@ -270,6 +274,7 @@ function ActivePhase({
   session: SessionData;
   checkedInPlayerIds: string[];
   currentPlayerId: string;
+  isAdmin: boolean;
   onUpdate: () => void;
 }) {
   const round = session.currentRound;
@@ -283,6 +288,113 @@ function ActivePhase({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [standings, setStandings] = useState<PlayerStanding[]>([]);
+
+  // Admin edit mode — override current round assignments
+  const [editMode, setEditMode] = useState(false);
+  const [draftMatches, setDraftMatches] = useState<
+    { teamA: [string, string]; teamB: [string, string] }[]
+  >([]);
+  const [draftSitting, setDraftSitting] = useState<string[]>([]);
+
+  function enterEditMode() {
+    if (!round) return;
+    setDraftMatches(
+      round.matches.map((m) => ({
+        teamA: [m.teamA[0], m.teamA[1]],
+        teamB: [m.teamB[0], m.teamB[1]],
+      }))
+    );
+    setDraftSitting([...round.sitting]);
+    setError("");
+    setEditMode(true);
+  }
+
+  function cancelEditMode() {
+    setEditMode(false);
+    setError("");
+  }
+
+  function setDraftPlayer(
+    matchIdx: number,
+    team: "A" | "B",
+    slotIdx: number,
+    playerId: string
+  ) {
+    setDraftMatches((prev) =>
+      prev.map((m, i) => {
+        if (i !== matchIdx) return m;
+        if (team === "A") {
+          const arr: [string, string] = [m.teamA[0], m.teamA[1]];
+          arr[slotIdx] = playerId;
+          return { ...m, teamA: arr };
+        } else {
+          const arr: [string, string] = [m.teamB[0], m.teamB[1]];
+          arr[slotIdx] = playerId;
+          return { ...m, teamB: arr };
+        }
+      })
+    );
+  }
+
+  function setDraftSitter(slotIdx: number, playerId: string) {
+    setDraftSitting((prev) => {
+      const next = [...prev];
+      next[slotIdx] = playerId;
+      return next;
+    });
+  }
+
+  function validateDraft(): string | null {
+    const allIds = [
+      ...draftMatches.flatMap((m) => [...m.teamA, ...m.teamB]),
+      ...draftSitting,
+    ];
+    const checkedInSet = new Set(checkedInPlayerIds);
+    const seen = new Set<string>();
+    for (const id of allIds) {
+      if (!id) return "All slots must be filled";
+      if (!checkedInSet.has(id)) return `${getName(id)} is not in this session`;
+      if (seen.has(id)) return `${getName(id)} is assigned more than once`;
+      seen.add(id);
+    }
+    if (seen.size !== checkedInPlayerIds.length)
+      return "All checked-in players must be assigned";
+    return null;
+  }
+
+  async function saveOverride() {
+    const err = validateDraft();
+    if (err) {
+      setError(err);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(
+        `/api/groups/${group.id}/sessions/${session.id}/round`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            matches: draftMatches,
+            sitting: draftSitting,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to save");
+        setLoading(false);
+        return;
+      }
+      setEditMode(false);
+      onUpdate();
+    } catch {
+      setError("Something went wrong.");
+      setLoading(false);
+    }
+  }
 
   const memberMap = new Map(members.map((m) => [m.id, m]));
   const getName = (id: string) => memberMap.get(id)?.displayName ?? "Unknown";
@@ -422,9 +534,20 @@ function ActivePhase({
           <h1 className="text-2xl font-bold text-dark-100">
             Round {round.roundNumber}
           </h1>
-          <span className="badge-green">
-            {checkedInPlayerIds.length} players
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="badge-green">
+              {checkedInPlayerIds.length} players
+            </span>
+            {isAdmin && !editMode && (
+              <button
+                type="button"
+                onClick={enterEditMode}
+                className="btn-secondary text-xs px-2 py-1"
+              >
+                Edit Assignments
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -437,13 +560,34 @@ function ActivePhase({
             </p>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
               {/* Team A */}
-              <div className="text-right">
-                <p className="text-sm font-medium text-dark-100">
-                  {getName(match.teamA[0])}
-                </p>
-                <p className="text-sm text-surface-muted">
-                  {getName(match.teamA[1])}
-                </p>
+              <div className="text-right space-y-1">
+                {editMode ? (
+                  <>
+                    <select
+                      value={draftMatches[i]?.teamA[0] ?? ""}
+                      onChange={(e) => setDraftPlayer(i, "A", 0, e.target.value)}
+                      className="input text-sm w-full"
+                    >
+                      {checkedInPlayerIds.map((id) => (
+                        <option key={id} value={id}>{getName(id)}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={draftMatches[i]?.teamA[1] ?? ""}
+                      onChange={(e) => setDraftPlayer(i, "A", 1, e.target.value)}
+                      className="input text-sm w-full"
+                    >
+                      {checkedInPlayerIds.map((id) => (
+                        <option key={id} value={id}>{getName(id)}</option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-dark-100">{getName(match.teamA[0])}</p>
+                    <p className="text-sm text-surface-muted">{getName(match.teamA[1])}</p>
+                  </>
+                )}
               </div>
 
               {/* Scores */}
@@ -456,6 +600,7 @@ function ActivePhase({
                   onChange={(e) => setScore(i, "scoreA", e.target.value)}
                   className="input w-20 py-3 text-center text-2xl font-bold"
                   placeholder="—"
+                  disabled={editMode}
                 />
                 <span className="text-surface-muted font-bold text-lg">:</span>
                 <input
@@ -466,17 +611,39 @@ function ActivePhase({
                   onChange={(e) => setScore(i, "scoreB", e.target.value)}
                   className="input w-20 py-3 text-center text-2xl font-bold"
                   placeholder="—"
+                  disabled={editMode}
                 />
               </div>
 
               {/* Team B */}
-              <div>
-                <p className="text-sm font-medium text-dark-100">
-                  {getName(match.teamB[0])}
-                </p>
-                <p className="text-sm text-surface-muted">
-                  {getName(match.teamB[1])}
-                </p>
+              <div className="space-y-1">
+                {editMode ? (
+                  <>
+                    <select
+                      value={draftMatches[i]?.teamB[0] ?? ""}
+                      onChange={(e) => setDraftPlayer(i, "B", 0, e.target.value)}
+                      className="input text-sm w-full"
+                    >
+                      {checkedInPlayerIds.map((id) => (
+                        <option key={id} value={id}>{getName(id)}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={draftMatches[i]?.teamB[1] ?? ""}
+                      onChange={(e) => setDraftPlayer(i, "B", 1, e.target.value)}
+                      className="input text-sm w-full"
+                    >
+                      {checkedInPlayerIds.map((id) => (
+                        <option key={id} value={id}>{getName(id)}</option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-dark-100">{getName(match.teamB[0])}</p>
+                    <p className="text-sm text-surface-muted">{getName(match.teamB[1])}</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -484,36 +651,75 @@ function ActivePhase({
       </div>
 
       {/* Sitting players */}
-      {round.sitting.length > 0 && (
+      {(round.sitting.length > 0 || editMode) && (
         <div className="rounded-lg border border-surface-border bg-surface-overlay px-4 py-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-surface-muted mb-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-surface-muted mb-2">
             Sitting out
           </p>
-          <p className="text-sm text-dark-200">
-            {round.sitting.map((id) => getName(id)).join(", ")}
-          </p>
+          {editMode ? (
+            <div className="space-y-1.5">
+              {draftSitting.map((sid, si) => (
+                <select
+                  key={si}
+                  value={sid}
+                  onChange={(e) => setDraftSitter(si, e.target.value)}
+                  className="input text-sm w-full"
+                >
+                  {checkedInPlayerIds.map((id) => (
+                    <option key={id} value={id}>{getName(id)}</option>
+                  ))}
+                </select>
+              ))}
+              {draftSitting.length === 0 && (
+                <p className="text-sm text-surface-muted">No one sitting out</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-dark-200">
+              {round.sitting.map((id) => getName(id)).join(", ")}
+            </p>
+          )}
         </div>
       )}
 
       <FormError message={error} />
 
       {/* Actions */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <button
-          onClick={submitAndNextRound}
-          disabled={!allScored || loading}
-          className="btn-primary flex-1"
-        >
-          {loading ? "Submitting..." : "Submit Scores & Next Round"}
-        </button>
-        <button
-          onClick={() => endSession(allScored)}
-          disabled={loading}
-          className="btn-secondary flex-1"
-        >
-          {allScored ? "Submit Scores & End Session" : "End Session"}
-        </button>
-      </div>
+      {editMode ? (
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            onClick={saveOverride}
+            disabled={loading}
+            className="btn-primary flex-1"
+          >
+            {loading ? "Saving..." : "Save Assignments"}
+          </button>
+          <button
+            onClick={cancelEditMode}
+            disabled={loading}
+            className="btn-secondary flex-1"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            onClick={submitAndNextRound}
+            disabled={!allScored || loading}
+            className="btn-primary flex-1"
+          >
+            {loading ? "Submitting..." : "Submit Scores & Next Round"}
+          </button>
+          <button
+            onClick={() => endSession(allScored)}
+            disabled={loading}
+            className="btn-secondary flex-1"
+          >
+            {allScored ? "Submit Scores & End Session" : "End Session"}
+          </button>
+        </div>
+      )}
 
       {/* Session Standings */}
       {standings.length > 0 && (
