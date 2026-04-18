@@ -10,7 +10,6 @@ import { InviteButton } from "./invite-button";
 import { ResetStatsButton } from "./reset-stats-button";
 import { RollingSessionsSetting } from "./rolling-sessions-setting";
 import { CollapsibleMembers } from "./collapsible-members";
-import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import type { GroupWithPreferences } from "@/lib/queries/group";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -139,6 +138,14 @@ export default async function GroupPage({
   const sheets = await getGroupSheets(group.id);
   const isFreePlay = group.group_type === "free_play";
 
+  // Build mailto: link for all group admins
+  const adminEmails = members
+    .filter((m) => (m as any).group_role === "admin" && (m as any).player?.email)
+    .map((m) => (m as any).player.email as string);
+  const contactAdminsHref = adminEmails.length > 0
+    ? `mailto:${adminEmails.join(",")}?subject=${encodeURIComponent(`Question about ${group.name}`)}`
+    : null;
+
   // Fetch play time schedule for display
   const { data: playTimeData } = await supabase
     .from("group_recurring_schedules")
@@ -259,11 +266,10 @@ export default async function GroupPage({
               Group Settings
             </Link>
           )}
-          {isMember && !isGroupAdmin && (
-            <ContactOrganizersButton
-              endpoint={`/api/groups/${group.id}/contact-admins`}
-              label="Contact Admins"
-            />
+          {isMember && contactAdminsHref && (
+            <a href={contactAdminsHref} className="btn-secondary text-xs">
+              Contact Admins
+            </a>
           )}
         </div>
       </div>
