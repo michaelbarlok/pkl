@@ -16,6 +16,7 @@ import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import { PaidToggle } from "@/components/paid-toggle";
 import { PaymentReminderButton } from "@/components/payment-reminder-button";
 import { ShareBracketButton } from "@/components/share-bracket-button";
+import { HideTournamentToggle } from "@/app/(app)/admin/tournaments/hide-toggle";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -249,6 +250,16 @@ export default async function TournamentDetailPage({
                   <Link href={`/tournaments/${id}/edit`} className="btn-secondary text-xs">
                     Edit
                   </Link>
+                )}
+                {/* Global admins can flip visibility right from the page;
+                     exposed here (in addition to /admin/tournaments) so the
+                     toggle is one tap away on mobile. The API gates this
+                     to admins, so non-admin managers don't see it. */}
+                {isAdmin && (
+                  <HideTournamentToggle
+                    tournamentId={id}
+                    isHidden={(tournament as any).is_hidden ?? false}
+                  />
                 )}
               </div>
             </div>
