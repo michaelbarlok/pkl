@@ -4,7 +4,6 @@ import { useConfirm } from "@/components/confirm-modal";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { distributeCourts, seedSession1, seedSameDaySession } from "@/lib/shootout-engine";
 import type { RankedPlayer, SeedablePlayer } from "@/lib/shootout-engine";
-import { isTestUser } from "@/lib/test-users";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -332,7 +331,6 @@ export default function CheckInPage() {
 
     const members: GroupMember[] = (memberships ?? [])
       .filter((m: any) => !existingIds.has(m.player_id))
-      .filter((m: any) => !isTestUser(m.player?.display_name))
       .map((m: any) => ({
         id: m.player_id,
         display_name: m.player?.display_name ?? "Unknown",

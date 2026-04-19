@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, GroupMembership } from "@/types/database";
+import { isTestUser } from "@/lib/test-users";
 import { MembersTable } from "./members-table";
 import { Breadcrumb } from "@/components/breadcrumb";
 import Link from "next/link";
@@ -15,12 +16,16 @@ export default async function AdminMembersPage() {
     .eq("user_id", user!.id)
     .single();
 
-  // Fetch all profiles — newest members first
-  const { data: profiles } = await supabase
+  // Fetch all profiles — newest members first. Seeded [TEST] accounts are
+  // filtered out so the platform-wide directory stays clean; they still
+  // show up wherever they're actually participating (group rosters, sheet
+  // sign-ups, sessions).
+  const { data: allProfiles } = await supabase
     .from("profiles")
     .select("*")
     .order("member_since", { ascending: false })
     .returns<Profile[]>();
+  const profiles = (allProfiles ?? []).filter((p) => !isTestUser(p.display_name));
 
   // Fetch all group memberships to show step info
   const { data: allMemberships } = await supabase
@@ -51,7 +56,7 @@ export default async function AdminMembersPage() {
         <div>
           <h1 className="text-2xl font-bold text-dark-100">Member Management</h1>
           <p className="mt-1 text-surface-muted">
-            {profiles?.length ?? 0} total members
+            {profiles.length} total members
           </p>
         </div>
         <Link
@@ -66,7 +71,7 @@ export default async function AdminMembersPage() {
       </div>
 
       <MembersTable
-        profiles={profiles ?? []}
+        profiles={profiles}
         membershipMap={membershipMap}
         currentProfileId={currentProfile?.id ?? ""}
       />

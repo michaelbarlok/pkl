@@ -11,7 +11,6 @@ import { RollingSessionsSetting } from "./rolling-sessions-setting";
 import { GroupTabs, type TabSpec } from "./group-tabs";
 import { MembersGrid } from "./members-grid";
 import { groupGradient } from "@/lib/group-gradient";
-import { isTestUser } from "@/lib/test-users";
 import type { GroupWithPreferences } from "@/lib/queries/group";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -214,12 +213,6 @@ export default async function GroupPage({
   }
 
   const members = await getGroupMembers(group.id);
-  // Members tab + roster count should only show real people. Test users
-  // still exist in the DB (and still count on the ladder / in sessions),
-  // they're just hidden from the directory so the roster stays clean.
-  const visibleMembers = members.filter(
-    (m) => !isTestUser((m as any).player?.display_name)
-  );
   const sheets = await getGroupSheets(group.id);
   const isFreePlay = group.group_type === "free_play";
 
@@ -278,7 +271,7 @@ export default async function GroupPage({
 
   const tabs: TabSpec[] = [
     { id: "overview", label: "Overview" },
-    { id: "members", label: "Members", count: visibleMembers.length },
+    { id: "members", label: "Members", count: members.length },
     ...(isMember ? ([{ id: "forum", label: "Forum", href: `/groups/${slug}/forum` }] as TabSpec[]) : []),
   ];
 
@@ -291,7 +284,7 @@ export default async function GroupPage({
             <div className="card card-static">
               <p className="text-sm text-surface-muted">Members</p>
               <p className="mt-1 text-2xl font-bold text-dark-100">
-                {visibleMembers.length}
+                {members.length}
               </p>
             </div>
 
@@ -464,7 +457,7 @@ export default async function GroupPage({
   const membersPanel = (
     <div className="pt-6">
       <MembersGrid
-        members={visibleMembers as any}
+        members={members as any}
         currentPlayerId={profile?.id ?? null}
         isFreePlay={isFreePlay}
       />
