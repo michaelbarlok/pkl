@@ -56,6 +56,11 @@ export function LandingFooter() {
                 </a>
               </li>
               <li>
+                <Link href="/about" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
+                  About
+                </Link>
+              </li>
+              <li>
                 <Link href="/privacy" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
                   Privacy Policy
                 </Link>
@@ -75,6 +80,9 @@ export function LandingFooter() {
             &copy; {new Date().getFullYear()} Tri-Star Pickleball. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
+            <Link href="/about" className="text-xs text-dark-400 hover:text-dark-200 transition-colors">
+              About
+            </Link>
             <Link href="/privacy" className="text-xs text-dark-400 hover:text-dark-200 transition-colors">
               Privacy Policy
             </Link>
