@@ -64,6 +64,7 @@ export function SessionsTable({ sessions }: { sessions: SessionRow[] }) {
       columns={columns}
       keyFn={(s) => s.id}
       rowHref={(s) => `/admin/sessions/${s.id}`}
+      mobileMode="cards"
       caption="Shootout sessions across all groups"
       empty={{
         title: "No sessions yet",

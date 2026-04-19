@@ -111,6 +111,7 @@ export function SheetsTable({
       data={sheets}
       columns={columns}
       keyFn={(s) => s.id}
+      mobileMode="cards"
       caption={kind === "active" ? "Active sign-up sheets" : "Cancelled sign-up sheets"}
       getRowClassName={(s) => (s.status === "cancelled" ? "bg-red-500/5" : "")}
       empty={
