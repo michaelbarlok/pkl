@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { SupabaseProvider } from "@/components/providers/supabase-provider";
 import { ToastProvider } from "@/components/toast";
 import { ConfirmProvider } from "@/components/confirm-modal";
@@ -9,6 +9,20 @@ import "./globals.css";
 export const dynamic = "force-dynamic";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://tristarpickleball.com";
+
+/**
+ * `viewport-fit=cover` lets the page draw under the iOS safe-area insets
+ * so the bottom nav can anchor flush to the bottom of the screen and use
+ * `env(safe-area-inset-bottom)` to pad itself above the home-indicator.
+ * Without this the CSS env() value resolves to 0 and the tab labels
+ * squeeze against the indicator, which reads as "nav got cut off".
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0f1115",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),

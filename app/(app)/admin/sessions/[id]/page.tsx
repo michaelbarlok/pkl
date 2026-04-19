@@ -301,6 +301,22 @@ export default function AdminSessionDetailPage() {
       .from("game_results")
       .update({ score_a: a, score_b: b })
       .eq("id", gameId);
+
+    // Editing a score after the round is closed means pool_finish, win_pct
+    // and steps are now stale — ask the server to re-derive them. For an
+    // active round we still update win_pct / pool_finish but skip step
+    // movement (the server decides based on session.status).
+    await fetch(`/api/sessions/${id}/recompute`, { method: "POST" }).catch(() => {});
+
+    // Refresh participants so the table shows updated pool_finish / step_after
+    const { data: refreshed } = await supabase
+      .from("session_participants")
+      .select("*, player:profiles(id, display_name, avatar_url)")
+      .eq("session_id", id)
+      .order("court_number", { ascending: true })
+      .order("step_before", { ascending: true });
+    if (refreshed) setParticipants(refreshed);
+
     setEditingScore(null);
     setSavingScore(false);
   }
@@ -334,6 +350,16 @@ export default function AdminSessionDetailPage() {
       setNewScoreError(data.error ?? "Failed to submit");
     } else {
       setEnteringGame(null);
+      // If the session is already past round_active, adding a score for a
+      // game that was missing needs to trigger a recompute too.
+      await fetch(`/api/sessions/${id}/recompute`, { method: "POST" }).catch(() => {});
+      const { data: refreshed } = await supabase
+        .from("session_participants")
+        .select("*, player:profiles(id, display_name, avatar_url)")
+        .eq("session_id", id)
+        .order("court_number", { ascending: true })
+        .order("step_before", { ascending: true });
+      if (refreshed) setParticipants(refreshed);
     }
     setSubmittingNewScore(false);
   }
@@ -716,11 +742,14 @@ export default function AdminSessionDetailPage() {
         </div>
       )}
 
-      {/* Live Court View */}
-      {isRoundLive && courtNumbers.length > 0 && (
+      {/* Court Details — available for any session with court assignments
+           so admins can audit & edit scores even after the session closes */}
+      {courtNumbers.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-dark-100">Live Courts</h2>
+            <h2 className="text-lg font-semibold text-dark-100">
+              {isRoundLive ? "Live Courts" : "Courts"}
+            </h2>
             <select
               value={selectedCourt}
               onChange={(e) => setSelectedCourt(Number(e.target.value))}
@@ -960,71 +989,146 @@ export default function AdminSessionDetailPage() {
         </div>
       )}
 
-      {/* Participants Table */}
-      <div className="card overflow-x-auto p-0">
-        <div className="px-2 sm:px-4 py-3 border-b border-surface-border">
-          <h2 className="text-sm font-semibold text-dark-200">Participants</h2>
-        </div>
-        <table className="min-w-full divide-y divide-surface-border">
-          <thead className="bg-surface-overlay">
-            <tr>
-              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
-              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Checked In</th>
-              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Court</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step Before</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step After</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Finish</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Next Court</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-surface-border bg-surface-raised">
-            {participants.map((p) => (
-              <tr key={p.id}>
-                <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm font-medium text-dark-100">
-                  {(p as any).player?.display_name ?? "Unknown"}
-                </td>
-                <td className="whitespace-nowrap px-2 sm:px-4 py-3">
+      {/* Participants */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-dark-200">Participants</h2>
+
+        {/* Mobile: stacked card list. Shows all the data a desktop admin
+             sees, but without the horizontal scroll that was clipping
+             columns on phones. */}
+        <div className="space-y-2 sm:hidden">
+          {participants.map((p) => {
+            const ordinal = p.pool_finish != null
+              ? `${p.pool_finish}${["st", "nd", "rd"][p.pool_finish - 1] ?? "th"}`
+              : null;
+            const stepDelta =
+              p.step_after != null && p.step_before != null
+                ? p.step_after - p.step_before
+                : null;
+            const curr = p.court_number;
+            const next = p.target_court_next;
+            return (
+              <div key={p.id} className="card !p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-sm font-medium text-dark-100">
+                    {(p as any).player?.display_name ?? "Unknown"}
+                  </span>
                   {p.checked_in ? (
-                    <span className="badge-green">Yes</span>
+                    <span className="badge-green">Checked in</span>
                   ) : (
-                    <span className="badge-gray">No</span>
+                    <span className="badge-gray">Not checked in</span>
                   )}
-                </td>
-                <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
-                  {p.court_number ?? "—"}
-                </td>
-                <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
-                  {p.step_before}
-                </td>
-                <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
-                  {p.step_after != null ? (
-                    <span className={p.step_after < p.step_before ? "text-teal-300 font-medium" : p.step_after > p.step_before ? "text-red-400 font-medium" : ""}>
-                      {p.step_after}
-                      {p.step_after < p.step_before && " ↑"}
-                      {p.step_after > p.step_before && " ↓"}
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-dark-200">
-                  {p.pool_finish != null ? `${p.pool_finish}${["st","nd","rd"][p.pool_finish-1] ?? "th"}` : "—"}
-                </td>
-                <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm font-medium">
-                  {(() => {
-                    const next = p.target_court_next;
-                    const curr = p.court_number;
-                    if (next == null) return <span className="text-surface-muted">—</span>;
-                    if (curr == null || next === curr) return <span className="text-surface-muted">→ {next}</span>;
-                    if (next < curr) return <span className="text-teal-300 font-semibold">↑ Court {next}</span>;
-                    return <span className="text-red-400 font-semibold">↓ Court {next}</span>;
-                  })()}
-                </td>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <Stat label="Court" value={curr ?? "—"} />
+                  <Stat label="Finish" value={ordinal ?? "—"} />
+                  <Stat
+                    label="Step"
+                    value={
+                      p.step_after != null ? (
+                        <span className={stepDelta != null && stepDelta < 0 ? "text-teal-300 font-medium" : stepDelta != null && stepDelta > 0 ? "text-red-400 font-medium" : ""}>
+                          {p.step_before} → {p.step_after}
+                          {stepDelta != null && stepDelta < 0 && " ↑"}
+                          {stepDelta != null && stepDelta > 0 && " ↓"}
+                        </span>
+                      ) : (
+                        `${p.step_before}`
+                      )
+                    }
+                  />
+                  <Stat
+                    label="Next court"
+                    value={
+                      next == null ? (
+                        <span className="text-surface-muted">—</span>
+                      ) : curr == null || next === curr ? (
+                        <span className="text-surface-muted">→ {next}</span>
+                      ) : next < curr ? (
+                        <span className="text-teal-300 font-semibold">↑ {next}</span>
+                      ) : (
+                        <span className="text-red-400 font-semibold">↓ {next}</span>
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop: full table */}
+        <div className="hidden sm:block card overflow-x-auto p-0">
+          <table className="min-w-full divide-y divide-surface-border">
+            <thead className="bg-surface-overlay">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Checked In</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Court</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step Before</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step After</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Finish</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Next Court</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-surface-border bg-surface-raised">
+              {participants.map((p) => (
+                <tr key={p.id}>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-dark-100">
+                    {(p as any).player?.display_name ?? "Unknown"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {p.checked_in ? (
+                      <span className="badge-green">Yes</span>
+                    ) : (
+                      <span className="badge-gray">No</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-dark-200">
+                    {p.court_number ?? "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-dark-200">
+                    {p.step_before}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-dark-200">
+                    {p.step_after != null ? (
+                      <span className={p.step_after < p.step_before ? "text-teal-300 font-medium" : p.step_after > p.step_before ? "text-red-400 font-medium" : ""}>
+                        {p.step_after}
+                        {p.step_after < p.step_before && " ↑"}
+                        {p.step_after > p.step_before && " ↓"}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-dark-200">
+                    {p.pool_finish != null ? `${p.pool_finish}${["st","nd","rd"][p.pool_finish-1] ?? "th"}` : "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm font-medium">
+                    {(() => {
+                      const next = p.target_court_next;
+                      const curr = p.court_number;
+                      if (next == null) return <span className="text-surface-muted">—</span>;
+                      if (curr == null || next === curr) return <span className="text-surface-muted">→ {next}</span>;
+                      if (next < curr) return <span className="text-teal-300 font-semibold">↑ Court {next}</span>;
+                      return <span className="text-red-400 font-semibold">↓ Court {next}</span>;
+                    })()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+    </div>
+  );
+}
+
+/** Compact label/value pair used inside the mobile participant cards. */
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-surface-muted">{label}</p>
+      <p className="text-sm text-dark-100">{value}</p>
     </div>
   );
 }
