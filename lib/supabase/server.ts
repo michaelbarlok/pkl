@@ -31,6 +31,16 @@ export async function createServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        // Force Next.js/Vercel to skip the Data Cache for every PostgREST call.
+        // Supabase-js delegates to globalThis.fetch, which on Vercel can cache
+        // GET responses unless cache: "no-store" is set explicitly. The cron
+        // relies on reading live schedule + sheet state on every invocation.
+        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+          fetch(input, { ...init, cache: "no-store" }),
+      },
+    }
   );
 }
