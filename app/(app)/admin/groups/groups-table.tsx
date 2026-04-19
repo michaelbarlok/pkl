@@ -129,6 +129,7 @@ export function GroupsTable({
       data={groups}
       columns={columns}
       keyFn={(g) => g.id}
+      mobileMode="cards"
       caption="All shootout groups"
       empty={{
         title: "No groups created yet",

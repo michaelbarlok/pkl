@@ -96,6 +96,7 @@ export function TournamentsTable({ tournaments }: { tournaments: TournamentRow[]
       data={tournaments}
       columns={columns}
       keyFn={(t) => t.id}
+      mobileMode="cards"
       caption="All tournaments"
       empty={{
         title: "No tournaments yet",
