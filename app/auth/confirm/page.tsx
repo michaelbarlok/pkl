@@ -75,7 +75,7 @@ function ConfirmForm() {
       <div className="flex min-h-screen items-center justify-center bg-dark-950 px-4">
         <div className="w-full max-w-md text-center space-y-4">
           <Logo className="mx-auto h-28 w-auto" />
-          <div className="rounded-lg bg-red-900/20 border border-red-500/30 px-4 py-3 text-sm text-red-400">
+          <div className="alert-danger px-4 py-3 text-sm">
             {error}
             <p className="mt-1 text-xs text-surface-muted">
               The link may have expired. Please request a new confirmation email.

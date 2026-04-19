@@ -119,9 +119,9 @@ function ConfirmModal({
             <div
               className={cn(
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                variant === "danger" && "bg-red-900/50 text-red-400",
-                variant === "warning" && "bg-amber-900/50 text-amber-400",
-                variant === "default" && "bg-brand-900/50 text-brand-400"
+                variant === "danger" && "alert-danger",
+                variant === "warning" && "alert-warning",
+                variant === "default" && "alert-info"
               )}
             >
               {variant === "danger" ? (

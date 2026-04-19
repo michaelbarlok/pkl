@@ -186,7 +186,7 @@ export default async function SheetDetailPage({
       </div>
 
       {isCancelled && (
-        <div className="rounded-md bg-red-900/30 p-4 text-red-300">
+        <div className="alert-danger p-4">
           This event has been cancelled.
         </div>
       )}
@@ -261,8 +261,8 @@ export default async function SheetDetailPage({
 
       {/* Waitlist position banner */}
       {myWaitlistPosition && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
-          You&apos;re <strong className="text-amber-100">#{myWaitlistPosition}</strong> on the waitlist — we&apos;ll notify you if a spot opens.
+        <div className="alert-warning px-4 py-3 text-sm">
+          You&apos;re <strong>#{myWaitlistPosition}</strong> on the waitlist — we&apos;ll notify you if a spot opens.
         </div>
       )}
 

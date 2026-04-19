@@ -494,8 +494,8 @@ export default function EditProfilePage() {
             ) : null}
 
             {pushPermission === "denied" && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3 text-xs text-amber-200 space-y-2">
-                <p className="font-semibold text-amber-100">How to re-enable push notifications:</p>
+              <div className="alert-warning px-4 py-3 text-xs space-y-2">
+                <p className="font-semibold">How to re-enable push notifications:</p>
                 {isStandalone ? (
                   <ol className="list-decimal list-inside space-y-1 text-amber-200/90">
                     <li>Long-press the <strong>Tri-Star Pickleball</strong> icon on your home screen</li>

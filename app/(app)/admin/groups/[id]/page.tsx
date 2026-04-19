@@ -479,10 +479,8 @@ export default function AdminGroupDetailPage() {
       {message && (
         <div
           className={cn(
-            "rounded-lg px-4 py-3 text-sm",
-            message.type === "success"
-              ? "bg-teal-900/30 text-teal-300"
-              : "bg-red-900/30 text-red-400"
+            "px-4 py-3 text-sm",
+            message.type === "success" ? "alert-success" : "alert-danger"
           )}
         >
           {message.text}
