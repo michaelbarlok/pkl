@@ -1,10 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import Link from "next/link";
-import { formatDate } from "@/lib/utils";
 import { US_STATES } from "@/lib/us-states";
-import { ConfirmFormButton } from "@/components/confirm-form-button";
 import { Breadcrumb } from "@/components/breadcrumb";
+import { GroupsTable, type GroupRow } from "./groups-table";
 
 export default async function AdminGroupsPage() {
   const supabase = await createClient();
@@ -154,7 +152,7 @@ export default async function AdminGroupsPage() {
     <div className="space-y-6">
       <Breadcrumb items={[{ label: "Admin" }, { label: "Groups" }]} />
       <div>
-        <h1 className="text-2xl font-bold text-dark-100">Manage Groups</h1>
+        <h1 className="text-heading">Manage Groups</h1>
         <p className="mt-1 text-surface-muted">
           Create and manage shootout groups.
         </p>
@@ -235,165 +233,21 @@ export default async function AdminGroupsPage() {
       </div>
 
       {/* Groups Table */}
-      <div className="card overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-surface-border">
-            <thead className="bg-surface-overlay">
-              <tr>
-                <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Name
-                </th>
-                <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Type
-                </th>
-                <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Visibility
-                </th>
-                <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Slug
-                </th>
-                <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Members
-                </th>
-                <th className="hidden sm:table-cell px-2 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Last Session
-                </th>
-                <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Active
-                </th>
-                <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-surface-muted">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-border bg-surface-raised">
-              {groups?.map((group) => {
-                const memberCount =
-                  (
-                    group.group_memberships as unknown as {
-                      count: number;
-                    }[]
-                  )?.[0]?.count ?? 0;
-                const lastSession = lastSessionMap.get(group.id);
-
-                return (
-                  <tr key={group.id}>
-                    <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-sm font-medium text-dark-100">
-                      {group.name}
-                    </td>
-                    <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm">
-                      <span className={group.group_type === "free_play" ? "badge-yellow" : "badge-blue"}>
-                        {group.group_type === "free_play" ? "Free Play" : "Ladder"}
-                      </span>
-                    </td>
-                    <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm">
-                      <span className={group.visibility === "private" ? "badge-gray" : "badge-green"}>
-                        {group.visibility === "private" ? "Private" : "Public"}
-                      </span>
-                    </td>
-                    <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-sm text-surface-muted">
-                      {group.slug}
-                    </td>
-                    <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-right text-sm text-dark-100">
-                      {memberCount}
-                    </td>
-                    <td className="hidden sm:table-cell whitespace-nowrap px-2 sm:px-4 py-3 text-right text-sm text-surface-muted">
-                      {lastSession
-                        ? formatDate(lastSession)
-                        : "None"}
-                    </td>
-                    <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-center text-sm">
-                      {group.is_active ? (
-                        <span className="badge-green">Active</span>
-                      ) : (
-                        <span className="badge-gray">Inactive</span>
-                      )}
-                    </td>
-                    <td className="px-2 sm:px-4 py-3 text-right text-sm">
-                      <div className="flex items-center justify-end gap-2 flex-wrap">
-                        <Link
-                          href={`/admin/groups/${group.id}`}
-                          className="text-brand-400 hover:text-brand-300"
-                        >
-                          Edit
-                        </Link>
-                        {group.is_active ? (
-                          <ConfirmFormButton
-                            action={toggleActive}
-                            hiddenInputs={{ groupId: group.id, currentActive: "true" }}
-                            label="Deactivate"
-                            confirmTitle={`Deactivate "${group.name}"?`}
-                            confirmDescription="Members will no longer be able to access this group until it is reactivated."
-                            confirmLabel="Deactivate"
-                            variant="danger"
-                            className="text-red-400 hover:text-red-500"
-                          />
-                        ) : (
-                          <form action={toggleActive} className="inline">
-                            <input type="hidden" name="groupId" value={group.id} />
-                            <input type="hidden" name="currentActive" value="false" />
-                            <button type="submit" className="text-teal-300 hover:text-green-500">
-                              Activate
-                            </button>
-                          </form>
-                        )}
-                        <RenameForm groupId={group.id} currentName={group.name} action={renameGroup} />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {(!groups || groups.length === 0) && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center">
-                    <svg className="mx-auto mb-2 h-8 w-8 text-surface-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-                    </svg>
-                    <p className="text-sm text-surface-muted">No groups created yet.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <GroupsTable
+        groups={(groups ?? []).map((g): GroupRow => ({
+          id: g.id,
+          name: g.name,
+          slug: g.slug,
+          group_type: g.group_type,
+          visibility: g.visibility,
+          is_active: g.is_active,
+          memberCount:
+            (g.group_memberships as unknown as { count: number }[])?.[0]?.count ?? 0,
+          lastSession: lastSessionMap.get(g.id) ?? null,
+        }))}
+        toggleActive={toggleActive}
+        renameGroup={renameGroup}
+      />
     </div>
-  );
-}
-
-// ============================================================
-// Rename inline form (Server Component)
-// ============================================================
-
-function RenameForm({
-  groupId,
-  currentName,
-  action,
-}: {
-  groupId: string;
-  currentName: string;
-  action: (formData: FormData) => Promise<void>;
-}) {
-  return (
-    <details className="relative inline-block">
-      <summary className="cursor-pointer text-surface-muted hover:text-surface-muted">
-        Rename
-      </summary>
-      <div className="absolute right-0 top-6 z-10 w-64 rounded-lg border bg-surface-raised p-3 shadow-lg">
-        <form action={action} className="flex flex-col gap-2">
-          <input type="hidden" name="groupId" value={groupId} />
-          <input
-            type="text"
-            name="newName"
-            defaultValue={currentName}
-            required
-            className="input"
-          />
-          <button type="submit" className="btn-secondary text-sm">
-            Save
-          </button>
-        </form>
-      </div>
-    </details>
   );
 }

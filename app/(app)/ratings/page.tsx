@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
-import { formatDate } from "@/lib/utils";
+import { RatingsTable, type RankedPlayer } from "./ratings-table";
 
 const PCT_WINDOW_SESSIONS = 14;
 
@@ -107,17 +106,7 @@ export default async function RatingsPage() {
   const percentages = await getPlayerPercentages(supabase);
 
   // Deduplicate players: use their best (lowest) step across groups
-  const playerMap = new Map<
-    string,
-    {
-      player_id: string;
-      current_step: number;
-      display_name: string;
-      avatar_url: string | null;
-      percentage: number;
-      last_played_at: string | null;
-    }
-  >();
+  const playerMap = new Map<string, RankedPlayer>();
 
   for (const m of memberships ?? []) {
     const player = m.player as any;
@@ -148,68 +137,12 @@ export default async function RatingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-dark-100">Rankings</h1>
-        <p className="text-sm text-surface-muted">
+        <h1 className="text-heading">Rankings</h1>
+        <p className="mt-1 text-sm text-surface-muted">
           Player rankings by step and scoring percentage (last {PCT_WINDOW_SESSIONS} sessions)
         </p>
       </div>
-
-      <div className="card overflow-x-auto p-0">
-        <table className="min-w-full divide-y divide-surface-border">
-          <thead className="bg-surface-overlay">
-            <tr>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-10 sm:w-16">Rank</th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step</th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Pct</th>
-              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Last Played</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-surface-border bg-surface-raised">
-            {ranked.map((r, i) => (
-              <tr key={r.player_id}>
-                <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4 text-sm font-medium text-surface-muted">
-                  {i + 1}
-                </td>
-                <td className="px-2 sm:px-4 py-3 sm:py-4">
-                  <Link href={`/players/${r.player_id}`} className="flex items-center gap-2 sm:gap-3 hover:text-brand-400 min-w-0">
-                    {r.avatar_url ? (
-                      <img src={r.avatar_url} alt="" className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs sm:text-sm font-medium flex-shrink-0">
-                        {r.display_name?.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <span className="text-xs sm:text-sm font-medium text-dark-100 truncate">
-                      {r.display_name}
-                    </span>
-                  </Link>
-                </td>
-                <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4">
-                  <span className="inline-flex items-center rounded-md bg-brand-900/40 px-2 py-1 text-sm font-semibold text-brand-300">
-                    {r.current_step}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap px-2 sm:px-4 py-3 sm:py-4 text-sm text-dark-200">
-                  {r.percentage > 0 ? `${r.percentage.toFixed(1)}%` : "—"}
-                </td>
-                <td className="px-2 sm:px-4 py-3 sm:py-4 text-sm text-surface-muted">
-                  {r.last_played_at
-                    ? formatDate(r.last_played_at)
-                    : "—"}
-                </td>
-              </tr>
-            ))}
-            {ranked.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-2 sm:px-4 py-8 text-center text-surface-muted">
-                  No ranked players yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <RatingsTable ranked={ranked} />
     </div>
   );
 }
