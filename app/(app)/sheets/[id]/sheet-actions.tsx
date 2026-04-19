@@ -2,7 +2,7 @@
 
 import { FormError } from "@/components/form-error";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RegistrationStatus } from "@/types/database";
 
 interface SheetActionsProps {
@@ -14,6 +14,16 @@ interface SheetActionsProps {
   isFull: boolean;
 }
 
+// If a request is pending for more than this long, we switch the label to a
+// "still working..." message so users under a concurrent-signup spike don't
+// assume the site froze and start hammering refresh.
+const SLOW_THRESHOLD_MS = 5_000;
+// Hard client-side cap. If we haven't heard back by this point, abort so
+// the button isn't stuck forever. The server's signup RPC is idempotent
+// (checks `already_registered` before inserting), so retrying is always
+// safe — no risk of a duplicate registration.
+const REQUEST_TIMEOUT_MS = 20_000;
+
 /**
  * The primary action card for a sheet.
  *
@@ -21,9 +31,12 @@ interface SheetActionsProps {
  * a sheet page the #1 question is "am I signed up?" and the #2 is "can I
  * still sign up?" — we answer both visually before text.
  *
- * When the user hasn't acted yet and signup is open, the CTA pulses to
- * draw the eye. Once registered, the CTA flips to a calm secondary
- * confirmation with a muted Withdraw.
+ * The handler is hardened for concurrent-signup spikes:
+ *  - AbortController hard timeout so a stuck fetch can't freeze the CTA.
+ *  - Progressive "still working" label after 5s so users don't panic-refresh.
+ *  - On any failure, the user can just tap again — the server RPC is
+ *    idempotent and will either complete the signup or return their
+ *    existing registration instead of inserting a duplicate.
  */
 export function SheetActions({
   sheetId,
@@ -36,35 +49,61 @@ export function SheetActions({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slow, setSlow] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function handleSignUp() {
+  // Cancel any in-flight request + timers when the component unmounts
+  // (e.g. user navigated away mid-spinner).
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
+  }, []);
+
+  async function run(url: string, verb: "signup" | "withdraw") {
     setLoading(true);
     setError(null);
+    setSlow(false);
+    setAttempted(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeoutHandle = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    slowTimerRef.current = setTimeout(() => setSlow(true), SLOW_THRESHOLD_MS);
+
     try {
-      const res = await fetch(`/api/sheets/${sheetId}/signup`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to sign up.");
+      const res = await fetch(url, { method: "POST", signal: controller.signal });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || `Failed to ${verb}.`);
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to sign up.");
+      // AbortError fires both on our timeout and on unmount. We only want
+      // to surface an error for the timeout case.
+      if ((err as { name?: string })?.name === "AbortError") {
+        setError(
+          `That took longer than expected. Your ${verb === "signup" ? "sign-up" : "withdrawal"} may have gone through — tap again to retry, or refresh to check your status.`
+        );
+      } else {
+        setError(err instanceof Error ? err.message : `Failed to ${verb}.`);
+      }
     } finally {
+      clearTimeout(timeoutHandle);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+      abortRef.current = null;
       setLoading(false);
+      setSlow(false);
     }
   }
 
+  async function handleSignUp() {
+    await run(`/api/sheets/${sheetId}/signup`, "signup");
+  }
+
   async function handleWithdraw() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/sheets/${sheetId}/withdraw`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to withdraw.");
-      router.refresh();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to withdraw.");
-    } finally {
-      setLoading(false);
-    }
+    await run(`/api/sheets/${sheetId}/withdraw`, "withdraw");
   }
 
   const isRegistered =
@@ -76,14 +115,18 @@ export function SheetActions({
   const pulse = !isRegistered && !signupClosed && !loading;
 
   const ctaLabel = loading
-    ? (isRegistered ? "Withdrawing…" : "Signing up…")
-    : isRegistered
-      ? "Withdraw"
-      : signupClosed
-        ? "Sign-up closed"
-        : isFull
-          ? "Join waitlist"
-          : "Sign up";
+    ? slow
+      ? (isRegistered ? "Still working…" : "Still working…")
+      : (isRegistered ? "Withdrawing…" : "Signing up…")
+    : attempted && error
+      ? (isRegistered ? "Try again" : "Try again")
+      : isRegistered
+        ? "Withdraw"
+        : signupClosed
+          ? "Sign-up closed"
+          : isFull
+            ? "Join waitlist"
+            : "Sign up";
 
   return (
     <div className="rounded-2xl bg-surface-raised ring-1 ring-surface-border p-4 sm:p-5">
@@ -127,6 +170,11 @@ export function SheetActions({
                     ? "This event is full — join the waitlist to hold your spot."
                     : "Sign up to lock in your seat."}
               </p>
+              {slow && (
+                <p className="mt-1 text-xs text-surface-muted">
+                  Busy sheet — hang tight, your spot is being locked in.
+                </p>
+              )}
             </>
           )}
         </div>
