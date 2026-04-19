@@ -98,6 +98,7 @@ export interface SignupSheet {
   group_id: string;
   event_date: string;
   event_time: string;
+  timezone: string;
   location: string;
   player_limit: number;
   signup_opens_at?: string | null;
