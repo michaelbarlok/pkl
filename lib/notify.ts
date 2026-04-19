@@ -46,11 +46,27 @@ export async function notify({
   }
 
   const prefs: string[] = profile.preferred_notify ?? ["email"];
-  const typePrefs = (profile.notification_preferences as Record<string, "email" | "push" | "off">) ?? {};
-  const typePref = typePrefs[type] as "email" | "push" | "off" | undefined;
+  const rawTypePrefs =
+    (profile.notification_preferences as Record<string, unknown> | null) ?? {};
+  const rawTypePref = rawTypePrefs[type];
 
-  // If the user turned this notification type off entirely, do nothing
-  if (typePref === "off") return;
+  // Per-type prefs: accept both the new array shape (["email","push"]) and
+  // the legacy string shape ("email"|"push"|"off") for rows not touched by
+  // the 077 backfill. An empty array means "off" for this type.
+  const typeChannels: Set<"email" | "push"> | null = (() => {
+    if (rawTypePref === undefined || rawTypePref === null) return null;
+    if (Array.isArray(rawTypePref)) {
+      return new Set(rawTypePref.filter((c): c is "email" | "push" => c === "email" || c === "push"));
+    }
+    if (typeof rawTypePref === "string") {
+      if (rawTypePref === "off") return new Set();
+      if (rawTypePref === "email" || rawTypePref === "push") return new Set([rawTypePref]);
+    }
+    return null;
+  })();
+
+  // If the user explicitly turned this notification type off entirely, do nothing
+  if (typeChannels && typeChannels.size === 0) return;
 
   // 2. Write in-app notification
   try {
@@ -69,9 +85,10 @@ export async function notify({
     console.error("Notification insert threw:", e);
   }
 
-  // Per-type value determines channel; unset falls back to global preferred_notify
-  const shouldEmail = typePref === "email" || (typePref === undefined && prefs.includes("email"));
-  const shouldPush  = typePref === "push"  || (typePref === undefined && prefs.includes("push"));
+  // Per-type prefs take priority; missing entries fall back to the global
+  // preferred_notify list. Both channels can be active simultaneously.
+  const shouldEmail = typeChannels ? typeChannels.has("email") : prefs.includes("email");
+  const shouldPush = typeChannels ? typeChannels.has("push") : prefs.includes("push");
 
   // 3. Fire email, SMS, and push in parallel. Previously these were
   // awaited one after the other, so a push was delayed by however long

@@ -33,7 +33,8 @@ export default function EditProfilePage() {
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyPush, setNotifyPush] = useState(false);
   const [notifyForumReplies, setNotifyForumReplies] = useState(false);
-  const [notificationPrefs, setNotificationPrefs] = useState<Record<string, "email" | "push" | "off">>({});
+  type Channel = "email" | "push";
+  const [notificationPrefs, setNotificationPrefs] = useState<Record<string, Channel[]>>({});
   const [pushSupported, setPushSupported] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isStandalone, setIsStandalone] = useState(false);
@@ -89,7 +90,20 @@ export default function EditProfilePage() {
       setNotifyEmail(prefs.includes("email"));
       setNotifyPush(prefs.includes("push"));
       setNotifyForumReplies(profile.notify_forum_replies ?? false);
-      setNotificationPrefs((profile.notification_preferences as Record<string, "email" | "push" | "off">) ?? {});
+      // Accept both the new array shape and the legacy string shape so a user
+      // whose row hasn't been backfilled yet still sees the right toggles.
+      const rawPrefs = (profile.notification_preferences as Record<string, unknown> | null) ?? {};
+      const normalized: Record<string, Channel[]> = {};
+      for (const [key, raw] of Object.entries(rawPrefs)) {
+        if (Array.isArray(raw)) {
+          normalized[key] = raw.filter((c): c is Channel => c === "email" || c === "push");
+        } else if (raw === "email" || raw === "push") {
+          normalized[key] = [raw];
+        } else if (raw === "off") {
+          normalized[key] = [];
+        }
+      }
+      setNotificationPrefs(normalized);
       setDuprId(profile.dupr_id ?? "");
       setDuprSingles(profile.dupr_singles_rating?.toString() ?? "");
       setDuprDoubles(profile.dupr_doubles_rating?.toString() ?? "");
@@ -555,17 +569,25 @@ export default function EditProfilePage() {
                 },
               ] as const;
 
-              const getVal = (t: string): "email" | "push" | "off" =>
-                (notificationPrefs[t] as "email" | "push" | "off" | undefined) ?? "email";
+              // Missing entry = fall back to the global preferred_notify list,
+              // which for a normal account is ["email"] (plus "push" if they
+              // opted into browser push above).
+              const getChannels = (t: string): Channel[] => {
+                const v = notificationPrefs[t];
+                if (v !== undefined) return v;
+                const fallback: Channel[] = ["email"];
+                if (notifyPush) fallback.push("push");
+                return fallback;
+              };
 
-              const setVal = (t: string, val: "email" | "push" | "off") =>
-                setNotificationPrefs((prev) => ({ ...prev, [t]: val }));
-
-              const OPTIONS: { value: "email" | "push" | "off"; label: string }[] = [
-                { value: "email", label: "Email" },
-                { value: "push",  label: "Push" },
-                { value: "off",   label: "Off"  },
-              ];
+              const toggleChannel = (t: string, ch: Channel) =>
+                setNotificationPrefs((prev) => {
+                  const current = prev[t] ?? getChannels(t);
+                  const next = current.includes(ch)
+                    ? current.filter((c) => c !== ch)
+                    : [...current, ch];
+                  return { ...prev, [t]: next };
+                });
 
               return (
                 <div className="rounded-lg border border-surface-border overflow-hidden">
@@ -582,31 +604,37 @@ export default function EditProfilePage() {
                       </div>
 
                       {group.types.map(({ type, label }, ri) => {
-                        const current = getVal(type);
+                        const channels = getChannels(type);
+                        const off = channels.length === 0;
                         const isLast = gi === notifGroups.length - 1 && ri === group.types.length - 1;
+                        const CHANNEL_OPTS: { value: Channel; label: string }[] = [
+                          { value: "email", label: "Email" },
+                          { value: "push", label: "Push" },
+                        ];
                         return (
                           <div
                             key={type}
                             className={`flex items-center justify-between gap-3 px-3 py-2.5 ${!isLast ? "border-b border-surface-border/50" : ""} hover:bg-surface-overlay/30`}
                           >
-                            <span className={`text-sm ${current === "off" ? "text-surface-muted" : "text-dark-200"}`}>{label}</span>
-                            <div className="flex rounded-md overflow-hidden border border-surface-border shrink-0">
-                              {OPTIONS.map(({ value, label: optLabel }) => {
-                                const isActive = current === value;
+                            <span className={`text-sm ${off ? "text-surface-muted italic" : "text-dark-200"}`}>
+                              {label}{off && <span className="ml-2 text-xs">(off)</span>}
+                            </span>
+                            <div className="flex gap-1.5 shrink-0">
+                              {CHANNEL_OPTS.map(({ value, label: optLabel }) => {
+                                const isActive = channels.includes(value);
                                 const isPushDisabled = value === "push" && (!pushSupported || !notifyPush);
                                 return (
                                   <button
                                     key={value}
                                     type="button"
                                     disabled={isPushDisabled}
-                                    onClick={() => setVal(type, value)}
+                                    onClick={() => toggleChannel(type, value)}
+                                    aria-pressed={isActive}
                                     className={[
-                                      "px-2.5 py-1 text-xs font-medium transition-colors border-r border-surface-border last:border-r-0",
+                                      "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                                       isActive
-                                        ? value === "off"
-                                          ? "bg-red-900/50 text-red-300"
-                                          : "bg-brand-600 text-white"
-                                        : "bg-surface-overlay text-surface-muted hover:bg-surface-overlay/80",
+                                        ? "border-brand-500 bg-brand-600 text-white"
+                                        : "border-surface-border bg-surface-overlay text-surface-muted hover:bg-surface-overlay/80",
                                       isPushDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer",
                                     ].join(" ")}
                                   >
