@@ -117,6 +117,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="mx-auto w-full max-w-5xl animate-fade-in">
             {children}
           </div>
+          {/* Persistent copyright notice — visible on every authenticated
+               page so the ownership claim is consistent across the app. */}
+          <p className="mx-auto mt-10 max-w-5xl text-center text-[11px] text-surface-muted">
+            &copy; {new Date().getFullYear()} Tri-Star Pickleball. All rights reserved.
+          </p>
         </main>
       </div>
       <MobileNav profile={profile} isGroupAdmin={isGroupAdmin} />
