@@ -83,6 +83,7 @@ export async function GET(request: NextRequest) {
         group_id: groupId,
         event_date: eventDateStr,
         event_time: eventTimeIso,
+        timezone: tz,
         location: sched.location,
         player_limit: sched.player_limit,
         signup_closes_at: signupClosesAt,

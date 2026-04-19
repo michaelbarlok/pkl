@@ -4,7 +4,7 @@ import { getRecentMatches, getPlayerStats, getRecentSessions } from "@/lib/queri
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
 import { FreePlayLeaderboard } from "./leaderboard";
 import { InviteButton } from "./invite-button";
 import { ResetStatsButton } from "./reset-stats-button";
@@ -300,10 +300,10 @@ export default async function GroupPage({
                       className="flex flex-col hover:text-brand-400 transition-colors group"
                     >
                       <span className="text-sm font-medium text-dark-100 group-hover:text-brand-400">
-                        {formatDate(sheet.event_date)}
+                        {formatDateInZone(sheet.event_time, sheet.timezone)}
                       </span>
                       <span className="text-xs text-surface-muted">
-                        {formatTime(sheet.event_time)} · {sheet.location}
+                        {formatTimeInZone(sheet.event_time, sheet.timezone)} · {sheet.location}
                       </span>
                     </Link>
                   </li>

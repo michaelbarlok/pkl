@@ -44,6 +44,48 @@ export function formatDateTime(dateStr: string): string {
   return `${formatDate(dateStr)} ${formatTime(dateStr)}`;
 }
 
+/**
+ * Zone-aware date formatter. Always resolves in the given IANA timezone
+ * regardless of where the code runs (server, browser, whatever). Use
+ * this for anything tied to a specific event/location — signup sheet
+ * pages, emails, notifications — instead of `formatDate` / `formatTime`,
+ * which fall back to the runtime's local zone.
+ *
+ * Output: "Fri 3-15-2026"
+ */
+export function formatDateInZone(dateStr: string, timeZone: string): string {
+  const date = new Date(dateStr);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("weekday")} ${get("month")}-${get("day")}-${get("year")}`;
+}
+
+/** Zone-aware time formatter. Output: "8:00 pm" */
+export function formatTimeInZone(dateStr: string, timeZone: string): string {
+  const date = new Date(dateStr);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(date);
+  const hour = parts.find((p) => p.type === "hour")?.value ?? "";
+  const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
+  const dayPeriod = (parts.find((p) => p.type === "dayPeriod")?.value ?? "").toLowerCase();
+  return `${hour}:${minute} ${dayPeriod}`;
+}
+
+/** Zone-aware date+time. Output: "Fri 3-15-2026 8:00 pm" */
+export function formatDateTimeInZone(dateStr: string, timeZone: string): string {
+  return `${formatDateInZone(dateStr, timeZone)} ${formatTimeInZone(dateStr, timeZone)}`;
+}
+
 export function getCountdown(targetDateStr: string): string {
   const now = new Date();
   const target = new Date(targetDateStr);

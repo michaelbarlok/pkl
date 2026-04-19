@@ -249,6 +249,7 @@ export default function NewSheetFromSheetsPage() {
           group_id: groupId,
           event_date: eventDate,
           event_time: new Date(`${eventDate}T${eventTime}:00`).toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           location: location.trim(),
           player_limit: playerLimit,
           signup_closes_at: signupClosesAt,

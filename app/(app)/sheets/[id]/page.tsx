@@ -2,7 +2,7 @@ import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { formatDate, formatTime, PRIORITY_ORDER } from "@/lib/utils";
+import { formatDateInZone, formatTimeInZone, PRIORITY_ORDER } from "@/lib/utils";
 import type { Registration, Profile } from "@/types/database";
 import { SheetActions } from "./sheet-actions";
 import { AdminAddMember } from "./admin-add-member";
@@ -196,11 +196,11 @@ export default async function SheetDetailPage({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <p className="text-sm font-medium text-surface-muted">Date</p>
-            <p className="mt-1 text-dark-100">{formatDate(sheet.event_date)}</p>
+            <p className="mt-1 text-dark-100">{formatDateInZone(sheet.event_time, sheet.timezone)}</p>
           </div>
           <div>
             <p className="text-sm font-medium text-surface-muted">Time</p>
-            <p className="mt-1 text-dark-100">{formatTime(sheet.event_time)}</p>
+            <p className="mt-1 text-dark-100">{formatTimeInZone(sheet.event_time, sheet.timezone)}</p>
           </div>
           <div>
             <p className="text-sm font-medium text-surface-muted">Location</p>
@@ -226,8 +226,8 @@ export default async function SheetDetailPage({
               Sign-Up Closes
             </p>
             <p className="mt-1 text-dark-100">
-              {formatDate(sheet.signup_closes_at)},{" "}
-              {formatTime(sheet.signup_closes_at)}
+              {formatDateInZone(sheet.signup_closes_at, sheet.timezone)},{" "}
+              {formatTimeInZone(sheet.signup_closes_at, sheet.timezone)}
             </p>
           </div>
           {sheet.withdraw_closes_at && (
@@ -236,8 +236,8 @@ export default async function SheetDetailPage({
                 Withdraw Deadline
               </p>
               <p className="mt-1 text-dark-100">
-                {formatDate(sheet.withdraw_closes_at)},{" "}
-                {formatTime(sheet.withdraw_closes_at)}
+                {formatDateInZone(sheet.withdraw_closes_at, sheet.timezone)},{" "}
+                {formatTimeInZone(sheet.withdraw_closes_at, sheet.timezone)}
               </p>
             </div>
           )}
