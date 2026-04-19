@@ -1,8 +1,10 @@
 "use client";
 
 import { useConfirm } from "@/components/confirm-modal";
+import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { matchFirstChoice } from "@/lib/first-choice";
 import type { ShootoutSession, SessionParticipant, ShootoutGroup, GameResult } from "@/types/database";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
@@ -881,13 +883,26 @@ export default function AdminSessionDetailPage() {
                           </button>
                         )}
                       </div>
-                      <div className="text-sm text-dark-100">
-                        {match.team1.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
-                      </div>
-                      <div className="text-xs text-surface-muted my-0.5">vs</div>
-                      <div className="text-sm text-dark-100">
-                        {match.team2.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
-                      </div>
+                      {(() => {
+                        const firstChoice = matchFirstChoice(id, selectedCourt, match.gameNumber);
+                        return (
+                          <>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm text-dark-100 truncate">
+                                {match.team1.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
+                              </span>
+                              {firstChoice === "team1" && <FirstChoiceBadge className="shrink-0" />}
+                            </div>
+                            <div className="text-xs text-surface-muted my-0.5">vs</div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm text-dark-100 truncate">
+                                {match.team2.map((pid) => playerNameMap.get(pid) ?? "?").join(" & ")}
+                              </span>
+                              {firstChoice === "team2" && <FirstChoiceBadge className="shrink-0" />}
+                            </div>
+                          </>
+                        );
+                      })()}
                       {enteringGame === matchKey && (
                         <div className="mt-3 space-y-3">
                           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
