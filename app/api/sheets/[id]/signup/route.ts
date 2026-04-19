@@ -1,6 +1,7 @@
 import { requireAuth } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
+import { sheetSignupClosed } from "@/lib/sheet-lifecycle";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { formatDateInZone } from "@/lib/utils";
@@ -28,10 +29,11 @@ export async function POST(
       // No body or invalid JSON — signing up self
     }
 
-    // Fetch the sheet (need allow_member_guests for authorization check)
+    // Fetch the sheet (need allow_member_guests for authorization check).
+    // event_time is required for the "signups close at event start" cap.
     const { data: sheet, error: sheetError } = await auth.supabase
       .from("signup_sheets")
-      .select("id, group_id, status, player_limit, signup_closes_at, allow_member_guests")
+      .select("id, group_id, status, player_limit, signup_closes_at, event_time, event_date, allow_member_guests")
       .eq("id", sheetId)
       .single();
 
@@ -77,7 +79,7 @@ export async function POST(
       );
     }
 
-    if (new Date(sheet.signup_closes_at) < new Date()) {
+    if (sheetSignupClosed(sheet)) {
       return NextResponse.json(
         { error: "Sign-up cutoff has passed" },
         { status: 400 }

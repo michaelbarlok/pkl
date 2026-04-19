@@ -1,6 +1,11 @@
 import { EmptyState } from "@/components/empty-state";
 import { FormError } from "@/components/form-error";
 import { createClient } from "@/lib/supabase/server";
+import {
+  sheetIsExpired,
+  sheetSignupClosed,
+  sheetWithdrawClosed,
+} from "@/lib/sheet-lifecycle";
 import { formatDate } from "@/lib/utils";
 import type { SignupSheet } from "@/types/database";
 import Link from "next/link";
@@ -59,13 +64,7 @@ export default async function SheetsPage() {
   }
 
   // Drop any sheet whose event started more than 12 hours ago
-  const now = Date.now();
-  const filteredSheets = (sheets ?? []).filter((s) => {
-    const eventStart = s.event_time
-      ? new Date(s.event_time).getTime()
-      : new Date(`${s.event_date}T00:00`).getTime();
-    return now < eventStart + 12 * 60 * 60 * 1000;
-  });
+  const filteredSheets = (sheets ?? []).filter((s) => !sheetIsExpired(s));
 
   // Sort: active sheets first (most recent on top), then cancelled (most recent on top)
   const sortedSheets = [...filteredSheets].sort((a, b) => {
@@ -176,10 +175,8 @@ export default async function SheetsPage() {
     const waitlisted = waitlistCountMap[sheet.id] ?? 0;
     const players = playersMap[sheet.id] ?? [];
     const myStatus = myRegMap[sheet.id] ?? null;
-    const signupClosed = new Date(sheet.signup_closes_at) < new Date();
-    const withdrawClosed = sheet.withdraw_closes_at
-      ? new Date(sheet.withdraw_closes_at) < new Date()
-      : false;
+    const signupClosed = sheetSignupClosed(sheet);
+    const withdrawClosed = sheetWithdrawClosed(sheet);
 
     return (
       <SheetCard
