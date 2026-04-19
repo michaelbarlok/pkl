@@ -12,9 +12,27 @@ export function cn(...inputs: ClassValue[]) {
 /** Priority sort order: high first, then normal, then low. */
 export const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 };
 
-/** Format date as Day M-D-YYYY (e.g. "Fri 3-15-2026") */
+/** Format date as Day M-D-YYYY (e.g. "Fri 3-15-2026").
+ *
+ *  Parses date-only ("YYYY-MM-DD") and no-zone ("YYYY-MM-DDTHH:mm[:ss]")
+ *  strings in local time. Without this, JS parses bare dates as UTC
+ *  midnight — so a DATE column value like "2026-04-19" renders as
+ *  "Sat 4-18-2026" anywhere west of UTC. Strings with an explicit zone
+ *  ("Z" or "+HH:mm") still parse normally. */
 export function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
+  const noZone = dateStr.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+  const date = noZone
+    ? new Date(
+        Number(noZone[1]),
+        Number(noZone[2]) - 1,
+        Number(noZone[3]),
+        Number(noZone[4] ?? "0"),
+        Number(noZone[5] ?? "0"),
+        Number(noZone[6] ?? "0")
+      )
+    : new Date(dateStr);
   const day = date.toLocaleDateString("en-US", { weekday: "short" });
   return `${day} ${date.getMonth() + 1}-${date.getDate()}-${date.getFullYear()}`;
 }
