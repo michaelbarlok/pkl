@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatDateInZone, formatTimeInZone, PRIORITY_ORDER } from "@/lib/utils";
+import {
+  sheetIsExpired,
+  sheetSignupClosed,
+  sheetWithdrawClosed,
+} from "@/lib/sheet-lifecycle";
 import type { Registration, Profile } from "@/types/database";
 import { SheetActions } from "./sheet-actions";
 import { AdminAddMember } from "./admin-add-member";
@@ -106,10 +111,8 @@ export default async function SheetDetailPage({
   const now = new Date();
   const signupClosedAt = new Date(sheet.signup_closes_at);
   const eventAt = new Date(sheet.event_time);
-  const signupClosed = signupClosedAt < now;
-  const withdrawClosed = sheet.withdraw_closes_at
-    ? new Date(sheet.withdraw_closes_at) < now
-    : false;
+  const signupClosed = sheetSignupClosed(sheet, now);
+  const withdrawClosed = sheetWithdrawClosed(sheet, now);
   const isCancelled = sheet.status === "cancelled";
   const isFull = confirmed.length >= sheet.player_limit;
   const isAdmin = profile.role === "admin";
@@ -127,6 +130,12 @@ export default async function SheetDetailPage({
     isGroupAdmin = membership?.group_role === "admin";
   }
   const hasAdminView = isAdmin || isGroupAdmin;
+
+  // Once the event is 12+ hours past its start time, regular players can't
+  // reach the sheet anymore — the list already hides it, but we also need
+  // to block direct-link access. Admins keep access for post-event review
+  // and cleanup.
+  if (sheetIsExpired(sheet, now) && !hasAdminView) notFound();
 
   const myWaitlistPosition = myRegistration?.status === "waitlist"
     ? waitlisted.findIndex((r: Registration) => r.player_id === profile.id) + 1

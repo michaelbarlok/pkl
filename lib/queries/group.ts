@@ -89,11 +89,14 @@ export async function getGroupMembers(
 
 /**
  * Fetch upcoming signup sheets for a group (open status, future dates).
+ * Applies the 12-hour post-event expiry so a morning event stops showing
+ * up later the same day.
  */
 export async function getGroupSheets(
   groupId: string
 ): Promise<SignupSheet[]> {
   const supabase = await createClient();
+  const { sheetIsExpired } = await import("@/lib/sheet-lifecycle");
 
   const { data, error } = await supabase
     .from("signup_sheets")
@@ -105,7 +108,7 @@ export async function getGroupSheets(
 
   if (error || !data) return [];
 
-  return data as SignupSheet[];
+  return (data as SignupSheet[]).filter((s) => !sheetIsExpired(s));
 }
 
 /**

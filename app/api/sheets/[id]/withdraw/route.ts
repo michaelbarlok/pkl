@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { sheetWithdrawClosed } from "@/lib/sheet-lifecycle";
 import { promoteNextWaitlistPlayer } from "@/lib/waitlist";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
@@ -29,14 +30,17 @@ export async function POST(
     if (!isAdminRemoval) {
       const { data: sheet } = await auth.supabase
         .from("signup_sheets")
-        .select("status, withdraw_closes_at")
+        .select("status, withdraw_closes_at, event_time, event_date")
         .eq("id", sheetId)
         .single();
 
       if (sheet?.status !== "open") {
         return NextResponse.json({ error: "Sheet is not open" }, { status: 400 });
       }
-      if (sheet?.withdraw_closes_at && new Date(sheet.withdraw_closes_at) < new Date()) {
+      // Withdrawals are capped at event start — even if the admin set no
+      // explicit withdraw deadline, play has begun and no one should be
+      // able to drop off the roster live.
+      if (sheet && sheetWithdrawClosed(sheet)) {
         return NextResponse.json({ error: "Withdrawal deadline has passed" }, { status: 400 });
       }
     }

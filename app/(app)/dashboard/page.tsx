@@ -6,6 +6,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getBadgeStats } from "@/lib/queries/badges";
 import { groupGradient } from "@/lib/group-gradient";
+import { sheetIsExpired } from "@/lib/sheet-lifecycle";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatTime } from "@/lib/utils";
@@ -52,7 +53,11 @@ export default async function DashboardPage() {
 
   // Filter to active groups only
   const activeGroupMemberships = (memberships ?? []).filter((m) => (m as any).group?.is_active !== false);
-  const activeSheets = (sheets ?? []).filter((s: any) => s.group?.is_active !== false);
+  // Hide sheets whose event is 12+ hours past — matches the sheets-list rule
+  // so the dashboard doesn't keep surfacing a finished event.
+  const activeSheets = (sheets ?? []).filter(
+    (s: any) => s.group?.is_active !== false && !sheetIsExpired(s)
+  );
   const groupIds = activeGroupMemberships.map((m) => m.group_id);
 
   // Aggregate stats
