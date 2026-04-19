@@ -17,6 +17,33 @@ const TZ_OPTIONS = [
   { value: "Pacific/Honolulu", label: "Hawaii" },
 ];
 
+/** 15-minute time options from 00:00 through 23:45. */
+const TIME_OPTIONS: string[] = (() => {
+  const out: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
+  }
+  return out;
+})();
+
+function formatTime12h(hhmm: string): string {
+  const [hStr, mStr] = hhmm.split(":");
+  const h = parseInt(hStr, 10);
+  const suffix = h >= 12 ? "pm" : "am";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${mStr} ${suffix}`;
+}
+
+/** Ensure a time the admin stored previously (e.g. 17:30) is in the options
+ *  list. If an admin has saved a non-15-min value from before this change,
+ *  add it as an extra option so the dropdown can render it. */
+function timeOptionsIncluding(current: string): string[] {
+  if (!current || TIME_OPTIONS.includes(current)) return TIME_OPTIONS;
+  return [...TIME_OPTIONS, current].sort();
+}
+
 type EditorForm = {
   id?: string;
   label: string;
@@ -309,13 +336,16 @@ function ScheduleEditor({
         </label>
         <label className="block">
           <span className="text-sm font-medium text-dark-200">Start time</span>
-          <input
-            type="time"
+          <select
             value={form.event_time}
             onChange={(e) => set("event_time", e.target.value)}
             className="input mt-1 w-full"
             required
-          />
+          >
+            {timeOptionsIncluding(form.event_time).map((t) => (
+              <option key={t} value={t}>{formatTime12h(t)}</option>
+            ))}
+          </select>
         </label>
         <label className="block">
           <span className="text-sm font-medium text-dark-200">Timezone</span>
@@ -416,12 +446,15 @@ function ScheduleEditor({
             </label>
             <label className="block">
               <span className="text-sm font-medium text-dark-200">Post time</span>
-              <input
-                type="time"
+              <select
                 value={form.post_time}
                 onChange={(e) => set("post_time", e.target.value)}
                 className="input mt-1 w-full"
-              />
+              >
+                {timeOptionsIncluding(form.post_time).map((t) => (
+                  <option key={t} value={t}>{formatTime12h(t)}</option>
+                ))}
+              </select>
             </label>
           </div>
         )}
