@@ -8,11 +8,14 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/cron/create-scheduled-sheets
  *
- * Runs every hour. For each active group_recurring_schedule that has
- * post_day_of_week + post_time set, converts the current UTC time into the
- * schedule's timezone and checks whether the hour/day matches the post
- * schedule. When it does — and no sheet already exists for the upcoming play
- * day — it creates the sheet and notifies all group members.
+ * Runs every minute. Processes every schedule whose precomputed
+ * `next_post_at` has come due. The DB trigger keeps `next_post_at`
+ * in sync with the admin's intent, so this route does no timezone
+ * matching of its own — it just drains the queue.
+ *
+ * Missed fires self-heal: if Vercel's cron misses a minute (deploy,
+ * outage, cold start), due rows stay due and are picked up by the
+ * next run.
  */
 export async function GET(request: NextRequest) {
   const authError = verifyCronSecret(request);
@@ -20,87 +23,43 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createServiceClient();
 
-  const { data: schedules, error: schedErr } = await supabase
+  const nowIso = new Date().toISOString();
+  const { data: due, error: queryErr } = await supabase
     .from("group_recurring_schedules")
     .select("*, group:shootout_groups(id, name)")
     .eq("is_active", true)
-    .not("post_day_of_week", "is", null)
-    .not("post_time", "is", null);
+    .not("next_post_at", "is", null)
+    .lte("next_post_at", nowIso);
 
-  if (schedErr) return NextResponse.json({ error: schedErr.message }, { status: 500 });
-  if (!schedules || schedules.length === 0) return NextResponse.json({ created: 0 });
+  if (queryErr) {
+    return NextResponse.json({ error: queryErr.message }, { status: 500 });
+  }
+  if (!due || due.length === 0) {
+    return NextResponse.json({ created: 0 });
+  }
 
-  const now = new Date();
   let created = 0;
 
-  for (const sched of schedules) {
+  for (const sched of due) {
     const tz = (sched.timezone as string) || "America/New_York";
-
-    // Convert current UTC time to the schedule's local timezone
-    const localParts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      hour: "numeric",
-      minute: "numeric",
-      weekday: "short",
-      hour12: false,
-    }).formatToParts(now);
-
-    // Normalize hour: some Intl implementations return 24 for midnight instead of 0
-    const rawHour = parseInt(localParts.find((p) => p.type === "hour")?.value ?? "0", 10);
-    const localHour = rawHour === 24 ? 0 : rawHour;
-    const localMinute = parseInt(localParts.find((p) => p.type === "minute")?.value ?? "0", 10);
-    const localWeekdayShort = localParts.find((p) => p.type === "weekday")?.value ?? "";
-
-    const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const localDayOfWeek = WEEKDAY_SHORT.findIndex((d) => localWeekdayShort.startsWith(d));
-
-    // Parse the configured post time (stored as "HH:MM:SS")
-    const [postH, postM] = ((sched.post_time as string) ?? "08:00:00").split(":").map(Number);
-
-    // Round localMinute down to the nearest 15-min mark so cron jitter (1-2 min late)
-    // doesn't cause us to miss the window entirely. Post times are restricted to :00/:15/:30/:45.
-    const roundedMinute = Math.floor(localMinute / 15) * 15;
-
-    const hourMatches = localHour === postH;
-    const minuteMatches = roundedMinute === postM;
-    const dayMatches = localDayOfWeek === (sched.post_day_of_week as number);
-
-    console.log(`[cron] schedule ${sched.id}: local=${WEEKDAY_SHORT[localDayOfWeek]} ${localHour}:${String(localMinute).padStart(2,"0")} (rounded min=${roundedMinute}), target=${WEEKDAY_SHORT[sched.post_day_of_week as number]} ${postH}:${String(postM).padStart(2,"0")}, match=${dayMatches && hourMatches && minuteMatches}`);
-
-    if (!dayMatches || !hourMatches || !minuteMatches) continue;
-
-    // Find the next occurrence of the play day_of_week in the local timezone
     const playDow = sched.day_of_week as number;
-    const localDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now); // YYYY-MM-DD
-    const localDate = new Date(localDateStr + "T00:00:00Z"); // midnight UTC = local date
 
-    let daysUntilPlay = (playDow - localDayOfWeek + 7) % 7;
-    if (daysUntilPlay === 0) daysUntilPlay = 7; // always schedule the next upcoming day, not today if posting today
+    // Next occurrence of the play day of week in the schedule's local zone
+    const nowLocalDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
+    const localToday = new Date(nowLocalDateStr + "T00:00:00Z");
+    const localTodayDow = getDowInZone(new Date(), tz);
+    let daysUntilPlay = (playDow - localTodayDow + 7) % 7;
+    if (daysUntilPlay === 0) daysUntilPlay = 7;
 
-    const eventDate = new Date(localDate);
+    const eventDate = new Date(localToday);
     eventDate.setUTCDate(eventDate.getUTCDate() + daysUntilPlay);
     const eventDateStr = eventDate.toISOString().split("T")[0];
 
-    const groupId = sched.group_id as string;
-
-    // Skip if sheet already exists for this group + event date
-    const { data: existing } = await supabase
-      .from("signup_sheets")
-      .select("id")
-      .eq("group_id", groupId)
-      .eq("event_date", eventDateStr)
-      .maybeSingle();
-
-    if (existing) continue;
-
-    // Compute signup_closes_at in UTC
     const eventTimeStr = (sched.event_time as string).slice(0, 5); // "HH:MM"
     const [evH, evM] = eventTimeStr.split(":").map(Number);
     const closeHours = sched.signup_closes_hours_before as number;
 
-    // Build the event datetime in local time, then convert to UTC via Intl trick.
-    // event_time is a timestamptz column — writing a naive local string would be
-    // interpreted as UTC by Postgres and display at the wrong hour on clients.
+    // Event instant in UTC (tz-correct)
     const localEventStr = `${eventDateStr}T${eventTimeStr.padStart(5, "0")}:00`;
     const eventTimeUtc = localToUtc(localEventStr, tz);
     const eventTimeIso = eventTimeUtc.toISOString();
@@ -115,6 +74,8 @@ export async function GET(request: NextRequest) {
       withdrawDt.setUTCHours(withdrawDt.getUTCHours() - sched.withdraw_closes_hours_before);
       withdrawClosesAt = withdrawDt.toISOString();
     }
+
+    const groupId = sched.group_id as string;
 
     const { data: sheet, error: insertErr } = await supabase
       .from("signup_sheets")
@@ -135,11 +96,30 @@ export async function GET(request: NextRequest) {
       .select("id")
       .single();
 
-    if (insertErr || !sheet) continue;
+    // A duplicate-key error means another run already created this sheet;
+    // treat as success and advance the queue so we don't keep retrying.
+    const isDuplicate =
+      insertErr?.code === "23505" ||
+      /duplicate key|signup_sheets_group_event_date_unique/i.test(insertErr?.message ?? "");
 
+    if (insertErr && !isDuplicate) {
+      console.error(`[cron] insert failed for schedule ${sched.id}:`, insertErr.message);
+      continue;
+    }
+
+    // Always advance the queue after a confirmed post (or confirmed duplicate).
+    const { error: bumpErr } = await supabase.rpc("bump_schedule_next_post_at", {
+      p_schedule_id: sched.id,
+    });
+    if (bumpErr) {
+      console.error(`[cron] bump_schedule_next_post_at failed for ${sched.id}:`, bumpErr.message);
+      // Don't continue — still try to notify if we have a sheet id
+    }
+
+    if (!sheet) continue;
     created++;
 
-    // Notify all group members
+    // Notify all group members about the newly posted sheet
     const { data: members } = await supabase
       .from("group_memberships")
       .select("player_id")
@@ -147,8 +127,7 @@ export async function GET(request: NextRequest) {
 
     const memberIds = (members ?? []).map((m) => m.player_id as string);
     if (memberIds.length > 0) {
-      const groupName = (sched.group as any)?.name ?? "your group";
-      // Format local event time for notification copy
+      const groupName = (sched.group as { name?: string } | null)?.name ?? "your group";
       const h = evH === 0 ? 12 : evH > 12 ? evH - 12 : evH;
       const ampm = evH >= 12 ? "pm" : "am";
       const displayTime = `${h}:${String(evM).padStart(2, "0")} ${ampm}`;
@@ -171,7 +150,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ created });
+  return NextResponse.json({ created, candidates: due.length });
+}
+
+/**
+ * Day-of-week (0=Sun..6=Sat) of `d` in the given IANA timezone.
+ */
+function getDowInZone(d: Date, tz: string): number {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(d);
+  const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return SHORT.findIndex((x) => weekday.startsWith(x));
 }
 
 /**
@@ -179,8 +167,6 @@ export async function GET(request: NextRequest) {
  * timezone to a UTC Date object.
  */
 function localToUtc(localStr: string, tz: string): Date {
-  // Format: find the UTC offset at that moment using Intl
-  // We iterate by adjusting until the local representation matches.
   const candidate = new Date(localStr + "Z"); // initial guess treating as UTC
   const offsetMs = getUtcOffsetMs(candidate, tz);
   return new Date(candidate.getTime() - offsetMs);
