@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
+/**
+ * Returns the list of recurring schedules (play times) for the group.
+ * A group may have zero, one, or many.
+ */
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id: groupId } = await params;
 
@@ -18,12 +22,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .from("group_recurring_schedules")
     .select("*")
     .eq("group_id", groupId)
-    .maybeSingle();
+    .order("day_of_week", { ascending: true })
+    .order("event_time", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ schedule: data });
+  return NextResponse.json({ schedules: data ?? [] });
 }
 
+/** Create a new play time for the group. */
 export async function POST(req: NextRequest, { params }: Params) {
   const { id: groupId } = await params;
 
@@ -36,29 +42,42 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const body = await req.json();
-  const { error } = await auth.supabase.from("group_recurring_schedules").insert({
-    group_id: groupId,
-    created_by: auth.profile.id,
-    day_of_week: body.day_of_week,
-    event_time: body.event_time,
-    timezone: body.timezone ?? "America/New_York",
-    location: body.location,
-    player_limit: body.player_limit ?? 16,
-    signup_closes_hours_before: body.signup_closes_hours_before ?? 2,
-    withdraw_closes_hours_before: body.withdraw_closes_hours_before ?? null,
-    allow_member_guests: body.allow_member_guests ?? false,
-    notes: body.notes ?? null,
-    is_active: body.is_active ?? true,
-    post_day_of_week: body.post_day_of_week ?? null,
-    post_time: body.post_time ?? null,
-  });
+  const { data, error } = await auth.supabase
+    .from("group_recurring_schedules")
+    .insert({
+      group_id: groupId,
+      created_by: auth.profile.id,
+      label: body.label ?? null,
+      day_of_week: body.day_of_week,
+      event_time: body.event_time,
+      timezone: body.timezone ?? "America/New_York",
+      location: body.location,
+      player_limit: body.player_limit ?? 16,
+      signup_closes_hours_before: body.signup_closes_hours_before ?? 2,
+      withdraw_closes_hours_before: body.withdraw_closes_hours_before ?? null,
+      allow_member_guests: body.allow_member_guests ?? false,
+      notes: body.notes ?? null,
+      is_active: body.is_active ?? true,
+      post_day_of_week: body.post_day_of_week ?? null,
+      post_time: body.post_time ?? null,
+    })
+    .select("*")
+    .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ message: "Play time created" }, { status: 201 });
+  return NextResponse.json({ schedule: data }, { status: 201 });
 }
 
+/**
+ * Update a single play time. Requires ?scheduleId=<uuid> so the caller
+ * identifies which row to change.
+ */
 export async function PUT(req: NextRequest, { params }: Params) {
   const { id: groupId } = await params;
+  const scheduleId = new URL(req.url).searchParams.get("scheduleId");
+  if (!scheduleId) {
+    return NextResponse.json({ error: "scheduleId query param is required" }, { status: 400 });
+  }
 
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -71,6 +90,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const body = await req.json();
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
+  if (body.label !== undefined) updates.label = body.label;
   if (body.day_of_week !== undefined) updates.day_of_week = body.day_of_week;
   if (body.event_time !== undefined) updates.event_time = body.event_time;
   if (body.timezone !== undefined) updates.timezone = body.timezone;
@@ -81,21 +101,29 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.allow_member_guests !== undefined) updates.allow_member_guests = body.allow_member_guests;
   if (body.notes !== undefined) updates.notes = body.notes;
   if (body.is_active !== undefined) updates.is_active = body.is_active;
-  // Explicitly set to null when auto-post is disabled
-  updates.post_day_of_week = body.post_day_of_week ?? null;
-  updates.post_time = body.post_time ?? null;
+  // Explicit null resets auto-post for this play time
+  if (body.post_day_of_week !== undefined) updates.post_day_of_week = body.post_day_of_week ?? null;
+  if (body.post_time !== undefined) updates.post_time = body.post_time ?? null;
 
-  const { error } = await auth.supabase
+  const { data, error } = await auth.supabase
     .from("group_recurring_schedules")
     .update(updates)
-    .eq("group_id", groupId);
+    .eq("id", scheduleId)
+    .eq("group_id", groupId)
+    .select("*")
+    .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ message: "Play time updated" });
+  return NextResponse.json({ schedule: data });
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+/** Delete a single play time. Requires ?scheduleId=<uuid>. */
+export async function DELETE(req: NextRequest, { params }: Params) {
   const { id: groupId } = await params;
+  const scheduleId = new URL(req.url).searchParams.get("scheduleId");
+  if (!scheduleId) {
+    return NextResponse.json({ error: "scheduleId query param is required" }, { status: 400 });
+  }
 
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -108,8 +136,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { error } = await auth.supabase
     .from("group_recurring_schedules")
     .delete()
+    .eq("id", scheduleId)
     .eq("group_id", groupId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ message: "Play time deleted" });
+  return NextResponse.json({ success: true });
 }

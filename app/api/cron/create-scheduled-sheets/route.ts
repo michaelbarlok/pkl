@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { createServiceClient } from "@/lib/supabase/server";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { notifyMany } from "@/lib/notify";
+import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -56,7 +57,6 @@ export async function GET(request: NextRequest) {
     const eventDateStr = eventDate.toISOString().split("T")[0];
 
     const eventTimeStr = (sched.event_time as string).slice(0, 5); // "HH:MM"
-    const [evH, evM] = eventTimeStr.split(":").map(Number);
     const closeHours = sched.signup_closes_hours_before as number;
 
     // Event instant in UTC (tz-correct)
@@ -129,20 +129,22 @@ export async function GET(request: NextRequest) {
     const memberIds = (members ?? []).map((m) => m.player_id as string);
     if (memberIds.length > 0) {
       const groupName = (sched.group as { name?: string } | null)?.name ?? "your group";
-      const h = evH === 0 ? 12 : evH > 12 ? evH - 12 : evH;
-      const ampm = evH >= 12 ? "pm" : "am";
-      const displayTime = `${h}:${String(evM).padStart(2, "0")} ${ampm}`;
+      const displayDate = formatDateInZone(eventTimeIso, tz);
+      const displayTime = formatTimeInZone(eventTimeIso, tz);
 
       await notifyMany(memberIds, {
         type: "new_sheet",
         title: `Sign-up open — ${groupName}`,
-        body: `A new sign-up sheet is open for ${groupName} on ${eventDateStr} at ${displayTime}.`,
+        body: `A new sign-up sheet is open for ${groupName} on ${displayDate} at ${displayTime}.`,
         link: `/sheets/${sheet.id}`,
         groupId,
         emailTemplate: "NewSheet",
         emailData: {
           groupName,
-          eventDate: eventDateStr,
+          // Pass the full UTC timestamp so the email renders the correct
+          // calendar day in the group's zone (a bare YYYY-MM-DD would
+          // off-by-one west of UTC without formatDateInZone's guard).
+          eventDate: eventTimeIso,
           eventTime: eventTimeIso,
           timezone: tz,
           location: sched.location,

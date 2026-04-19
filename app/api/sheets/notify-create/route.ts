@@ -1,7 +1,7 @@
 import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { notifyMany } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth();
@@ -41,10 +41,9 @@ export async function POST(request: NextRequest) {
 
   if (playerIds.length > 0) {
     const groupName = sheet.group?.name ?? "Event";
-    const eventDate = formatDate(sheet.event_date);
-    const eventTime = sheet.event_time
-      ? formatTime(sheet.event_time)
-      : null;
+    const tz = (sheet.timezone as string | undefined) ?? "America/New_York";
+    const eventDate = sheet.event_time ? formatDateInZone(sheet.event_time, tz) : "";
+    const eventTime = sheet.event_time ? formatTimeInZone(sheet.event_time, tz) : null;
 
     await notifyMany(playerIds, {
       type: "new_sheet",
@@ -55,8 +54,9 @@ export async function POST(request: NextRequest) {
       emailTemplate: "NewSheet",
       emailData: {
         groupName,
-        eventDate: sheet.event_date,
+        eventDate: sheet.event_time,
         eventTime: sheet.event_time,
+        timezone: tz,
         location: sheet.location,
         sheetId,
       },
