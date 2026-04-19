@@ -74,10 +74,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               role="alert"
               onClick={() => dismiss(t.id)}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ring-1 cursor-pointer animate-slide-up",
-                t.type === "success" && "bg-teal-900/90 text-teal-200 ring-teal-500/30",
-                t.type === "error" && "bg-red-900/90 text-red-200 ring-red-500/30",
-                t.type === "info" && "bg-surface-raised text-dark-100 ring-surface-border"
+                "flex items-center gap-2.5 px-4 py-3 text-sm font-medium shadow-lg cursor-pointer animate-slide-up",
+                t.type === "success" && "alert-success",
+                t.type === "error" && "alert-danger",
+                t.type === "info" && "rounded-lg bg-surface-raised text-dark-100 ring-1 ring-surface-border"
               )}
             >
               <ToastIcon type={t.type} />

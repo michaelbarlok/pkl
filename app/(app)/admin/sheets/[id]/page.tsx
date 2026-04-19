@@ -474,19 +474,19 @@ export default function AdminSheetDetailPage() {
       </div>
 
       {sheet.status === "cancelled" && (
-        <div className="rounded-md bg-red-900/30 p-4 text-red-300 font-medium">
+        <div className="alert-danger p-4 font-medium">
           This event has been cancelled.
         </div>
       )}
 
       {error && (
-        <div className="rounded-md bg-red-900/30 p-3 text-sm text-red-400">
+        <div className="alert-danger p-3 text-sm">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="rounded-md bg-teal-900/30 p-3 text-sm text-teal-300">
+        <div className="alert-success p-3 text-sm">
           {success}
         </div>
       )}

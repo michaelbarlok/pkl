@@ -113,7 +113,7 @@ export function AdminAddMember({
         </div>
       )}
       {success && (
-        <div className="mb-3 rounded-md bg-teal-900/30 p-2 text-sm text-teal-300">
+        <div className="mb-3 alert-success p-2 text-sm">
           {success}
         </div>
       )}

@@ -645,7 +645,7 @@ export default function CheckInPage() {
       )}
 
       {seedError && (
-        <div className="rounded-md bg-red-900/30 border border-red-500/30 p-4 text-red-300 text-sm">
+        <div className="alert-danger p-4 text-sm">
           <strong>Seeding error:</strong> {seedError}
         </div>
       )}

@@ -107,7 +107,7 @@ export function SuggestFeatureButton({
 
             {success ? (
               <div className="space-y-4">
-                <div className="rounded-lg border border-teal-500/30 bg-teal-900/20 px-4 py-3 text-sm text-teal-300">
+                <div className="alert-success px-4 py-3 text-sm">
                   Thanks! Your suggestion has been sent. We appreciate the feedback.
                 </div>
                 <button onClick={closeModal} className="btn-primary w-full">

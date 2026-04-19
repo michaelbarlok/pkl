@@ -77,7 +77,7 @@ export function CreateGroupForm({
       className="card space-y-4"
     >
       {error && (
-        <div className="rounded-md bg-red-900/30 border border-red-700/50 px-4 py-3 text-sm text-red-300">
+        <div className="alert-danger px-4 py-3 text-sm">
           {error}
         </div>
       )}

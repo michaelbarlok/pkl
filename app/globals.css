@@ -25,6 +25,21 @@
   --color-teal-vivid:  #5dead8;  /* teal-300 */
   --color-brand-vivid: #2dd4c5;  /* brand-400 */
   --color-red-vivid:   #f87171;  /* red-400 */
+
+  /* Alert/toast backgrounds + text. Tuned for dark surfaces by default.
+     The .light block below flips these to legible light-mode variants. */
+  --alert-danger-bg:    rgb(127 29 29 / 0.30);
+  --alert-danger-text:  #fecaca; /* red-200 */
+  --alert-danger-ring:  rgb(239 68 68 / 0.30);
+  --alert-warning-bg:   rgb(120 53 15 / 0.30);
+  --alert-warning-text: #fde68a; /* amber-200 */
+  --alert-warning-ring: rgb(245 158 11 / 0.30);
+  --alert-success-bg:   rgb(15 118 110 / 0.25);
+  --alert-success-text: #99f6f1; /* teal-200 */
+  --alert-success-ring: rgb(20 184 166 / 0.30);
+  --alert-info-bg:      rgb(15 118 110 / 0.25);
+  --alert-info-text:    #5dead8; /* teal-300 */
+  --alert-info-ring:    rgb(14 165 160 / 0.30);
 }
 
 /* Light theme — toggled by adding `.light` to <html> */
@@ -44,11 +59,26 @@
   --color-surface-raised:  #eceef5;
   --color-surface-overlay: #f5f6fa;
   --color-surface-border:  #b8bdc9;
-  --color-surface-muted:   #8992a3;
+  --color-surface-muted:   #64707e; /* darker than dark-mode so it stays legible on light surfaces */
   /* Adaptive accent text — dark values for light surfaces */
   --color-teal-vivid:  #0f766e;  /* teal-700 */
   --color-brand-vivid: #0d9490;  /* brand-600 */
   --color-red-vivid:   #dc2626;  /* red-600 */
+
+  /* Light-mode alert tokens: pastel bg + saturated dark text so everything
+     stays above WCAG AA on a light card. */
+  --alert-danger-bg:    #fee2e2; /* red-100 */
+  --alert-danger-text:  #991b1b; /* red-800 */
+  --alert-danger-ring:  #fca5a5; /* red-300 */
+  --alert-warning-bg:   #fef3c7; /* amber-100 */
+  --alert-warning-text: #92400e; /* amber-800 */
+  --alert-warning-ring: #fcd34d; /* amber-300 */
+  --alert-success-bg:   #ccfbf8; /* teal-100 */
+  --alert-success-text: #115e59; /* teal-800 */
+  --alert-success-ring: #5dead8; /* teal-300 */
+  --alert-info-bg:      #ccfbf8; /* teal-100 */
+  --alert-info-text:    #0f766e; /* teal-700 */
+  --alert-info-ring:    #5dead8; /* teal-300 */
 }
 
 @layer base {
@@ -135,29 +165,68 @@
   .card-accent-brand  { @apply border-l-[3px] border-l-brand-400/70; }
   .card-accent-gray   { @apply border-l-[3px] border-l-surface-border; }
 
+  /* ── Alerts / inline status banners ─────────────────────────────────
+     Backgrounds + text are driven by CSS variables that flip in light
+     mode, so these stay legible in both themes. Prefer these utility
+     classes over bespoke bg-red-900 / text-red-200 combos. */
+  .alert-danger {
+    background-color: var(--alert-danger-bg);
+    color: var(--alert-danger-text);
+    box-shadow: inset 0 0 0 1px var(--alert-danger-ring);
+    @apply rounded-lg;
+  }
+  .alert-warning {
+    background-color: var(--alert-warning-bg);
+    color: var(--alert-warning-text);
+    box-shadow: inset 0 0 0 1px var(--alert-warning-ring);
+    @apply rounded-lg;
+  }
+  .alert-success {
+    background-color: var(--alert-success-bg);
+    color: var(--alert-success-text);
+    box-shadow: inset 0 0 0 1px var(--alert-success-ring);
+    @apply rounded-lg;
+  }
+  .alert-info {
+    background-color: var(--alert-info-bg);
+    color: var(--alert-info-text);
+    box-shadow: inset 0 0 0 1px var(--alert-info-ring);
+    @apply rounded-lg;
+  }
+
   /* ── Badges ── */
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold;
   }
 
+  /* Badge color tokens flip with the theme so they stay readable on
+     both dark and light surfaces. */
   .badge-green {
-    @apply badge bg-teal-900/80 text-teal-200;
+    @apply badge;
+    background-color: var(--alert-success-bg);
+    color: var(--alert-success-text);
   }
 
   .badge-yellow {
-    @apply badge bg-accent-900/80 text-accent-200;
+    @apply badge;
+    background-color: var(--alert-warning-bg);
+    color: var(--alert-warning-text);
   }
 
   .badge-red {
-    @apply badge bg-red-900/80 text-red-200;
+    @apply badge;
+    background-color: var(--alert-danger-bg);
+    color: var(--alert-danger-text);
   }
 
   .badge-blue {
-    @apply badge bg-brand-900/80 text-brand-200;
+    @apply badge;
+    background-color: var(--alert-info-bg);
+    color: var(--alert-info-text);
   }
 
   .badge-gray {
-    @apply badge bg-dark-600 text-dark-200;
+    @apply badge bg-dark-600 text-dark-100;
   }
 
   /* ── Tables on dark ── */
