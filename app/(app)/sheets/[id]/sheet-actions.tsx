@@ -1,6 +1,8 @@
 "use client";
 
 import { FormError } from "@/components/form-error";
+import { useSupabase } from "@/components/providers/supabase-provider";
+import { useToast } from "@/components/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { RegistrationStatus } from "@/types/database";
@@ -60,13 +62,15 @@ function sleep(ms: number): Promise<void> {
  */
 export function SheetActions({
   sheetId,
-  profileId: _profileId,
+  profileId,
   myRegistration,
   signupClosed,
   withdrawClosed,
   isFull,
 }: SheetActionsProps) {
   const router = useRouter();
+  const { supabase } = useSupabase();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
@@ -74,6 +78,82 @@ export function SheetActions({
   const abortRef = useRef<AbortController | null>(null);
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef(false);
+
+  // Local copy of the viewer's registration so realtime bumps / promotions
+  // / admin removals flip the UI immediately instead of waiting for a
+  // manual page refresh. Seeded from the server and re-synced any time
+  // the server-rendered prop changes (e.g. after router.refresh()).
+  const [liveReg, setLiveReg] = useState(myRegistration);
+  useEffect(() => {
+    setLiveReg(myRegistration);
+  }, [myRegistration]);
+
+  // Realtime subscription to the viewer's own row(s) on this sheet so we
+  // don't miss:
+  //   - a priority bump (confirmed → waitlist) from someone else signing
+  //     up as high priority,
+  //   - a waitlist promotion (waitlist → confirmed) after someone
+  //     withdraws,
+  //   - an admin removing them (→ withdrawn),
+  //   - an admin adding them when they weren't registered yet (INSERT).
+  //
+  // Like LiveRosterCount, this uses the separate Realtime WebSocket
+  // pool — it does NOT share connections with the signup RPC path and
+  // makes zero extra HTTP calls per event.
+  useEffect(() => {
+    if (!profileId) return;
+    const channel = supabase
+      .channel(`my-registration-${sheetId}-${profileId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "registrations",
+          filter: `sheet_id=eq.${sheetId}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as
+            | { id?: string; player_id?: string; status?: RegistrationStatus }
+            | undefined;
+          if (!row || row.player_id !== profileId) return;
+
+          const newStatus = (payload.new as { status?: RegistrationStatus } | undefined)?.status;
+          const oldStatus = (payload.old as { status?: RegistrationStatus } | undefined)?.status;
+
+          // Notify only on the transitions users care about. Skip toasts
+          // fired by the viewer's own signup / withdraw (those already
+          // have their own UI feedback + router.refresh()).
+          if (oldStatus === "confirmed" && newStatus === "waitlist") {
+            toast("You've been moved to the waitlist.", "info");
+          } else if (oldStatus === "waitlist" && newStatus === "confirmed") {
+            toast("You've been promoted — you're confirmed!", "success");
+          } else if (
+            (oldStatus === "confirmed" || oldStatus === "waitlist") &&
+            newStatus === "withdrawn"
+          ) {
+            toast("You've been removed from this event.", "info");
+          }
+
+          if (payload.eventType === "DELETE") {
+            setLiveReg(null);
+          } else if (
+            newStatus === "confirmed" ||
+            newStatus === "waitlist"
+          ) {
+            setLiveReg({ id: row.id!, status: newStatus });
+          } else {
+            // withdrawn or anything unexpected — treat as not registered
+            setLiveReg(null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sheetId, profileId, supabase, toast]);
 
   useEffect(() => {
     return () => {
@@ -176,8 +256,8 @@ export function SheetActions({
   }
 
   const isRegistered =
-    myRegistration &&
-    (myRegistration.status === "confirmed" || myRegistration.status === "waitlist");
+    liveReg &&
+    (liveReg.status === "confirmed" || liveReg.status === "waitlist");
 
   const pulse = !isRegistered && !signupClosed && !loading;
 
@@ -214,7 +294,7 @@ export function SheetActions({
               </p>
               <p className="mt-0.5 text-lg font-semibold text-dark-100">
                 You&apos;re{" "}
-                {myRegistration.status === "confirmed" ? (
+                {liveReg?.status === "confirmed" ? (
                   <span className="text-teal-300">confirmed</span>
                 ) : (
                   <span className="text-accent-300">on the waitlist</span>
