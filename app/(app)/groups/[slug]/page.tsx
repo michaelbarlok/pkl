@@ -15,7 +15,7 @@ import type { GroupWithPreferences } from "@/lib/queries/group";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function PlayTimeDisplay({ playTime }: {
-  playTime: { day_of_week: number; event_time: string; timezone: string; location: string; player_limit: number };
+  playTime: { label?: string | null; day_of_week: number; event_time: string; timezone: string; location: string; player_limit: number };
 }) {
   const [hStr, mStr] = playTime.event_time.slice(0, 5).split(":");
   const h = parseInt(hStr, 10);
@@ -146,14 +146,15 @@ export default async function GroupPage({
     ? `mailto:${adminEmails.join(",")}?subject=${encodeURIComponent(`Question about ${group.name}`)}`
     : null;
 
-  // Fetch play time schedule for display
-  const { data: playTimeData } = await supabase
+  // Fetch active play times for display (a group may have several)
+  const { data: playTimesData } = await supabase
     .from("group_recurring_schedules")
-    .select("day_of_week, event_time, timezone, location, player_limit, is_active")
+    .select("id, label, day_of_week, event_time, timezone, location, player_limit, is_active")
     .eq("group_id", group.id)
     .eq("is_active", true)
-    .maybeSingle();
-  const playTime = playTimeData ?? null;
+    .order("day_of_week", { ascending: true })
+    .order("event_time", { ascending: true });
+  const playTimes = playTimesData ?? [];
 
   const recentMatches = isFreePlay ? await getRecentMatches(group.id, 10) : [];
   const playerStats = isFreePlay ? await getPlayerStats(group.id) : [];
@@ -209,9 +210,11 @@ export default async function GroupPage({
           )}
 
           {/* Play Time */}
-          {playTime && (
+          {playTimes.length > 0 && (
             <div className="mt-2 space-y-1">
-              <PlayTimeDisplay playTime={playTime} />
+              {playTimes.map((pt) => (
+                <PlayTimeDisplay key={pt.id} playTime={pt} />
+              ))}
             </div>
           )}
         </div>

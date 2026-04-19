@@ -5,7 +5,21 @@ import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { ShootoutGroup } from "@/types/database";
+import type { ShootoutGroup, GroupRecurringSchedule } from "@/types/database";
+
+const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function nextDateForDow(dayOfWeek: number): string {
+  const today = new Date();
+  const todayDow = today.getDay();
+  const delta = (dayOfWeek - todayDow + 7) % 7;
+  const target = new Date(today);
+  target.setDate(today.getDate() + delta);
+  const y = target.getFullYear();
+  const m = String(target.getMonth() + 1).padStart(2, "0");
+  const d = String(target.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 export default function NewSheetFromSheetsPage() {
   const { supabase } = useSupabase();
@@ -30,6 +44,9 @@ export default function NewSheetFromSheetsPage() {
   const [notes, setNotes] = useState("");
   // Group timezone (from recurring schedule, falls back to ET)
   const [groupTimezone, setGroupTimezone] = useState("America/New_York");
+  // Play times for the selected group
+  const [groupSchedules, setGroupSchedules] = useState<GroupRecurringSchedule[]>([]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState("");
 
   // Generate 15-min time options
   const timeOptions: string[] = [];
@@ -76,6 +93,52 @@ export default function NewSheetFromSheetsPage() {
     const get = (parts: Intl.DateTimeFormatPart[], type: string) => parseInt(parts.find(p => p.type === type)?.value ?? "0", 10);
     const toMs = (parts: Intl.DateTimeFormatPart[]) => Date.UTC(get(parts,"year"), get(parts,"month")-1, get(parts,"day"), get(parts,"hour"), get(parts,"minute"), get(parts,"second"));
     return new Date(candidate.getTime() - (toMs(tzParts) - toMs(utcParts)));
+  }
+
+  // Fetch play times whenever the selected group changes.
+  useEffect(() => {
+    if (!groupId) {
+      setGroupSchedules([]);
+      setSelectedScheduleId("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/groups/${groupId}/schedule`, { cache: "no-store" });
+        const json = await res.json();
+        if (cancelled) return;
+        const list = (json.schedules as GroupRecurringSchedule[]) ?? [];
+        setGroupSchedules(list);
+        setSelectedScheduleId("");
+        // Default the timezone from the first play time so sign-up/withdraw
+        // cutoff math uses the group's zone even before picking a play time.
+        if (list[0]?.timezone) setGroupTimezone(list[0].timezone);
+      } catch {
+        if (!cancelled) setGroupSchedules([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId]);
+
+  function applyPlayTime(scheduleId: string) {
+    setSelectedScheduleId(scheduleId);
+    if (!scheduleId) return;
+    const sched = groupSchedules.find((s) => s.id === scheduleId);
+    if (!sched) return;
+    setEventDate(nextDateForDow(sched.day_of_week));
+    setEventTime(sched.event_time.slice(0, 5));
+    setLocation(sched.location);
+    setPlayerLimit(sched.player_limit);
+    setSignupCloseHours(String(sched.signup_closes_hours_before));
+    setWithdrawCloseHours(
+      sched.withdraw_closes_hours_before != null ? String(sched.withdraw_closes_hours_before) : ""
+    );
+    setAllowMemberGuests(sched.allow_member_guests);
+    setNotes(sched.notes ?? "");
+    if (sched.timezone) setGroupTimezone(sched.timezone);
   }
 
   useEffect(() => {
@@ -134,13 +197,6 @@ export default function NewSheetFromSheetsPage() {
       setAdminGroups(groups);
       if (groups.length > 0) {
         setGroupId(groups[0].id);
-        // Load timezone for the first group
-        const { data: sched } = await supabase
-          .from("group_recurring_schedules")
-          .select("timezone")
-          .eq("group_id", groups[0].id)
-          .maybeSingle();
-        if (sched?.timezone) setGroupTimezone(sched.timezone);
       }
 
       // Load saved locations
@@ -333,15 +389,7 @@ export default function NewSheetFromSheetsPage() {
             <select
               id="group"
               value={groupId}
-              onChange={async (e) => {
-                setGroupId(e.target.value);
-                const { data: sched } = await supabase
-                  .from("group_recurring_schedules")
-                  .select("timezone")
-                  .eq("group_id", e.target.value)
-                  .maybeSingle();
-                setGroupTimezone(sched?.timezone ?? "America/New_York");
-              }}
+              onChange={(e) => setGroupId(e.target.value)}
               className="input w-full"
               required
             >
@@ -353,6 +401,35 @@ export default function NewSheetFromSheetsPage() {
             </select>
           )}
         </div>
+
+        {groupSchedules.length > 0 && (
+          <div>
+            <label htmlFor="playTime" className="block text-sm font-medium text-dark-200 mb-1">
+              Use a play time (optional)
+            </label>
+            <select
+              id="playTime"
+              value={selectedScheduleId}
+              onChange={(e) => applyPlayTime(e.target.value)}
+              className="input w-full"
+            >
+              <option value="">Enter details manually</option>
+              {groupSchedules.map((s) => {
+                const label =
+                  (s as unknown as { label?: string | null }).label?.trim() ||
+                  `${DAY_NAMES_FULL[s.day_of_week]}s ${formatTime12h(s.event_time.slice(0, 5))}`;
+                return (
+                  <option key={s.id} value={s.id}>
+                    {label} — {s.location}
+                  </option>
+                );
+              })}
+            </select>
+            <p className="mt-1 text-xs text-surface-muted">
+              Pre-fills date (next occurrence), time, location, and limits from the selected play time.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>

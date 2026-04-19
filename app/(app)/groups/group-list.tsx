@@ -13,8 +13,14 @@ function fmt12h(time: string) {
   return `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${mStr} ${h >= 12 ? "pm" : "am"}`;
 }
 
-function formatPlayTime(pt: GroupCardData["playTime"]): string {
-  if (!pt) return "";
+type PlayTime = {
+  day_of_week: number;
+  event_time: string;
+  timezone: string;
+  location: string;
+};
+
+function formatPlayTime(pt: PlayTime): string {
   const localTime = fmt12h(pt.event_time.slice(0, 5));
   const tzAbbr =
     new Intl.DateTimeFormat("en-US", { timeZone: pt.timezone, timeZoneName: "short" })
@@ -34,12 +40,7 @@ export interface GroupCardData {
   state: string | null;
   memberCount: number;
   isJoined: boolean;
-  playTime: {
-    day_of_week: number;
-    event_time: string;
-    timezone: string;
-    location: string;
-  } | null;
+  playTimes: PlayTime[];
 }
 
 type Tab = "mine" | "search";
@@ -210,7 +211,9 @@ function GroupCard({
   onJoin: (groupId: string, groupType: string) => Promise<void>;
 }) {
   const cityState = [group.city, group.state].filter(Boolean).join(", ");
-  const playTimeStr = group.playTime ? formatPlayTime(group.playTime) : null;
+  const firstPlayTime = group.playTimes[0] ?? null;
+  const playTimeStr = firstPlayTime ? formatPlayTime(firstPlayTime) : null;
+  const extraPlayTimes = group.playTimes.length > 1 ? group.playTimes.length - 1 : 0;
 
   return (
     <div
@@ -241,15 +244,16 @@ function GroupCard({
           {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
         </p>
 
-        {/* Play time (one line) */}
-        {playTimeStr && (
+        {/* Play time (first one shown inline; "+N more" summarizes others) */}
+        {playTimeStr && firstPlayTime && (
           <p className="mt-1 text-xs text-brand-vivid font-medium flex items-center gap-1 min-w-0">
             <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
             </svg>
             <span className="truncate">
               {playTimeStr}
-              {group.playTime?.location ? ` · ${group.playTime.location}` : ""}
+              {firstPlayTime.location ? ` · ${firstPlayTime.location}` : ""}
+              {extraPlayTimes > 0 && <span className="text-surface-muted"> · +{extraPlayTimes} more</span>}
             </span>
           </p>
         )}

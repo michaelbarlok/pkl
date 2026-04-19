@@ -38,7 +38,19 @@ export default async function GroupsPage() {
   }
 
   const groupCards: GroupCardData[] = (groups ?? []).map((group) => {
-    const sched = (group.group_recurring_schedules as any)?.[0] ?? null;
+    const active = ((group.group_recurring_schedules as unknown as Array<{
+      day_of_week: number;
+      event_time: string;
+      timezone: string | null;
+      location: string;
+      is_active: boolean;
+    }>) ?? [])
+      .filter((s) => s.is_active)
+      .sort((a, b) =>
+        a.day_of_week === b.day_of_week
+          ? a.event_time.localeCompare(b.event_time)
+          : a.day_of_week - b.day_of_week
+      );
     return {
       id: group.id,
       name: group.name,
@@ -51,12 +63,12 @@ export default async function GroupsPage() {
       memberCount:
         (group.group_memberships as unknown as { count: number }[])?.[0]?.count ?? 0,
       isJoined: joinedGroupIds.has(group.id),
-      playTime: sched && sched.is_active ? {
-        day_of_week: sched.day_of_week,
-        event_time: sched.event_time,
-        timezone: sched.timezone ?? "America/New_York",
-        location: sched.location,
-      } : null,
+      playTimes: active.map((s) => ({
+        day_of_week: s.day_of_week,
+        event_time: s.event_time,
+        timezone: s.timezone ?? "America/New_York",
+        location: s.location,
+      })),
     };
   });
 
