@@ -57,7 +57,7 @@ export function GroupTabs({
       <div
         role="tablist"
         aria-label="Group sections"
-        className="sticky top-0 z-20 -mx-4 sm:mx-0 bg-dark-950/90 backdrop-blur supports-[backdrop-filter]:bg-dark-950/70 border-b border-surface-border"
+        className="sticky top-0 z-20 -mx-4 sm:mx-0 bg-dark-950 border-b border-surface-border"
       >
         <div className="flex gap-1 overflow-x-auto px-4 sm:px-0 py-1 scroll-smooth">
           {tabs.map((tab) => {
