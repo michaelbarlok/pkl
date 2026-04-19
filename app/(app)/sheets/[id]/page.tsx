@@ -18,6 +18,7 @@ import { Breadcrumb } from "@/components/breadcrumb";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { computeCourtPreview, CourtPreviewSection } from "./court-preview";
+import { LiveRosterCount } from "./live-roster-count";
 
 export const dynamic = "force-dynamic";
 
@@ -284,11 +285,11 @@ export default async function SheetDetailPage({
             <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-3 text-sm">
               <HeroField label="Time" value={eventTimeLine} />
               <HeroField label="Location" value={sheet.location} />
-              <HeroField
-                label="Players"
-                value={`${confirmed.length}/${sheet.player_limit}${
-                  waitlisted.length > 0 ? ` (+${waitlisted.length} wait)` : ""
-                }`}
+              <LiveRosterCount
+                sheetId={sheet.id}
+                initialConfirmed={confirmed.length}
+                initialWaitlist={waitlisted.length}
+                playerLimit={sheet.player_limit}
               />
             </dl>
             {countdownText && (
