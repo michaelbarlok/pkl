@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // individual pages handle the no-user case (e.g. landing page at /).
   if (!user) {
     return (
-      <div className="min-h-screen bg-dark-950 flex flex-col">
+      <div className="min-h-dvh bg-dark-950 flex flex-col">
         <LandingNav />
         <main className="flex-1 mx-auto w-full max-w-7xl px-3 pt-20 pb-8 sm:px-6 lg:px-8">
           {children}
@@ -73,7 +73,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-dark-950">
+      <div className="min-h-dvh bg-dark-950">
         <MissingProfile />
       </div>
     );
@@ -92,7 +92,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-dark-950">
+    <div className="flex min-h-dvh bg-dark-950">
       <Sidebar profile={profile} isGroupAdmin={isGroupAdmin} />
       <div className="flex flex-1 flex-col min-w-0">
         {/* Mobile header — logo + notification bell, desktop hidden */}

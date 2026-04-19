@@ -112,6 +112,16 @@
 }
 
 @layer base {
+  /* overscroll-behavior: none keeps Android Chrome's URL/toolbar
+     auto-hide from kicking in on every scroll gesture. Without this,
+     the toolbar shrinks/grows the viewport mid-scroll and the fixed
+     bottom nav appears to "follow" the movement. Users still get
+     normal scroll, they just don't lose/gain viewport height every
+     time they flick. */
+  html, body {
+    overscroll-behavior: none;
+  }
+
   body {
     @apply bg-dark-950 text-dark-100 antialiased;
   }
