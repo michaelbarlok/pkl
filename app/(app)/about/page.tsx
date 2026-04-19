@@ -13,9 +13,10 @@ export default function AboutPage() {
         <p className="text-eyebrow">About</p>
         <h1 className="text-heading">Built by pickleball players, for pickleball players.</h1>
         <p className="text-dark-200">
-          Tri-Star Pickleball grew out of the Athens, Georgia pickleball community — where
-          scheduling a shootout meant wrangling a group chat, tracking scores on paper, and
-          arguing over rankings at the end of the night.
+          Tri-Star Pickleball is a Tennessee-based platform that grew out of the Athens,
+          Tennessee pickleball community — where scheduling a shootout meant wrangling a
+          group chat, tracking scores on paper, and arguing over rankings at the end of
+          the night.
         </p>
       </header>
 
