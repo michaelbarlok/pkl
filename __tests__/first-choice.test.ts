@@ -10,7 +10,7 @@
  *      be massively favored.
  */
 
-import { matchFirstChoice } from "@/lib/first-choice";
+import { matchFirstChoice, freePlayMatchFirstChoice } from "@/lib/first-choice";
 
 const SESSION_A = "4f9d7c12-7e03-4d0e-b4a1-20a5f1c3a111";
 const SESSION_B = "9a8c6d45-1b72-4f19-bc33-77c9e2d41842";
@@ -68,6 +68,61 @@ describe("matchFirstChoice", () => {
       for (let court = 1; court <= 4; court++) {
         for (let game = 1; game <= 5; game++) {
           if (matchFirstChoice(sid, court, game) === "team1") team1++;
+          total++;
+        }
+      }
+    }
+    const ratio = team1 / total;
+    expect(ratio).toBeGreaterThan(0.35);
+    expect(ratio).toBeLessThan(0.65);
+  });
+});
+
+describe("freePlayMatchFirstChoice", () => {
+  test("is deterministic per (session, round, matchIndex)", () => {
+    const first = freePlayMatchFirstChoice(SESSION_A, 3, 2);
+    for (let i = 0; i < 50; i++) {
+      expect(freePlayMatchFirstChoice(SESSION_A, 3, 2)).toBe(first);
+    }
+  });
+
+  test("only ever returns 'team1' or 'team2'", () => {
+    for (let round = 1; round <= 8; round++) {
+      for (let idx = 0; idx < 5; idx++) {
+        expect(["team1", "team2"]).toContain(
+          freePlayMatchFirstChoice(SESSION_A, round, idx)
+        );
+      }
+    }
+  });
+
+  test("is namespaced separately from shootout (same numeric inputs can differ)", () => {
+    // The shootout and free-play hashes use different key prefixes, so the
+    // same (session, a, b) inputs should NOT be forced to produce identical
+    // labels. Across a moderate sample at least one pair must differ.
+    let differed = false;
+    for (let a = 1; a <= 5 && !differed; a++) {
+      for (let b = 1; b <= 5 && !differed; b++) {
+        if (
+          matchFirstChoice(SESSION_A, a, b) !==
+          freePlayMatchFirstChoice(SESSION_A, a, b)
+        ) {
+          differed = true;
+        }
+      }
+    }
+    expect(differed).toBe(true);
+  });
+
+  test("distribution is roughly 50/50 across a realistic free-play session", () => {
+    // 10 sessions × 8 rounds × 3 matches = 240 match slots.
+    let team1 = 0;
+    let total = 0;
+    for (let s = 0; s < 10; s++) {
+      const sid = `11111111-1111-4111-8111-1111111111${String(s).padStart(2, "0")}`;
+      for (let round = 1; round <= 8; round++) {
+        for (let idx = 0; idx < 3; idx++) {
+          if (freePlayMatchFirstChoice(sid, round, idx) === "team1") team1++;
           total++;
         }
       }

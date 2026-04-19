@@ -1,7 +1,8 @@
 /**
- * Small pill shown beside the team that holds "first choice" for a ladder
- * match. The tooltip (`title`) explains what holding first choice actually
- * means so new players don't have to guess.
+ * Small pill shown beside the team that holds "first choice" for a match.
+ * The tooltip (`title`) explains what holding first choice actually means
+ * so new players don't have to guess. Sized a touch smaller on mobile so
+ * it doesn't crowd tight match rows.
  */
 export function FirstChoiceBadge({ className }: { className?: string }) {
   return (
@@ -9,21 +10,17 @@ export function FirstChoiceBadge({ className }: { className?: string }) {
       title="This team chooses to serve/return first OR chooses which side of the court they play on."
       aria-label="First choice — chooses to serve/return first OR chooses court side"
       className={
-        "inline-flex items-center gap-1 rounded-full bg-accent-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-300 ring-1 ring-accent-500/30" +
+        "inline-flex items-center gap-1 rounded-full bg-accent-500/15 px-1.5 py-0.5 text-[9px] sm:px-2 sm:text-[10px] font-semibold uppercase tracking-wide text-accent-300 ring-1 ring-accent-500/30" +
         (className ? ` ${className}` : "")
       }
     >
       <svg
-        className="h-2.5 w-2.5"
+        className="h-2 w-2 sm:h-2.5 sm:w-2.5"
         fill="currentColor"
         viewBox="0 0 20 20"
         aria-hidden
       >
-        <path
-          fillRule="evenodd"
-          d="M9.293 2.293a1 1 0 0 1 1.414 0l7 7a1 1 0 0 1-.707 1.707H14v6a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-6H3a1 1 0 0 1-.707-1.707l7-7z"
-          clipRule="evenodd"
-        />
+        <path d="M10 1.5l2.47 5.01 5.53.8-4 3.9.94 5.49L10 14.09l-4.94 2.6.94-5.49-4-3.9 5.53-.8L10 1.5z" />
       </svg>
       First choice
     </span>
