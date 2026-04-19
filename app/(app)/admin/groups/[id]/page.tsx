@@ -3,6 +3,7 @@
 import { useConfirm } from "@/components/confirm-modal";
 import { EmptyState } from "@/components/empty-state";
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { isTestUser } from "@/lib/test-users";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { cn, formatDate } from "@/lib/utils";
@@ -122,7 +123,11 @@ export default function AdminGroupDetailPage() {
     if (groupRes.data) setGroup(groupRes.data);
     if (prefsRes.data) setPreferences(prefsRes.data);
     if (membersRes.data) setMembers(membersRes.data as MemberRow[]);
-    if (playersRes.data) setAllPlayers(playersRes.data);
+    // Strip test users from the add-player picker so admins can't drop
+     // a simulation account into a real group. Test users still exist in
+     // the DB; we just don't surface them as pickable.
+    if (playersRes.data)
+      setAllPlayers(playersRes.data.filter((p) => !isTestUser(p.display_name)));
     if (pendingRes.data) setPendingMembers(pendingRes.data as PendingMember[]);
 
     // Schedules are managed inside GroupSchedulesSection.
