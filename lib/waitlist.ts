@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
-import { formatDate } from "@/lib/utils";
+import { formatDateInZone } from "@/lib/utils";
 
 /**
  * After a confirmed player is removed from a sheet, promote the
@@ -35,21 +35,22 @@ export async function promoteNextWaitlistPlayer(sheetId: string): Promise<string
   // Notify the promoted player (non-blocking)
   const { data: sheet } = await admin
     .from("signup_sheets")
-    .select("event_date, group:shootout_groups(name)")
+    .select("event_time, timezone, group:shootout_groups(name)")
     .eq("id", sheetId)
     .single();
 
   const groupName = (sheet as { group?: { name?: string } })?.group?.name ?? "the event";
-  const eventDate = sheet?.event_date ?? "";
+  const eventTime = (sheet?.event_time as string | undefined) ?? "";
+  const tz = (sheet?.timezone as string | undefined) ?? "America/New_York";
 
   notify({
     profileId: player_id,
     type: "waitlist_promoted",
     title: "You're in!",
-    body: `A spot opened up for ${groupName} on ${eventDate ? formatDate(eventDate) : "the upcoming date"}. You've been moved from the waitlist to the confirmed list.`,
+    body: `A spot opened up for ${groupName} on ${eventTime ? formatDateInZone(eventTime, tz) : "the upcoming date"}. You've been moved from the waitlist to the confirmed list.`,
     link: `/sheets/${sheetId}`,
     emailTemplate: "WaitlistPromoted",
-    emailData: { groupName, eventDate, sheetId },
+    emailData: { groupName, eventDate: eventTime, timezone: tz, sheetId },
   }).catch(() => {
     // notification failure is non-blocking
   });

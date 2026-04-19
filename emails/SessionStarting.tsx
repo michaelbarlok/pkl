@@ -1,23 +1,25 @@
 import { Button, Link, Text } from "@react-email/components";
 import BaseEmail from "./BaseEmail";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
 
 interface Props {
   groupName?: string;
   eventDate?: string;
   eventTime?: string;
+  timezone?: string;
   sheetId?: string;
 }
 
-export default function SessionStarting({ groupName, eventDate, eventTime, sheetId }: Props) {
+export default function SessionStarting({ groupName, eventDate, eventTime, timezone, sheetId }: Props) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const tz = timezone ?? "America/New_York";
 
   return (
     <BaseEmail preview="You're signed up for tomorrow's session" heading="Session Tomorrow!">
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
         Just a reminder — you&apos;re confirmed for <strong>{groupName ?? "the event"}</strong>
-        {eventDate ? ` on ${formatDate(eventDate)}` : " tomorrow"}
-        {eventTime ? ` at ${formatTime(eventTime)}` : ""}.
+        {eventDate ? ` on ${formatDateInZone(eventDate, tz)}` : " tomorrow"}
+        {eventTime ? ` at ${formatTimeInZone(eventTime, tz)}` : ""}.
       </Text>
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
         If something came up and you can&apos;t make it, please withdraw as soon as possible

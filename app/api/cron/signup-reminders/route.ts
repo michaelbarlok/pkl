@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { notifyMany } from "@/lib/notify";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { formatDate } from "@/lib/utils";
+import { formatDateInZone } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   const authError = verifyCronSecret(request);
@@ -55,15 +55,16 @@ export async function GET(request: NextRequest) {
       await notifyMany(unregistered, {
         type: "signup_reminder",
         title: "Sign-up closing soon!",
-        body: `Sign-up for ${sheet.group?.name ?? "the event"} on ${formatDate(sheet.event_date)} closes in less than 1 hour.`,
+        body: `Sign-up for ${sheet.group?.name ?? "the event"} on ${formatDateInZone(sheet.event_time, sheet.timezone)} closes in less than 1 hour.`,
         link: `/sheets/${sheet.id}`,
         groupId: sheet.group_id,
         emailTemplate: "SignupReminder",
         emailData: {
           sheetId: sheet.id,
           groupName: sheet.group?.name,
-          eventDate: sheet.event_date,
+          eventDate: sheet.event_time,
           closesAt: sheet.signup_closes_at,
+          timezone: sheet.timezone,
         },
       });
       totalReminded += unregistered.length;

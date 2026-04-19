@@ -1,6 +1,6 @@
 import { Link, Text } from "@react-email/components";
 import BaseEmail from "./BaseEmail";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
 
 const REASON_LABELS: Record<string, string> = {
   lack_of_interest: "Lack of Player Interest",
@@ -12,6 +12,7 @@ interface Props {
   groupName?: string;
   eventDate?: string;
   eventTime?: string;
+  timezone?: string;
   sheetId?: string;
   cancellationReason?: string | null;
   cancellationMessage?: string | null;
@@ -21,11 +22,13 @@ export default function SheetCancelled({
   groupName,
   eventDate,
   eventTime,
+  timezone,
   sheetId,
   cancellationReason,
   cancellationMessage,
 }: Props) {
-  const formattedTime = eventTime ? formatTime(eventTime) : null;
+  const tz = timezone ?? "America/New_York";
+  const formattedTime = eventTime ? formatTimeInZone(eventTime, tz) : null;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const reasonLabel = cancellationReason ? REASON_LABELS[cancellationReason] : null;
 
@@ -33,7 +36,7 @@ export default function SheetCancelled({
     <BaseEmail preview="Event cancelled" heading="Event Cancelled">
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
         The {groupName ?? "pickleball"} event scheduled for{" "}
-        {eventDate ? formatDate(eventDate) : "the upcoming date"}
+        {eventDate ? formatDateInZone(eventDate, tz) : "the upcoming date"}
         {formattedTime ? ` at ${formattedTime}` : ""} has been cancelled.
       </Text>
 

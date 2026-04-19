@@ -1,26 +1,28 @@
 import { Button, Link, Text } from "@react-email/components";
 import BaseEmail from "./BaseEmail";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDateInZone, formatDateTimeInZone } from "@/lib/utils";
 
 interface Props {
   groupName?: string;
   eventDate?: string;
   closesAt?: string;
+  timezone?: string;
   sheetId?: string;
 }
 
-export default function SignupReminder({ groupName, eventDate, closesAt, sheetId }: Props) {
+export default function SignupReminder({ groupName, eventDate, closesAt, timezone, sheetId }: Props) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const tz = timezone ?? "America/New_York";
 
   return (
     <BaseEmail preview="Sign-up closing soon!" heading="Don't miss out!">
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
         Sign-up for <strong>{groupName ?? "the event"}</strong> on{" "}
-        {eventDate ? formatDate(eventDate) : "an upcoming date"} is closing soon.
+        {eventDate ? formatDateInZone(eventDate, tz) : "an upcoming date"} is closing soon.
       </Text>
       {closesAt && (
         <Text style={{ color: "#6b7280", fontSize: "14px" }}>
-          Closes at: {formatDateTime(closesAt)}
+          Closes at: {formatDateTimeInZone(closesAt, tz)}
         </Text>
       )}
       <Button

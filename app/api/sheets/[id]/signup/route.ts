@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-import { formatDate } from "@/lib/utils";
+import { formatDateInZone } from "@/lib/utils";
 
 export async function POST(
   request: NextRequest,
@@ -129,21 +129,22 @@ export async function POST(
     if (result.bumped_player_id) {
       const { data: sheetGroup } = await auth.supabase
         .from("signup_sheets")
-        .select("event_date, group:shootout_groups(name)")
+        .select("event_time, timezone, group:shootout_groups(name)")
         .eq("id", sheetId)
         .single();
 
       const gName = (sheetGroup as { group?: { name?: string } })?.group?.name ?? "the event";
-      const evDate = sheetGroup?.event_date ?? "";
+      const evTime = (sheetGroup?.event_time as string | undefined) ?? "";
+      const tz = (sheetGroup?.timezone as string | undefined) ?? "America/New_York";
 
       notify({
         profileId: result.bumped_player_id,
         type: "bumped_to_waitlist",
         title: "Moved to waitlist",
-        body: `A group admin signed up for ${gName} on ${evDate ? formatDate(evDate) : "the upcoming date"} using a priority spot — your confirmed registration has moved to the waitlist. You'll be notified if a spot opens up.`,
+        body: `A group admin signed up for ${gName} on ${evTime ? formatDateInZone(evTime, tz) : "the upcoming date"} using a priority spot — your confirmed registration has moved to the waitlist. You'll be notified if a spot opens up.`,
         link: `/sheets/${sheetId}`,
         emailTemplate: "BumpedToWaitlist",
-        emailData: { groupName: gName, eventDate: evDate, sheetId },
+        emailData: { groupName: gName, eventDate: evTime, timezone: tz, sheetId },
       }).catch((err) => console.error("Bump notify failed:", err));
     }
 
