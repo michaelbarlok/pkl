@@ -73,45 +73,46 @@ export async function notify({
   const shouldEmail = typePref === "email" || (typePref === undefined && prefs.includes("email"));
   const shouldPush  = typePref === "push"  || (typePref === undefined && prefs.includes("push"));
 
-  // 3. Email via Resend
-  if (shouldEmail && emailTemplate && profile.email && !isTestUser(profile.email, profile.display_name)) {
-    try {
-      await sendEmail({
-        to: profile.email,
-        subject: title,
-        template: emailTemplate,
-        data: { ...emailData, title, body },
-      });
-    } catch (err) {
-      console.error("Failed to send email notification:", err);
-    }
-  }
+  // 3. Fire email, SMS, and push in parallel. Previously these were
+  // awaited one after the other, so a push was delayed by however long
+  // Resend took (~1-3s) before the browser push service even saw it —
+  // users on push-only notifications experienced a 30s+ perceived lag
+  // compared to email. Each channel is independent and failures are
+  // already handled locally, so there's no reason to serialize.
+  const emailPromise =
+    shouldEmail && emailTemplate && profile.email && !isTestUser(profile.email, profile.display_name)
+      ? sendEmail({
+          to: profile.email,
+          subject: title,
+          template: emailTemplate,
+          data: { ...emailData, title, body },
+        }).catch((err) => {
+          console.error("Failed to send email notification:", err);
+        })
+      : null;
 
-  // 4. SMS via Twilio (uses global prefs only)
-  if (prefs.includes("sms") && profile.phone) {
-    try {
-      await sendSMS({
-        to: profile.phone,
-        message: `${title}: ${body}`,
-      });
-    } catch (err) {
-      console.error("Failed to send SMS notification:", err);
-    }
-  }
+  const smsPromise =
+    prefs.includes("sms") && profile.phone
+      ? sendSMS({
+          to: profile.phone,
+          message: `${title}: ${body}`,
+        }).catch((err) => {
+          console.error("Failed to send SMS notification:", err);
+        })
+      : null;
 
-  // 5. Web Push notification
-  if (shouldPush) {
-    try {
-      await sendPushNotification(supabase, profileId, {
+  const pushPromise = shouldPush
+    ? sendPushNotification(supabase, profileId, {
         title,
         body,
         link,
         tag: type,
-      });
-    } catch (err) {
-      console.error("Failed to send push notification:", err);
-    }
-  }
+      }).catch((err) => {
+        console.error("Failed to send push notification:", err);
+      })
+    : null;
+
+  await Promise.allSettled([emailPromise, smsPromise, pushPromise].filter((p) => p !== null));
 }
 
 /**
