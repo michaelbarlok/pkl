@@ -3,13 +3,14 @@ import { getGroupMembers, getGroupSheets, isGroupMember } from "@/lib/queries/gr
 import { getRecentMatches, getPlayerStats, getRecentSessions } from "@/lib/queries/free-play";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cn } from "@/lib/utils";
 import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
 import { FreePlayLeaderboard } from "./leaderboard";
 import { InviteButton } from "./invite-button";
 import { ResetStatsButton } from "./reset-stats-button";
 import { RollingSessionsSetting } from "./rolling-sessions-setting";
-import { CollapsibleMembers } from "./collapsible-members";
+import { GroupTabs, type TabSpec } from "./group-tabs";
+import { MembersGrid } from "./members-grid";
+import { groupGradient } from "@/lib/group-gradient";
 import type { GroupWithPreferences } from "@/lib/queries/group";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -266,173 +267,88 @@ export default async function GroupPage({
     tokenValid ||
     (group.visibility === "private" && isMember);
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/groups"
-              className="text-sm text-surface-muted hover:text-dark-200"
-            >
-              Groups
-            </Link>
-            <span className="text-sm text-surface-muted">/</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold text-dark-100">
-            {group.name}
-          </h1>
-          {(group.city || group.state) && (
-            <p className="mt-1 text-xs text-surface-muted">
-              {[group.city, group.state].filter(Boolean).join(", ")}
-            </p>
-          )}
-          {group.description && (
-            <p className="mt-1 text-surface-muted">{group.description}</p>
-          )}
+  const gradient = groupGradient(group.slug ?? group.id);
 
-          {/* Play Time */}
-          {playTimes.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {playTimes.map((pt) => (
-                <PlayTimeDisplay key={pt.id} playTime={pt} />
-              ))}
-            </div>
-          )}
-        </div>
+  const tabs: TabSpec[] = [
+    { id: "overview", label: "Overview" },
+    { id: "members", label: "Members", count: members.length },
+    ...(isMember ? ([{ id: "forum", label: "Forum", href: `/groups/${slug}/forum` }] as TabSpec[]) : []),
+  ];
 
-        <div className="flex flex-wrap items-center gap-3">
-          <span className={group.visibility === "private" ? "badge-gray" : "badge-green"}>
-            {group.visibility === "private" ? "Private" : "Public"}
-          </span>
-
-          {isMember ? (
-            <>
-              <span className="badge-green">Member</span>
-              {/* Invite button available to all members of any group */}
-              <InviteButton
-                groupId={group.id}
-                groupSlug={slug}
-                groupName={group.name}
-                groupVisibility={group.visibility}
-              />
-            </>
-          ) : canJoin ? (
-            /* Non-member who can join (public group, or private via valid token) */
-            user && profile ? (
-              <JoinButton
-                groupId={group.id}
-                playerId={profile.id}
-                groupType={group.group_type}
-                slug={slug}
-              />
-            ) : (
-              /* Unauthenticated — redirect to login, then back here */
-              <Link
-                href={`/login?next=${encodeURIComponent(nextUrl)}`}
-                className="btn-primary"
-              >
-                Join Group
-              </Link>
-            )
-          ) : null}
-
-          {isMember && (
-            <Link href={`/groups/${slug}/forum`} className="btn-secondary">
-              Forum
-            </Link>
-          )}
-          {isGroupAdmin && group.group_type === "ladder_league" && (
-            <Link href={`/admin/sheets/new?groupId=${group.id}`} className="btn-primary">
-              + Create Sheet
-            </Link>
-          )}
-          {isGroupAdmin && (
-            <Link href={`/admin/groups/${group.id}?tab=preferences`} className="btn-secondary">
-              Group Settings
-            </Link>
-          )}
-          {isMember && contactAdminsHref && (
-            <a href={contactAdminsHref} className="btn-secondary text-xs">
-              Contact Admins
-            </a>
-          )}
-        </div>
-      </div>
-
+  const overviewPanel = (
+    <div className="space-y-8 pt-6">
       {/* Stats (ladder league only) */}
       {!isFreePlay && (
         <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="card card-static">
-            <p className="text-sm text-surface-muted">Members</p>
-            <p className="mt-1 text-2xl font-bold text-dark-100">
-              {members.length}
-            </p>
-          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="card card-static">
+              <p className="text-sm text-surface-muted">Members</p>
+              <p className="mt-1 text-2xl font-bold text-dark-100">
+                {members.length}
+              </p>
+            </div>
 
-          {/* Upcoming Events — posted sheets and the next occurrences of each play time */}
-          <div className="card card-static">
-            <p className="text-sm text-surface-muted mb-2">Upcoming Events</p>
-            {upcomingEvents.length === 0 ? (
-              <p className="text-sm text-surface-muted italic">None scheduled</p>
-            ) : (
-              <ul className="space-y-1.5">
-                {upcomingEvents.map((ev) =>
-                  ev.kind === "sheet" ? (
-                    <li key={ev.key}>
-                      <Link
-                        href={`/sheets/${ev.sheet.id}`}
-                        className="flex flex-col hover:text-brand-400 transition-colors group"
-                      >
-                        <span className="text-sm font-medium text-dark-100 group-hover:text-brand-400">
-                          {formatDateInZone(ev.sheet.event_time, ev.sheet.timezone)}
+            {/* Upcoming Events — posted sheets and the next occurrences of each play time */}
+            <div className="card card-static">
+              <p className="text-sm text-surface-muted mb-2">Upcoming Events</p>
+              {upcomingEvents.length === 0 ? (
+                <p className="text-sm text-surface-muted italic">None scheduled</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {upcomingEvents.map((ev) =>
+                    ev.kind === "sheet" ? (
+                      <li key={ev.key}>
+                        <Link
+                          href={`/sheets/${ev.sheet.id}`}
+                          className="flex flex-col hover:text-brand-400 transition-colors group"
+                        >
+                          <span className="text-sm font-medium text-dark-100 group-hover:text-brand-400">
+                            {formatDateInZone(ev.sheet.event_time, ev.sheet.timezone)}
+                          </span>
+                          <span className="text-xs text-surface-muted">
+                            {formatTimeInZone(ev.sheet.event_time, ev.sheet.timezone)} · {ev.sheet.location}
+                          </span>
+                        </Link>
+                      </li>
+                    ) : (
+                      <li key={ev.key} className="flex flex-col opacity-80">
+                        <span className="text-sm font-medium text-dark-200">
+                          {formatDateInZone(ev.event_date, ev.timezone)}
                         </span>
                         <span className="text-xs text-surface-muted">
-                          {formatTimeInZone(ev.sheet.event_time, ev.sheet.timezone)} · {ev.sheet.location}
+                          {formatTimeInZone(ev.event_time_local, ev.timezone)} · {ev.location} · <span className="italic">sheet not yet posted</span>
                         </span>
-                      </Link>
-                    </li>
-                  ) : (
-                    <li key={ev.key} className="flex flex-col opacity-80">
-                      <span className="text-sm font-medium text-dark-200">
-                        {formatDateInZone(ev.event_date, ev.timezone)}
-                      </span>
-                      <span className="text-xs text-surface-muted">
-                        {formatTimeInZone(ev.event_time_local, ev.timezone)} · {ev.location} · <span className="italic">sheet not yet posted</span>
-                      </span>
-                    </li>
-                  )
-                )}
-              </ul>
-            )}
+                      </li>
+                    )
+                  )}
+                </ul>
+              )}
+            </div>
+
+            <Link
+              href={`/groups/${slug}/ladder`}
+              className="card hover:ring-brand-500/30 hover:ring-2 transition-shadow flex flex-col items-center justify-center text-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-6 w-6 text-brand-400 mb-1">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+              </svg>
+              <p className="text-sm font-semibold text-brand-400">
+                View Rankings
+              </p>
+            </Link>
           </div>
 
-          <Link
-            href={`/groups/${slug}/ladder`}
-            className="card hover:ring-brand-500/30 hover:ring-2 transition-shadow flex flex-col items-center justify-center text-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-6 w-6 text-brand-400 mb-1">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+          {/* Ladder mode note */}
+          <div className="flex items-center gap-2 text-xs text-surface-muted">
+            <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0-3.75-3.75M17.25 21 21 17.25" />
             </svg>
-            <p className="text-sm font-semibold text-brand-400">
-              View Rankings
-            </p>
-          </Link>
-        </div>
-
-        {/* Ladder mode note */}
-        <div className="flex items-center gap-2 text-xs text-surface-muted">
-          <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0-3.75-3.75M17.25 21 21 17.25" />
-          </svg>
-          {group.ladder_type === "dynamic_ranking" ? (
-            <span><span className="font-medium text-dark-300">Dynamic Ranking</span> — courts reset each session based on updated overall standings</span>
-          ) : (
-            <span><span className="font-medium text-dark-300">Court Promotion</span> — finish 1st to move up a court, last place moves down</span>
-          )}
-        </div>
+            {group.ladder_type === "dynamic_ranking" ? (
+              <span><span className="font-medium text-dark-300">Dynamic Ranking</span> — courts reset each session based on updated overall standings</span>
+            ) : (
+              <span><span className="font-medium text-dark-300">Court Promotion</span> — finish 1st to move up a court, last place moves down</span>
+            )}
+          </div>
         </div>
       )}
 
@@ -442,7 +358,7 @@ export default async function GroupPage({
           <div className="flex flex-wrap gap-3">
             <Link
               href={`/groups/${slug}/session`}
-              className={activeSessionId ? "btn-primary" : "btn-primary"}
+              className="btn-primary"
             >
               {activeSessionId ? "Continue Session" : "Start Session"}
             </Link>
@@ -479,31 +395,30 @@ export default async function GroupPage({
               const aWon = match.score_a > match.score_b;
               const bWon = match.score_b > match.score_a;
               return (
-              <div key={match.id} className="card p-0 overflow-hidden">
-                <div className={`flex items-center justify-between gap-2 px-4 py-2.5 ${aWon ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-                  <span className={`text-sm truncate ${aWon ? "font-semibold text-teal-300" : "text-dark-300"}`}>
-                    {aWon && <span className="mr-1">✓</span>}
-                    {match.team_a_p1_profile?.display_name}
-                    {match.team_a_p2_profile && ` & ${match.team_a_p2_profile.display_name}`}
-                  </span>
-                  <span className={`font-mono text-sm font-bold shrink-0 ${aWon ? "text-teal-300" : "text-dark-300"}`}>{match.score_a}</span>
+                <div key={match.id} className="card p-0 overflow-hidden">
+                  <div className={`flex items-center justify-between gap-2 px-4 py-2.5 ${aWon ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+                    <span className={`text-sm truncate ${aWon ? "font-semibold text-teal-300" : "text-dark-300"}`}>
+                      {aWon && <span className="mr-1">✓</span>}
+                      {match.team_a_p1_profile?.display_name}
+                      {match.team_a_p2_profile && ` & ${match.team_a_p2_profile.display_name}`}
+                    </span>
+                    <span className={`font-mono text-sm font-bold shrink-0 ${aWon ? "text-teal-300" : "text-dark-300"}`}>{match.score_a}</span>
+                  </div>
+                  <div className="h-px bg-surface-border" />
+                  <div className={`flex items-center justify-between gap-2 px-4 py-2.5 ${bWon ? "bg-teal-900/30" : "bg-surface-raised"}`}>
+                    <span className={`text-sm truncate ${bWon ? "font-semibold text-teal-300" : "text-dark-300"}`}>
+                      {bWon && <span className="mr-1">✓</span>}
+                      {match.team_b_p1_profile?.display_name}
+                      {match.team_b_p2_profile && ` & ${match.team_b_p2_profile.display_name}`}
+                    </span>
+                    <span className={`font-mono text-sm font-bold shrink-0 ${bWon ? "text-teal-300" : "text-dark-300"}`}>{match.score_b}</span>
+                  </div>
                 </div>
-                <div className="h-px bg-surface-border" />
-                <div className={`flex items-center justify-between gap-2 px-4 py-2.5 ${bWon ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-                  <span className={`text-sm truncate ${bWon ? "font-semibold text-teal-300" : "text-dark-300"}`}>
-                    {bWon && <span className="mr-1">✓</span>}
-                    {match.team_b_p1_profile?.display_name}
-                    {match.team_b_p2_profile && ` & ${match.team_b_p2_profile.display_name}`}
-                  </span>
-                  <span className={`font-mono text-sm font-bold shrink-0 ${bWon ? "text-teal-300" : "text-dark-300"}`}>{match.score_b}</span>
-                </div>
-              </div>
               );
             })}
           </div>
         </section>
       )}
-
 
       {isFreePlay && isMember && recentSessions.length > 0 && (
         <section>
@@ -536,13 +451,125 @@ export default async function GroupPage({
           </div>
         </section>
       )}
+    </div>
+  );
 
-      {/* Members */}
-      <CollapsibleMembers
+  const membersPanel = (
+    <div className="pt-6">
+      <MembersGrid
         members={members as any}
         currentPlayerId={profile?.id ?? null}
         isFreePlay={isFreePlay}
       />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Hero */}
+      <div className="rounded-2xl bg-surface-raised ring-1 ring-surface-border overflow-hidden">
+        {/* Deterministic group-color strip */}
+        <div className={`h-1.5 ${gradient}`} />
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/groups"
+                  className="text-sm text-surface-muted hover:text-dark-200"
+                >
+                  Groups
+                </Link>
+                <span className="text-sm text-surface-muted">/</span>
+              </div>
+              <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-dark-100">
+                {group.name}
+              </h1>
+              {(group.city || group.state) && (
+                <p className="mt-1 text-xs text-surface-muted">
+                  {[group.city, group.state].filter(Boolean).join(", ")}
+                </p>
+              )}
+              {group.description && (
+                <p className="mt-2 text-sm text-surface-muted max-w-2xl">
+                  {group.description}
+                </p>
+              )}
+
+              {/* Play Time */}
+              {playTimes.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {playTimes.map((pt) => (
+                    <PlayTimeDisplay key={pt.id} playTime={pt} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <span className={group.visibility === "private" ? "badge-gray" : "badge-green"}>
+                {group.visibility === "private" ? "Private" : "Public"}
+              </span>
+              <span className={isFreePlay ? "badge-yellow" : "badge-blue"}>
+                {isFreePlay ? "Free Play" : "Ladder"}
+              </span>
+              {isMember && <span className="badge-green">Member</span>}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            {isMember ? (
+              <InviteButton
+                groupId={group.id}
+                groupSlug={slug}
+                groupName={group.name}
+                groupVisibility={group.visibility}
+              />
+            ) : canJoin ? (
+              user && profile ? (
+                <JoinButton
+                  groupId={group.id}
+                  playerId={profile.id}
+                  groupType={group.group_type}
+                  slug={slug}
+                />
+              ) : (
+                <Link
+                  href={`/login?next=${encodeURIComponent(nextUrl)}`}
+                  className="btn-primary"
+                >
+                  Join Group
+                </Link>
+              )
+            ) : null}
+
+            {isGroupAdmin && group.group_type === "ladder_league" && (
+              <Link href={`/admin/sheets/new?groupId=${group.id}`} className="btn-primary">
+                + Create Sheet
+              </Link>
+            )}
+            {isGroupAdmin && (
+              <Link href={`/admin/groups/${group.id}?tab=preferences`} className="btn-secondary">
+                Group Settings
+              </Link>
+            )}
+            {isMember && contactAdminsHref && (
+              <a href={contactAdminsHref} className="btn-secondary text-xs">
+                Contact Admins
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <GroupTabs tabs={tabs}>
+        {{
+          overview: overviewPanel,
+          members: membersPanel,
+        }}
+      </GroupTabs>
     </div>
   );
 }

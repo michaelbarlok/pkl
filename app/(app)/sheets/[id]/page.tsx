@@ -12,6 +12,7 @@ import { ShareButton } from "./share-button";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { PlayerAvatar } from "@/components/player-avatar";
+import { computeCourtPreview, CourtPreviewSection } from "./court-preview";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +113,21 @@ export default async function SheetDetailPage({
   const isCancelled = sheet.status === "cancelled";
   const isFull = confirmed.length >= sheet.player_limit;
   const isAdmin = profile.role === "admin";
+
+  // Group admins see the same "all courts" preview that platform admins do —
+  // they're the ones actually running the shootout. Only costs one tiny query.
+  let isGroupAdmin = false;
+  if (sheet.group_id) {
+    const { data: membership } = await supabase
+      .from("group_memberships")
+      .select("group_role")
+      .eq("group_id", sheet.group_id)
+      .eq("player_id", profile.id)
+      .maybeSingle();
+    isGroupAdmin = membership?.group_role === "admin";
+  }
+  const hasAdminView = isAdmin || isGroupAdmin;
+
   const myWaitlistPosition = myRegistration?.status === "waitlist"
     ? waitlisted.findIndex((r: Registration) => r.player_id === profile.id) + 1
     : null;
@@ -134,6 +150,42 @@ export default async function SheetDetailPage({
     for (const p of participants ?? []) {
       if (p.court_number) courtByPlayer.set(p.player_id, p.court_number);
     }
+  }
+
+  // Court preview — only meaningful for ladder groups before a session starts.
+  // Viewer has to be an admin or confirmed on the sheet to see it at all.
+  const isLadderGroup = (sheet as any).group?.group_type === "ladder_league";
+  const viewerIsConfirmed = myRegistration?.status === "confirmed";
+  const shouldShowPreview =
+    isLadderGroup &&
+    !isCancelled &&
+    !activeSession &&
+    confirmed.length >= 4 &&
+    (hasAdminView || viewerIsConfirmed);
+
+  let preview: ReturnType<typeof computeCourtPreview> = null;
+  if (shouldShowPreview && sheet.group_id) {
+    // Pull each confirmed player's ladder stats from the same group so the
+    // preview uses the exact sort keys seedSession1 uses at start-time.
+    const confirmedIds = confirmed.map((r) => r.player_id);
+    const { data: memberships } = await supabase
+      .from("group_memberships")
+      .select("player_id, current_step, win_pct, total_sessions, last_played_at")
+      .eq("group_id", sheet.group_id)
+      .in("player_id", confirmedIds);
+    preview = computeCourtPreview(
+      confirmed.map((r) => ({
+        player_id: r.player_id,
+        player: r.player
+          ? {
+              id: r.player.id,
+              display_name: r.player.display_name,
+              avatar_url: r.player.avatar_url,
+            }
+          : undefined,
+      })),
+      memberships ?? []
+    );
   }
 
   // Add-member eligibility: admins always; regular members only when the
@@ -337,6 +389,16 @@ export default async function SheetDetailPage({
 
       {canAddMembers && !isCancelled && (
         <AdminAddMember sheetId={sheet.id} members={availableMembers} />
+      )}
+
+      {/* ── Court preview (pre-session only) ───────────────────── */}
+      {preview && (
+        <CourtPreviewSection
+          courts={preview.courts}
+          numCourts={preview.numCourts}
+          viewerPlayerId={profile.id}
+          viewMode={hasAdminView ? "all" : "own"}
+        />
       )}
 
       {/* ── Confirmed panel ────────────────────────────────────── */}

@@ -43,6 +43,39 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+/**
+ * Tournament hero uses a deterministic gradient keyed on the tournament id
+ * so each tournament wears a consistent "color" across the app (brackets,
+ * detail, cards). Stays inside the brand palette.
+ */
+function tournamentHeroGradient(seed: string): string {
+  const palette = [
+    "from-brand-700/50 via-brand-600/30 to-surface-raised",
+    "from-accent-700/40 via-brand-600/25 to-surface-raised",
+    "from-teal-700/40 via-brand-600/25 to-surface-raised",
+    "from-indigo-700/40 via-violet-600/25 to-surface-raised",
+    "from-rose-700/35 via-accent-600/25 to-surface-raised",
+  ];
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return palette[Math.abs(h) % palette.length];
+}
+
+/** Split an ISO/date into month/day chip pieces for the hero. */
+function tournamentDateChip(startIso: string, endIso: string | null) {
+  const d = new Date((startIso.length === 10 ? startIso : startIso.slice(0, 10)) + "T12:00:00");
+  const month = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+  const day = String(d.getDate());
+  // If the tournament spans multiple days, include the trailing day in a
+  // subtle second line.
+  let endDay: string | null = null;
+  if (endIso && endIso !== startIso) {
+    const e = new Date((endIso.length === 10 ? endIso : endIso.slice(0, 10)) + "T12:00:00");
+    endDay = `–${e.getDate()}`;
+  }
+  return { month, day, endDay };
+}
+
 export default async function TournamentDetailPage({
   params,
 }: {
@@ -134,87 +167,136 @@ export default async function TournamentDetailPage({
       {/* Real-time bracket updates */}
       {isInProgress && <TournamentRealtimeSubscription tournamentId={id} />}
 
-      {/* Header */}
-      <div>
-        <Breadcrumb items={[{ label: "Tournaments", href: "/tournaments" }, { label: tournament.title }]} />
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-2xl font-bold text-dark-100">{tournament.title}</h1>
-          <div className="flex items-center gap-2 shrink-0">
-            {matches.length > 0 && !(tournament as any).is_hidden && (
-              <ShareBracketButton tournamentId={id} />
-            )}
-            {canManage && (
-              <Link href={`/tournaments/${id}/edit`} className="btn-secondary text-xs shrink-0">
-                Edit
-              </Link>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 mt-2">
-          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[tournament.status]}`}>
-            {STATUS_LABELS[tournament.status]}
-          </span>
-          {(tournament as any).is_hidden && canManage && (
-            <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-300">
-              Hidden from public
-            </span>
-          )}
-          <span className="text-xs text-surface-muted">
-            {FORMAT_LABELS[tournament.format]} &middot; {tournament.type === "doubles" ? "Doubles" : "Singles"}
-            &middot; {tournament.divisions?.length ?? 0} division{(tournament.divisions?.length ?? 0) !== 1 ? "s" : ""}
-          </span>
-        </div>
-      </div>
+      <Breadcrumb items={[{ label: "Tournaments", href: "/tournaments" }, { label: tournament.title }]} />
 
-      {/* Details Card */}
-      <div className="card space-y-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <p className="text-xs text-surface-muted uppercase font-medium">Date</p>
-            <p className="text-sm text-dark-100">
-              {formatDate(tournament.start_date + "T00:00:00")}
-              {tournament.end_date !== tournament.start_date && (
-                <> — {formatDate(tournament.end_date + "T00:00:00")}</>
-              )}
-            </p>
-          </div>
-          {tournament.start_time && (
-            <div>
-              <p className="text-xs text-surface-muted uppercase font-medium">Time</p>
-              <p className="text-sm text-dark-100">{formatTime(tournament.start_time)}</p>
+      {/* Hero */}
+      {(() => {
+        const chip = tournamentDateChip(tournament.start_date, tournament.end_date ?? null);
+        const heroTint = tournamentHeroGradient(id);
+        const isLive = tournament.status === "in_progress";
+        return (
+          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${heroTint} ring-1 ring-surface-border`}>
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[tournament.status]}`}>
+                      {isLive && <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-accent-300 animate-pulse align-middle" />}
+                      {STATUS_LABELS[tournament.status]}
+                    </span>
+                    {(tournament as any).is_hidden && canManage && (
+                      <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-300">
+                        Hidden from public
+                      </span>
+                    )}
+                  </div>
+                  <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-dark-100 break-words">
+                    {tournament.title}
+                  </h1>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-surface-muted">
+                    <span className="inline-flex items-center gap-1.5">
+                      <svg className="h-4 w-4 text-surface-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0zM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                      </svg>
+                      {tournament.location}
+                    </span>
+                    {tournament.start_time && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <svg className="h-4 w-4 text-surface-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                        </svg>
+                        {formatTime(tournament.start_time)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Format pill row */}
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="badge-blue text-xs">
+                      {FORMAT_LABELS[tournament.format]}
+                    </span>
+                    <span className="badge-gray text-xs">
+                      {tournament.type === "doubles" ? "Doubles" : "Singles"}
+                    </span>
+                    <span className="badge-gray text-xs">
+                      {tournament.divisions?.length ?? 0} division{(tournament.divisions?.length ?? 0) !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Date chip */}
+                <div className="shrink-0 text-right">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-muted leading-none">
+                    {chip.month}
+                  </p>
+                  <p className="text-4xl sm:text-5xl font-bold leading-none mt-1 text-dark-100">
+                    {chip.day}
+                    {chip.endDay && (
+                      <span className="text-xl font-semibold text-surface-muted align-top ml-0.5">
+                        {chip.endDay}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Hero action row */}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {matches.length > 0 && !(tournament as any).is_hidden && (
+                  <ShareBracketButton tournamentId={id} />
+                )}
+                {canManage && (
+                  <Link href={`/tournaments/${id}/edit`} className="btn-secondary text-xs">
+                    Edit
+                  </Link>
+                )}
+              </div>
             </div>
-          )}
-          <div>
-            <p className="text-xs text-surface-muted uppercase font-medium">Location</p>
-            <p className="text-sm text-dark-100">{tournament.location}</p>
           </div>
-          <div>
-            <p className="text-xs text-surface-muted uppercase font-medium">Organizer{coOrganizers.length > 0 ? "s" : ""}</p>
-            <p className="text-sm text-dark-100">
+        );
+      })()}
+
+      {/* Details — a scannable label/value list rather than a long info-dump card */}
+      <div className="card space-y-4">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+          <DetailRow label={`Organizer${coOrganizers.length > 0 ? "s" : ""}`}>
+            <span className="text-sm text-dark-100">
               {tournament.creator?.display_name ?? "Unknown"}
               {coOrganizers.length > 0 && (
                 <span className="text-dark-200">
                   {", "}{coOrganizers.map((o: any) => o.profile?.display_name ?? "Unknown").join(", ")}
                 </span>
               )}
-            </p>
-          </div>
+            </span>
+          </DetailRow>
+          <DetailRow label="Date">
+            <span className="text-sm text-dark-100">
+              {formatDate(tournament.start_date + "T00:00:00")}
+              {tournament.end_date !== tournament.start_date && (
+                <> — {formatDate(tournament.end_date + "T00:00:00")}</>
+              )}
+            </span>
+          </DetailRow>
           {tournament.max_teams_per_division && (
-            <div>
-              <p className="text-xs text-surface-muted uppercase font-medium">Max per Division</p>
-              <p className="text-sm text-dark-100">{tournament.max_teams_per_division} teams</p>
-            </div>
+            <DetailRow label="Max per Division">
+              <span className="text-sm text-dark-100">{tournament.max_teams_per_division} teams</span>
+            </DetailRow>
           )}
           {tournament.entry_fee && (
-            <div>
-              <p className="text-xs text-surface-muted uppercase font-medium">Entry Fee</p>
-              <p className="text-sm text-dark-100">{tournament.entry_fee}</p>
-            </div>
+            <DetailRow label="Entry Fee">
+              <span className="text-sm text-dark-100">{tournament.entry_fee}</span>
+            </DetailRow>
+          )}
+          {tournament.registration_closes_at && (
+            <DetailRow label="Registration Closes">
+              <span className="text-sm text-dark-100">
+                {formatDateTime(tournament.registration_closes_at)}
+              </span>
+            </DetailRow>
           )}
           {tournament.payment_options && tournament.payment_options.length > 0 && (
-            <div>
-              <p className="text-xs text-surface-muted uppercase font-medium">Pay Via</p>
-              <div className="mt-1 space-y-1">
+            <DetailRow label="Pay Via">
+              <div className="space-y-1">
                 {tournament.payment_options.map((opt) => (
                   <p key={opt.method} className="text-sm text-dark-100">
                     <span className="font-medium capitalize">{opt.method}</span>
@@ -229,11 +311,10 @@ export default async function TournamentDetailPage({
                   </p>
                 ))}
               </div>
-            </div>
+            </DetailRow>
           )}
           {(tournament as any).payment_link && (
-            <div>
-              <p className="text-xs text-surface-muted uppercase font-medium">Payment Link</p>
+            <DetailRow label="Payment Link">
               <a
                 href={(tournament as any).payment_link}
                 target="_blank"
@@ -242,25 +323,19 @@ export default async function TournamentDetailPage({
               >
                 {(tournament as any).payment_link}
               </a>
-            </div>
+            </DetailRow>
           )}
-          {(tournament as any).payment_directions && (
-            <div>
-              <p className="text-xs text-surface-muted uppercase font-medium">Payment Directions</p>
-              <p className="text-sm text-dark-100 whitespace-pre-line">{(tournament as any).payment_directions}</p>
-            </div>
-          )}
-          {tournament.registration_closes_at && (
-            <div>
-              <p className="text-xs text-surface-muted uppercase font-medium">Registration Closes</p>
-              <p className="text-sm text-dark-100">
-                {formatDateTime(tournament.registration_closes_at)}
-              </p>
-            </div>
-          )}
-        </div>
+        </dl>
+
+        {(tournament as any).payment_directions && (
+          <div className="pt-3 border-t border-surface-border">
+            <p className="text-xs text-surface-muted uppercase font-medium mb-1">Payment Directions</p>
+            <p className="text-sm text-dark-100 whitespace-pre-line">{(tournament as any).payment_directions}</p>
+          </div>
+        )}
+
         {tournament.format === "round_robin" && (tournament.score_to_win_pool || tournament.score_to_win_playoff) && (
-          <div className="border-t border-surface-border pt-3">
+          <div className="pt-3 border-t border-surface-border">
             <div className="flex flex-wrap gap-4">
               <div>
                 <p className="text-xs text-surface-muted uppercase font-medium">Pool Games To</p>
@@ -282,7 +357,7 @@ export default async function TournamentDetailPage({
 
         {tournament.description && (
           <div className="pt-3 border-t border-surface-border">
-            <p className="text-sm text-dark-200 whitespace-pre-wrap">{tournament.description}</p>
+            <p className="text-sm text-dark-200 whitespace-pre-wrap leading-relaxed">{tournament.description}</p>
           </div>
         )}
 
@@ -531,6 +606,18 @@ export default async function TournamentDetailPage({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Single label → value cell used inside the tournament details grid. */
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[11px] text-surface-muted uppercase font-medium tracking-wide">
+        {label}
+      </dt>
+      <dd className="mt-0.5">{children}</dd>
     </div>
   );
 }
