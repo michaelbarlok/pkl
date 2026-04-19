@@ -16,17 +16,41 @@ export async function POST(
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
 
-    // Optionally accept a player_id and priority in the body
+    // Optionally accept a player_id, priority, and clicked_at in the body
     let targetPlayerId: string | null = null;
     let priorityOverride: string | null = null;
+    let clickedAtInput: string | null = null;
     try {
       const body = await request.json();
       targetPlayerId = body?.player_id ?? null;
       if (body?.priority && ["high", "normal", "low"].includes(body.priority)) {
         priorityOverride = body.priority;
       }
+      if (typeof body?.clicked_at === "string") {
+        clickedAtInput = body.clicked_at;
+      }
     } catch {
       // No body or invalid JSON — signing up self
+    }
+
+    // Validate the client-supplied clicked_at timestamp. It's used for
+    // `signed_up_at` ordering so users are placed in line by WHEN THEY
+    // CLICKED, not when the server happened to process their request.
+    // We accept a clicked_at up to 2 minutes in the past (well past any
+    // reasonable queue wait) and up to 5 seconds in the future (allow
+    // for clock skew). Anything outside that range falls back to now()
+    // inside the RPC so we can't be tricked into putting someone
+    // artificially at the head of the queue.
+    let clickedAtIso: string | null = null;
+    if (clickedAtInput) {
+      const parsed = new Date(clickedAtInput);
+      const ms = parsed.getTime();
+      if (!Number.isNaN(ms)) {
+        const now = Date.now();
+        if (ms <= now + 5_000 && ms >= now - 120_000) {
+          clickedAtIso = parsed.toISOString();
+        }
+      }
     }
 
     // Fetch the sheet (need allow_member_guests for authorization check).
@@ -97,6 +121,7 @@ export async function POST(
         p_player_id: playerId,
         p_priority: priority,
         p_registered_by: targetPlayerId ? auth.profile.id : null,
+        p_signed_up_at: clickedAtIso,
       }
     );
 

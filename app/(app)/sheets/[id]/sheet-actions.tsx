@@ -1,8 +1,10 @@
 "use client";
 
 import { FormError } from "@/components/form-error";
+import { useSupabase } from "@/components/providers/supabase-provider";
+import { useToast } from "@/components/toast";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RegistrationStatus } from "@/types/database";
 
 interface SheetActionsProps {
@@ -14,76 +16,266 @@ interface SheetActionsProps {
   isFull: boolean;
 }
 
+// If a single attempt is pending for more than this long, switch the label
+// to "Still working..." so users under a concurrent-signup spike don't
+// assume the site froze and start hammering refresh.
+const SLOW_THRESHOLD_MS = 5_000;
+// Hard per-attempt cap. Each attempt aborts at this point and the retry
+// loop kicks in. The server RPC is idempotent (already_registered short-
+// circuit) so retries can't duplicate a registration.
+const ATTEMPT_TIMEOUT_MS = 20_000;
+// Total number of attempts before we surface an error to the user.
+const MAX_ATTEMPTS = 4;
+
+/**
+ * Exponential backoff with jitter (ms). Attempt 1 is immediate, 2 waits
+ * ~1s, 3 waits ~3s, 4 waits ~7s. Jitter spreads concurrent retries so
+ * they don't all hit the DB lock at the same moment.
+ */
+function backoffDelay(attempt: number): number {
+  const base = Math.pow(2, attempt - 1) * 500;
+  const jitter = Math.random() * 250;
+  return base + jitter;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 /**
  * The primary action card for a sheet.
  *
- * Layout is deliberately bigger than a normal row: when someone lands on
- * a sheet page the #1 question is "am I signed up?" and the #2 is "can I
- * still sign up?" — we answer both visually before text.
- *
- * When the user hasn't acted yet and signup is open, the CTA pulses to
- * draw the eye. Once registered, the CTA flips to a calm secondary
- * confirmation with a muted Withdraw.
+ * Hardened for concurrent-signup spikes:
+ *  - Click time is captured at the moment of the button press and sent on
+ *    every attempt. The server uses it as `signed_up_at` so ordering
+ *    reflects who actually clicked first, not whose request happened to
+ *    reach the DB lock first.
+ *  - Auto-retries on transient failures (timeouts, network errors, 5xx)
+ *    with exponential backoff + jitter, up to 4 attempts. 4xx errors
+ *    (sheet closed, etc.) stop immediately — retrying won't change the
+ *    answer.
+ *  - Progressive "Still working..." label after 5s of a single attempt.
+ *  - Hard per-attempt timeout so a stuck request can't freeze the button
+ *    forever.
+ *  - All state cleans up on unmount so nothing leaks if the user
+ *    navigates away mid-request.
  */
 export function SheetActions({
   sheetId,
-  profileId: _profileId,
+  profileId,
   myRegistration,
   signupClosed,
   withdrawClosed,
   isFull,
 }: SheetActionsProps) {
   const router = useRouter();
+  const { supabase } = useSupabase();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slow, setSlow] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountedRef = useRef(false);
 
-  async function handleSignUp() {
+  // Local copy of the viewer's registration so realtime bumps / promotions
+  // / admin removals flip the UI immediately instead of waiting for a
+  // manual page refresh. Seeded from the server and re-synced any time
+  // the server-rendered prop changes (e.g. after router.refresh()).
+  const [liveReg, setLiveReg] = useState(myRegistration);
+  useEffect(() => {
+    setLiveReg(myRegistration);
+  }, [myRegistration]);
+
+  // Realtime subscription to the viewer's own row(s) on this sheet so we
+  // don't miss:
+  //   - a priority bump (confirmed → waitlist) from someone else signing
+  //     up as high priority,
+  //   - a waitlist promotion (waitlist → confirmed) after someone
+  //     withdraws,
+  //   - an admin removing them (→ withdrawn),
+  //   - an admin adding them when they weren't registered yet (INSERT).
+  //
+  // Like LiveRosterCount, this uses the separate Realtime WebSocket
+  // pool — it does NOT share connections with the signup RPC path and
+  // makes zero extra HTTP calls per event.
+  useEffect(() => {
+    if (!profileId) return;
+    const channel = supabase
+      .channel(`my-registration-${sheetId}-${profileId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "registrations",
+          filter: `sheet_id=eq.${sheetId}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as
+            | { id?: string; player_id?: string; status?: RegistrationStatus }
+            | undefined;
+          if (!row || row.player_id !== profileId) return;
+
+          const newStatus = (payload.new as { status?: RegistrationStatus } | undefined)?.status;
+          const oldStatus = (payload.old as { status?: RegistrationStatus } | undefined)?.status;
+
+          // Notify only on the transitions users care about. Skip toasts
+          // fired by the viewer's own signup / withdraw (those already
+          // have their own UI feedback + router.refresh()).
+          if (oldStatus === "confirmed" && newStatus === "waitlist") {
+            toast("You've been moved to the waitlist.", "info");
+          } else if (oldStatus === "waitlist" && newStatus === "confirmed") {
+            toast("You've been promoted — you're confirmed!", "success");
+          } else if (
+            (oldStatus === "confirmed" || oldStatus === "waitlist") &&
+            newStatus === "withdrawn"
+          ) {
+            toast("You've been removed from this event.", "info");
+          }
+
+          if (payload.eventType === "DELETE") {
+            setLiveReg(null);
+          } else if (
+            newStatus === "confirmed" ||
+            newStatus === "waitlist"
+          ) {
+            setLiveReg({ id: row.id!, status: newStatus });
+          } else {
+            // withdrawn or anything unexpected — treat as not registered
+            setLiveReg(null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sheetId, profileId, supabase, toast]);
+
+  useEffect(() => {
+    return () => {
+      unmountedRef.current = true;
+      abortRef.current?.abort();
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
+  }, []);
+
+  /**
+   * Fire a single attempt with its own timeout + "still working" timer.
+   * Returns the Response on ok or 4xx (caller decides whether to retry),
+   * or throws on network / abort / 5xx so the retry loop picks it up.
+   */
+  async function attempt(url: string, body: Record<string, unknown>): Promise<Response> {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const hardStop = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+    slowTimerRef.current = setTimeout(() => setSlow(true), SLOW_THRESHOLD_MS);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      // 5xx: let the retry loop handle it.
+      if (res.status >= 500) {
+        throw new Error(`server_${res.status}`);
+      }
+      return res;
+    } finally {
+      clearTimeout(hardStop);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+      setSlow(false);
+      abortRef.current = null;
+    }
+  }
+
+  async function runWithRetry(url: string, body: Record<string, unknown>): Promise<Response | null> {
+    let lastErr: unknown = null;
+    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
+      if (unmountedRef.current) return null;
+      try {
+        const res = await attempt(url, body);
+        // Non-5xx (ok or 4xx) — return to caller immediately.
+        return res;
+      } catch (err) {
+        lastErr = err;
+        // Don't retry past the last attempt.
+        if (i === MAX_ATTEMPTS) break;
+        await sleep(backoffDelay(i));
+      }
+    }
+    // All attempts exhausted.
+    throw lastErr ?? new Error("unknown_error");
+  }
+
+  async function run(url: string, verb: "signup" | "withdraw") {
     setLoading(true);
     setError(null);
+    setSlow(false);
+    setAttempted(true);
+
+    // Capture click time ONCE, here. Every retry sends the same value so
+    // the user's place in line reflects their original click, not a
+    // later retry.
+    const clickedAt = new Date().toISOString();
+
     try {
-      const res = await fetch(`/api/sheets/${sheetId}/signup`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to sign up.");
+      const res = await runWithRetry(url, { clicked_at: clickedAt });
+      if (!res) return; // component unmounted mid-flight
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error || `Failed to ${verb}.`);
+      }
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to sign up.");
+      if (unmountedRef.current) return;
+      const name = (err as { name?: string })?.name;
+      const msg = (err as { message?: string })?.message ?? "";
+      if (name === "AbortError" || msg.startsWith("server_")) {
+        setError(
+          `We couldn't confirm your ${verb === "signup" ? "sign-up" : "withdrawal"} after several tries. It may have gone through — refresh to check, or tap to try again.`
+        );
+      } else {
+        setError(msg || `Failed to ${verb}.`);
+      }
     } finally {
-      setLoading(false);
+      if (!unmountedRef.current) setLoading(false);
     }
+  }
+
+  async function handleSignUp() {
+    await run(`/api/sheets/${sheetId}/signup`, "signup");
   }
 
   async function handleWithdraw() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/sheets/${sheetId}/withdraw`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to withdraw.");
-      router.refresh();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to withdraw.");
-    } finally {
-      setLoading(false);
-    }
+    await run(`/api/sheets/${sheetId}/withdraw`, "withdraw");
   }
 
   const isRegistered =
-    myRegistration &&
-    (myRegistration.status === "confirmed" || myRegistration.status === "waitlist");
+    liveReg &&
+    (liveReg.status === "confirmed" || liveReg.status === "waitlist");
 
-  // The CTA pulses in exactly one case: signup is open, user isn't
-  // registered yet, and we're not mid-request. Anything else is calm.
   const pulse = !isRegistered && !signupClosed && !loading;
 
   const ctaLabel = loading
-    ? (isRegistered ? "Withdrawing…" : "Signing up…")
-    : isRegistered
-      ? "Withdraw"
-      : signupClosed
-        ? "Sign-up closed"
-        : isFull
-          ? "Join waitlist"
-          : "Sign up";
+    ? slow
+      ? "Still working…"
+      : isRegistered
+        ? "Withdrawing…"
+        : "Signing up…"
+    : attempted && error
+      ? "Try again"
+      : isRegistered
+        ? "Withdraw"
+        : signupClosed
+          ? "Sign-up closed"
+          : isFull
+            ? "Join waitlist"
+            : "Sign up";
 
   return (
     <div className="rounded-2xl bg-surface-raised ring-1 ring-surface-border p-4 sm:p-5">
@@ -102,7 +294,7 @@ export function SheetActions({
               </p>
               <p className="mt-0.5 text-lg font-semibold text-dark-100">
                 You&apos;re{" "}
-                {myRegistration.status === "confirmed" ? (
+                {liveReg?.status === "confirmed" ? (
                   <span className="text-teal-300">confirmed</span>
                 ) : (
                   <span className="text-accent-300">on the waitlist</span>
@@ -127,6 +319,11 @@ export function SheetActions({
                     ? "This event is full — join the waitlist to hold your spot."
                     : "Sign up to lock in your seat."}
               </p>
+              {slow && (
+                <p className="mt-1 text-xs text-surface-muted">
+                  Busy sheet — hang tight, your spot is being locked in.
+                </p>
+              )}
             </>
           )}
         </div>
