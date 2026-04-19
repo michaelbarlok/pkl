@@ -9,56 +9,99 @@ export default async function HomePage() {
   const isLoggedIn = !!user;
 
   return (
-    <div className="space-y-12 sm:space-y-20 py-8 sm:py-16">
+    <div className="space-y-16 sm:space-y-24 py-4 sm:py-10">
       {/* ── Hero ── */}
-      <section className="text-center space-y-6">
-        <Logo className="mx-auto h-28 w-auto sm:h-36" />
-        <h1 className="text-3xl font-bold text-dark-100 sm:text-5xl tracking-tight">
-          Your pickleball community,<br className="hidden sm:block" /> all in one place.
-        </h1>
-        <p className="max-w-lg mx-auto text-base text-dark-200 sm:text-lg">
-          Show up with any number of players and let Free Play manage the teams and scores. Or sign up for shootouts, climb the rankings, and never miss a match.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-          {isLoggedIn ? (
-            <Link href="/dashboard" className="btn-primary btn-lg">
-              Go to Dashboard
-            </Link>
-          ) : (
-            <>
-              <Link href="/register" className="btn-primary btn-lg">
-                Get Started
+      <section className="relative overflow-hidden rounded-3xl">
+        {/* Layered gradient backdrop — keeps the hero grounded without heavy imagery */}
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-br from-brand-700/30 via-brand-600/15 to-surface-raised"
+        />
+        <div
+          aria-hidden
+          className="absolute -top-24 -left-24 h-80 w-80 rounded-full bg-brand-500/20 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-teal-500/15 blur-3xl"
+        />
+        <div className="relative px-6 py-16 sm:px-10 sm:py-20 text-center space-y-6">
+          <Logo className="mx-auto h-24 w-auto sm:h-32" />
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-dark-950/40 ring-1 ring-surface-border px-3 py-1 text-xs font-medium text-brand-vivid">
+            <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />
+            Built for ladder leagues, free play, and everything in between
+          </span>
+          <h1 className="text-3xl font-bold text-dark-100 sm:text-5xl tracking-tight">
+            Your pickleball community,<br className="hidden sm:block" /> all in one place.
+          </h1>
+          <p className="max-w-xl mx-auto text-base text-dark-200 sm:text-lg leading-relaxed">
+            Show up with any number of players and let Free Play manage the teams and
+            scores. Or sign up for shootouts, climb the rankings, and never miss a match.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            {isLoggedIn ? (
+              <Link href="/dashboard" className="btn-primary btn-lg">
+                Go to Dashboard
               </Link>
-              <Link href="/login" className="btn-secondary btn-lg">
-                Log In
-              </Link>
-            </>
+            ) : (
+              <>
+                <Link href="/register" className="btn-primary btn-lg">
+                  Get Started
+                </Link>
+                <Link href="#features" className="btn-secondary btn-lg">
+                  See how it works
+                </Link>
+              </>
+            )}
+          </div>
+          {!isLoggedIn && (
+            <p className="text-xs text-surface-muted">
+              Free to join — no credit card, no app install.
+            </p>
           )}
         </div>
       </section>
 
       {/* ── How It Works ── */}
-      <section className="max-w-3xl mx-auto space-y-8 text-center">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-dark-100 sm:text-3xl tracking-tight">Get started in minutes</h2>
-          <p className="text-dark-300">No complicated setup. Just sign up, join a group, and play.</p>
+      <section className="max-w-4xl mx-auto space-y-10">
+        <div className="text-center space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-vivid">
+            Getting started
+          </p>
+          <h2 className="text-2xl font-bold text-dark-100 sm:text-3xl tracking-tight">Up and running in minutes</h2>
+          <p className="text-dark-300">No complicated setup. Sign up, join a group, and play.</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
-          <div className="space-y-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 font-bold text-lg">1</div>
-            <h3 className="text-base font-semibold text-dark-100">Create your account</h3>
-            <p className="text-sm text-dark-300">Sign up in seconds. Just your name and email.</p>
-          </div>
-          <div className="space-y-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 font-bold text-lg">2</div>
-            <h3 className="text-base font-semibold text-dark-100">Join a group</h3>
-            <p className="text-sm text-dark-300">Find your local ladder league or free play group and request to join. The organizer approves you and you&apos;re in.</p>
-          </div>
-          <div className="space-y-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 font-bold text-lg">3</div>
-            <h3 className="text-base font-semibold text-dark-100">Sign up &amp; play</h3>
-            <p className="text-sm text-dark-300">Browse upcoming sessions, tap to sign up, show up and play. Scores and rankings update automatically.</p>
-          </div>
+        <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
+          {/* Connector line — only on desktop, sits behind the step dots */}
+          <div
+            aria-hidden
+            className="hidden sm:block absolute top-5 left-[16.666%] right-[16.666%] h-px bg-gradient-to-r from-brand-500/30 via-brand-500/60 to-brand-500/30"
+          />
+          {[
+            {
+              n: 1,
+              title: "Create your account",
+              body: "Sign up in seconds. Just your name and email.",
+            },
+            {
+              n: 2,
+              title: "Join a group",
+              body: "Find your local ladder league or free play group and request to join. The organizer approves you and you're in.",
+            },
+            {
+              n: 3,
+              title: "Sign up & play",
+              body: "Browse upcoming sessions, tap to sign up, show up and play. Scores and rankings update automatically.",
+            },
+          ].map((step) => (
+            <div key={step.n} className="relative space-y-3">
+              <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-brand-900/80 text-brand-300 font-bold text-lg ring-4 ring-dark-950">
+                {step.n}
+              </div>
+              <h3 className="text-base font-semibold text-dark-100">{step.title}</h3>
+              <p className="text-sm text-dark-300">{step.body}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -350,9 +393,12 @@ export default async function HomePage() {
       {/* ── FAQ ── */}
       <section className="max-w-2xl mx-auto space-y-8">
         <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold text-dark-100 sm:text-3xl tracking-tight">Frequently asked questions</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-vivid">
+            Frequently asked
+          </p>
+          <h2 className="text-2xl font-bold text-dark-100 sm:text-3xl tracking-tight">Answers before you sign up</h2>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-2">
           {[
             {
               q: "Do I need to be invited or can anyone join?",
@@ -371,37 +417,64 @@ export default async function HomePage() {
               a: "Free Play handles it automatically — it rotates players fairly so everyone gets balanced game time, no matter how many people show up.",
             },
           ].map((item) => (
-            <div key={item.q} className="card space-y-2">
-              <p className="text-sm font-semibold text-dark-100">{item.q}</p>
-              <p className="text-sm text-dark-300">{item.a}</p>
-            </div>
+            <details
+              key={item.q}
+              className="group rounded-xl bg-surface-raised ring-1 ring-surface-border transition-colors hover:ring-brand-500/30"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-dark-100">
+                {item.q}
+                <svg
+                  className="h-4 w-4 shrink-0 text-surface-muted transition-transform group-open:rotate-180"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  aria-hidden
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </summary>
+              <p className="border-t border-surface-border px-4 py-3 text-sm text-dark-300 leading-relaxed">
+                {item.a}
+              </p>
+            </details>
           ))}
         </div>
       </section>
 
       {/* ── Bottom CTA ── */}
-      <section className="text-center space-y-4 pb-8">
-        <h2 className="text-2xl font-bold text-dark-100 sm:text-3xl">
-          Ready to play?
-        </h2>
-        <p className="text-dark-200 max-w-md mx-auto">
-          Join the community and start tracking your games — casual or competitive.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-          {isLoggedIn ? (
-            <Link href="/dashboard" className="btn-primary btn-lg">
-              Go to Dashboard
-            </Link>
-          ) : (
-            <>
-              <Link href="/register" className="btn-primary btn-lg">
-                Create Your Account
-              </Link>
-              <Link href="/login" className="btn-secondary btn-lg">
-                Log In
-              </Link>
-            </>
-          )}
+      <section className="pb-8">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-700/40 via-brand-600/25 to-teal-600/20 ring-1 ring-surface-border">
+          <div
+            aria-hidden
+            className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl"
+          />
+          <div className="relative px-6 py-12 sm:px-10 sm:py-14 text-center space-y-4">
+            <h2 className="text-2xl font-bold text-dark-100 sm:text-3xl">
+              Ready to play?
+            </h2>
+            <p className="text-dark-200 max-w-md mx-auto">
+              Join the community and start tracking your games — casual or competitive.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              {isLoggedIn ? (
+                <Link href="/dashboard" className="btn-primary btn-lg">
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link href="/register" className="btn-primary btn-lg">
+                    Create your account
+                  </Link>
+                  <Link href="/login" className="btn-secondary btn-lg">
+                    Log in
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
