@@ -102,7 +102,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Link>
           <NotificationBell profileId={profile.id} />
         </header>
-        <main className="flex-1 px-3 py-4 pb-20 sm:px-6 md:pb-6 lg:px-8">
+        {/* The bottom padding has to clear the fixed MobileNav PLUS the
+             iOS home-indicator safe-area. Without the env() term, the
+             last bit of content slips behind the nav on phones with a
+             home indicator. */}
+        <main className="flex-1 px-3 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-6 lg:px-8">
           <div className="mx-auto w-full max-w-5xl animate-fade-in">
             {children}
           </div>
