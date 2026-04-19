@@ -35,21 +35,45 @@ function hash32(input: string): number {
   return h >>> 0;
 }
 
+/** Shared reducer: take any stable match-identifying string and flip it
+ *  into "team1" or "team2". */
+function firstChoiceFromKey(key: string): "team1" | "team2" {
+  return (hash32(key) & 1) === 0 ? "team1" : "team2";
+}
+
 /**
- * Pick which of the two teams in a given match gets "first choice".
+ * Pick which of the two teams in a given **shootout ladder** match gets
+ * "first choice".
  *
  * Inputs:
  *   - sessionId: the shootout session UUID
  *   - courtNumber: the pool / court number within the session
  *   - gameNumber: the game index within the court (1-based)
- *
- * Output: "team1" or "team2".
  */
 export function matchFirstChoice(
   sessionId: string,
   courtNumber: number,
   gameNumber: number
 ): "team1" | "team2" {
-  const key = `${sessionId}:${courtNumber}:${gameNumber}`;
-  return (hash32(key) & 1) === 0 ? "team1" : "team2";
+  return firstChoiceFromKey(`${sessionId}:${courtNumber}:${gameNumber}`);
+}
+
+/**
+ * Pick which of the two teams in a given **free play** match gets "first
+ * choice". Free play matches are addressed by their position in a round
+ * rather than by court, but the rule is identical: the team tagged gets
+ * to pick serve/return or which side of the court.
+ *
+ * Inputs:
+ *   - sessionId: the free_play_sessions UUID
+ *   - roundNumber: the round the match belongs to
+ *   - matchIndex: position of the match inside the round (0-based, matches
+ *                 the order of `current_round.matches` in the DB)
+ */
+export function freePlayMatchFirstChoice(
+  sessionId: string,
+  roundNumber: number,
+  matchIndex: number
+): "team1" | "team2" {
+  return firstChoiceFromKey(`fp:${sessionId}:${roundNumber}:${matchIndex}`);
 }

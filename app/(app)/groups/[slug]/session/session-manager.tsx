@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { FormError } from "@/components/form-error";
+import { FirstChoiceBadge } from "@/components/first-choice-badge";
+import { freePlayMatchFirstChoice } from "@/lib/first-choice";
 
 interface PlayerStanding {
   playerId: string;
@@ -642,7 +644,16 @@ function ActivePhase({
 
       {/* Matches */}
       <div className="space-y-4">
-        {round.matches.map((match, i) => (
+        {round.matches.map((match, i) => {
+          // One team in every free-play match gets "first choice" (serve/return
+          // or side of the court). Hidden while the admin is reshaping teams
+          // and once a score has been entered — it's exercised pre-game.
+          const isScored = match.scoreA != null && match.scoreB != null;
+          const firstChoice =
+            !editMode && !isScored
+              ? freePlayMatchFirstChoice(session.id, round.roundNumber, i)
+              : null;
+          return (
           <div key={i} className="card space-y-3">
             <p className="text-xs font-medium uppercase tracking-wider text-surface-muted">
               Court {i + 1}
@@ -675,6 +686,11 @@ function ActivePhase({
                   <>
                     <p className="text-sm font-medium text-dark-100">{getName(match.teamA[0])}</p>
                     <p className="text-sm text-surface-muted">{getName(match.teamA[1])}</p>
+                    {firstChoice === "team1" && (
+                      <div className="flex justify-end pt-1">
+                        <FirstChoiceBadge />
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -731,12 +747,18 @@ function ActivePhase({
                   <>
                     <p className="text-sm font-medium text-dark-100">{getName(match.teamB[0])}</p>
                     <p className="text-sm text-surface-muted">{getName(match.teamB[1])}</p>
+                    {firstChoice === "team2" && (
+                      <div className="flex justify-start pt-1">
+                        <FirstChoiceBadge />
+                      </div>
+                    )}
                   </>
                 )}
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Sitting players */}
