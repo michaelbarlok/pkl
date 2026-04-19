@@ -1,7 +1,7 @@
 import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { notifyMany } from "@/lib/notify";
 import { NextResponse } from "next/server";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
 import type { CancellationReason } from "@/types/database";
 
 const REASON_LABELS: Record<CancellationReason, string> = {
@@ -81,12 +81,13 @@ export async function POST(
 
   if (playerIds.length > 0) {
     const groupName = sheet.group?.name ?? "Event";
-    const eventDate = formatDate(sheet.event_date);
-    const eventTime = sheet.event_time ? formatTime(sheet.event_time) : null;
+    const tz = (sheet.timezone as string | undefined) ?? "America/New_York";
+    const eventDateDisplay = sheet.event_time ? formatDateInZone(sheet.event_time, tz) : "";
+    const eventTimeDisplay = sheet.event_time ? formatTimeInZone(sheet.event_time, tz) : null;
 
     const reasonLabel = cancellationReason ? REASON_LABELS[cancellationReason] : null;
     const bodyParts = [
-      `The ${groupName} event on ${eventDate}${eventTime ? ` at ${eventTime}` : ""} has been cancelled.`,
+      `The ${groupName} event on ${eventDateDisplay}${eventTimeDisplay ? ` at ${eventTimeDisplay}` : ""} has been cancelled.`,
       reasonLabel ? `Reason: ${reasonLabel}` : null,
       cancellationMessage ? `"${cancellationMessage}"` : null,
     ].filter(Boolean);
@@ -100,8 +101,9 @@ export async function POST(
       emailTemplate: "SheetCancelled",
       emailData: {
         groupName,
-        eventDate,
+        eventDate: sheet.event_time,
         eventTime: sheet.event_time,
+        timezone: tz,
         sheetId: id,
         cancellationReason,
         cancellationMessage,

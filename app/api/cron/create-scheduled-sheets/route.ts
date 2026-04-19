@@ -144,6 +144,7 @@ export async function GET(request: NextRequest) {
           groupName,
           eventDate: eventDateStr,
           eventTime: eventTimeIso,
+          timezone: tz,
           location: sched.location,
           sheetId: sheet.id,
         },

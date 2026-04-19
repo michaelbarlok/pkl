@@ -1,17 +1,19 @@
 import { Button, Link, Text } from "@react-email/components";
 import BaseEmail from "./BaseEmail";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
 
 interface Props {
   groupName?: string;
   eventDate?: string;
   eventTime?: string;
   location?: string;
+  timezone?: string;
   sheetId?: string;
 }
 
-export default function NewSheet({ groupName, eventDate, eventTime, location, sheetId }: Props) {
-  const formattedTime = eventTime ? formatTime(eventTime) : null;
+export default function NewSheet({ groupName, eventDate, eventTime, location, timezone, sheetId }: Props) {
+  const tz = timezone ?? "America/New_York";
+  const formattedTime = eventTime ? formatTimeInZone(eventTime, tz) : null;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   return (
@@ -20,7 +22,7 @@ export default function NewSheet({ groupName, eventDate, eventTime, location, sh
         A new event has been posted for <strong>{groupName ?? "your group"}</strong>!
       </Text>
       <Text style={{ color: "#374151", fontSize: "14px" }}>
-        Date: {eventDate ? formatDate(eventDate) : "TBD"}
+        Date: {eventDate ? formatDateInZone(eventDate, tz) : "TBD"}
         {formattedTime ? ` at ${formattedTime}` : ""}
       </Text>
       {location && (
