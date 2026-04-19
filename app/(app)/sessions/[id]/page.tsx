@@ -1,7 +1,9 @@
 "use client";
 
 import { EmptyState } from "@/components/empty-state";
+import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { matchFirstChoice } from "@/lib/first-choice";
 import type { ShootoutSession, SessionParticipant, GameResult } from "@/types/database";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -549,7 +551,11 @@ export default function PlayerSessionPage() {
                         );
                       }
 
-                      // No result yet
+                      // No result yet — one team holds "first choice" for the coin-toss
+                      // equivalent (serve/return or side of the court). Deterministic per
+                      // (session, court, game) so the same team keeps the label until it's played.
+                      const firstChoice = matchFirstChoice(sessionId, courtNum, match.gameNumber);
+
                       if (canEnter) {
                         const href = isAdmin && !isMyCourtSection
                           ? `/sessions/${sessionId}/score?court=${courtNum}&game=${match.gameNumber}`
@@ -564,12 +570,14 @@ export default function PlayerSessionPage() {
                               <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
                               <span className="text-xs font-semibold text-brand-300 group-hover:text-brand-200 transition-colors">Enter score →</span>
                             </div>
-                            <div className="px-3 py-2.5 bg-surface-raised">
-                              <span className="text-sm text-dark-200">{formatTeam(match.team1, playerNames)}</span>
+                            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-surface-raised">
+                              <span className="text-sm text-dark-200 truncate">{formatTeam(match.team1, playerNames)}</span>
+                              {firstChoice === "team1" && <FirstChoiceBadge className="shrink-0" />}
                             </div>
                             <div className="h-px bg-surface-border" />
-                            <div className="px-3 py-2.5 bg-surface-raised">
-                              <span className="text-sm text-dark-200">{formatTeam(match.team2, playerNames)}</span>
+                            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-surface-raised">
+                              <span className="text-sm text-dark-200 truncate">{formatTeam(match.team2, playerNames)}</span>
+                              {firstChoice === "team2" && <FirstChoiceBadge className="shrink-0" />}
                             </div>
                             {match.bye && (
                               <div className="px-3 py-1.5 bg-surface-overlay/60 border-t border-surface-border">
@@ -587,12 +595,14 @@ export default function PlayerSessionPage() {
                             <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
                             <span className="text-xs text-surface-muted italic">Awaiting score</span>
                           </div>
-                          <div className="px-3 py-2.5 bg-surface-raised">
-                            <span className="text-sm text-dark-300">{formatTeam(match.team1, playerNames)}</span>
+                          <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-surface-raised">
+                            <span className="text-sm text-dark-300 truncate">{formatTeam(match.team1, playerNames)}</span>
+                            {firstChoice === "team1" && <FirstChoiceBadge className="shrink-0" />}
                           </div>
                           <div className="h-px bg-surface-border" />
-                          <div className="px-3 py-2.5 bg-surface-raised">
-                            <span className="text-sm text-dark-300">{formatTeam(match.team2, playerNames)}</span>
+                          <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-surface-raised">
+                            <span className="text-sm text-dark-300 truncate">{formatTeam(match.team2, playerNames)}</span>
+                            {firstChoice === "team2" && <FirstChoiceBadge className="shrink-0" />}
                           </div>
                           {match.bye && (
                             <div className="px-3 py-1.5 bg-surface-overlay/60 border-t border-surface-border">

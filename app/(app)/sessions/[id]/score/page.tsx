@@ -1,6 +1,8 @@
 "use client";
 
+import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { matchFirstChoice } from "@/lib/first-choice";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 
@@ -190,19 +192,29 @@ export default function ScoreEntryPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {prefilledMatch ? (
           <>
-            {/* Game header */}
-            <div className="card bg-surface-overlay text-center py-3">
-              <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-1">
-                Game {prefilledMatch.gameNumber}
-              </p>
-              <p className="text-base font-semibold text-dark-100">
-                {formatTeamNames(prefilledMatch.team1)}
-              </p>
-              <p className="text-xs text-surface-muted my-0.5">vs</p>
-              <p className="text-base font-semibold text-dark-100">
-                {formatTeamNames(prefilledMatch.team2)}
-              </p>
-            </div>
+            {/* Game header — tags whichever team has "first choice" so the
+                scorekeeper can confirm it before play. */}
+            {(() => {
+              const firstChoice = activeCourt != null
+                ? matchFirstChoice(sessionId, activeCourt, prefilledMatch.gameNumber)
+                : null;
+              return (
+                <div className="card bg-surface-overlay text-center py-3">
+                  <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-1">
+                    Game {prefilledMatch.gameNumber}
+                  </p>
+                  <p className="text-base font-semibold text-dark-100 flex items-center justify-center gap-2 flex-wrap">
+                    <span>{formatTeamNames(prefilledMatch.team1)}</span>
+                    {firstChoice === "team1" && <FirstChoiceBadge />}
+                  </p>
+                  <p className="text-xs text-surface-muted my-0.5">vs</p>
+                  <p className="text-base font-semibold text-dark-100 flex items-center justify-center gap-2 flex-wrap">
+                    <span>{formatTeamNames(prefilledMatch.team2)}</span>
+                    {firstChoice === "team2" && <FirstChoiceBadge />}
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* Score inputs */}
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
