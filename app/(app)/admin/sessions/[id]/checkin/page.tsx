@@ -651,24 +651,24 @@ export default function CheckInPage() {
       )}
 
       {/* Check-in Table */}
-      <div className="card overflow-hidden p-0">
+      <div className="card overflow-x-auto p-0">
         <table className="min-w-full divide-y divide-surface-border">
           <thead className="bg-surface-overlay">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-12">Check-in</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Pt %</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-24">Court</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-12">Check-in</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Name</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Step</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Pt %</th>
+              <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-20">Court</th>
               {session.is_same_day_continuation && (
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Move</th>
+                <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Move</th>
               )}
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border bg-surface-raised">
             {participants.map((p) => (
               <tr key={p.id} className={!p.checked_in ? "opacity-50" : ""}>
-                <td className="px-4 py-3">
+                <td className="px-2 sm:px-4 py-3">
                   <input
                     type="checkbox"
                     checked={p.checked_in}
@@ -676,12 +676,12 @@ export default function CheckInPage() {
                     className="h-4 w-4 rounded border-surface-border text-brand-600 focus:ring-brand-600"
                   />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-2 sm:px-4 py-3">
                   <div className="flex items-center gap-2">
                     {p.avatar_url ? (
-                      <img src={p.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover" />
+                      <img src={p.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover shrink-0" />
                     ) : (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs font-medium">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-900/50 text-brand-300 text-xs font-medium shrink-0">
                         {p.display_name.charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -691,9 +691,9 @@ export default function CheckInPage() {
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-sm text-dark-200">{p.current_step}</td>
-                <td className="px-4 py-3 text-sm text-dark-200">{p.win_pct.toFixed(1)}%</td>
-                <td className="px-4 py-3">
+                <td className="px-2 sm:px-4 py-3 text-sm text-dark-200">{p.current_step}</td>
+                <td className="px-2 sm:px-4 py-3 text-sm text-dark-200">{p.win_pct.toFixed(1)}%</td>
+                <td className="px-2 sm:px-4 py-3">
                   <input
                     type="number"
                     min={1}
@@ -705,12 +705,12 @@ export default function CheckInPage() {
                         e.target.value ? parseInt(e.target.value) : null
                       )
                     }
-                    className="w-16 rounded border border-surface-border bg-surface-overlay text-dark-100 text-sm py-1 px-2 text-center focus:ring-1 focus:ring-brand-600 focus:outline-none"
+                    className="w-12 rounded border border-surface-border bg-surface-overlay text-dark-100 text-sm py-1 px-1 text-center focus:ring-1 focus:ring-brand-600 focus:outline-none"
                     placeholder="—"
                   />
                 </td>
                 {session.is_same_day_continuation && (
-                  <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap">
+                  <td className="px-2 sm:px-4 py-3 text-sm font-semibold whitespace-nowrap">
                     {(() => {
                       const prev = p.prev_court_number;
                       const next = p.target_court_next ?? p.court_number;
