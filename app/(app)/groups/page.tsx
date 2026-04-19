@@ -105,12 +105,7 @@ export default async function GroupsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-100">Browse Groups</h1>
-          <p className="mt-1 text-surface-muted">
-            Find a shootout group to join and start competing.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-dark-100">Groups</h1>
         <Link href="/groups/new" className="btn-primary whitespace-nowrap">
           Create a Group
         </Link>
