@@ -242,51 +242,70 @@ export default async function DashboardPage() {
       .slice(0, 5);
   }
 
+  // A brand new user has nothing to show: no groups, no timeline, no tourneys.
+  // Rather than an awkward "greeting + empty state soup" we give them a guided
+  // first-run block that points at the three things they can do right now.
+  const isFirstRun =
+    !lead &&
+    activeGroupMemberships.length === 0 &&
+    allTournaments.length === 0 &&
+    totalSessions === 0;
+
   return (
     <div className="space-y-10 sm:space-y-12 animate-fade-in">
       {/* 1 ── Contextual hero */}
-      {lead ? <ContextualHero lead={lead} /> : <SimpleHero name={profile.display_name} />}
+      {isFirstRun ? (
+        <OnboardingHero name={profile.display_name} />
+      ) : lead ? (
+        <ContextualHero lead={lead} />
+      ) : (
+        <SimpleHero name={profile.display_name} />
+      )}
 
       {/* 2 ── Timeline */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <SectionLabel>What&apos;s next</SectionLabel>
-          <Link href="/sheets" className="text-sm text-brand-400 hover:text-brand-300">View sheets</Link>
-        </div>
-        {orderedTimeline.length > 0 ? (
-          <ul className="divide-y divide-surface-border rounded-xl bg-surface-raised ring-1 ring-surface-border overflow-hidden">
-            {orderedTimeline.map((item) => (
-              <TimelineRow key={`${item.kind}-${item.id}`} item={item} todayIso={todayIso} />
-            ))}
-          </ul>
-        ) : (
-          <EmptyState
-            illustration={<EmptyIllustrationCalendar />}
-            title="Nothing scheduled"
-            description="Check back soon for upcoming events and tournaments."
-            actionLabel="Browse sheets"
-            actionHref="/sheets"
-            secondaryLabel="See tournaments"
-            secondaryHref="/tournaments"
-          />
-        )}
-      </section>
+      {!isFirstRun && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <SectionLabel>What&apos;s next</SectionLabel>
+            <Link href="/sheets" className="text-sm text-brand-400 hover:text-brand-300">View sheets</Link>
+          </div>
+          {orderedTimeline.length > 0 ? (
+            <ul className="divide-y divide-surface-border rounded-xl bg-surface-raised ring-1 ring-surface-border overflow-hidden">
+              {orderedTimeline.map((item) => (
+                <TimelineRow key={`${item.kind}-${item.id}`} item={item} todayIso={todayIso} />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              illustration={<EmptyIllustrationCalendar />}
+              title="Nothing scheduled"
+              description="Check back soon for upcoming events and tournaments."
+              actionLabel="Browse sheets"
+              actionHref="/sheets"
+              secondaryLabel="See tournaments"
+              secondaryHref="/tournaments"
+            />
+          )}
+        </section>
+      )}
 
       {/* 3 ── Compact stats strip */}
-      <section>
-        <SectionLabel className="mb-3">Your season</SectionLabel>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <StatTile label="Sessions" value={String(totalSessions)} />
-          <StatTile label="Pt win %" value={weightedWinPct !== null ? `${weightedWinPct}%` : "—"} />
-          <StatTile label="Groups" value={String(groupCount)} />
-          <StatTile
-            label="Badges"
-            value={`${badgeStats.earned}`}
-            suffix={`/${badgeStats.total}`}
-            href="/badges"
-          />
-        </div>
-      </section>
+      {!isFirstRun && (
+        <section>
+          <SectionLabel className="mb-3">Your season</SectionLabel>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <StatTile label="Sessions" value={String(totalSessions)} />
+            <StatTile label="Pt win %" value={weightedWinPct !== null ? `${weightedWinPct}%` : "—"} />
+            <StatTile label="Groups" value={String(groupCount)} />
+            <StatTile
+              label="Badges"
+              value={`${badgeStats.earned}`}
+              suffix={`/${badgeStats.total}`}
+              href="/badges"
+            />
+          </div>
+        </section>
+      )}
 
       {/* 4 ── Recent activity */}
       {activity.length > 0 && (
@@ -314,12 +333,13 @@ export default async function DashboardPage() {
       )}
 
       {/* 5 ── My Groups */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <SectionLabel>My groups</SectionLabel>
-          <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300">Browse all</Link>
-        </div>
-        {activeGroupMemberships.length > 0 ? (
+      {!isFirstRun && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <SectionLabel>My groups</SectionLabel>
+            <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300">Browse all</Link>
+          </div>
+          {activeGroupMemberships.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {activeGroupMemberships.map((m) => {
               const g = (m as any).group;
@@ -349,16 +369,17 @@ export default async function DashboardPage() {
               );
             })}
           </div>
-        ) : (
-          <EmptyState
-            illustration={<EmptyIllustrationGroups />}
-            title="No groups yet"
-            description="Find a ladder league or free play group that fits your schedule."
-            actionLabel="Browse groups"
-            actionHref="/groups"
-          />
-        )}
-      </section>
+          ) : (
+            <EmptyState
+              illustration={<EmptyIllustrationGroups />}
+              title="No groups yet"
+              description="Find a ladder league or free play group that fits your schedule."
+              actionLabel="Browse groups"
+              actionHref="/groups"
+            />
+          )}
+        </section>
+      )}
 
       <footer className="pt-4 border-t border-surface-border flex items-center gap-4">
         <Link href="/privacy" className="text-xs text-surface-muted hover:text-dark-200 transition-colors">
@@ -442,6 +463,68 @@ function SimpleHero({ name }: { name: string }) {
     <div>
       <h1 className="text-heading">{greeting}, {name}</h1>
       <p className="mt-1 text-surface-muted">Nothing urgent — here&apos;s what&apos;s on the horizon.</p>
+    </div>
+  );
+}
+
+/** First-run welcome block: three numbered steps + a primary CTA. Shown only
+ *  to users with no groups, no registrations, and no session history. */
+function OnboardingHero({ name }: { name: string }) {
+  const steps = [
+    {
+      n: 1,
+      title: "Join a group",
+      body: "Find a ladder league or free-play group that fits your schedule and request to join.",
+    },
+    {
+      n: 2,
+      title: "Sign up for a session",
+      body: "Once you're in, tap into any open sign-up sheet and grab a spot.",
+    },
+    {
+      n: 3,
+      title: "Show up and play",
+      body: "Courts, scores, and rankings update as you play — no spreadsheets required.",
+    },
+  ];
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-700/40 via-brand-600/25 to-surface-raised ring-1 ring-surface-border">
+      <div className="p-6 sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-vivid">
+          Welcome
+        </p>
+        <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-dark-100">
+          Hey {name} — let&apos;s get you playing.
+        </h1>
+        <p className="mt-2 max-w-xl text-sm sm:text-base text-surface-muted">
+          Three quick steps. You can come back to this anytime — your dashboard
+          will fill in with live events and stats as soon as you join a group.
+        </p>
+
+        <ol className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {steps.map((s) => (
+            <li
+              key={s.n}
+              className="rounded-xl bg-dark-950/30 ring-1 ring-surface-border p-4"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-900/60 text-brand-300 font-bold">
+                {s.n}
+              </div>
+              <p className="mt-3 text-sm font-semibold text-dark-100">{s.title}</p>
+              <p className="mt-1 text-xs text-surface-muted leading-relaxed">{s.body}</p>
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <Link href="/groups" className="btn-primary">
+            Browse groups
+          </Link>
+          <Link href="/tournaments" className="text-sm font-medium text-brand-400 hover:text-brand-300">
+            Or check tournaments →
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

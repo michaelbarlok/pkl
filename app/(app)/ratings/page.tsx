@@ -134,14 +134,64 @@ export default async function RatingsPage() {
     return b.percentage - a.percentage;
   });
 
+  const totalPlayers = ranked.length;
+  const topStep = ranked[0]?.current_step ?? null;
+  const playersAtTop = topStep !== null
+    ? ranked.filter((r) => r.current_step === topStep).length
+    : 0;
+  const ratedPlayers = ranked.filter((r) => r.percentage > 0).length;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-heading">Rankings</h1>
-        <p className="mt-1 text-sm text-surface-muted">
-          Player rankings by step and scoring percentage (last {PCT_WINDOW_SESSIONS} sessions)
-        </p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-700/40 via-brand-600/25 to-surface-raised ring-1 ring-surface-border">
+        <div className="p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-vivid">
+            Community
+          </p>
+          <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-dark-100">
+            Rankings
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-surface-muted leading-relaxed">
+            Every active player ordered by step (lower is better) and then by their
+            scoring percentage across the last {PCT_WINDOW_SESSIONS} sessions. Your
+            step moves when you win shootout courts; your percentage is the share of
+            total points you won in recent play.
+          </p>
+        </div>
+
+        {/* Stat strip */}
+        {totalPlayers > 0 && (
+          <div className="border-t border-surface-border bg-dark-950/20 px-5 sm:px-6 py-3">
+            <div className="grid grid-cols-3 gap-4 text-center sm:text-left">
+              <div>
+                <p className="text-lg sm:text-xl font-bold text-dark-100">{totalPlayers}</p>
+                <p className="text-[10px] sm:text-[11px] uppercase tracking-wide text-surface-muted">
+                  Ranked players
+                </p>
+              </div>
+              {topStep !== null && (
+                <div>
+                  <p className="text-lg sm:text-xl font-bold text-dark-100">
+                    {playersAtTop}
+                    <span className="ml-1 text-xs font-normal text-surface-muted">at step {topStep}</span>
+                  </p>
+                  <p className="text-[10px] sm:text-[11px] uppercase tracking-wide text-surface-muted">
+                    Top of the ladder
+                  </p>
+                </div>
+              )}
+              <div>
+                <p className="text-lg sm:text-xl font-bold text-dark-100">{ratedPlayers}</p>
+                <p className="text-[10px] sm:text-[11px] uppercase tracking-wide text-surface-muted">
+                  With recent scores
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
       <RatingsTable ranked={ranked} />
     </div>
   );
