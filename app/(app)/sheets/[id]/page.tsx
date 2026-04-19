@@ -1,4 +1,3 @@
-import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -9,8 +8,10 @@ import { AdminAddMember } from "./admin-add-member";
 import { AdminDeleteSheet } from "./admin-delete-sheet";
 import { AdminRemovePlayer } from "./admin-remove-player";
 import { StartShootout } from "./start-shootout";
+import { ShareButton } from "./share-button";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
+import { PlayerAvatar } from "@/components/player-avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,6 @@ export default async function SheetDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  // Get current user
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -35,7 +35,6 @@ export default async function SheetDetailPage({
     .single();
   if (!profile) notFound();
 
-  // Fetch the sheet with group info
   const { data: sheet, error } = await supabase
     .from("signup_sheets")
     .select("*, group:shootout_groups(*)")
@@ -44,7 +43,7 @@ export default async function SheetDetailPage({
 
   if (error || !sheet) notFound();
 
-  // Fetch registrations — try with player join, fall back to plain query
+  // Registrations — with a fallback when the join errors out under RLS.
   let registrations: (Registration & { player?: Profile })[] | null = null;
   {
     const { data, error: regError } = await supabase
@@ -55,7 +54,6 @@ export default async function SheetDetailPage({
       .order("signed_up_at", { ascending: true });
 
     if (regError) {
-      // Fallback: query without join, then fetch profiles separately
       console.error("Registration join query failed:", regError.message);
       const { data: plainRegs } = await supabase
         .from("registrations")
@@ -86,7 +84,6 @@ export default async function SheetDetailPage({
   const confirmed = (registrations ?? [])
     .filter((r: Registration) => r.status === "confirmed")
     .sort((a, b) => {
-      // High-priority (admins) first, then by signup timestamp
       const aPri = PRIORITY_ORDER[a.priority ?? "normal"] ?? 1;
       const bPri = PRIORITY_ORDER[b.priority ?? "normal"] ?? 1;
       if (aPri !== bPri) return aPri - bPri;
@@ -95,21 +92,20 @@ export default async function SheetDetailPage({
   const waitlisted = (registrations ?? [])
     .filter((r: Registration) => r.status === "waitlist")
     .sort((a, b) => {
-      // Waitlist uses waitlist_position as the authoritative order
-      // (matches promotion order in the promote_next_waitlist_player RPC)
       const aPri = PRIORITY_ORDER[a.priority ?? "normal"] ?? 1;
       const bPri = PRIORITY_ORDER[b.priority ?? "normal"] ?? 1;
       if (aPri !== bPri) return aPri - bPri;
       return (a.waitlist_position ?? 999) - (b.waitlist_position ?? 999);
     });
 
-  // Check current user's registration
   const myRegistration = (registrations ?? []).find(
     (r: Registration) => r.player_id === profile.id
   );
 
   const now = new Date();
-  const signupClosed = new Date(sheet.signup_closes_at) < now;
+  const signupClosedAt = new Date(sheet.signup_closes_at);
+  const eventAt = new Date(sheet.event_time);
+  const signupClosed = signupClosedAt < now;
   const withdrawClosed = sheet.withdraw_closes_at
     ? new Date(sheet.withdraw_closes_at) < now
     : false;
@@ -120,24 +116,34 @@ export default async function SheetDetailPage({
     ? waitlisted.findIndex((r: Registration) => r.player_id === profile.id) + 1
     : null;
 
-  // Check for an active (non-complete) session on this sheet
+  // Active session (for court assignment lookup in the roster).
   const { data: activeSessions } = await supabase
     .from("shootout_sessions")
     .select("id, status")
     .eq("sheet_id", id)
     .neq("status", "session_complete")
     .limit(1);
-
   const activeSession = activeSessions?.[0] ?? null;
 
-  // Add-member: admins always, regular members when allow_member_guests is on
+  let courtByPlayer = new Map<string, number>();
+  if (activeSession) {
+    const { data: participants } = await supabase
+      .from("session_participants")
+      .select("player_id, court_number")
+      .eq("session_id", activeSession.id);
+    for (const p of participants ?? []) {
+      if (p.court_number) courtByPlayer.set(p.player_id, p.court_number);
+    }
+  }
+
+  // Add-member eligibility: admins always; regular members only when the
+  // group has allow_member_guests set AND signup is still open.
   const canAddMembers = isAdmin || (sheet.allow_member_guests && !signupClosed);
   const registeredPlayerIds = new Set(
     (registrations ?? []).map((r: Registration) => r.player_id)
   );
   let availableMembers: { id: string; display_name: string }[] = [];
   if (canAddMembers && !isCancelled && sheet.group_id) {
-    // Only show group members who haven't already signed up
     const { data: memberships } = await supabase
       .from("group_memberships")
       .select("player_id")
@@ -159,114 +165,107 @@ export default async function SheetDetailPage({
     }
   }
 
+  const tz = sheet.timezone ?? "America/New_York";
+  const eventDateLine = formatDateInZone(sheet.event_time, tz);
+  const eventTimeLine = formatTimeInZone(sheet.event_time, tz);
+  const signupCloseLine = `${formatDateInZone(sheet.signup_closes_at, tz)}, ${formatTimeInZone(sheet.signup_closes_at, tz)}`;
+
+  // Countdown copy: "closes in 3d 4h" / "closing soon" / "closed"
+  const countdownText = (() => {
+    if (isCancelled) return null;
+    if (signupClosed) {
+      if (eventAt > now) return `Event in ${shortDuration(eventAt.getTime() - now.getTime())}`;
+      return null;
+    }
+    return `Signup closes in ${shortDuration(signupClosedAt.getTime() - now.getTime())}`;
+  })();
+
+  const dateChip = formatDateChip(sheet.event_time, tz);
+  const statusPill =
+    sheet.status === "cancelled" ? { label: "Cancelled", cls: "status-cancelled" }
+    : sheet.status === "closed" ? { label: "Closed", cls: "status-closed" }
+    : isFull ? { label: "Waitlist only", cls: "status-upcoming" }
+    : { label: "Open", cls: "status-open" };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <Breadcrumb items={[
         { label: "Sheets", href: "/sheets" },
         { label: sheet.group?.name ?? "Event" },
       ]} />
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-100">
-            {sheet.group?.name ?? "Event"}
-          </h1>
-          <p className="mt-1 text-surface-muted">{sheet.location}</p>
+      {/* ── Event hero ─────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600/25 via-brand-700/15 to-surface-raised ring-1 ring-surface-border">
+        <div className="p-5 sm:p-7 flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-7">
+          {/* Big date chip */}
+          <div className="flex items-center gap-4 sm:gap-5 shrink-0">
+            <div className="text-center leading-none">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-brand-vivid">
+                {dateChip.month}
+              </p>
+              <p className="mt-1.5 text-5xl sm:text-6xl font-bold text-dark-100">
+                {dateChip.day}
+              </p>
+              <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-surface-muted">
+                {dateChip.weekday}
+              </p>
+            </div>
+          </div>
+
+          {/* Title + details */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-bold text-dark-100 break-words">
+                {sheet.group?.name ?? "Event"}
+              </h1>
+              <span className={`${statusPill.cls} shrink-0`}>{statusPill.label}</span>
+            </div>
+            <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-3 text-sm">
+              <HeroField label="Time" value={eventTimeLine} />
+              <HeroField label="Location" value={sheet.location} />
+              <HeroField
+                label="Players"
+                value={`${confirmed.length}/${sheet.player_limit}${
+                  waitlisted.length > 0 ? ` (+${waitlisted.length} wait)` : ""
+                }`}
+              />
+            </dl>
+            {countdownText && (
+              <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-vivid">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                </svg>
+                {countdownText}
+              </p>
+            )}
+          </div>
         </div>
-        <div>
-          {sheet.status === "open" && <span className="badge-green">Open</span>}
-          {sheet.status === "closed" && (
-            <span className="badge-yellow">Closed</span>
+
+        {/* Secondary action row within the hero */}
+        <div className="px-5 sm:px-7 pb-4 flex flex-wrap items-center gap-2 text-xs">
+          <ShareButton title={`${sheet.group?.name ?? "Event"} · ${eventDateLine}`} />
+          {!isAdmin && !isCancelled && (
+            <ContactOrganizersButton
+              endpoint={`/api/groups/${sheet.group_id}/contact-admins`}
+              label="Contact admins"
+            />
           )}
-          {sheet.status === "cancelled" && (
-            <span className="badge-red">Cancelled</span>
+          {sheet.group?.slug && (
+            <Link
+              href={`/groups/${sheet.group.slug}`}
+              className="btn-secondary btn-sm"
+            >
+              About group
+            </Link>
           )}
         </div>
       </div>
 
       {isCancelled && (
-        <div className="alert-danger p-4">
-          This event has been cancelled.
-        </div>
+        <div className="alert-danger p-4">This event has been cancelled.</div>
       )}
 
-      {/* Event Info */}
-      <div className="card">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <p className="text-sm font-medium text-surface-muted">Date</p>
-            <p className="mt-1 text-dark-100">{formatDateInZone(sheet.event_time, sheet.timezone)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-surface-muted">Time</p>
-            <p className="mt-1 text-dark-100">{formatTimeInZone(sheet.event_time, sheet.timezone)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-surface-muted">Location</p>
-            <p className="mt-1 text-dark-100">{sheet.location}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-surface-muted">Group</p>
-            <p className="mt-1 text-dark-100">{sheet.group?.name ?? "N/A"}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-surface-muted">Player Limit</p>
-            <p className="mt-1 text-dark-100">
-              {confirmed.length}/{sheet.player_limit}
-              {waitlisted.length > 0 && (
-                <span className="ml-2 text-sm text-surface-muted">
-                  (+{waitlisted.length} waitlisted)
-                </span>
-              )}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-surface-muted">
-              Sign-Up Closes
-            </p>
-            <p className="mt-1 text-dark-100">
-              {formatDateInZone(sheet.signup_closes_at, sheet.timezone)},{" "}
-              {formatTimeInZone(sheet.signup_closes_at, sheet.timezone)}
-            </p>
-          </div>
-          {sheet.withdraw_closes_at && (
-            <div>
-              <p className="text-sm font-medium text-surface-muted">
-                Withdraw Deadline
-              </p>
-              <p className="mt-1 text-dark-100">
-                {formatDateInZone(sheet.withdraw_closes_at, sheet.timezone)},{" "}
-                {formatTimeInZone(sheet.withdraw_closes_at, sheet.timezone)}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {sheet.notes && (
-          <div className="mt-4 border-t border-surface-border pt-4">
-            <p className="text-sm font-medium text-surface-muted">Notes</p>
-            <p className="mt-1 text-dark-200">{sheet.notes}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Contact Group Admins */}
-      {!isAdmin && !isCancelled && (
-        <ContactOrganizersButton
-          endpoint={`/api/groups/${sheet.group_id}/contact-admins`}
-          label="Contact Group Admins"
-        />
-      )}
-
-      {/* Waitlist position banner */}
-      {myWaitlistPosition && (
-        <div className="alert-warning px-4 py-3 text-sm">
-          You&apos;re <strong>#{myWaitlistPosition}</strong> on the waitlist — we&apos;ll notify you if a spot opens.
-        </div>
-      )}
-
-      {/* Sign-Up / Withdraw Actions */}
+      {/* ── Primary action card ────────────────────────────────── */}
       {!isCancelled && (
         <SheetActions
           sheetId={sheet.id}
@@ -282,124 +281,255 @@ export default async function SheetDetailPage({
         />
       )}
 
-      {/* Admin actions: Start Shootout, Add Member, Cancel Event */}
+      {myWaitlistPosition && (
+        <div className="alert-warning px-4 py-3 text-sm">
+          You&apos;re <strong>#{myWaitlistPosition}</strong> on the waitlist — we&apos;ll notify you if a spot opens.
+        </div>
+      )}
+
+      {/* ── Event details (smaller, under the fold) ────────────── */}
+      <details className="rounded-xl bg-surface-raised ring-1 ring-surface-border">
+        <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
+          <span className="text-sm font-semibold text-dark-100">Event details</span>
+          <svg className="h-4 w-4 text-surface-muted transition-transform group-open:rotate-180" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+            <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+          </svg>
+        </summary>
+        <div className="border-t border-surface-border px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
+          <DetailRow label="Sign-up closes" value={signupCloseLine} />
+          {sheet.withdraw_closes_at && (
+            <DetailRow
+              label="Withdraw deadline"
+              value={`${formatDateInZone(sheet.withdraw_closes_at, tz)}, ${formatTimeInZone(sheet.withdraw_closes_at, tz)}`}
+            />
+          )}
+          <DetailRow label="Group" value={sheet.group?.name ?? "—"} />
+          <DetailRow label="Location" value={sheet.location} />
+        </div>
+        {sheet.notes && (
+          <div className="border-t border-surface-border px-4 py-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-surface-muted">Notes</p>
+            <p className="mt-1 text-sm text-dark-200 whitespace-pre-wrap">{sheet.notes}</p>
+          </div>
+        )}
+      </details>
+
+      {/* ── Admin toolbox ──────────────────────────────────────── */}
       {isAdmin && !isCancelled && (
-        <div className="card space-y-4">
-          <h3 className="text-sm font-semibold text-dark-100">Admin Actions</h3>
-          <div className="flex flex-wrap gap-3">
+        <div className="rounded-xl bg-surface-raised ring-1 ring-dashed ring-surface-border p-4 space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-surface-muted">
+            Admin actions
+          </h3>
+          <div className="flex flex-wrap gap-2">
             {(sheet.status === "open" || sheet.status === "closed") &&
               (sheet as any).group?.group_type !== "free_play" && (
-              <StartShootout
-                sheetId={sheet.id}
-                groupId={sheet.group_id}
-                confirmedPlayerIds={confirmed.map((r: Registration) => r.player_id)}
-                activeSession={activeSession}
-              />
-            )}
+                <StartShootout
+                  sheetId={sheet.id}
+                  groupId={sheet.group_id}
+                  confirmedPlayerIds={confirmed.map((r: Registration) => r.player_id)}
+                  activeSession={activeSession}
+                />
+              )}
             <AdminDeleteSheet sheetId={sheet.id} />
           </div>
         </div>
       )}
 
-      {/* Add a member (admins always, regular members when enabled) */}
       {canAddMembers && !isCancelled && (
         <AdminAddMember sheetId={sheet.id} members={availableMembers} />
       )}
 
-      {/* Players */}
-      <section>
-        <h2 className="text-lg font-semibold text-dark-100 mb-3">
-          Players ({confirmed.length}/{sheet.player_limit})
-          {waitlisted.length > 0 && (
-            <span className="ml-2 text-sm font-normal text-surface-muted">
-              +{waitlisted.length} waitlisted
+      {/* ── Confirmed panel ────────────────────────────────────── */}
+      <section className="rounded-xl bg-surface-raised ring-1 ring-surface-border">
+        <header className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
+          <h2 className="text-sm font-semibold text-dark-100">
+            Confirmed
+            <span className="ml-2 text-surface-muted font-normal">
+              {confirmed.length}/{sheet.player_limit}
             </span>
+          </h2>
+          {activeSession && (
+            <span className="badge-blue">Shootout in progress</span>
           )}
-        </h2>
-        {confirmed.length > 0 || waitlisted.length > 0 ? (
-          <div className="card divide-y divide-surface-border max-h-[32rem] overflow-y-auto">
+        </header>
+        {confirmed.length > 0 ? (
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-0.5 p-2">
             {confirmed.map((reg: Registration & { player?: Profile }) => (
-              <div
+              <RosterCard
                 key={reg.id}
-                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                reg={reg}
+                court={courtByPlayer.get(reg.player_id)}
+                isMe={reg.player_id === profile.id}
+                adminCanRemove={isAdmin && !isCancelled}
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="px-4 py-8 text-center text-sm text-surface-muted">
+            No players signed up yet — be the first!
+          </p>
+        )}
+      </section>
+
+      {/* ── Waitlist panel ─────────────────────────────────────── */}
+      {waitlisted.length > 0 && (
+        <section className="rounded-xl bg-surface-raised ring-1 ring-surface-border">
+          <header className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
+            <h2 className="text-sm font-semibold text-dark-100">
+              Waitlist
+              <span className="ml-2 text-surface-muted font-normal">
+                {waitlisted.length}
+              </span>
+            </h2>
+            <span className="text-xs text-surface-muted">
+              Promoted in order if spots open
+            </span>
+          </header>
+          <ul className="divide-y divide-surface-border">
+            {waitlisted.map((reg: Registration & { player?: Profile }, idx: number) => (
+              <li
+                key={reg.id}
+                className={`flex items-center gap-3 px-4 py-2.5 ${
+                  reg.player_id === profile.id ? "bg-brand-500/5" : ""
+                }`}
               >
-                {reg.player?.avatar_url ? (
-                  <img
-                    src={reg.player.avatar_url}
-                    alt=""
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-sm font-medium text-surface-muted">
-                    {reg.player?.display_name?.charAt(0) ?? "?"}
-                  </div>
-                )}
-                <span className="flex-1 text-dark-100">
+                <span className="text-xs font-semibold text-surface-muted w-6 text-right shrink-0">
+                  #{idx + 1}
+                </span>
+                <PlayerAvatar
+                  displayName={reg.player?.display_name ?? "?"}
+                  avatarUrl={reg.player?.avatar_url ?? null}
+                  size="sm"
+                />
+                <span className="flex-1 truncate text-sm text-dark-100">
                   {reg.player?.display_name ?? "Unknown"}
                 </span>
-                {reg.player?.skill_level && (
-                  <span className="badge-blue text-xs">
-                    {reg.player.skill_level}
-                  </span>
-                )}
                 {isAdmin && !isCancelled && (
                   <AdminRemovePlayer
                     registrationId={reg.id}
                     playerName={reg.player?.display_name ?? "this player"}
                   />
                 )}
-              </div>
+              </li>
             ))}
-            {waitlisted.length > 0 && (
-              <>
-                <div className="py-2">
-                  <span className="text-xs font-medium uppercase tracking-wider text-surface-muted">
-                    Waitlist
-                  </span>
-                </div>
-                {waitlisted.map(
-                  (reg: Registration & { player?: Profile }, idx: number) => (
-                    <div
-                      key={reg.id}
-                      className="flex items-center gap-3 py-3"
-                    >
-                      <span className="text-sm font-medium text-surface-muted w-6 text-right">
-                        {idx + 1}.
-                      </span>
-                      {reg.player?.avatar_url ? (
-                        <img
-                          src={reg.player.avatar_url}
-                          alt=""
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-overlay text-sm font-medium text-surface-muted">
-                          {reg.player?.display_name?.charAt(0) ?? "?"}
-                        </div>
-                      )}
-                      <span className="flex-1 text-dark-100">
-                        {reg.player?.display_name ?? "Unknown"}
-                      </span>
-                      <span className="badge-yellow text-xs">Waitlisted</span>
-                      {isAdmin && !isCancelled && (
-                        <AdminRemovePlayer
-                          registrationId={reg.id}
-                          playerName={reg.player?.display_name ?? "this player"}
-                        />
-                      )}
-                    </div>
-                  )
-                )}
-              </>
-            )}
-          </div>
-        ) : (
-          <EmptyState
-            title="No players signed up yet"
-            description="Be the first to sign up for this event."
-          />
-        )}
-      </section>
+          </ul>
+        </section>
+      )}
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────
+
+function RosterCard({
+  reg,
+  court,
+  isMe,
+  adminCanRemove,
+}: {
+  reg: Registration & { player?: Profile };
+  court: number | undefined;
+  isMe: boolean;
+  adminCanRemove: boolean;
+}) {
+  return (
+    <li
+      className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-surface-overlay/50 ${
+        isMe ? "bg-brand-500/5 ring-1 ring-brand-500/30" : ""
+      }`}
+    >
+      <PlayerAvatar
+        displayName={reg.player?.display_name ?? "?"}
+        avatarUrl={reg.player?.avatar_url ?? null}
+        size="md"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-dark-100 truncate">
+          {reg.player?.display_name ?? "Unknown"}
+          {isMe && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-vivid">You</span>}
+        </p>
+        <div className="mt-0.5 flex items-center gap-2 text-xs text-surface-muted">
+          {reg.player?.skill_level && (
+            <span>{reg.player.skill_level}</span>
+          )}
+          {reg.priority === "high" && (
+            <span className="text-accent-400 font-medium">Priority</span>
+          )}
+          {reg.priority === "low" && (
+            <span className="text-surface-muted">Low priority</span>
+          )}
+        </div>
+      </div>
+      {court && (
+        <span className="badge-blue shrink-0" title="Court assignment">
+          Court {court}
+        </span>
+      )}
+      {adminCanRemove && (
+        <AdminRemovePlayer
+          registrationId={reg.id}
+          playerName={reg.player?.display_name ?? "this player"}
+        />
+      )}
+    </li>
+  );
+}
+
+function HeroField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted">
+        {label}
+      </dt>
+      <dd className="mt-0.5 text-dark-100 truncate">{value}</dd>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-surface-muted">{label}</p>
+      <p className="mt-0.5 text-dark-100">{value}</p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+/** "3d 4h", "2h 15m", "15m", "Now" — used in the countdown pill. */
+function shortDuration(ms: number): string {
+  if (ms <= 0) return "now";
+  const totalMin = Math.floor(ms / 60000);
+  const d = Math.floor(totalMin / 1440);
+  const h = Math.floor((totalMin % 1440) / 60);
+  const m = totalMin % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+/** Format an event timestamp into a tight "APR / 22 / Fri" chip keyed
+ *  to the sheet's timezone so it matches what the user expects. */
+function formatDateChip(iso: string, tz: string): {
+  month: string;
+  day: string;
+  weekday: string;
+} {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return {
+    month: get("month").toUpperCase(),
+    day: get("day"),
+    weekday: get("weekday").toUpperCase(),
+  };
 }

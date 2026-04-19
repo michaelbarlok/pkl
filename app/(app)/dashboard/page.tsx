@@ -5,10 +5,21 @@ import {
 } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { getBadgeStats } from "@/lib/queries/badges";
+import { groupGradient } from "@/lib/group-gradient";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatTime } from "@/lib/utils";
 
+/**
+ * Authenticated home / dashboard.
+ *
+ * Shape:
+ *  1. Contextual hero — live session, today's event, or next event CTA.
+ *  2. Unified "What's next" timeline (live + upcoming) with status pills.
+ *  3. Compact stats strip (dense tiles).
+ *  4. Recent activity feed.
+ *  5. My groups.
+ */
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -42,6 +53,7 @@ export default async function DashboardPage() {
   // Filter to active groups only
   const activeGroupMemberships = (memberships ?? []).filter((m) => (m as any).group?.is_active !== false);
   const activeSheets = (sheets ?? []).filter((s: any) => s.group?.is_active !== false);
+  const groupIds = activeGroupMemberships.map((m) => m.group_id);
 
   // Aggregate stats
   const totalSessions = activeGroupMemberships.reduce((s, m) => s + (m.total_sessions ?? 0), 0);
@@ -76,249 +88,177 @@ export default async function DashboardPage() {
     return s && !["session_complete", "created"].includes(s);
   });
 
-  const hasActive = activeSessions.length > 0 || activeTournaments.length > 0;
+  // Unified timeline: live + upcoming, with explicit status keys driving
+  // the pill on the right. Keeps ordering stable (live → today → future).
+  type TimelineItem =
+    | { kind: "live-session"; id: string; href: string; title: string; subtitle: string; status: "live" }
+    | { kind: "live-tournament"; id: string; href: string; title: string; subtitle: string; status: "live" }
+    | { kind: "sheet"; id: string; href: string; title: string; subtitle: string; date: string; status: "open" }
+    | { kind: "tournament"; id: string; href: string; title: string; subtitle: string; date: string; status: "upcoming" | "waitlist" | "organizer" };
 
-  // Build unified upcoming events sorted by date
-  type UpcomingEvent =
-    | { kind: "sheet"; date: string; id: string; group: string; location: string }
-    | { kind: "tournament"; date: string; id: string; title: string; location: string; time?: string; status: string };
-
-  const upcoming: UpcomingEvent[] = [
-    ...(upcomingTournaments.map((r: any) => ({
-      kind: "tournament" as const,
-      date: r.tournament.start_date,
+  const timeline: TimelineItem[] = [
+    ...activeSessions.map((ap: any): TimelineItem => ({
+      kind: "live-session",
+      id: ap.session_id,
+      href: `/sessions/${ap.session_id}`,
+      title: ap.session?.group?.name ?? "Shootout",
+      subtitle: ap.court_number
+        ? `Court ${ap.court_number} · ${ap.session?.sheet?.location ?? ""}`
+        : ap.session?.sheet?.location ?? "",
+      status: "live",
+    })),
+    ...activeTournaments.map((r: any): TimelineItem => ({
+      kind: "live-tournament",
       id: r.tournament_id,
+      href: `/tournaments/${r.tournament_id}`,
       title: r.tournament.title,
-      location: r.tournament.location,
-      time: r.tournament.start_time,
-      status: r.status,
-    }))),
-    ...(activeSheets.map((s: any) => ({
-      kind: "sheet" as const,
-      date: s.event_date,
+      subtitle: r.tournament.location ?? "",
+      status: "live",
+    })),
+    ...activeSheets.map((s: any): TimelineItem => ({
+      kind: "sheet",
       id: s.id,
-      group: s.group?.name ?? "Event",
-      location: s.location,
-    }))),
-  ].sort((a, b) => a.date.localeCompare(b.date));
+      href: `/sheets/${s.id}`,
+      title: s.group?.name ?? "Event",
+      subtitle: s.location,
+      date: s.event_date,
+      status: "open",
+    })),
+    ...upcomingTournaments.map((r: any): TimelineItem => ({
+      kind: "tournament",
+      id: r.tournament_id,
+      href: `/tournaments/${r.tournament_id}`,
+      title: r.tournament.title,
+      subtitle: r.tournament.start_time
+        ? `${formatTime(r.tournament.start_time)} · ${r.tournament.location ?? ""}`
+        : r.tournament.location ?? "",
+      date: r.tournament.start_date,
+      status:
+        r.status === "organizer" ? "organizer" :
+        r.status === "confirmed" ? "upcoming" :
+        "waitlist",
+    })),
+  ];
+
+  // Live items stay at top in insertion order; dated items sort by date.
+  const liveItems = timeline.filter((t) => t.status === "live");
+  const datedItems = timeline
+    .filter((t): t is Extract<TimelineItem, { date: string }> => "date" in t)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const orderedTimeline: TimelineItem[] = [...liveItems, ...datedItems];
+
+  // ── Contextual hero ─────────────────────────────────────────
+  // Pick one "lead" event to feature: live session first, then a tournament
+  // in progress, then the very next upcoming. Everything else goes in the
+  // timeline below it.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const lead: TimelineItem | null = orderedTimeline[0] ?? null;
+
+  // ── Activity feed (best-effort, capped for perf) ────────────
+  // We combine three signals into a single feed. Each source is tight
+  // (indexed + capped to 10) so we don't pay for a big union across groups.
+  let activity: Array<{
+    id: string;
+    when: string; // ISO
+    text: React.ReactNode;
+    href?: string;
+  }> = [];
+
+  if (groupIds.length > 0) {
+    const [
+      { data: recentSessions },
+      { data: recentMatches },
+      { data: recentBadges },
+    ] = await Promise.all([
+      supabase
+        .from("shootout_sessions")
+        .select("id, group_id, created_at, updated_at, group:shootout_groups(name)")
+        .in("group_id", groupIds)
+        .eq("status", "session_complete")
+        .order("updated_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("free_play_matches")
+        .select(
+          `id, group_id, played_at, score_a, score_b,
+           group:shootout_groups(name),
+           a1:profiles!free_play_matches_team_a_p1_fkey(display_name),
+           b1:profiles!free_play_matches_team_b_p1_fkey(display_name)`
+        )
+        .in("group_id", groupIds)
+        .order("played_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("player_badges")
+        .select(
+          `id, earned_at, player:profiles!player_badges_player_id_fkey(display_name),
+           badge:badge_definitions(name)`
+        )
+        .order("earned_at", { ascending: false })
+        .limit(5),
+    ]);
+
+    activity = [
+      ...((recentSessions ?? []).map((s: any) => ({
+        id: `sess-${s.id}`,
+        when: s.updated_at ?? s.created_at,
+        href: `/sessions/${s.id}`,
+        text: (
+          <>
+            <span className="font-medium text-dark-100">{s.group?.name ?? "Shootout"}</span>
+            <span className="text-surface-muted"> · session completed</span>
+          </>
+        ),
+      }))),
+      ...((recentMatches ?? []).map((m: any) => {
+        const winner = m.score_a > m.score_b ? m.a1?.display_name : m.b1?.display_name;
+        return {
+          id: `match-${m.id}`,
+          when: m.played_at,
+          text: (
+            <>
+              <span className="font-medium text-dark-100">{winner ?? "A player"}</span>
+              <span className="text-surface-muted"> won {m.score_a}–{m.score_b} in </span>
+              <span className="text-dark-200">{m.group?.name ?? "free play"}</span>
+            </>
+          ),
+        };
+      })),
+      ...((recentBadges ?? []).map((b: any) => ({
+        id: `badge-${b.id}`,
+        when: b.earned_at,
+        text: (
+          <>
+            <span className="font-medium text-dark-100">{b.player?.display_name ?? "Someone"}</span>
+            <span className="text-surface-muted"> earned the </span>
+            <span className="text-amber-400 font-medium">{b.badge?.name ?? "a"}</span>
+            <span className="text-surface-muted"> badge</span>
+          </>
+        ),
+      }))),
+    ]
+      .filter((a) => !!a.when)
+      .sort((a, b) => b.when.localeCompare(a.when))
+      .slice(0, 5);
+  }
 
   return (
     <div className="space-y-10 sm:space-y-12 animate-fade-in">
-      {/* Header */}
-      <div>
-        <h1 className="text-heading">
-          Welcome back, {profile.display_name}
-        </h1>
-        <p className="mt-1 text-surface-muted">Here&apos;s what&apos;s happening in Tri-Star Pickleball.</p>
-      </div>
+      {/* 1 ── Contextual hero */}
+      {lead ? <ContextualHero lead={lead} /> : <SimpleHero name={profile.display_name} />}
 
-      {/* Active now */}
-      {hasActive && (
-        <section>
-          <SectionLabel>Live Now</SectionLabel>
-          <div className="space-y-3">
-            {activeSessions.map((ap: any) => (
-              <Link
-                key={ap.session_id}
-                href={`/sessions/${ap.session_id}`}
-                className="card flex items-center justify-between bg-teal-900/30 border border-teal-500/30 hover:border-teal-500/60 transition-colors"
-              >
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-400">Live Session</p>
-                  <p className="text-base font-bold text-dark-100">
-                    {ap.session?.group?.name ?? "Shootout"}
-                    {ap.court_number && <span className="font-normal text-dark-300"> — Court {ap.court_number}</span>}
-                  </p>
-                  <p className="text-xs text-surface-muted">{ap.session?.sheet?.location}</p>
-                </div>
-                <span className="flex items-center gap-1 text-sm font-medium text-teal-300">
-                  Go
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                    <path fillRule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clipRule="evenodd" />
-                  </svg>
-                </span>
-              </Link>
-            ))}
-            {activeTournaments.map((reg: any) => (
-              <Link
-                key={reg.tournament_id}
-                href={`/tournaments/${reg.tournament_id}`}
-                className="card flex items-center justify-between bg-accent-900/30 border border-accent-500/30 hover:border-accent-500/60 transition-colors"
-              >
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-accent-400">Tournament In Progress</p>
-                  <p className="text-base font-bold text-dark-100">{reg.tournament.title}</p>
-                  <p className="text-xs text-surface-muted">{reg.tournament.location}</p>
-                </div>
-                <span className="flex items-center gap-1 text-sm font-medium text-accent-300">
-                  Go
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                    <path fillRule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clipRule="evenodd" />
-                  </svg>
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="card flex items-start gap-3 p-4 sm:p-5">
-          <div className="rounded-lg bg-brand-500/10 p-2 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-brand-vivid">
-              <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-xs text-surface-muted">Sessions</p>
-            <p className="text-2xl font-bold text-dark-100">{totalSessions}</p>
-          </div>
-        </div>
-        <div className="card flex items-start gap-3 p-4 sm:p-5">
-          <div className="rounded-lg bg-green-500/10 p-2 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-green-400">
-              <path fillRule="evenodd" d="M15.22 6.268a.75.75 0 01.968-.431l5.942 2.28a.75.75 0 01.431.97l-2.28 5.941a.75.75 0 11-1.4-.537l1.63-4.251-1.086.484a11.2 11.2 0 00-5.45 5.173.75.75 0 01-1.199.19L9 12.31l-6.22 6.22a.75.75 0 11-1.06-1.06l6.75-6.75a.75.75 0 011.06 0l3.606 3.605a12.694 12.694 0 015.68-4.973l1.086-.484-4.251-1.632a.75.75 0 01-.432-.968z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-xs text-surface-muted">Pt Win %</p>
-            <p className="text-2xl font-bold text-dark-100">{weightedWinPct !== null ? `${weightedWinPct}%` : "—"}</p>
-          </div>
-        </div>
-        <div className="card flex items-start gap-3 p-4 sm:p-5">
-          <div className="rounded-lg bg-indigo-500/10 p-2 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-indigo-400">
-              <path fillRule="evenodd" d="M8.25 6.75a3.75 3.75 0 117.5 0 3.75 3.75 0 01-7.5 0zM15.75 9.75a3 3 0 116 0 3 3 0 01-6 0zM2.25 9.75a3 3 0 116 0 3 3 0 01-6 0zM6.31 15.117A6.745 6.745 0 0112 12a6.745 6.745 0 016.709 7.498.75.75 0 01-.372.568A12.696 12.696 0 0112 21.75c-2.305 0-4.47-.612-6.337-1.684a.75.75 0 01-.372-.568 6.787 6.787 0 011.019-4.38z" clipRule="evenodd" />
-              <path d="M5.082 14.254a8.287 8.287 0 00-1.308 5.135 9.687 9.687 0 01-1.764-.44l-.115-.04a.563.563 0 01-.373-.487l-.01-.121a3.75 3.75 0 013.57-4.047zM20.226 19.389a8.287 8.287 0 00-1.308-5.135 3.75 3.75 0 013.57 4.047l-.01.121a.563.563 0 01-.373.486l-.115.04c-.567.2-1.156.349-1.764.441z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-xs text-surface-muted">Groups</p>
-            <p className="text-2xl font-bold text-dark-100">{groupCount}</p>
-          </div>
-        </div>
-        <Link href="/badges" className="card flex items-start gap-3 p-4 sm:p-5 hover:ring-brand-500/30 transition-shadow">
-          <div className="rounded-lg bg-amber-500/10 p-2 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-amber-400">
-              <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-xs text-surface-muted">Badges</p>
-            <p className="text-2xl font-bold text-dark-100">
-              {badgeStats.earned}
-              <span className="text-sm font-normal text-surface-muted"> / {badgeStats.total}</span>
-            </p>
-          </div>
-        </Link>
-      </div>
-
-      {/* My Groups */}
+      {/* 2 ── Timeline */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <SectionLabel>My Groups</SectionLabel>
-          <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300">Browse all</Link>
-        </div>
-        {activeGroupMemberships.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {activeGroupMemberships.map((m) => (
-              <Link
-                key={m.group_id}
-                href={`/groups/${(m as any).group?.slug}`}
-                className="card hover:ring-brand-500/30 transition-shadow"
-              >
-                <h3 className="font-semibold text-dark-100">{(m as any).group?.name}</h3>
-                {((m as any).group?.city || (m as any).group?.state) && (
-                  <p className="text-xs text-surface-muted mb-2">
-                    {[(m as any).group?.city, (m as any).group?.state].filter(Boolean).join(", ")}
-                  </p>
-                )}
-                <div className="mt-2 grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <p className="text-lg font-bold text-dark-100">{m.current_step}</p>
-                    <p className="text-[10px] text-surface-muted uppercase tracking-wide">Step</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-dark-100">{m.win_pct}%</p>
-                    <p className="text-[10px] text-surface-muted uppercase tracking-wide">Pts</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-dark-100">{m.total_sessions}</p>
-                    <p className="text-[10px] text-surface-muted uppercase tracking-wide">Sessions</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            illustration={<EmptyIllustrationGroups />}
-            title="No groups yet"
-            description="Find a ladder league or free play group that fits your schedule."
-            actionLabel="Browse groups"
-            actionHref="/groups"
-          />
-        )}
-      </section>
-
-      {/* Upcoming Schedule */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <SectionLabel>Upcoming</SectionLabel>
+          <SectionLabel>What&apos;s next</SectionLabel>
           <Link href="/sheets" className="text-sm text-brand-400 hover:text-brand-300">View sheets</Link>
         </div>
-        {upcoming.length > 0 ? (
-          <div className="space-y-2">
-            {upcoming.map((ev) =>
-              ev.kind === "sheet" ? (
-                <Link
-                  key={`sheet-${ev.id}`}
-                  href={`/sheets/${ev.id}`}
-                  className="card flex items-center gap-4 hover:ring-brand-500/30 transition-shadow"
-                >
-                  {/* Date block */}
-                  <div className="shrink-0 w-11 text-center">
-                    <p className="text-[10px] font-semibold uppercase text-surface-muted leading-none">
-                      {new Date(ev.date + "T12:00:00").toLocaleDateString("en-US", { month: "short" })}
-                    </p>
-                    <p className="text-xl font-bold text-dark-100 leading-tight">
-                      {new Date(ev.date + "T12:00:00").getDate()}
-                    </p>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-dark-100 truncate">{ev.group}</p>
-                    <p className="text-xs text-surface-muted truncate">{ev.location}</p>
-                  </div>
-                  <span className="badge-green shrink-0">Open</span>
-                </Link>
-              ) : (
-                <Link
-                  key={`t-${ev.id}`}
-                  href={`/tournaments/${ev.id}`}
-                  className="card flex items-center gap-4 hover:ring-brand-500/30 transition-shadow"
-                >
-                  <div className="shrink-0 w-11 text-center">
-                    <p className="text-[10px] font-semibold uppercase text-surface-muted leading-none">
-                      {new Date(ev.date + "T12:00:00").toLocaleDateString("en-US", { month: "short" })}
-                    </p>
-                    <p className="text-xl font-bold text-dark-100 leading-tight">
-                      {new Date(ev.date + "T12:00:00").getDate()}
-                    </p>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-dark-100 truncate">{ev.title}</p>
-                    <p className="text-xs text-surface-muted truncate">
-                      {ev.time && `${formatTime(ev.time)} · `}{ev.location}
-                    </p>
-                  </div>
-                  <span className={ev.status === "organizer" ? "badge-blue shrink-0" : ev.status === "confirmed" ? "badge-green shrink-0" : "badge-yellow shrink-0"}>
-                    {ev.status === "organizer" ? "Organizer" : ev.status === "confirmed" ? "Registered" : "Waitlist"}
-                  </span>
-                </Link>
-              )
-            )}
-          </div>
+        {orderedTimeline.length > 0 ? (
+          <ul className="divide-y divide-surface-border rounded-xl bg-surface-raised ring-1 ring-surface-border overflow-hidden">
+            {orderedTimeline.map((item) => (
+              <TimelineRow key={`${item.kind}-${item.id}`} item={item} todayIso={todayIso} />
+            ))}
+          </ul>
         ) : (
           <EmptyState
             illustration={<EmptyIllustrationCalendar />}
@@ -332,7 +272,94 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {/* Footer */}
+      {/* 3 ── Compact stats strip */}
+      <section>
+        <SectionLabel className="mb-3">Your season</SectionLabel>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatTile label="Sessions" value={String(totalSessions)} />
+          <StatTile label="Pt win %" value={weightedWinPct !== null ? `${weightedWinPct}%` : "—"} />
+          <StatTile label="Groups" value={String(groupCount)} />
+          <StatTile
+            label="Badges"
+            value={`${badgeStats.earned}`}
+            suffix={`/${badgeStats.total}`}
+            href="/badges"
+          />
+        </div>
+      </section>
+
+      {/* 4 ── Recent activity */}
+      {activity.length > 0 && (
+        <section>
+          <SectionLabel className="mb-3">Recent activity</SectionLabel>
+          <ul className="space-y-1.5">
+            {activity.map((a) => (
+              <li key={a.id} className="flex items-baseline gap-3 text-sm">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-surface-muted w-10 shrink-0">
+                  {relativeShort(a.when)}
+                </span>
+                <span className="flex-1 min-w-0 truncate">
+                  {a.href ? (
+                    <Link href={a.href} className="hover:text-brand-300 transition-colors">
+                      {a.text}
+                    </Link>
+                  ) : (
+                    a.text
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* 5 ── My Groups */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <SectionLabel>My groups</SectionLabel>
+          <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300">Browse all</Link>
+        </div>
+        {activeGroupMemberships.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {activeGroupMemberships.map((m) => {
+              const g = (m as any).group;
+              const gradient = groupGradient(g?.slug ?? g?.id ?? "");
+              return (
+                <Link
+                  key={m.group_id}
+                  href={`/groups/${g?.slug}`}
+                  className="group relative rounded-xl bg-surface-raised ring-1 ring-surface-border overflow-hidden transition-all hover:ring-brand-500/40 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/25"
+                >
+                  {/* Tiny color strip that matches the group's gradient */}
+                  <div className={`h-1.5 ${gradient}`} />
+                  <div className="p-4">
+                    <h3 className="font-semibold text-dark-100">{g?.name}</h3>
+                    {(g?.city || g?.state) && (
+                      <p className="text-xs text-surface-muted mb-2">
+                        {[g?.city, g?.state].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+                    <div className="mt-2 grid grid-cols-3 gap-1 text-center">
+                      <GroupMiniStat label="Step" value={String(m.current_step)} />
+                      <GroupMiniStat label="Pts" value={`${m.win_pct}%`} />
+                      <GroupMiniStat label="Sessions" value={String(m.total_sessions)} />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            illustration={<EmptyIllustrationGroups />}
+            title="No groups yet"
+            description="Find a ladder league or free play group that fits your schedule."
+            actionLabel="Browse groups"
+            actionHref="/groups"
+          />
+        )}
+      </section>
+
       <footer className="pt-4 border-t border-surface-border flex items-center gap-4">
         <Link href="/privacy" className="text-xs text-surface-muted hover:text-dark-200 transition-colors">
           Privacy Policy
@@ -345,12 +372,204 @@ export default async function DashboardPage() {
   );
 }
 
-/** Tiny uppercase eyebrow used to introduce each dashboard section.
- *  Keeps headings visually consistent and easier to scan. */
-function SectionLabel({ children }: { children: React.ReactNode }) {
+// ─────────────────────────────────────────────────────────────
+// Sub-components (server-side only; no client JS)
+// ─────────────────────────────────────────────────────────────
+
+function ContextualHero({ lead }: { lead: any }) {
+  const isLive = lead.status === "live";
+  const tint = isLive
+    ? "from-teal-600/40 via-brand-600/30 to-surface-raised"
+    : "from-brand-600/30 via-brand-700/20 to-surface-raised";
+  const eyebrow = isLive
+    ? "You're live right now"
+    : lead.kind === "sheet"
+      ? "Next up"
+      : "Next tournament";
+  const cta = isLive ? "Jump to court →" : lead.kind === "sheet" ? "View sheet →" : "View tournament →";
+  const bigDate = "date" in lead && lead.date
+    ? formatDateChip(lead.date)
+    : null;
+
   return (
-    <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-surface-muted">
+    <Link
+      href={lead.href}
+      className={`group relative block rounded-2xl p-6 sm:p-7 bg-gradient-to-br ${tint} ring-1 ring-surface-border overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-vivid">
+            {eyebrow}
+          </p>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-dark-100 break-words">
+            {lead.title}
+          </h1>
+          <p className="mt-1 text-sm sm:text-base text-surface-muted">
+            {lead.subtitle}
+          </p>
+          <p className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-vivid group-hover:text-brand-300">
+            {cta}
+          </p>
+        </div>
+        {bigDate && (
+          <div className="shrink-0 text-right">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-muted leading-none">
+              {bigDate.month}
+            </p>
+            <p className="text-4xl sm:text-5xl font-bold leading-none mt-1 text-dark-100">
+              {bigDate.day}
+            </p>
+          </div>
+        )}
+        {isLive && !bigDate && (
+          <span className="status-live self-start whitespace-nowrap animate-pulse">
+            Live
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+function SimpleHero({ name }: { name: string }) {
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 5 ? "Good night" :
+    hour < 12 ? "Good morning" :
+    hour < 18 ? "Good afternoon" :
+    "Good evening";
+  return (
+    <div>
+      <h1 className="text-heading">{greeting}, {name}</h1>
+      <p className="mt-1 text-surface-muted">Nothing urgent — here&apos;s what&apos;s on the horizon.</p>
+    </div>
+  );
+}
+
+function TimelineRow({ item, todayIso }: { item: any; todayIso: string }) {
+  const isLive = item.status === "live";
+  const statusClass =
+    item.status === "live" ? "status-live"
+    : item.status === "open" ? "status-open"
+    : item.status === "upcoming" ? "status-upcoming"
+    : item.status === "waitlist" ? "badge-yellow"
+    : item.status === "organizer" ? "badge-blue"
+    : "status-closed";
+  const statusLabel =
+    item.status === "live" ? "Live"
+    : item.status === "open" ? "Open"
+    : item.status === "upcoming" ? "Registered"
+    : item.status === "waitlist" ? "Waitlist"
+    : item.status === "organizer" ? "Organizer"
+    : "";
+
+  const chip = "date" in item && item.date
+    ? formatDateChip(item.date, item.date === todayIso)
+    : null;
+
+  return (
+    <li>
+      <Link
+        href={item.href}
+        className="flex items-center gap-4 px-4 py-3.5 hover:bg-surface-overlay/60 transition-colors"
+      >
+        {chip ? (
+          <div className="shrink-0 w-11 text-center">
+            <p className="text-[10px] font-semibold uppercase text-surface-muted leading-none">
+              {chip.month}
+            </p>
+            <p className="text-xl font-bold text-dark-100 leading-tight">
+              {chip.day}
+            </p>
+          </div>
+        ) : (
+          <div className="shrink-0 h-10 w-10 rounded-full bg-teal-500/15 flex items-center justify-center">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-60 animate-ping" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-teal-400" />
+            </span>
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-dark-100 truncate">{item.title}</p>
+          <p className="text-xs text-surface-muted truncate">{item.subtitle}</p>
+        </div>
+        <span className={`${statusClass} shrink-0`}>
+          {isLive ? <span className="animate-pulse">{statusLabel}</span> : statusLabel}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  suffix,
+  href,
+}: {
+  label: string;
+  value: string;
+  suffix?: string;
+  href?: string;
+}) {
+  const inner = (
+    <div className="rounded-lg bg-surface-raised ring-1 ring-surface-border px-3 py-2.5 transition-all hover:ring-brand-500/30">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-surface-muted">
+        {label}
+      </p>
+      <p className="mt-0.5 text-lg font-bold text-dark-100">
+        {value}
+        {suffix && <span className="text-xs font-normal text-surface-muted ml-0.5">{suffix}</span>}
+      </p>
+    </div>
+  );
+  return href ? <Link href={href}>{inner}</Link> : inner;
+}
+
+function GroupMiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-lg font-bold text-dark-100">{value}</p>
+      <p className="text-[10px] text-surface-muted uppercase tracking-wide">{label}</p>
+    </div>
+  );
+}
+
+function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <h2 className={`text-xs font-semibold uppercase tracking-[0.08em] text-surface-muted ${className ?? ""}`}>
       {children}
     </h2>
   );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+/** Tiny "5m / 2h / 3d" stamp for the activity feed. */
+function relativeShort(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 0) return "now";
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "now";
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const d = Math.floor(hr / 24);
+  if (d < 7) return `${d}d`;
+  const w = Math.floor(d / 7);
+  return `${w}w`;
+}
+
+/** Split a YYYY-MM-DD (or full ISO) into a compact month/day chip. "TODAY"
+ *  overrides the month slot when the supplied date is today's ISO. */
+function formatDateChip(iso: string, isToday = false): { month: string; day: string } {
+  const dateOnly = iso.length === 10 ? iso + "T12:00:00" : iso;
+  const d = new Date(dateOnly);
+  return {
+    month: isToday ? "TDY" : d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+    day: String(d.getDate()),
+  };
 }
