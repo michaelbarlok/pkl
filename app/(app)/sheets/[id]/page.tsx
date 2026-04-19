@@ -391,16 +391,6 @@ export default async function SheetDetailPage({
         <AdminAddMember sheetId={sheet.id} members={availableMembers} />
       )}
 
-      {/* ── Court preview (pre-session only) ───────────────────── */}
-      {preview && (
-        <CourtPreviewSection
-          courts={preview.courts}
-          numCourts={preview.numCourts}
-          viewerPlayerId={profile.id}
-          viewMode={hasAdminView ? "all" : "own"}
-        />
-      )}
-
       {/* ── Confirmed panel ────────────────────────────────────── */}
       <section className="rounded-xl bg-surface-raised ring-1 ring-surface-border">
         <header className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
@@ -476,6 +466,16 @@ export default async function SheetDetailPage({
             ))}
           </ul>
         </section>
+      )}
+
+      {/* ── Court preview (pre-session only) ───────────────────── */}
+      {preview && (
+        <CourtPreviewSection
+          courts={preview.courts}
+          numCourts={preview.numCourts}
+          viewerPlayerId={profile.id}
+          viewMode={hasAdminView ? "all" : "own"}
+        />
       )}
     </div>
   );
