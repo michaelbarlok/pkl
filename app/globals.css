@@ -81,9 +81,49 @@
   --alert-info-ring:    #5dead8; /* teal-300 */
 }
 
+/* ── Semantic status tokens ──────────────────────────────────────
+   "Status language" used by every status badge/pill so the user
+   sees the same color for the same kind of state across the app
+   (a live session and an in-progress tournament look the same).
+   Driven through CSS vars so light + dark resolve cleanly. */
+:root {
+  --status-live-bg:        rgb(15 118 110 / 0.30);  /* teal */
+  --status-live-text:      var(--color-teal-vivid);
+  --status-upcoming-bg:    rgb(13 148 144 / 0.20);  /* brand */
+  --status-upcoming-text:  var(--color-brand-vivid);
+  --status-open-bg:        var(--alert-success-bg);
+  --status-open-text:      var(--alert-success-text);
+  --status-closed-bg:      var(--color-surface-overlay);
+  --status-closed-text:    var(--color-dark-200);
+  --status-cancelled-bg:   var(--alert-danger-bg);
+  --status-cancelled-text: var(--alert-danger-text);
+}
+.light {
+  --status-live-bg:        #ccfbf8;
+  --status-live-text:      #115e59;
+  --status-upcoming-bg:    #d1f4f3;
+  --status-upcoming-text:  #0d9490;
+  --status-open-bg:        var(--alert-success-bg);
+  --status-open-text:      var(--alert-success-text);
+  --status-closed-bg:      #e2e5ed;
+  --status-closed-text:    #4e5768;
+  --status-cancelled-bg:   var(--alert-danger-bg);
+  --status-cancelled-text: var(--alert-danger-text);
+}
+
 @layer base {
   body {
     @apply bg-dark-950 text-dark-100 antialiased;
+  }
+
+  /* Keyboard-focus ring for everything interactive. Mouse focus stays
+     unaffected (focus-visible). Component classes can override the ring
+     color for context (danger / accent etc.). */
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  summary:focus-visible {
+    @apply outline-none ring-2 ring-brand-500/50 ring-offset-2 ring-offset-surface;
   }
 
   /* Theme-aware logo switching — pairs with components/logo.tsx */
@@ -126,9 +166,19 @@
     @apply btn-base bg-red-600 px-3.5 py-2 text-sm text-white hover:bg-red-500 focus-visible:outline-red-600;
   }
 
-  /* Size variants — apply after the color class */
+  /* Size variants — apply after the color class. Sizes from xs..lg keep
+     button density consistent across the app. Default (no modifier) =
+     md (px-3.5 py-2 text-sm). */
+  .btn-xs {
+    @apply px-2 py-1 text-[11px] font-semibold;
+  }
+
   .btn-sm {
     @apply px-2.5 py-1.5 text-xs;
+  }
+
+  .btn-md {
+    @apply px-3.5 py-2 text-sm;
   }
 
   .btn-lg {
@@ -197,6 +247,53 @@
   /* ── Badges ── */
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold;
+  }
+
+  .badge-sm {
+    @apply inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide;
+  }
+
+  .badge-md {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
+  /* ── Semantic status pills ──────────────────────────────────────
+     Use these for any "what state is this in" pill so the same
+     visual meaning lands on tournaments, sessions, sheets, etc. */
+  .status-live {
+    @apply badge-md;
+    background-color: var(--status-live-bg);
+    color: var(--status-live-text);
+  }
+  .status-upcoming {
+    @apply badge-md;
+    background-color: var(--status-upcoming-bg);
+    color: var(--status-upcoming-text);
+  }
+  .status-open {
+    @apply badge-md;
+    background-color: var(--status-open-bg);
+    color: var(--status-open-text);
+  }
+  .status-closed {
+    @apply badge-md;
+    background-color: var(--status-closed-bg);
+    color: var(--status-closed-text);
+  }
+  .status-cancelled {
+    @apply badge-md;
+    background-color: var(--status-cancelled-bg);
+    color: var(--status-cancelled-text);
+  }
+
+  /* ── Interactive motion + focus polish ──────────────────────────
+     Drop on any clickable surface that isn't already a .card or
+     .btn-* (rows, link-list items, custom tiles) for a consistent
+     hover lift + keyboard focus ring. */
+  .interactive {
+    @apply transition-[background-color,box-shadow,transform] duration-150
+           hover:-translate-y-px focus-visible:outline-none
+           focus-visible:ring-2 focus-visible:ring-brand-500/50;
   }
 
   /* Badge color tokens flip with the theme so they stay readable on
