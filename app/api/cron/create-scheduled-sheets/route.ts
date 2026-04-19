@@ -142,7 +142,10 @@ export async function GET(request: NextRequest) {
         emailTemplate: "NewSheet",
         emailData: {
           groupName,
-          eventDate: eventDateStr,
+          // Pass the full UTC timestamp so the email renders the correct
+          // calendar day in the group's zone (a bare YYYY-MM-DD would
+          // off-by-one west of UTC without formatDateInZone's guard).
+          eventDate: eventTimeIso,
           eventTime: eventTimeIso,
           timezone: tz,
           location: sched.location,

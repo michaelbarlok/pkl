@@ -51,10 +51,28 @@ export function formatDateTime(dateStr: string): string {
  * pages, emails, notifications — instead of `formatDate` / `formatTime`,
  * which fall back to the runtime's local zone.
  *
+ * Accepts either a bare calendar date ("2026-04-22") — which is treated
+ * as a wall-clock date and renders the same everywhere — or a full
+ * datetime string / ISO timestamp, which is resolved against the zone.
+ *
  * Output: "Fri 3-15-2026"
  */
 export function formatDateInZone(dateStr: string, timeZone: string): string {
-  const date = new Date(dateStr);
+  const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const trimmed = dateStr.trim();
+
+  // Bare YYYY-MM-DD — render as calendar date so a PG DATE column or
+  // date-only string doesn't cross a day boundary when shown in a zone
+  // west of UTC (e.g. "2026-04-22" formatted in America/New_York would
+  // otherwise roll back to Apr 21).
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [y, m, d] = trimmed.split("-").map(Number);
+    const noon = new Date(Date.UTC(y, m - 1, d, 12));
+    const weekday = WEEKDAY_SHORT[noon.getUTCDay()];
+    return `${weekday} ${m}-${d}-${y}`;
+  }
+
+  const date = new Date(trimmed);
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     weekday: "short",
@@ -66,9 +84,21 @@ export function formatDateInZone(dateStr: string, timeZone: string): string {
   return `${get("weekday")} ${get("month")}-${get("day")}-${get("year")}`;
 }
 
-/** Zone-aware time formatter. Output: "8:00 pm" */
+/**
+ * Zone-aware time formatter. Output: "8:00 pm".
+ * Also accepts a bare "HH:MM" / "HH:MM:SS" string (rendered as-is).
+ */
 export function formatTimeInZone(dateStr: string, timeZone: string): string {
-  const date = new Date(dateStr);
+  const trimmed = dateStr.trim();
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+    const [hStr, mStr] = trimmed.split(":");
+    let hours = parseInt(hStr, 10);
+    const minutes = parseInt(mStr, 10);
+    const ampm = hours >= 12 ? "pm" : "am";
+    hours = hours % 12 || 12;
+    return `${hours}:${minutes.toString().padStart(2, "0")} ${ampm}`;
+  }
+  const date = new Date(trimmed);
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     hour: "numeric",
