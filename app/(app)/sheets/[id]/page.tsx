@@ -18,6 +18,7 @@ import { Breadcrumb } from "@/components/breadcrumb";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { computeCourtPreview, CourtPreviewSection } from "./court-preview";
+import { isTestUser } from "@/lib/test-users";
 
 export const dynamic = "force-dynamic";
 
@@ -222,7 +223,11 @@ export default async function SheetDetailPage({
         .eq("is_active", true)
         .order("display_name", { ascending: true });
 
-      availableMembers = memberProfiles ?? [];
+      // Hide test users from the Add-Member picker so admins can't
+      // accidentally drop a simulation account onto a real sheet.
+      availableMembers = (memberProfiles ?? []).filter(
+        (p) => !isTestUser(p.display_name)
+      );
     }
   }
 
