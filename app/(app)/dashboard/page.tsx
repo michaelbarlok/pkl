@@ -99,10 +99,10 @@ export default async function DashboardPage() {
   ].sort((a, b) => a.date.localeCompare(b.date));
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-10 sm:space-y-12 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-dark-100">
+        <h1 className="text-2xl sm:text-3xl font-bold text-dark-100">
           Welcome back, {profile.display_name}
         </h1>
         <p className="mt-1 text-surface-muted">Here&apos;s what&apos;s happening in Tri-Star Pickleball.</p>
@@ -111,7 +111,7 @@ export default async function DashboardPage() {
       {/* Active now */}
       {hasActive && (
         <section>
-          <h2 className="text-base font-semibold text-dark-100 mb-3">Active Now</h2>
+          <SectionLabel>Live Now</SectionLabel>
           <div className="space-y-3">
             {activeSessions.map((ap: any) => (
               <Link
@@ -160,7 +160,7 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="card flex items-start gap-3">
+        <div className="card flex items-start gap-3 p-4 sm:p-5">
           <div className="rounded-lg bg-brand-500/10 p-2 shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-brand-vivid">
               <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
@@ -171,7 +171,7 @@ export default async function DashboardPage() {
             <p className="text-2xl font-bold text-dark-100">{totalSessions}</p>
           </div>
         </div>
-        <div className="card flex items-start gap-3">
+        <div className="card flex items-start gap-3 p-4 sm:p-5">
           <div className="rounded-lg bg-green-500/10 p-2 shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-green-400">
               <path fillRule="evenodd" d="M15.22 6.268a.75.75 0 01.968-.431l5.942 2.28a.75.75 0 01.431.97l-2.28 5.941a.75.75 0 11-1.4-.537l1.63-4.251-1.086.484a11.2 11.2 0 00-5.45 5.173.75.75 0 01-1.199.19L9 12.31l-6.22 6.22a.75.75 0 11-1.06-1.06l6.75-6.75a.75.75 0 011.06 0l3.606 3.605a12.694 12.694 0 015.68-4.973l1.086-.484-4.251-1.632a.75.75 0 01-.432-.968z" clipRule="evenodd" />
@@ -182,7 +182,7 @@ export default async function DashboardPage() {
             <p className="text-2xl font-bold text-dark-100">{weightedWinPct !== null ? `${weightedWinPct}%` : "—"}</p>
           </div>
         </div>
-        <div className="card flex items-start gap-3">
+        <div className="card flex items-start gap-3 p-4 sm:p-5">
           <div className="rounded-lg bg-indigo-500/10 p-2 shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-indigo-400">
               <path fillRule="evenodd" d="M8.25 6.75a3.75 3.75 0 117.5 0 3.75 3.75 0 01-7.5 0zM15.75 9.75a3 3 0 116 0 3 3 0 01-6 0zM2.25 9.75a3 3 0 116 0 3 3 0 01-6 0zM6.31 15.117A6.745 6.745 0 0112 12a6.745 6.745 0 016.709 7.498.75.75 0 01-.372.568A12.696 12.696 0 0112 21.75c-2.305 0-4.47-.612-6.337-1.684a.75.75 0 01-.372-.568 6.787 6.787 0 011.019-4.38z" clipRule="evenodd" />
@@ -194,7 +194,7 @@ export default async function DashboardPage() {
             <p className="text-2xl font-bold text-dark-100">{groupCount}</p>
           </div>
         </div>
-        <Link href="/badges" className="card flex items-start gap-3 hover:ring-brand-500/30 transition-shadow">
+        <Link href="/badges" className="card flex items-start gap-3 p-4 sm:p-5 hover:ring-brand-500/30 transition-shadow">
           <div className="rounded-lg bg-amber-500/10 p-2 shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-amber-400">
               <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
@@ -213,7 +213,7 @@ export default async function DashboardPage() {
       {/* My Groups */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-dark-100">My Groups</h2>
+          <SectionLabel>My Groups</SectionLabel>
           <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300">Browse all</Link>
         </div>
         {activeGroupMemberships.length > 0 ? (
@@ -266,7 +266,7 @@ export default async function DashboardPage() {
       {/* Upcoming Schedule */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-dark-100">Upcoming</h2>
+          <SectionLabel>Upcoming</SectionLabel>
           <Link href="/sheets" className="text-sm text-brand-400 hover:text-brand-300">View sheets</Link>
         </div>
         {upcoming.length > 0 ? (
@@ -346,5 +346,15 @@ export default async function DashboardPage() {
         </Link>
       </footer>
     </div>
+  );
+}
+
+/** Tiny uppercase eyebrow used to introduce each dashboard section.
+ *  Keeps headings visually consistent and easier to scan. */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-surface-muted">
+      {children}
+    </h2>
   );
 }
