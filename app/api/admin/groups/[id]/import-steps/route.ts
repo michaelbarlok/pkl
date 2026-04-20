@@ -3,7 +3,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 interface StepRow {
-  playerName: string;    // display_name to match
+  playerName: string;    // display_name from CSV (used for auto-match)
+  playerId?: string;     // admin-supplied manual match; wins over display-name lookup
   step?: number;
   winPct?: number;
   totalSessions?: number;
@@ -106,6 +107,55 @@ export async function POST(
       .maybeSingle();
     const defaultStep = prefs?.new_player_start_step ?? 5;
 
+    // Build an index of group members by player_id so manual-match rows
+    // can be looked up in O(1).
+    const memberByPlayerId = new Map<string, MemberInfo>();
+    for (const m of memberMap.values()) memberByPlayerId.set(m.playerId, m);
+
+    /**
+     * Build the partial update payload for an existing-member stats
+     * correction. Only fields the CSV actually provides are included, so
+     * an empty cell can't silently zero someone's session count.
+     */
+    function buildMemberUpdate(row: StepRow): Record<string, unknown> {
+      const payload: Record<string, unknown> = {};
+      if (row.step !== undefined && !isNaN(row.step))                 payload.current_step   = row.step;
+      if (row.winPct !== undefined && !isNaN(row.winPct))             payload.win_pct        = row.winPct;
+      if (row.totalSessions !== undefined && !isNaN(row.totalSessions)) payload.total_sessions = row.totalSessions;
+      if (row.lastPlayedAt) {
+        const d = new Date(row.lastPlayedAt);
+        if (!isNaN(d.getTime())) payload.last_played_at = d.toISOString();
+      }
+      if (row.joinedAt) {
+        const d = new Date(row.joinedAt);
+        if (!isNaN(d.getTime())) payload.joined_at = d.toISOString();
+      }
+      return payload;
+    }
+
+    async function applyMemberUpdate(
+      row: StepRow,
+      target: MemberInfo,
+      csvName: string,
+    ): Promise<RowResult> {
+      const updatePayload = buildMemberUpdate(row);
+      if (Object.keys(updatePayload).length === 0) {
+        return { playerName: csvName, profileId: target.profileId, displayName: target.displayName, status: "already_member" };
+      }
+      const { error: updateError } = await serviceClient
+        .from("group_memberships")
+        .update(updatePayload)
+        .eq("group_id", groupId)
+        .eq("player_id", target.playerId);
+      if (updateError) {
+        return { playerName: csvName, displayName: target.displayName, status: "error", error: updateError.message };
+      }
+      if (row.skillLevel !== undefined && !isNaN(row.skillLevel)) {
+        await serviceClient.from("profiles").update({ skill_level: row.skillLevel }).eq("id", target.profileId);
+      }
+      return { playerName: csvName, profileId: target.profileId, displayName: target.displayName, status: "updated_member" };
+    }
+
     const results: RowResult[] = [];
 
     for (const row of rows) {
@@ -115,56 +165,34 @@ export async function POST(
         continue;
       }
 
+      // --- Manual match wins if provided ---
+      // Admin explicitly picked this group member for this CSV row (e.g.
+      // because display names didn't auto-match). Apply the CSV stats
+      // directly to that member regardless of the global overwrite flag —
+      // the manual pick IS the admin's explicit consent per row.
+      if (row.playerId) {
+        const target = memberByPlayerId.get(row.playerId);
+        if (!target) {
+          results.push({ playerName: name, status: "error", error: "Manually selected player is not a member of this group" });
+          continue;
+        }
+        results.push(await applyMemberUpdate(row, target, name));
+        continue;
+      }
+
       const key = name.toLowerCase();
 
       // --- Case A: already a group member ---
       // Default behavior: skip, don't clobber live stats accumulated through
       // real play. Opt-in (`overwrite: true` on the request) lets admins
-      // push CSV corrections onto live members — but only for fields the
-      // CSV actually provides, so an empty cell can't silently zero out
-      // someone's session count.
+      // push CSV corrections onto live members.
       const member = memberMap.get(key);
       if (member) {
         if (!allowOverwrite) {
           results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "already_member" });
           continue;
         }
-
-        const updatePayload: Record<string, unknown> = {};
-        if (row.step !== undefined && !isNaN(row.step))                 updatePayload.current_step   = row.step;
-        if (row.winPct !== undefined && !isNaN(row.winPct))             updatePayload.win_pct        = row.winPct;
-        if (row.totalSessions !== undefined && !isNaN(row.totalSessions)) updatePayload.total_sessions = row.totalSessions;
-        if (row.lastPlayedAt) {
-          const d = new Date(row.lastPlayedAt);
-          if (!isNaN(d.getTime())) updatePayload.last_played_at = d.toISOString();
-        }
-        if (row.joinedAt) {
-          const d = new Date(row.joinedAt);
-          if (!isNaN(d.getTime())) updatePayload.joined_at = d.toISOString();
-        }
-
-        if (Object.keys(updatePayload).length === 0) {
-          // CSV row had nothing to actually apply — treat as a clean skip.
-          results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "already_member" });
-          continue;
-        }
-
-        const { error: updateError } = await serviceClient
-          .from("group_memberships")
-          .update(updatePayload)
-          .eq("group_id", groupId)
-          .eq("player_id", member.playerId);
-
-        if (updateError) {
-          results.push({ playerName: name, displayName: member.displayName, status: "error", error: updateError.message });
-          continue;
-        }
-
-        if (row.skillLevel !== undefined && !isNaN(row.skillLevel)) {
-          await serviceClient.from("profiles").update({ skill_level: row.skillLevel }).eq("id", member.profileId);
-        }
-
-        results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "updated_member" });
+        results.push(await applyMemberUpdate(row, member, name));
         continue;
       }
 
