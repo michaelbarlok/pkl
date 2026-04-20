@@ -96,21 +96,28 @@ async function getPlayerPercentages(supabase: Awaited<ReturnType<typeof createCl
 export default async function RatingsPage() {
   const supabase = await createClient();
 
-  // Get all active players with their group memberships (for current_step)
+  // Get all active players with their group memberships (for current_step).
+  // total_sessions is pulled so we can skip memberships where the player
+  // hasn't actually played — see the filter in the loop below.
   const { data: memberships } = await supabase
     .from("group_memberships")
-    .select("player_id, current_step, last_played_at, player:profiles(id, display_name, avatar_url, is_active)")
+    .select("player_id, current_step, total_sessions, last_played_at, player:profiles(id, display_name, avatar_url, is_active)")
     .order("current_step", { ascending: true });
 
   // Calculate point percentages
   const percentages = await getPlayerPercentages(supabase);
 
-  // Deduplicate players: use their best (lowest) step across groups
+  // Deduplicate players: use their best (lowest) step across groups.
+  // Skip memberships with total_sessions = 0 so players who have been
+  // seeded / are pending / just joined but haven't played a real session
+  // don't clutter the ranking. A player shows up here only if at least
+  // one of their memberships has a session count > 0.
   const playerMap = new Map<string, RankedPlayer>();
 
   for (const m of memberships ?? []) {
     const player = m.player as any;
     if (!player?.is_active) continue;
+    if ((m.total_sessions ?? 0) <= 0) continue;
 
     const existing = playerMap.get(m.player_id);
     const pct = percentages.get(m.player_id) ?? 0;
