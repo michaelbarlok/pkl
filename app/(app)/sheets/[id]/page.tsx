@@ -423,6 +423,7 @@ export default async function SheetDetailPage({
                 court={courtByPlayer.get(reg.player_id)}
                 isMe={reg.player_id === profile.id}
                 adminCanRemove={isAdmin && !isCancelled}
+                showPriority={hasAdminView}
               />
             ))}
           </ul>
@@ -500,11 +501,16 @@ function RosterCard({
   court,
   isMe,
   adminCanRemove,
+  showPriority,
 }: {
   reg: Registration & { player?: Profile };
   court: number | undefined;
   isMe: boolean;
   adminCanRemove: boolean;
+  // Priority is an internal admin concept — regular players shouldn't
+  // see who got a high/low signup. Admins still need the signal for
+  // roster management.
+  showPriority: boolean;
 }) {
   return (
     <li
@@ -526,10 +532,10 @@ function RosterCard({
           {reg.player?.skill_level && (
             <span>{reg.player.skill_level}</span>
           )}
-          {reg.priority === "high" && (
+          {showPriority && reg.priority === "high" && (
             <span className="text-accent-400 font-medium">Priority</span>
           )}
-          {reg.priority === "low" && (
+          {showPriority && reg.priority === "low" && (
             <span className="text-surface-muted">Low priority</span>
           )}
         </div>
