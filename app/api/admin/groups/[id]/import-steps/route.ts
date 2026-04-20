@@ -247,10 +247,31 @@ export async function POST(
         if (!isNaN(d.getTime())) pendingPayload.joined_at = d.toISOString();
       }
 
-      // Upsert: re-importing same name updates the record
-      const { error: pendingError } = await serviceClient
+      // Can't use a single .upsert() here: the dedupe index is
+      //   pgm_group_name_unique ON pending_group_members(group_id, LOWER(name))
+      // which is an expression index. PostgREST's `onConflict` only
+      // accepts a plain column list and the corresponding ON CONFLICT
+      // (group_id, name) doesn't match the expression index, so every
+      // insert threw "42P10: there is no unique or exclusion constraint
+      // matching the ON CONFLICT specification". Do the case-insensitive
+      // lookup ourselves and then update-or-insert.
+      const { data: existingPending } = await serviceClient
         .from("pending_group_members")
-        .upsert(pendingPayload, { onConflict: "group_id,name" });
+        .select("id")
+        .eq("group_id", groupId)
+        .ilike("name", name)
+        .is("claimed_by", null)
+        .limit(1)
+        .maybeSingle();
+
+      const pendingError = existingPending
+        ? (await serviceClient
+            .from("pending_group_members")
+            .update(pendingPayload)
+            .eq("id", existingPending.id)).error
+        : (await serviceClient
+            .from("pending_group_members")
+            .insert(pendingPayload)).error;
 
       if (pendingError) {
         results.push({ playerName: name, status: "error", error: pendingError.message });
