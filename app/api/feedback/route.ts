@@ -1,12 +1,27 @@
 import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
+type FeedbackKind = "feature" | "bug";
+
+/**
+ * POST /api/feedback
+ *
+ * Generic user-feedback endpoint. `kind` tells us whether this is a
+ * feature suggestion or a bug report; the subject line + email heading
+ * reflect it so the inbox is triageable at a glance.
+ */
 export async function POST(request: NextRequest) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json().catch(() => ({}));
-  const { title, description } = body as { title?: string; description?: string };
+  const { kind, title, description } = body as {
+    kind?: FeedbackKind;
+    title?: string;
+    description?: string;
+  };
+
+  const safeKind: FeedbackKind = kind === "bug" ? "bug" : "feature";
 
   if (!description?.trim()) {
     return NextResponse.json({ error: "Description is required" }, { status: 400 });
@@ -33,8 +48,13 @@ export async function POST(request: NextRequest) {
   const playerEmail = fullProfile?.email ?? "";
   const headline = title?.trim() || "(no title)";
 
+  const isBug = safeKind === "bug";
+  const subjectPrefix = isBug ? "[Bug Report]" : "[Feature Request]";
+  const heading = isBug ? "Bug Report" : "Feature Request";
+  const bodyLabel = isBug ? "Details" : "Request";
+
   const html = `
-    <h2 style="font-family:sans-serif;margin:0 0 16px">Feature Request</h2>
+    <h2 style="font-family:sans-serif;margin:0 0 16px">${heading}</h2>
     <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse;width:100%">
       <tr>
         <td style="padding:6px 16px 6px 0;color:#6b7280;white-space:nowrap;vertical-align:top;width:120px">From</td>
@@ -45,7 +65,7 @@ export async function POST(request: NextRequest) {
         <td style="padding:6px 0;color:#111827;font-weight:600">${headline}</td>
       </tr>
       <tr>
-        <td style="padding:6px 16px 6px 0;color:#6b7280;vertical-align:top">Request</td>
+        <td style="padding:6px 16px 6px 0;color:#6b7280;vertical-align:top">${bodyLabel}</td>
         <td style="padding:6px 0;color:#111827;white-space:pre-wrap">${description.trim()}</td>
       </tr>
     </table>
@@ -55,12 +75,12 @@ export async function POST(request: NextRequest) {
     from: "Tri-Star Pickleball <info@tristarpickleball.com>",
     to: "info@tristarpickleball.com",
     replyTo: playerEmail || undefined,
-    subject: "Feature Request // Tri-Star Pickleball",
+    subject: `${subjectPrefix} ${headline} // Tri-Star Pickleball`,
     html,
   });
 
   if (error) {
-    console.error("Feature request email failed:", error);
+    console.error("Feedback email failed:", error);
     return NextResponse.json({ error: "Failed to send" }, { status: 500 });
   }
 
