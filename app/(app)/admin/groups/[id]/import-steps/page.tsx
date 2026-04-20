@@ -99,6 +99,11 @@ interface PreviewRow extends ParsedRow {
   matched: boolean;
   matchedName?: string;
   matchedProfileId?: string;
+  /** Set when the admin manually picked a group member for this row.
+   *  When set, `matched` is also true and `matchedName` shows the pick;
+   *  we track it separately so the UI can show a "Manual" label and
+   *  the Clear affordance. */
+  manualPlayerId?: string;
 }
 
 interface RowResult {
@@ -125,6 +130,10 @@ export default function ImportStepsPage() {
   const [overwriteExisting, setOverwriteExisting] = useState(false);
   const [results, setResults] = useState<RowResult[] | null>(null);
   const [summary, setSummary] = useState<{ alreadyMember: number; updatedMember: number; addedToGroup: number; pending: number; errors: number } | null>(null);
+
+  // Manual-match popover state: which row is picking, and current search text.
+  const [matchingRowIdx, setMatchingRowIdx] = useState<number | null>(null);
+  const [matchSearch, setMatchSearch] = useState("");
 
   // Load group members for matching
   useEffect(() => {
@@ -158,6 +167,40 @@ export default function ImportStepsPage() {
         matchedProfileId: member?.playerId,
       };
     });
+  }
+
+  function pickManualMatch(rowIdx: number, member: GroupMember) {
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === rowIdx
+          ? {
+              ...r,
+              matched: true,
+              matchedName: member.displayName,
+              matchedProfileId: member.playerId,
+              manualPlayerId: member.playerId,
+            }
+          : r
+      )
+    );
+    setMatchingRowIdx(null);
+    setMatchSearch("");
+  }
+
+  function clearManualMatch(rowIdx: number) {
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === rowIdx
+          ? {
+              ...r,
+              matched: false,
+              matchedName: undefined,
+              matchedProfileId: undefined,
+              manualPlayerId: undefined,
+            }
+          : r
+      )
+    );
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -208,6 +251,10 @@ export default function ImportStepsPage() {
     try {
       const payload = matched.map((r) => ({
         playerName: r.player,
+        // Only send playerId when the admin manually picked a member;
+        // for auto-matched rows the server does its own display_name
+        // lookup so the payload stays minimal.
+        playerId: r.manualPlayerId,
         step: r.step ? parseInt(r.step, 10) : undefined,
         winPct: r.pct ? parseFloat(r.pct) : undefined,
         totalSessions: r.rounds ? parseInt(r.rounds, 10) : undefined,
@@ -340,7 +387,7 @@ export default function ImportStepsPage() {
               {unmatchedCount > 0 && (
                 <span className="flex items-center gap-1 text-amber-400">
                   <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" /></svg>
-                  {unmatchedCount} unmatched (will be skipped)
+                  {unmatchedCount} unmatched — match manually below or they&apos;ll be skipped
                 </span>
               )}
             </div>
@@ -360,7 +407,19 @@ export default function ImportStepsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
+                {rows.map((r, i) => {
+                  // IDs already claimed by another row's manual pick — hide
+                  // them from the dropdown so the admin can't point two
+                  // CSV rows at the same member.
+                  const claimedElsewhere = new Set(
+                    rows
+                      .filter((other, j) => j !== i && other.manualPlayerId)
+                      .map((other) => other.manualPlayerId as string)
+                  );
+                  const isPickerOpen = matchingRowIdx === i;
+                  const isManual = !!r.manualPlayerId;
+
+                  return (
                   <tr
                     key={i}
                     className={`border-b border-surface-border/50 last:border-0 ${r.matched ? "" : "opacity-50"}`}
@@ -373,19 +432,98 @@ export default function ImportStepsPage() {
                     <td className="px-3 py-2 text-dark-200">{r.selfRating || <span className="text-surface-muted">—</span>}</td>
                     <td className="px-3 py-2">
                       {r.matched ? (
-                        <span className="inline-flex items-center gap-1 text-teal-400">
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                          {r.matchedName}
+                        <span className="inline-flex items-center gap-2 text-teal-400">
+                          <span className="inline-flex items-center gap-1">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                            {r.matchedName}
+                            {isManual && (
+                              <span className="ml-1 rounded-full bg-teal-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-300">
+                                Manual
+                              </span>
+                            )}
+                          </span>
+                          {isManual && (
+                            <button
+                              type="button"
+                              onClick={() => clearManualMatch(i)}
+                              className="text-[11px] text-surface-muted hover:text-dark-200"
+                            >
+                              Clear
+                            </button>
+                          )}
                         </span>
+                      ) : isPickerOpen ? (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={matchSearch}
+                            onChange={(e) => setMatchSearch(e.target.value)}
+                            placeholder="Search group members…"
+                            autoFocus
+                            className="input text-xs w-48 py-1"
+                          />
+                          <div className="absolute right-0 top-full z-20 mt-1 w-64 max-h-48 overflow-y-auto rounded-lg border border-surface-border bg-surface-raised shadow-xl">
+                            {groupMembers
+                              .filter((m) => !claimedElsewhere.has(m.playerId))
+                              .filter((m) =>
+                                matchSearch.length === 0
+                                  ? true
+                                  : m.displayName.toLowerCase().includes(matchSearch.toLowerCase())
+                              )
+                              .slice(0, 8)
+                              .map((m) => (
+                                <button
+                                  key={m.playerId}
+                                  type="button"
+                                  onClick={() => pickManualMatch(i, m)}
+                                  className="block w-full px-3 py-1.5 text-left text-xs text-dark-100 hover:bg-surface-overlay"
+                                >
+                                  {m.displayName}
+                                </button>
+                              ))}
+                            {groupMembers
+                              .filter((m) => !claimedElsewhere.has(m.playerId))
+                              .filter((m) =>
+                                matchSearch.length === 0
+                                  ? true
+                                  : m.displayName.toLowerCase().includes(matchSearch.toLowerCase())
+                              ).length === 0 && (
+                              <p className="px-3 py-2 text-xs text-surface-muted">No members match.</p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMatchingRowIdx(null);
+                              setMatchSearch("");
+                            }}
+                            className="ml-2 text-[11px] text-surface-muted hover:text-dark-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-amber-400">
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-                          No match
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 text-amber-400">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                            No match
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMatchingRowIdx(i);
+                              setMatchSearch("");
+                            }}
+                            className="text-[11px] text-brand-400 hover:text-brand-300"
+                          >
+                            Match manually
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
