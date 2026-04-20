@@ -118,7 +118,15 @@ export async function POST(
     );
   }
 
-  // Insert game result
+  // Insert game result.
+  //
+  // The pre-check above closes the common case fast, but two teammates
+  // on the same court can still tap Submit within ~200ms and both pass
+  // the check before either INSERT lands. Migration 083 adds a unique
+  // expression index on (session, round, pool, canonical_matchup), so
+  // the second concurrent insert fails with Postgres error 23505
+  // (unique_violation). We surface that as the same 409 the fast-path
+  // returns — no need for a tri-state UI.
   const { data: result, error } = await auth.supabase
     .from("game_results")
     .insert({
@@ -140,6 +148,12 @@ export async function POST(
     .single();
 
   if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: "A score already exists for this matchup in this round" },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

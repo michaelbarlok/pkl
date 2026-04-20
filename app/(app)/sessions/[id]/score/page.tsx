@@ -2,6 +2,7 @@
 
 import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { matchFirstChoice } from "@/lib/first-choice";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
@@ -65,6 +66,7 @@ export default function ScoreEntryPage() {
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [slow, setSlow] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -149,29 +151,45 @@ export default function ScoreEntryPage() {
     e.preventDefault();
     setMessage("");
     setSubmitting(true);
+    setSlow(false);
 
-    const res = await fetch(`/api/sessions/${sessionId}/score`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        round_number: session?.current_round || 1,
-        pool_number: activeCourt,
-        team_a_p1: teamAP1,
-        team_a_p2: teamAP2 || null,
-        team_b_p1: teamBP1,
-        team_b_p2: teamBP2 || null,
-        score_a: parseInt(scoreA),
-        score_b: parseInt(scoreB),
-      }),
-    });
+    // fetchWithRetry survives flaky LTE/wifi on the courts: up to 4
+    // attempts on timeout or 5xx, with exponential backoff + jitter so
+    // simultaneous submissions from multiple courts don't pile onto the
+    // DB lock at the same moment. 4xx (e.g. duplicate match) returns
+    // immediately — retrying won't change the answer.
+    try {
+      const res = await fetchWithRetry(
+        `/api/sessions/${sessionId}/score`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            round_number: session?.current_round || 1,
+            pool_number: activeCourt,
+            team_a_p1: teamAP1,
+            team_a_p2: teamAP2 || null,
+            team_b_p1: teamBP1,
+            team_b_p2: teamBP2 || null,
+            score_a: parseInt(scoreA),
+            score_b: parseInt(scoreB),
+          }),
+        },
+        { onSlow: setSlow }
+      );
 
-    const data = await res.json();
-    if (!res.ok) {
-      setMessage(data.error ?? "Failed to submit score");
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error ?? "Failed to submit score");
+        setSubmitting(false);
+      } else {
+        // Full page navigation to guarantee fresh data fetch
+        window.location.href = `/sessions/${sessionId}`;
+      }
+    } catch {
+      setMessage("Network issue — please try again.");
       setSubmitting(false);
-    } else {
-      // Full page navigation to guarantee fresh data fetch
-      window.location.href = `/sessions/${sessionId}`;
+      setSlow(false);
     }
   }
 
@@ -261,7 +279,7 @@ export default function ScoreEntryPage() {
         )}
 
         <button type="submit" className="btn-primary w-full" disabled={submitting}>
-          {submitting ? "Submitting..." : "Submit Score"}
+          {submitting ? (slow ? "Still working..." : "Submitting...") : "Submit Score"}
         </button>
       </form>
     </div>

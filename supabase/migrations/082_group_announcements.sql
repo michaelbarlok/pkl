@@ -5,7 +5,7 @@
 CREATE TABLE group_announcements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   group_id UUID NOT NULL REFERENCES shootout_groups(id) ON DELETE CASCADE,
-  sent_by UUID NOT NULL REFERENCES profiles(id) ON DELETE SET NULL,
+  sent_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
   body TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

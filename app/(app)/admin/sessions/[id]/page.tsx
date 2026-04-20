@@ -4,6 +4,7 @@ import { useConfirm } from "@/components/confirm-modal";
 import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { matchFirstChoice } from "@/lib/first-choice";
 import type { ShootoutSession, SessionParticipant, ShootoutGroup, GameResult } from "@/types/database";
 import Link from "next/link";
@@ -331,35 +332,41 @@ export default function AdminSessionDetailPage() {
       setSubmittingNewScore(false);
       return;
     }
-    const res = await fetch(`/api/sessions/${id}/score`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        round_number: session?.current_round || 1,
-        pool_number: selectedCourt,
-        team_a_p1: match.team1[0],
-        team_a_p2: match.team1[1] || null,
-        team_b_p1: match.team2[0],
-        team_b_p2: match.team2[1] || null,
-        score_a: a,
-        score_b: b,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setNewScoreError(data.error ?? "Failed to submit");
-    } else {
-      setEnteringGame(null);
-      // If the session is already past round_active, adding a score for a
-      // game that was missing needs to trigger a recompute too.
-      await fetch(`/api/sessions/${id}/recompute`, { method: "POST" }).catch(() => {});
-      const { data: refreshed } = await supabase
-        .from("session_participants")
-        .select("*, player:profiles(id, display_name, avatar_url)")
-        .eq("session_id", id)
-        .order("court_number", { ascending: true })
-        .order("step_before", { ascending: true });
-      if (refreshed) setParticipants(refreshed);
+    // fetchWithRetry absorbs transient network/5xx failures so admin
+    // entries from courtside wifi don't get dropped mid-session.
+    try {
+      const res = await fetchWithRetry(`/api/sessions/${id}/score`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          round_number: session?.current_round || 1,
+          pool_number: selectedCourt,
+          team_a_p1: match.team1[0],
+          team_a_p2: match.team1[1] || null,
+          team_b_p1: match.team2[0],
+          team_b_p2: match.team2[1] || null,
+          score_a: a,
+          score_b: b,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNewScoreError(data.error ?? "Failed to submit");
+      } else {
+        setEnteringGame(null);
+        // If the session is already past round_active, adding a score for a
+        // game that was missing needs to trigger a recompute too.
+        await fetch(`/api/sessions/${id}/recompute`, { method: "POST" }).catch(() => {});
+        const { data: refreshed } = await supabase
+          .from("session_participants")
+          .select("*, player:profiles(id, display_name, avatar_url)")
+          .eq("session_id", id)
+          .order("court_number", { ascending: true })
+          .order("step_before", { ascending: true });
+        if (refreshed) setParticipants(refreshed);
+      }
+    } catch {
+      setNewScoreError("Network issue — please try again.");
     }
     setSubmittingNewScore(false);
   }
