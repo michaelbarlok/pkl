@@ -69,7 +69,12 @@ export async function claimPendingMemberships(
       // Already a member — overwrite with pending stats (preserves historical data)
       const update: Record<string, unknown> = {};
       if (record.step != null)           update.current_step    = record.step;
-      if (record.win_pct != null)        update.win_pct         = record.win_pct;
+      if (record.win_pct != null) {
+        // Seed both the rolling value AND the durable imported
+        // baseline that the recompute blends as virtual sessions.
+        update.win_pct          = record.win_pct;
+        update.imported_win_pct = record.win_pct;
+      }
       if (record.total_sessions != null) update.total_sessions  = record.total_sessions;
       if (record.last_played_at)         update.last_played_at  = record.last_played_at;
       if (record.joined_at)              update.joined_at       = record.joined_at;
@@ -89,12 +94,16 @@ export async function claimPendingMemberships(
         .eq("group_id", record.group_id)
         .maybeSingle();
 
+      const importedPct = record.win_pct ?? 0;
       const insertPayload: Record<string, unknown> = {
-        group_id:       record.group_id,
-        player_id:      profileId,
-        current_step:   record.step ?? prefs?.new_player_start_step ?? 5,
-        win_pct:        record.win_pct ?? 0,
-        total_sessions: record.total_sessions ?? 0,
+        group_id:         record.group_id,
+        player_id:        profileId,
+        current_step:     record.step ?? prefs?.new_player_start_step ?? 5,
+        win_pct:          importedPct,
+        // Durable baseline; session recompute blends this as virtual
+        // past-session performance into the rolling point%.
+        imported_win_pct: importedPct,
+        total_sessions:   record.total_sessions ?? 0,
       };
       if (record.last_played_at) insertPayload.last_played_at = record.last_played_at;
       if (record.joined_at)      insertPayload.joined_at      = record.joined_at;

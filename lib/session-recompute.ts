@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { blendRollingPointPct } from "./blend-imported-win-pct";
 
 /**
  * Re-derive a session's pool_finish + win_pct + steps from current
@@ -53,17 +54,36 @@ export async function recomputeSessionStats(
     .eq("round_number", session.current_round || 1);
   if (!gameResults) return { ok: false, error: "Failed to fetch game results" };
 
-  // Group memberships for tiebreakers
+  // Group memberships for tiebreakers AND for blending imported
+  // baselines into the rolling point% below.
   const allPlayerIds = participants.map((p) => p.player_id);
   const { data: memberships } = await supabase
     .from("group_memberships")
-    .select("player_id, current_step, win_pct")
+    .select("player_id, current_step, win_pct, total_sessions, imported_win_pct")
     .eq("group_id", session.group_id)
     .in("player_id", allPlayerIds);
-  const memberMap = new Map(
-    (memberships ?? []).map((m: { player_id: string; current_step: number; win_pct: number }) =>
-      [m.player_id, { step: m.current_step, pointPct: m.win_pct }]
-    )
+  type MemberRow = {
+    player_id: string;
+    current_step: number;
+    win_pct: number;
+    total_sessions: number;
+    imported_win_pct: number | null;
+  };
+  const memberMap = new Map<string, {
+    step: number;
+    pointPct: number;
+    totalSessions: number;
+    importedWinPct: number | null;
+  }>(
+    (memberships ?? []).map((m: MemberRow) => [
+      m.player_id,
+      {
+        step: m.current_step,
+        pointPct: m.win_pct,
+        totalSessions: m.total_sessions ?? 0,
+        importedWinPct: m.imported_win_pct,
+      },
+    ])
   );
 
   // --- pool_finish per court (same algorithm as complete-round) ---
@@ -128,6 +148,14 @@ export async function recomputeSessionStats(
   }
 
   // --- win_pct (point %) per player, rolling window ---
+  //
+  // For each player:
+  //   1. Pull game_results from their last `windowSize` real sessions.
+  //   2. Sum pointsScored / pointsPossible across those games.
+  //   3. If they have an imported baseline (`imported_win_pct`) and
+  //      the real-session count is below the window, blend in virtual
+  //      imported sessions so the imported value ages out gradually
+  //      instead of being clobbered by the first real result.
   const { data: prefs } = await supabase
     .from("group_preferences")
     .select("pct_window_sessions")
@@ -155,6 +183,7 @@ export async function recomputeSessionStats(
 
     let pointsScored = 0;
     let pointsPossible = 0;
+    const sessionsWithGames = new Set<string>();
     for (const game of playerGames ?? []) {
       const isTeamA = game.team_a_p1 === p.player_id || game.team_a_p2 === p.player_id;
       const isTeamB = game.team_b_p1 === p.player_id || game.team_b_p2 === p.player_id;
@@ -162,10 +191,23 @@ export async function recomputeSessionStats(
       const maxScore = Math.max(game.score_a, game.score_b);
       pointsPossible += maxScore;
       pointsScored += isTeamA ? game.score_a : game.score_b;
+      sessionsWithGames.add(game.session_id);
     }
-    const pointPct = pointsPossible > 0
-      ? Math.round((pointsScored / pointsPossible) * 10000) / 100
-      : 0;
+
+    const member = memberMap.get(p.player_id);
+    const pointPct = blendRollingPointPct({
+      windowSize,
+      realPointsScored: pointsScored,
+      realPointsPossible: pointsPossible,
+      realSessionsInWindow: sessionsWithGames.size,
+      // total_sessions reflects state BEFORE update_steps_on_round_complete
+      // runs below, which matches the rolling-window semantics: the
+      // current session counts as one of the player's real sessions
+      // (we have its game_results) and the virtual borrow fills the
+      // remaining window slots.
+      totalSessions: member?.totalSessions ?? 0,
+      importedWinPct: member?.importedWinPct ?? null,
+    });
 
     await supabase
       .from("group_memberships")
