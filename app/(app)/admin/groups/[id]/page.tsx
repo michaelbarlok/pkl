@@ -324,21 +324,49 @@ export default function AdminGroupDetailPage() {
 
   const linkPendingMember = async (pending: PendingMember, playerId: string) => {
     const now = new Date().toISOString();
-    const membershipPayload: Record<string, unknown> = {
-      group_id: id,
-      player_id: playerId,
-      current_step: pending.step ?? preferences?.new_player_start_step ?? 5,
-      win_pct: pending.win_pct ?? 0,
-      total_sessions: pending.total_sessions ?? 0,
-    };
-    if (pending.last_played_at) membershipPayload.last_played_at = pending.last_played_at;
+    const isAlreadyMember = members.some((m) => m.player_id === playerId);
 
-    const { error: insertErr } = await supabase
-      .from("group_memberships")
-      .upsert(membershipPayload, { onConflict: "group_id,player_id" });
+    let writeErr: { message: string } | null = null;
 
-    if (insertErr) {
-      setMessage({ type: "error", text: `Failed to link: ${insertErr.message}` });
+    if (isAlreadyMember) {
+      // Existing member: apply ONLY the fields the pending record has
+      // so a NULL in the pending row doesn't zero out a real value. This
+      // matches the safe-overwrite behavior in the import-steps route.
+      const updatePayload: Record<string, unknown> = {};
+      if (pending.step != null)           updatePayload.current_step    = pending.step;
+      if (pending.win_pct != null)        updatePayload.win_pct         = pending.win_pct;
+      if (pending.total_sessions != null) updatePayload.total_sessions  = pending.total_sessions;
+      if (pending.last_played_at)         updatePayload.last_played_at  = pending.last_played_at;
+
+      if (Object.keys(updatePayload).length > 0) {
+        const { error } = await supabase
+          .from("group_memberships")
+          .update(updatePayload)
+          .eq("group_id", id)
+          .eq("player_id", playerId);
+        if (error) writeErr = error;
+      }
+    } else {
+      // Not yet a member: insert with defaults for fields the pending
+      // record didn't include (current_step falls back to the group's
+      // new_player_start_step, the rest to zero).
+      const insertPayload: Record<string, unknown> = {
+        group_id: id,
+        player_id: playerId,
+        current_step: pending.step ?? preferences?.new_player_start_step ?? 5,
+        win_pct: pending.win_pct ?? 0,
+        total_sessions: pending.total_sessions ?? 0,
+      };
+      if (pending.last_played_at) insertPayload.last_played_at = pending.last_played_at;
+
+      const { error } = await supabase
+        .from("group_memberships")
+        .insert(insertPayload);
+      if (error) writeErr = error;
+    }
+
+    if (writeErr) {
+      setMessage({ type: "error", text: `Failed to link: ${writeErr.message}` });
       return;
     }
 
@@ -348,7 +376,12 @@ export default function AdminGroupDetailPage() {
       .update({ claimed_by: playerId, claimed_at: now })
       .eq("id", pending.id);
 
-    setMessage({ type: "success", text: `${pending.name} linked and added to group.` });
+    setMessage({
+      type: "success",
+      text: isAlreadyMember
+        ? `${pending.name}'s stats applied to the existing member.`
+        : `${pending.name} linked and added to group.`,
+    });
     setLinkingPendingId(null);
     setLinkSearch("");
     await fetchData();
@@ -963,8 +996,11 @@ export default function AdminGroupDetailPage() {
                   Pending Members ({pendingMembers.length})
                 </h3>
                 <p className="text-xs text-surface-muted mt-0.5">
-                  These players were imported but haven't created an account yet. They'll be auto-added
-                  when they sign up. Use "Link" if they signed up with a different name.
+                  Imported stats waiting for an account. If the player auto-matches by
+                  display name on signup, their stats are applied automatically. If they
+                  signed up with a slightly different name, use <span className="font-medium text-dark-200">Link</span> to
+                  point this record at the right account &mdash; works whether they&apos;re already a
+                  member of this group or not.
                 </p>
               </div>
               <div className="overflow-x-auto rounded border border-surface-border">
@@ -1018,34 +1054,55 @@ export default function AdminGroupDetailPage() {
                                   className="input text-xs w-40"
                                   autoFocus
                                 />
-                                {linkSearch.length > 0 && (
-                                  <div className="absolute right-0 top-full mt-1 w-56 bg-surface-raised border border-surface-border rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
-                                    {allPlayers
-                                      .filter((p) =>
-                                        !members.some((m) => m.player_id === p.id) &&
-                                        (p.display_name.toLowerCase().includes(linkSearch.toLowerCase()) ||
-                                         p.full_name.toLowerCase().includes(linkSearch.toLowerCase()))
-                                      )
-                                      .slice(0, 10)
-                                      .map((p) => (
-                                        <button
-                                          key={p.id}
-                                          onClick={() => linkPendingMember(pending, p.id)}
-                                          className="w-full text-left px-3 py-2 text-xs hover:bg-surface-overlay"
-                                        >
-                                          <div className="font-medium text-dark-100">{p.display_name}</div>
-                                          <div className="text-surface-muted">{p.email}</div>
-                                        </button>
-                                      ))}
-                                    {allPlayers.filter((p) =>
-                                      !members.some((m) => m.player_id === p.id) &&
-                                      (p.display_name.toLowerCase().includes(linkSearch.toLowerCase()) ||
-                                       p.full_name.toLowerCase().includes(linkSearch.toLowerCase()))
-                                    ).length === 0 && (
-                                      <p className="px-3 py-2 text-surface-muted">No match found</p>
-                                    )}
-                                  </div>
-                                )}
+                                {linkSearch.length > 0 && (() => {
+                                  // Search ALL active players (group members and
+                                  // not). If the pick is already a member the
+                                  // linkPendingMember handler will apply the
+                                  // stats as an update instead of an insert —
+                                  // which is the typical case when someone
+                                  // signed up with a slightly different
+                                  // display name than the CSV.
+                                  const matches = allPlayers
+                                    .filter((p) =>
+                                      p.display_name.toLowerCase().includes(linkSearch.toLowerCase()) ||
+                                      p.full_name.toLowerCase().includes(linkSearch.toLowerCase())
+                                    )
+                                    .slice(0, 10);
+                                  return (
+                                    <div className="absolute right-0 top-full mt-1 w-64 bg-surface-raised border border-surface-border rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                                      {matches.length === 0 && (
+                                        <p className="px-3 py-2 text-surface-muted">No match found</p>
+                                      )}
+                                      {matches.map((p) => {
+                                        const isMember = members.some((m) => m.player_id === p.id);
+                                        return (
+                                          <button
+                                            key={p.id}
+                                            onClick={() => linkPendingMember(pending, p.id)}
+                                            className="w-full text-left px-3 py-2 text-xs hover:bg-surface-overlay"
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className="font-medium text-dark-100 truncate">{p.display_name}</span>
+                                              {isMember && (
+                                                <span className="shrink-0 rounded bg-teal-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-teal-300">
+                                                  Member
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-surface-muted truncate">
+                                              {p.email}
+                                            </div>
+                                            <div className="text-[11px] text-surface-muted mt-0.5">
+                                              {isMember
+                                                ? "Apply pending stats to existing member"
+                                                : "Add to group with pending stats"}
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <button
                                 onClick={() => { setLinkingPendingId(null); setLinkSearch(""); }}
