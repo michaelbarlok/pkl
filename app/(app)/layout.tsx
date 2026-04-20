@@ -5,6 +5,7 @@ import { MobileNav } from "./mobile-nav";
 import { MissingProfile } from "./missing-profile";
 import { LandingNav } from "./landing-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { ThemeListener } from "@/components/theme-listener";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
 
@@ -118,6 +119,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </main>
       </div>
       <MobileNav profile={profile} isGroupAdmin={isGroupAdmin} />
+      <ThemeListener />
     </div>
   );
 }
