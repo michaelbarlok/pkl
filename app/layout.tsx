@@ -28,13 +28,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: "Tri-Star Pickleball",
   description: "Pickleball ladder league platform",
-  icons: {
-    icon: [
-      { url: "/TriStarPB-icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/TriStarPB-icon-512.png", sizes: "512x512", type: "image/png" },
-    ],
-    apple: "/TriStarPB-icon-192.png",
-  },
+  // Icons are served from Next.js magic files in app/: favicon.ico,
+  // icon.png, apple-icon.png. Google checks /favicon.ico first, so that
+  // file MUST resolve (previously 404'd, which is why the search result
+  // showed the globe placeholder).
   manifest: "/manifest.json",
   openGraph: {
     title: "Tri-Star Pickleball",
