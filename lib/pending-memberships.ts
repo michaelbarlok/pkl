@@ -18,17 +18,41 @@ export async function claimPendingMemberships(
   email: string,
   groupId?: string
 ): Promise<void> {
-  // Build query for unclaimed pending records matching name OR email
-  let query = serviceClient
-    .from("pending_group_members")
-    .select("*")
-    .is("claimed_by", null)
-    .or(`name.ilike.${displayName},invite_email.ilike.${email}`);
+  // Two parameterized queries (one by name, one by email), then dedupe
+  // in JS. The previous implementation built a single `.or()` filter by
+  // string-interpolating the name + email into the PostgREST query —
+  // which broke on legitimate display names containing a comma
+  // ("Smith, Jane") because commas are the OR separator in that syntax.
+  // Going through the typed `.ilike()` method escapes values properly
+  // and doesn't care about special characters in the input.
+  const byId = new Map<string, Record<string, unknown>>();
 
-  if (groupId) query = query.eq("group_id", groupId);
+  const nameQuery = (() => {
+    const q = serviceClient
+      .from("pending_group_members")
+      .select("*")
+      .is("claimed_by", null)
+      .ilike("name", displayName);
+    return groupId ? q.eq("group_id", groupId) : q;
+  })();
+  const { data: byName } = await nameQuery;
+  for (const row of byName ?? []) byId.set(row.id, row);
 
-  const { data: pending } = await query;
-  if (!pending?.length) return;
+  if (email) {
+    const emailQuery = (() => {
+      const q = serviceClient
+        .from("pending_group_members")
+        .select("*")
+        .is("claimed_by", null)
+        .ilike("invite_email", email);
+      return groupId ? q.eq("group_id", groupId) : q;
+    })();
+    const { data: byEmail } = await emailQuery;
+    for (const row of byEmail ?? []) byId.set(row.id, row);
+  }
+
+  const pending = Array.from(byId.values());
+  if (pending.length === 0) return;
 
   const now = new Date().toISOString();
 

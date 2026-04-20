@@ -16,17 +16,20 @@ interface RowResult {
   playerName: string;
   profileId?: string;
   displayName?: string;
-  status: "already_member" | "added_to_group" | "pending" | "not_found" | "error";
+  status: "already_member" | "updated_member" | "added_to_group" | "pending" | "not_found" | "error";
   error?: string;
 }
 
 /**
  * POST /api/admin/groups/[id]/import-steps
  *
- * Body: { rows: StepRow[] }
+ * Body: { rows: StepRow[], overwrite?: boolean }
  *
- * Three outcomes per row:
- *   A. Player is already a group member → update their stats
+ * Four outcomes per row:
+ *   A. Player is already a group member:
+ *      - overwrite=false (default): skipped, live stats untouched
+ *      - overwrite=true: update the fields the CSV actually provides
+ *        (no clobbering of a field with 0 just because it was absent)
  *   B. Player has a profile but isn't a member → add to group with imported stats
  *   C. Player has no profile (not signed up yet) → create a pending_group_members record;
  *      stats will be applied automatically when they sign up
@@ -46,11 +49,13 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { rows } = body as { rows?: StepRow[] };
+    const { rows, overwrite } = body as { rows?: StepRow[]; overwrite?: boolean };
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({ error: "rows array is required" }, { status: 400 });
     }
+
+    const allowOverwrite = overwrite === true;
 
     const serviceClient = await createServiceClient();
 
@@ -112,10 +117,54 @@ export async function POST(
 
       const key = name.toLowerCase();
 
-      // --- Case A: already a group member → skip (don't overwrite live stats) ---
+      // --- Case A: already a group member ---
+      // Default behavior: skip, don't clobber live stats accumulated through
+      // real play. Opt-in (`overwrite: true` on the request) lets admins
+      // push CSV corrections onto live members — but only for fields the
+      // CSV actually provides, so an empty cell can't silently zero out
+      // someone's session count.
       const member = memberMap.get(key);
       if (member) {
-        results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "already_member" });
+        if (!allowOverwrite) {
+          results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "already_member" });
+          continue;
+        }
+
+        const updatePayload: Record<string, unknown> = {};
+        if (row.step !== undefined && !isNaN(row.step))                 updatePayload.current_step   = row.step;
+        if (row.winPct !== undefined && !isNaN(row.winPct))             updatePayload.win_pct        = row.winPct;
+        if (row.totalSessions !== undefined && !isNaN(row.totalSessions)) updatePayload.total_sessions = row.totalSessions;
+        if (row.lastPlayedAt) {
+          const d = new Date(row.lastPlayedAt);
+          if (!isNaN(d.getTime())) updatePayload.last_played_at = d.toISOString();
+        }
+        if (row.joinedAt) {
+          const d = new Date(row.joinedAt);
+          if (!isNaN(d.getTime())) updatePayload.joined_at = d.toISOString();
+        }
+
+        if (Object.keys(updatePayload).length === 0) {
+          // CSV row had nothing to actually apply — treat as a clean skip.
+          results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "already_member" });
+          continue;
+        }
+
+        const { error: updateError } = await serviceClient
+          .from("group_memberships")
+          .update(updatePayload)
+          .eq("group_id", groupId)
+          .eq("player_id", member.playerId);
+
+        if (updateError) {
+          results.push({ playerName: name, displayName: member.displayName, status: "error", error: updateError.message });
+          continue;
+        }
+
+        if (row.skillLevel !== undefined && !isNaN(row.skillLevel)) {
+          await serviceClient.from("profiles").update({ skill_level: row.skillLevel }).eq("id", member.profileId);
+        }
+
+        results.push({ playerName: name, profileId: member.profileId, displayName: member.displayName, status: "updated_member" });
         continue;
       }
 
@@ -184,11 +233,12 @@ export async function POST(
     }
 
     const alreadyMember = results.filter((r) => r.status === "already_member").length;
+    const updatedMember = results.filter((r) => r.status === "updated_member").length;
     const addedToGroup  = results.filter((r) => r.status === "added_to_group").length;
     const pending       = results.filter((r) => r.status === "pending").length;
     const errors        = results.filter((r) => r.status === "error").length;
 
-    return NextResponse.json({ results, alreadyMember, addedToGroup, pending, errors }, { status: 200 });
+    return NextResponse.json({ results, alreadyMember, updatedMember, addedToGroup, pending, errors }, { status: 200 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
