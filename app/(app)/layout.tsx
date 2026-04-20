@@ -92,16 +92,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-dark-950">
+    <div className="flex min-h-dvh bg-dark-950">
       <Sidebar profile={profile} isGroupAdmin={isGroupAdmin} />
-      {/* The middle column is the scroll container. Locking scroll here
-           (instead of on html/body) is the only reliable way to keep
-           Android Chrome's URL-bar auto-hide from toggling the viewport
-           mid-scroll — which made the fixed bottom nav appear to
-           partially move with the content. With scroll on this child,
-           the document root has nothing to scroll, and the URL bar
-           stays pinned. */}
-      <div className="flex flex-1 flex-col min-w-0 overflow-y-auto overscroll-contain">
+      <div className="flex flex-1 flex-col min-w-0">
         {/* Mobile header — logo + notification bell, desktop hidden */}
         <header className="md:hidden flex items-center justify-between px-4 h-12 border-b border-surface-border bg-surface shrink-0">
           <Link href="/dashboard">
