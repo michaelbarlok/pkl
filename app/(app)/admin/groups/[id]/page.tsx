@@ -4,6 +4,7 @@ import { useConfirm } from "@/components/confirm-modal";
 import { EmptyState } from "@/components/empty-state";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { cn, formatDate } from "@/lib/utils";
 import type {
@@ -988,21 +989,38 @@ export default function AdminGroupDetailPage() {
             </table>
           </div>
 
-          {/* Pending Members */}
-          {pendingMembers.length > 0 && (
-            <div className="card border border-amber-900/40 space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold text-dark-100">
-                  Pending Members ({pendingMembers.length})
-                </h3>
-                <p className="text-xs text-surface-muted mt-0.5">
-                  Imported stats waiting for an account. If the player auto-matches by
-                  display name on signup, their stats are applied automatically. If they
-                  signed up with a slightly different name, use <span className="font-medium text-dark-200">Link</span> to
-                  point this record at the right account &mdash; works whether they&apos;re already a
-                  member of this group or not.
-                </p>
-              </div>
+          {/* Pending Members — always rendered so the feature is
+               discoverable even before any records exist. The list
+               inside collapses to an empty-state when there are none. */}
+          <div className={cn(
+            "card space-y-3 border",
+            pendingMembers.length > 0 ? "border-amber-900/40" : "border-surface-border"
+          )}>
+            <div>
+              <h3 className="text-sm font-semibold text-dark-100">
+                Pending Members{pendingMembers.length > 0 ? ` (${pendingMembers.length})` : ""}
+              </h3>
+              <p className="text-xs text-surface-muted mt-0.5">
+                Imported stats waiting for an account. If the player auto-matches by
+                display name on signup, their stats are applied automatically. If they
+                signed up with a slightly different name, use <span className="font-medium text-dark-200">Link</span> to
+                point this record at the right account &mdash; works whether they&apos;re already a
+                member of this group or not.
+              </p>
+            </div>
+            {pendingMembers.length === 0 && (
+              <p className="rounded border border-dashed border-surface-border bg-surface-overlay/30 px-3 py-4 text-center text-xs text-surface-muted">
+                No pending records right now.{" "}
+                <Link
+                  href={`/admin/groups/${id}/import-steps`}
+                  className="text-brand-400 hover:text-brand-300"
+                >
+                  Import Steps
+                </Link>{" "}
+                to bring in stats for players who haven&apos;t signed up yet.
+              </p>
+            )}
+            {pendingMembers.length > 0 && (
               <div className="overflow-x-auto rounded border border-surface-border">
                 <table className="text-xs w-full min-w-max">
                   <thead>
@@ -1133,8 +1151,8 @@ export default function AdminGroupDetailPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
         </div>
       )}
