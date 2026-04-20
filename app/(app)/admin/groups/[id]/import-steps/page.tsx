@@ -104,7 +104,7 @@ interface PreviewRow extends ParsedRow {
 interface RowResult {
   playerName: string;
   displayName?: string;
-  status: "already_member" | "added_to_group" | "pending" | "not_found" | "error";
+  status: "already_member" | "updated_member" | "added_to_group" | "pending" | "not_found" | "error";
   error?: string;
 }
 
@@ -122,8 +122,9 @@ export default function ImportStepsPage() {
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [overwriteExisting, setOverwriteExisting] = useState(false);
   const [results, setResults] = useState<RowResult[] | null>(null);
-  const [summary, setSummary] = useState<{ alreadyMember: number; addedToGroup: number; pending: number; errors: number } | null>(null);
+  const [summary, setSummary] = useState<{ alreadyMember: number; updatedMember: number; addedToGroup: number; pending: number; errors: number } | null>(null);
 
   // Load group members for matching
   useEffect(() => {
@@ -218,7 +219,7 @@ export default function ImportStepsPage() {
       const res = await fetch(`/api/admin/groups/${groupId}/import-steps`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: payload }),
+        body: JSON.stringify({ rows: payload, overwrite: overwriteExisting }),
       });
 
       const data = await res.json();
@@ -226,7 +227,13 @@ export default function ImportStepsPage() {
         setParseError(data.error ?? "Import failed");
       } else {
         setResults(data.results);
-        setSummary({ alreadyMember: data.alreadyMember ?? 0, addedToGroup: data.addedToGroup ?? 0, pending: data.pending ?? 0, errors: data.errors });
+        setSummary({
+          alreadyMember: data.alreadyMember ?? 0,
+          updatedMember: data.updatedMember ?? 0,
+          addedToGroup: data.addedToGroup ?? 0,
+          pending: data.pending ?? 0,
+          errors: data.errors ?? 0,
+        });
         setRows([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -383,6 +390,27 @@ export default function ImportStepsPage() {
             </table>
           </div>
 
+          {/* Overwrite toggle — opt-in so a stats correction import can
+               update stats for members who are already in the group,
+               instead of silently skipping them. */}
+          <label className="flex items-start gap-2 cursor-pointer text-sm">
+            <input
+              type="checkbox"
+              checked={overwriteExisting}
+              onChange={(e) => setOverwriteExisting(e.target.checked)}
+              disabled={submitting}
+              className="mt-0.5 h-4 w-4 rounded border-surface-border bg-surface-overlay text-brand-500 focus:ring-brand-500"
+            />
+            <span className="text-dark-200">
+              Also update existing members&apos; stats
+              <span className="block text-xs text-surface-muted">
+                By default, matches to current group members are skipped. Turn this on to overwrite
+                their step / win % / sessions with the CSV values. Empty cells are ignored — they
+                won&apos;t zero out a field.
+              </span>
+            </span>
+          </label>
+
           <div className="flex gap-3">
             <button
               onClick={handleSubmit}
@@ -416,6 +444,12 @@ export default function ImportStepsPage() {
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-surface-overlay text-surface-muted text-xs font-bold">{summary.alreadyMember}</span>
                   <span className="text-dark-200">already a member (skipped)</span>
+                </div>
+              )}
+              {summary.updatedMember > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-teal-500/20 text-teal-300 text-xs font-bold">{summary.updatedMember}</span>
+                  <span className="text-dark-200">existing member updated</span>
                 </div>
               )}
               {summary.addedToGroup > 0 && (
@@ -464,6 +498,12 @@ export default function ImportStepsPage() {
                           <span className="inline-flex items-center gap-1 text-surface-muted">
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" /></svg>
                             Already a member — skipped
+                          </span>
+                        )}
+                        {r.status === "updated_member" && (
+                          <span className="inline-flex items-center gap-1 text-teal-300">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                            Existing member — stats updated
                           </span>
                         )}
                         {r.status === "added_to_group" && (
