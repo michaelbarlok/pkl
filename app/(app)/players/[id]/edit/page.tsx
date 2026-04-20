@@ -1,6 +1,7 @@
 "use client";
 
 import { AvatarUpload } from "@/components/avatar-upload";
+import { ThemeSelector } from "@/components/theme-selector";
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, getExistingSubscription } from "@/lib/push-client";
@@ -40,6 +41,7 @@ export default function EditProfilePage() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [togglingPush, setTogglingPush] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [groupAdminIds, setGroupAdminIds] = useState<Set<string>>(new Set());
   const [togglingGroup, setTogglingGroup] = useState<string | null>(null);
@@ -78,6 +80,7 @@ export default function EditProfilePage() {
 
       const callerIsAdmin = currentProfile?.role === "admin";
       setIsAdmin(callerIsAdmin);
+      setIsOwnProfile(currentProfile?.id === id);
 
       setDisplayName(profile.display_name ?? "");
       setFullName(profile.full_name ?? "");
@@ -685,6 +688,23 @@ export default function EditProfilePage() {
           </div>
         </form>
       </div>
+
+      {/* Appearance — theme preference. Lives outside the main form
+           because it's a client-only preference (localStorage) that
+           takes effect immediately; no Save button needed. Gated on
+           isOwnProfile because the preference is per-browser — a
+           global admin editing someone else's profile would otherwise
+           be flipping their OWN view, which is confusing. */}
+      {isOwnProfile && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-dark-100 mb-1">Appearance</h2>
+          <p className="text-sm text-surface-muted mb-3">
+            Choose how the app looks. &ldquo;System&rdquo; follows your device&apos;s light/dark setting
+            and updates automatically when you change it.
+          </p>
+          <ThemeSelector />
+        </div>
+      )}
 
       {/* Group Admin Roles — visible to global admins only */}
       {isAdmin && groups.length > 0 && (

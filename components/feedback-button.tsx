@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 
-export function SuggestFeatureButton({
+type FeedbackKind = "feature" | "bug";
+
+/**
+ * Generic feedback button in the side nav + mobile more menu. Submits
+ * either a feature suggestion or a bug report depending on which tab
+ * the user picks in the modal. The server uses the `kind` field to
+ * route the email subject line so we know what's what in the inbox.
+ */
+export function FeedbackButton({
   collapsed = false,
   onDone,
 }: {
@@ -10,6 +18,7 @@ export function SuggestFeatureButton({
   onDone?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<FeedbackKind>("feature");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -22,6 +31,7 @@ export function SuggestFeatureButton({
     setError("");
     setTitle("");
     setDescription("");
+    setKind("feature");
   }
 
   function closeModal() {
@@ -34,10 +44,10 @@ export function SuggestFeatureButton({
     setError("");
     setSubmitting(true);
 
-    const res = await fetch("/api/feature-request", {
+    const res = await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify({ kind, title, description }),
     });
 
     setSubmitting(false);
@@ -50,11 +60,24 @@ export function SuggestFeatureButton({
     }
   }
 
+  const isBug = kind === "bug";
+  const modalTitle = "Send feedback";
+  const modalSub = "Suggest a feature or report a bug — every submission lands in our inbox.";
+  const titlePlaceholder = isBug
+    ? "e.g. Scoreboard freezes when I submit round 3"
+    : "e.g. Show head-to-head records on profiles";
+  const descriptionPlaceholder = isBug
+    ? "What were you doing? What did you expect to happen? What happened instead?"
+    : "Describe the feature or improvement you'd like to see…";
+  const successCopy = isBug
+    ? "Thanks! Your bug report has been sent — we'll take a look."
+    : "Thanks! Your suggestion has been sent. We appreciate the feedback.";
+
   return (
     <>
       <button
         onClick={openModal}
-        title={collapsed ? "Suggest a Feature" : undefined}
+        title={collapsed ? "Send feedback" : undefined}
         className={
           collapsed
             ? "flex w-full items-center justify-center rounded-md py-1.5 text-surface-muted hover:bg-surface-overlay hover:text-dark-100 transition-colors"
@@ -69,35 +92,31 @@ export function SuggestFeatureButton({
           strokeWidth={2}
           className={collapsed ? "h-5 w-5" : "h-5 w-5 shrink-0"}
         >
+          {/* speech bubble — reads as generic "feedback" for both
+              features and bugs, unlike the old lightbulb glyph */}
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"
+            d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z"
           />
         </svg>
-        {!collapsed && "Suggest a Feature"}
+        {!collapsed && "Send feedback"}
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={closeModal}
-          />
+          <div className="absolute inset-0 bg-black/60" onClick={closeModal} />
 
-          {/* Modal */}
           <div className="relative w-full max-w-md rounded-xl bg-surface-raised border border-surface-border shadow-2xl p-6 space-y-4">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-base font-semibold text-dark-100">Suggest a Feature</h2>
-                <p className="text-xs text-surface-muted mt-0.5">
-                  We read every submission. Your ideas help shape the app.
-                </p>
+                <h2 className="text-base font-semibold text-dark-100">{modalTitle}</h2>
+                <p className="text-xs text-surface-muted mt-0.5">{modalSub}</p>
               </div>
               <button
                 onClick={closeModal}
                 className="ml-4 text-surface-muted hover:text-dark-100 transition-colors"
+                aria-label="Close"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -107,15 +126,53 @@ export function SuggestFeatureButton({
 
             {success ? (
               <div className="space-y-4">
-                <div className="alert-success px-4 py-3 text-sm">
-                  Thanks! Your suggestion has been sent. We appreciate the feedback.
-                </div>
+                <div className="alert-success px-4 py-3 text-sm">{successCopy}</div>
                 <button onClick={closeModal} className="btn-primary w-full">
                   Done
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Type selector */}
+                <div>
+                  <label className="block text-xs font-medium text-dark-200 mb-1.5">
+                    Type <span className="text-red-400">*</span>
+                  </label>
+                  <div
+                    role="radiogroup"
+                    className="inline-flex rounded-lg bg-surface-overlay p-0.5"
+                  >
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={kind === "feature"}
+                      onClick={() => setKind("feature")}
+                      className={
+                        "px-3 py-1.5 text-xs font-medium rounded-md transition-colors " +
+                        (kind === "feature"
+                          ? "bg-brand-500/20 text-brand-300 ring-1 ring-brand-500/40"
+                          : "text-dark-200 hover:text-dark-100")
+                      }
+                    >
+                      💡 Feature request
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={kind === "bug"}
+                      onClick={() => setKind("bug")}
+                      className={
+                        "px-3 py-1.5 text-xs font-medium rounded-md transition-colors " +
+                        (kind === "bug"
+                          ? "bg-red-500/15 text-red-300 ring-1 ring-red-500/40"
+                          : "text-dark-200 hover:text-dark-100")
+                      }
+                    >
+                      🐞 Bug report
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-dark-200 mb-1">
                     Title <span className="text-surface-muted font-normal">(optional)</span>
@@ -125,14 +182,15 @@ export function SuggestFeatureButton({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     maxLength={120}
-                    placeholder="e.g. Show head-to-head records on profiles"
+                    placeholder={titlePlaceholder}
                     className="input w-full"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-dark-200 mb-1">
-                    Description <span className="text-red-400">*</span>
+                    {isBug ? "What happened?" : "Description"}{" "}
+                    <span className="text-red-400">*</span>
                   </label>
                   <textarea
                     value={description}
@@ -140,7 +198,7 @@ export function SuggestFeatureButton({
                     maxLength={2000}
                     rows={5}
                     required
-                    placeholder="Describe the feature or improvement you'd like to see..."
+                    placeholder={descriptionPlaceholder}
                     className="input w-full resize-none"
                   />
                   <p className="text-right text-xs text-surface-muted mt-1">
@@ -148,9 +206,7 @@ export function SuggestFeatureButton({
                   </p>
                 </div>
 
-                {error && (
-                  <p className="text-sm text-red-400">{error}</p>
-                )}
+                {error && <p className="text-sm text-red-400">{error}</p>}
 
                 <div className="flex gap-3">
                   <button
@@ -158,13 +214,9 @@ export function SuggestFeatureButton({
                     disabled={submitting || !description.trim()}
                     className="btn-primary flex-1"
                   >
-                    {submitting ? "Sending…" : "Submit"}
+                    {submitting ? "Sending…" : isBug ? "Send report" : "Submit"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="btn-secondary"
-                  >
+                  <button type="button" onClick={closeModal} className="btn-secondary">
                     Cancel
                   </button>
                 </div>

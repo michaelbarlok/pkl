@@ -64,11 +64,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Apply saved theme before paint so React hydration doesn't strip it.
-            Falls back to system preference (prefers-color-scheme) on first visit. */}
+        {/* Apply saved theme preference before paint so React hydration
+            doesn't strip it and the page doesn't flash the wrong colors.
+            Stored values: "light" / "dark" / "system" (or missing → system).
+            Only "system" / missing falls through to matchMedia so users
+            who explicitly chose dark never see light on an OS-light
+            device (and vice versa). */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.classList.add('light');}else if(!t&&window.matchMedia('(prefers-color-scheme: light)').matches){document.documentElement.classList.add('light');}}catch(e){}})()`,
+            __html: `(function(){try{var t=localStorage.getItem('theme');var useLight=false;if(t==='light'){useLight=true;}else if(t==='dark'){useLight=false;}else{useLight=window.matchMedia('(prefers-color-scheme: light)').matches;}if(useLight){document.documentElement.classList.add('light');}}catch(e){}})()`,
           }}
         />
         {/* Register SW immediately — before React hydrates — so Chrome sees
