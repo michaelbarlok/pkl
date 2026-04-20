@@ -30,7 +30,13 @@ export default async function LadderPage({
   const isFreePlay = group.group_type === "free_play";
 
   // getGroupMembers already sorts by ranking sheet order
-  const members = isFreePlay ? [] : await getGroupMembers(group.id);
+  // Only include members who have actually played at least one session.
+  // Members with total_sessions = 0 (seeded / pending / just-joined) show
+  // as default step/0% and would otherwise clutter the ranking with
+  // meaningless entries.
+  const members = isFreePlay
+    ? []
+    : (await getGroupMembers(group.id)).filter((m) => (m.total_sessions ?? 0) > 0);
   const playerStats = isFreePlay ? await getPlayerStats(group.id) : [];
 
   return (
@@ -73,7 +79,7 @@ export default async function LadderPage({
         <div className="card overflow-hidden p-0">
           {members.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-surface-muted">
-              No members in this group yet.
+              No one has played a session yet — rankings appear here once members start playing.
             </p>
           ) : (
             <ul className="divide-y divide-surface-border">

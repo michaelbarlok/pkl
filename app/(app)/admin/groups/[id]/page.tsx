@@ -73,6 +73,9 @@ export default function AdminGroupDetailPage() {
   const confirm = useConfirm();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // player_id of the member whose step just saved, for a brief visual
+  // "saved ✓" flash on their row so the admin knows the write landed.
+  const [stepJustSaved, setStepJustSaved] = useState<string | null>(null);
 
   // Search state for adding members
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,21 +208,52 @@ export default function AdminGroupDetailPage() {
   };
 
   const updateStep = async (playerId: string, newStep: number) => {
-    if (newStep < 1) return;
+    // Clamp to the group's configured step range so a typo like 999
+    // doesn't leave a member out of bounds until the next session.
+    const minStep = preferences?.min_step ?? 1;
+    const maxStep = preferences?.max_step ?? 99;
+    const clamped = Math.min(maxStep, Math.max(minStep, newStep));
+    if (clamped < 1) return;
+
+    // Snapshot the old value so we can roll back if the write fails.
+    const oldStep = members.find((m) => m.player_id === playerId)?.current_step;
+
+    // Optimistically reflect the clamped value in the input.
+    if (clamped !== newStep) {
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.player_id === playerId ? { ...m, current_step: clamped } : m
+        )
+      );
+    }
+
     const { error } = await supabase
       .from("group_memberships")
-      .update({ current_step: newStep })
+      .update({ current_step: clamped })
       .eq("group_id", id)
       .eq("player_id", playerId);
 
     if (error) {
       setMessage({ type: "error", text: `Failed to update step: ${error.message}` });
+      // Roll the input back to the last-known-good value.
+      if (oldStep !== undefined) {
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.player_id === playerId ? { ...m, current_step: oldStep } : m
+          )
+        );
+      }
     } else {
       setMembers((prev) =>
         prev.map((m) =>
-          m.player_id === playerId ? { ...m, current_step: newStep } : m
+          m.player_id === playerId ? { ...m, current_step: clamped } : m
         )
       );
+      // Flash a brief "saved" indicator next to the input.
+      setStepJustSaved(playerId);
+      setTimeout(() => {
+        setStepJustSaved((curr) => (curr === playerId ? null : curr));
+      }, 1400);
     }
   };
 
@@ -820,20 +854,52 @@ export default function AdminGroupDetailPage() {
                     {group?.group_type !== "free_play" && (
                       <>
                         <td className="px-3 py-2 text-center whitespace-nowrap">
-                          <input
-                            type="number"
-                            min={1}
-                            value={member.current_step}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val)) setMembers((prev) => prev.map((m) => m.player_id === member.player_id ? { ...m, current_step: val } : m));
-                            }}
-                            onBlur={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val) && val >= 1) updateStep(member.player_id, val);
-                            }}
-                            className="w-14 rounded border border-surface-border bg-surface-raised text-dark-100 px-1.5 py-1 text-center text-xs font-semibold focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                          />
+                          <div className="inline-flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min={preferences?.min_step ?? 1}
+                              max={preferences?.max_step ?? 99}
+                              inputMode="numeric"
+                              value={member.current_step}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (!isNaN(val)) setMembers((prev) => prev.map((m) => m.player_id === member.player_id ? { ...m, current_step: val } : m));
+                              }}
+                              onBlur={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (!isNaN(val) && val >= 1) updateStep(member.player_id, val);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  // Enter triggers blur so the existing
+                                  // save path runs without needing a form.
+                                  (e.currentTarget as HTMLInputElement).blur();
+                                } else if (e.key === "Escape") {
+                                  // Revert any unsaved edit by snapping
+                                  // back to the last-saved server value,
+                                  // then blur without triggering a save.
+                                  const input = e.currentTarget as HTMLInputElement;
+                                  input.value = String(member.current_step);
+                                  input.blur();
+                                }
+                              }}
+                              className={cn(
+                                "w-14 rounded border bg-surface-raised text-dark-100 px-1.5 py-1 text-center text-xs font-semibold focus:ring-1 transition-colors",
+                                stepJustSaved === member.player_id
+                                  ? "border-teal-500/70 ring-1 ring-teal-500/40"
+                                  : "border-surface-border focus:border-brand-500 focus:ring-brand-500"
+                              )}
+                            />
+                            {stepJustSaved === member.player_id && (
+                              <span
+                                className="text-teal-400 text-sm leading-none"
+                                aria-label="Saved"
+                                title="Saved"
+                              >
+                                ✓
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-center whitespace-nowrap text-xs text-dark-200">
                           {member.win_pct}%
