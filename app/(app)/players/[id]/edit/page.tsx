@@ -232,13 +232,28 @@ export default function EditProfilePage() {
       usap_expiration: usapExpiration || null,
     };
 
-    const { error: updateError } = await supabase
+    // .select("id") makes Supabase return the updated row(s). If RLS
+    // filters the UPDATE to zero rows (which used to silently happen
+    // when an admin edited another user's profile before we added the
+    // admin UPDATE policy), Postgres returns success with data=[]. We
+    // treat that as an explicit failure so the user never sees a green
+    // "Profile updated!" while nothing actually changed.
+    const { data, error: updateError } = await supabase
       .from("profiles")
       .update(updates)
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
 
     if (updateError) {
       setError(updateError.message);
+      setSaving(false);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setError(
+        "Nothing saved — you may not have permission to edit this user. Ask a platform admin to make the change."
+      );
       setSaving(false);
       return;
     }
