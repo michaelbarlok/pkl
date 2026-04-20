@@ -466,30 +466,8 @@ export default function AdminGroupDetailPage() {
   // Broadcast announcement
   // ============================================================
 
-  const [broadcastTitle, setBroadcastTitle] = useState("");
-  const [broadcastMessage, setBroadcastMessage] = useState("");
-  const [broadcasting, setBroadcasting] = useState(false);
-  const [broadcastResult, setBroadcastResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const sendBroadcast = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBroadcasting(true);
-    setBroadcastResult(null);
-    const res = await fetch(`/api/groups/${id}/broadcast`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: broadcastTitle, message: broadcastMessage }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setBroadcastResult({ type: "success", text: `Sent to ${data.sent} member${data.sent !== 1 ? "s" : ""}.` });
-      setBroadcastTitle("");
-      setBroadcastMessage("");
-    } else {
-      setBroadcastResult({ type: "error", text: data.error ?? "Failed to send." });
-    }
-    setBroadcasting(false);
-  };
+  // Send Announcement lives on the group page now (admin-gated there)
+  // so broadcasting a message isn't buried under "settings".
 
   // ============================================================
   // Derived data
@@ -1355,57 +1333,6 @@ export default function AdminGroupDetailPage() {
           <GroupSchedulesSection groupId={id} />
         </div>
       )}
-
-      {/* Broadcast Announcement */}
-      <form onSubmit={sendBroadcast} className="card space-y-4">
-        <div>
-          <h3 className="text-sm font-semibold text-dark-100">Send Announcement</h3>
-          <p className="text-xs text-surface-muted mt-0.5">
-            Sends a push notification and email to all {members.length} group member{members.length !== 1 ? "s" : ""}.
-          </p>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-dark-200 mb-1.5">
-            Subject / Title <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="text"
-            value={broadcastTitle}
-            onChange={(e) => setBroadcastTitle(e.target.value)}
-            maxLength={100}
-            required
-            className="input w-full"
-            placeholder="e.g. Court change for Wednesday"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-dark-200 mb-1.5">
-            Message <span className="text-red-400">*</span>
-          </label>
-          <textarea
-            value={broadcastMessage}
-            onChange={(e) => setBroadcastMessage(e.target.value)}
-            maxLength={1000}
-            required
-            rows={4}
-            className="input w-full resize-none"
-            placeholder="Write your message to all group members..."
-          />
-          <p className="text-[11px] text-surface-muted mt-1 text-right">{broadcastMessage.length}/1000</p>
-        </div>
-        {broadcastResult && (
-          <p className={`text-sm font-medium ${broadcastResult.type === "success" ? "text-teal-400" : "text-red-400"}`}>
-            {broadcastResult.text}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={broadcasting || !broadcastTitle.trim() || !broadcastMessage.trim()}
-          className="btn-primary disabled:opacity-50"
-        >
-          {broadcasting ? "Sending..." : `Send to All Members`}
-        </button>
-      </form>
 
       {/* Danger Zone */}
       <div className="card border border-red-900/40 space-y-3">

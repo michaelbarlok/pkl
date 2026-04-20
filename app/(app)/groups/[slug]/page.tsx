@@ -10,6 +10,7 @@ import { ResetStatsButton } from "./reset-stats-button";
 import { RollingSessionsSetting } from "./rolling-sessions-setting";
 import { GroupTabs, type TabSpec } from "./group-tabs";
 import { MembersGrid } from "./members-grid";
+import { SendAnnouncement } from "./send-announcement";
 import { groupGradient } from "@/lib/group-gradient";
 import type { GroupWithPreferences } from "@/lib/queries/group";
 
@@ -244,6 +245,18 @@ export default async function GroupPage({
   const playerStats = isFreePlay ? await getPlayerStats(group.id) : [];
   const recentSessions = isFreePlay ? await getRecentSessions(group.id, 10) : [];
 
+  // Announcements are members-only content; RLS already enforces the
+  // read permission, but we skip the query for non-members to avoid a
+  // needless round-trip.
+  const recentAnnouncements = isMember
+    ? ((await supabase
+        .from("group_announcements")
+        .select("id, title, body, created_at, sent_by")
+        .eq("group_id", group.id)
+        .order("created_at", { ascending: false })
+        .limit(5)).data ?? [])
+    : [];
+
   // Check for active free play session
   let activeSessionId: string | null = null;
   if (isFreePlay && isMember) {
@@ -277,6 +290,45 @@ export default async function GroupPage({
 
   const overviewPanel = (
     <div className="space-y-8 pt-6">
+      {/* Announcements — admins can send from here (replaces the form
+          that used to live in Manage Groups), members see the recent
+          feed with deep-links to the detail page. */}
+      {isMember && (isGroupAdmin || recentAnnouncements.length > 0) && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-dark-100">Announcements</h2>
+          {isGroupAdmin && (
+            <SendAnnouncement groupId={group.id} memberCount={members.length} />
+          )}
+          {recentAnnouncements.length > 0 && (
+            <ul className="space-y-2">
+              {recentAnnouncements.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    href={`/groups/${slug}/announcements/${a.id}`}
+                    className="card block hover:ring-2 hover:ring-brand-500/30 transition-shadow"
+                  >
+                    <p className="text-sm font-semibold text-dark-100 line-clamp-1">
+                      {a.title}
+                    </p>
+                    <p className="mt-1 text-xs text-surface-muted line-clamp-2">
+                      {a.body}
+                    </p>
+                    <p className="mt-2 text-[11px] text-surface-muted">
+                      {new Date(a.created_at).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {/* Stats (ladder league only) */}
       {!isFreePlay && (
         <div className="space-y-4">
