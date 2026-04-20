@@ -243,13 +243,20 @@ export default function ImportStepsPage() {
   }
 
   async function handleSubmit() {
-    const matched = rows.filter((r) => r.matched);
-    if (matched.length === 0) return;
+    // Send every parsed row. The server's safe-dispatch handles the
+    // right outcome per row:
+    //   - manual match         → update the picked member's stats
+    //   - auto-match (Case A)  → already_member (skip) or updated_member (overwrite)
+    //   - profile but not in group (Case B) → added_to_group
+    //   - no profile match (Case C)        → stored as pending_group_members
+    // Filtering to "matched only" on the client was a bug that silently
+    // dropped every row destined to become a pending record.
+    if (rows.length === 0) return;
     setSubmitting(true);
     setResults(null);
 
     try {
-      const payload = matched.map((r) => ({
+      const payload = rows.map((r) => ({
         playerName: r.player,
         // Only send playerId when the admin manually picked a member;
         // for auto-matched rows the server does its own display_name
@@ -387,7 +394,7 @@ export default function ImportStepsPage() {
               {unmatchedCount > 0 && (
                 <span className="flex items-center gap-1 text-amber-400">
                   <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" /></svg>
-                  {unmatchedCount} unmatched — match manually below or they&apos;ll be skipped
+                  {unmatchedCount} unmatched — match manually or they&apos;ll be stored as pending until signup
                 </span>
               )}
             </div>
@@ -552,10 +559,10 @@ export default function ImportStepsPage() {
           <div className="flex gap-3">
             <button
               onClick={handleSubmit}
-              disabled={submitting || matchedCount === 0}
+              disabled={submitting || rows.length === 0}
               className="btn-primary"
             >
-              {submitting ? "Importing…" : `Import ${matchedCount} player${matchedCount !== 1 ? "s" : ""}`}
+              {submitting ? "Importing…" : `Import ${rows.length} row${rows.length !== 1 ? "s" : ""}`}
             </button>
             <button
               onClick={() => {
