@@ -120,7 +120,14 @@ export async function POST(
     function buildMemberUpdate(row: StepRow): Record<string, unknown> {
       const payload: Record<string, unknown> = {};
       if (row.step !== undefined && !isNaN(row.step))                 payload.current_step   = row.step;
-      if (row.winPct !== undefined && !isNaN(row.winPct))             payload.win_pct        = row.winPct;
+      // win_pct is the current rolling value; imported_win_pct is the
+      // durable baseline the recompute blends as virtual sessions. We
+      // set both so a fresh import (or an admin "overwrite") re-anchors
+      // the player's baseline cleanly.
+      if (row.winPct !== undefined && !isNaN(row.winPct)) {
+        payload.win_pct          = row.winPct;
+        payload.imported_win_pct = row.winPct;
+      }
       if (row.totalSessions !== undefined && !isNaN(row.totalSessions)) payload.total_sessions = row.totalSessions;
       if (row.lastPlayedAt) {
         const d = new Date(row.lastPlayedAt);
@@ -199,12 +206,17 @@ export async function POST(
       // --- Case B: has a profile but not yet a member → add to group ---
       const profile = profileMap.get(key);
       if (profile) {
+        const importedPct = row.winPct ?? 0;
         const insertPayload: Record<string, unknown> = {
-          group_id:       groupId,
-          player_id:      profile.id,
-          current_step:   row.step ?? defaultStep,
-          win_pct:        row.winPct ?? 0,
-          total_sessions: row.totalSessions ?? 0,
+          group_id:         groupId,
+          player_id:        profile.id,
+          current_step:     row.step ?? defaultStep,
+          win_pct:          importedPct,
+          // Durable baseline — the recompute treats this as virtual
+          // past-session performance until enough real sessions fill
+          // the rolling window.
+          imported_win_pct: importedPct,
+          total_sessions:   row.totalSessions ?? 0,
         };
         if (row.lastPlayedAt) {
           const d = new Date(row.lastPlayedAt);
