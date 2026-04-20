@@ -1,4 +1,4 @@
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
 import { sheetSignupClosed } from "@/lib/sheet-lifecycle";
@@ -65,11 +65,21 @@ export async function POST(
       return NextResponse.json({ error: "Sheet not found" }, { status: 404 });
     }
 
+    // "Admin" here means site admin OR group admin for the sheet's
+    // group. Both can add/remove players and both can bypass the
+    // signup cutoff — regular members can only sign themselves up,
+    // and only while the cutoff is open.
+    const callerIsAdmin = await isGroupAdmin(
+      auth.supabase,
+      auth.profile.id,
+      sheet.group_id,
+      auth.profile.role
+    );
+
     // Authorization: signing up someone else requires admin OR allow_member_guests
     const playerId = targetPlayerId || auth.profile.id;
     if (targetPlayerId && targetPlayerId !== auth.profile.id) {
-      const isAdmin = auth.profile.role === "admin";
-      if (!isAdmin && !sheet.allow_member_guests) {
+      if (!callerIsAdmin && !sheet.allow_member_guests) {
         return NextResponse.json(
           { error: "Adding other members is not enabled for this sheet" },
           { status: 403 }
@@ -103,7 +113,10 @@ export async function POST(
       );
     }
 
-    if (sheetSignupClosed(sheet)) {
+    // Admins (site or group) can add players after the cutoff — this
+    // covers last-minute substitutes. The RPC-side cutoff check is
+    // bypassed in the same step below via p_bypass_closed.
+    if (!callerIsAdmin && sheetSignupClosed(sheet)) {
       return NextResponse.json(
         { error: "Sign-up cutoff has passed" },
         { status: 400 }
@@ -122,6 +135,7 @@ export async function POST(
         p_priority: priority,
         p_registered_by: targetPlayerId ? auth.profile.id : null,
         p_signed_up_at: clickedAtIso,
+        p_bypass_closed: callerIsAdmin,
       }
     );
 

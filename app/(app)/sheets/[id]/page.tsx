@@ -200,7 +200,10 @@ export default async function SheetDetailPage({
 
   // Add-member eligibility: admins always; regular members only when the
   // group has allow_member_guests set AND signup is still open.
-  const canAddMembers = isAdmin || (sheet.allow_member_guests && !signupClosed);
+  // Group admins get the same add/remove affordances as site admins —
+  // including after the signup cutoff, which matches the server-side
+  // bypass in /api/sheets/[id]/signup.
+  const canAddMembers = hasAdminView || (sheet.allow_member_guests && !signupClosed);
   const registeredPlayerIds = new Set(
     (registrations ?? []).map((r: Registration) => r.player_id)
   );
@@ -306,7 +309,7 @@ export default async function SheetDetailPage({
         {/* Secondary action row within the hero */}
         <div className="px-5 sm:px-7 pb-4 flex flex-wrap items-center gap-2 text-xs">
           <ShareButton title={`${sheet.group?.name ?? "Event"} · ${eventDateLine}`} />
-          {!isAdmin && !isCancelled && (
+          {!hasAdminView && !isCancelled && (
             <ContactOrganizersButton
               endpoint={`/api/groups/${sheet.group_id}/contact-admins`}
               label="Contact admins"
@@ -377,7 +380,7 @@ export default async function SheetDetailPage({
       </details>
 
       {/* ── Admin toolbox ──────────────────────────────────────── */}
-      {isAdmin && !isCancelled && (
+      {hasAdminView && !isCancelled && (
         <div className="rounded-xl bg-surface-raised ring-1 ring-dashed ring-surface-border p-4 space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-surface-muted">
             Admin actions
@@ -422,7 +425,7 @@ export default async function SheetDetailPage({
                 reg={reg}
                 court={courtByPlayer.get(reg.player_id)}
                 isMe={reg.player_id === profile.id}
-                adminCanRemove={isAdmin && !isCancelled}
+                adminCanRemove={hasAdminView && !isCancelled}
                 showPriority={hasAdminView}
               />
             ))}
@@ -467,7 +470,7 @@ export default async function SheetDetailPage({
                 <span className="flex-1 truncate text-sm text-dark-100">
                   {reg.player?.display_name ?? "Unknown"}
                 </span>
-                {isAdmin && !isCancelled && (
+                {hasAdminView && !isCancelled && (
                   <AdminRemovePlayer
                     registrationId={reg.id}
                     playerName={reg.player?.display_name ?? "this player"}

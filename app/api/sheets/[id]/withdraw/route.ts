@@ -1,4 +1,4 @@
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { sheetWithdrawClosed } from "@/lib/sheet-lifecycle";
 import { promoteNextWaitlistPlayer } from "@/lib/waitlist";
 import { revalidatePath } from "next/cache";
@@ -24,23 +24,38 @@ export async function POST(
       // No body — self-withdrawal
     }
 
-    // For self-withdrawals (non-admin), enforce sheet status and deadline server-side.
-    // Admins removing other players bypass these checks intentionally.
-    const isAdminRemoval = !!registrationId && auth.profile.role === "admin";
-    if (!isAdminRemoval) {
-      const { data: sheet } = await auth.supabase
-        .from("signup_sheets")
-        .select("status, withdraw_closes_at, event_time, event_date")
-        .eq("id", sheetId)
-        .single();
+    // We need group_id to tell if the caller is a group admin, and
+    // status/deadlines for the self-withdrawal path — fetch once.
+    const { data: sheet } = await auth.supabase
+      .from("signup_sheets")
+      .select("group_id, status, withdraw_closes_at, event_time, event_date")
+      .eq("id", sheetId)
+      .single();
 
-      if (sheet?.status !== "open") {
+    if (!sheet) {
+      return NextResponse.json({ error: "Sheet not found" }, { status: 404 });
+    }
+
+    // Admins (site admin OR group admin) can remove any player at any
+    // time, including after withdraw_closes_at / event_time. A regular
+    // member can only withdraw themselves and only while the window is
+    // open.
+    const callerIsAdmin = await isGroupAdmin(
+      auth.supabase,
+      auth.profile.id,
+      sheet.group_id,
+      auth.profile.role
+    );
+    const isAdminRemoval = !!registrationId && callerIsAdmin;
+
+    if (!isAdminRemoval) {
+      if (sheet.status !== "open") {
         return NextResponse.json({ error: "Sheet is not open" }, { status: 400 });
       }
       // Withdrawals are capped at event start — even if the admin set no
       // explicit withdraw deadline, play has begun and no one should be
       // able to drop off the roster live.
-      if (sheet && sheetWithdrawClosed(sheet)) {
+      if (sheetWithdrawClosed(sheet)) {
         return NextResponse.json({ error: "Withdrawal deadline has passed" }, { status: 400 });
       }
     }
