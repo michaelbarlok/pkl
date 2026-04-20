@@ -214,18 +214,31 @@ export function SessionRecapAdmin({
                         </button>
                       </div>
                     </>
-                  ) : (
+                  ) : (() => {
+                    // Highlight the WHOLE winning team (both names) in
+                    // teal + bold, and the losing team in a neutral
+                    // color. Previously every p1 was bright and every
+                    // p2 was muted regardless of score, which looked
+                    // like the top name of each team had "won" the
+                    // match on every row.
+                    const aWon = m.score_a > m.score_b;
+                    const bWon = m.score_b > m.score_a;
+                    const nameClassFor = (won: boolean) =>
+                      won
+                        ? "text-sm font-semibold text-teal-300"
+                        : "text-sm text-dark-300";
+                    return (
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                       <div className="text-right space-y-0.5">
-                        <p className="text-sm font-medium text-dark-100">{getName(m.team_a_p1)}</p>
-                        <p className="text-sm text-surface-muted">{getName(m.team_a_p2)}</p>
+                        <p className={nameClassFor(aWon)}>{getName(m.team_a_p1)}</p>
+                        <p className={nameClassFor(aWon)}>{getName(m.team_a_p2)}</p>
                       </div>
                       <div className="flex items-center gap-1 text-lg font-bold">
-                        <span className={cn(m.score_a > m.score_b ? "text-teal-300" : "text-dark-100")}>
+                        <span className={cn(aWon ? "text-teal-300" : "text-dark-100")}>
                           {m.score_a}
                         </span>
                         <span className="text-surface-muted text-sm">:</span>
-                        <span className={cn(m.score_b > m.score_a ? "text-teal-300" : "text-dark-100")}>
+                        <span className={cn(bWon ? "text-teal-300" : "text-dark-100")}>
                           {m.score_b}
                         </span>
                         {isAdmin && (
@@ -239,11 +252,12 @@ export function SessionRecapAdmin({
                         )}
                       </div>
                       <div className="space-y-0.5">
-                        <p className="text-sm font-medium text-dark-100">{getName(m.team_b_p1)}</p>
-                        <p className="text-sm text-surface-muted">{getName(m.team_b_p2)}</p>
+                        <p className={nameClassFor(bWon)}>{getName(m.team_b_p1)}</p>
+                        <p className={nameClassFor(bWon)}>{getName(m.team_b_p2)}</p>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}
