@@ -176,7 +176,7 @@ export function Sidebar({ profile, isGroupAdmin = false }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "hidden md:flex flex-col h-full shrink-0 border-r border-surface-border bg-gradient-to-b from-dark-800 to-dark-950 transition-[width] duration-200 ease-in-out overflow-hidden",
+        "hidden md:flex flex-col h-screen sticky top-0 shrink-0 border-r border-surface-border bg-gradient-to-b from-dark-800 to-dark-950 transition-[width] duration-200 ease-in-out overflow-hidden",
         collapsed ? "w-14" : "w-56"
       )}
     >
