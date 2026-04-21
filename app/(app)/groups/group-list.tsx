@@ -101,7 +101,7 @@ export function GroupList({
             className={cn(
               "py-2.5 text-sm font-medium transition-colors",
               tab === "mine"
-                ? "border-b-2 border-brand-500 text-brand-300"
+                ? "border-b-2 border-brand-vivid text-brand-vivid"
                 : "text-surface-muted hover:text-dark-200"
             )}
           >
@@ -113,7 +113,7 @@ export function GroupList({
             className={cn(
               "py-2.5 text-sm font-medium transition-colors",
               tab === "search"
-                ? "border-b-2 border-brand-500 text-brand-300"
+                ? "border-b-2 border-brand-vivid text-brand-vivid"
                 : "text-surface-muted hover:text-dark-200"
             )}
           >
@@ -184,7 +184,7 @@ export function GroupList({
           <button
             type="button"
             onClick={() => setTab("search")}
-            className="inline-block text-sm font-medium text-brand-400 hover:text-brand-300"
+            className="inline-block text-sm font-medium text-brand-vivid hover:opacity-80"
           >
             Search for Groups →
           </button>
