@@ -269,6 +269,33 @@ export default async function GroupPage({
     activeSessionId = activeSession?.id ?? null;
   }
 
+  // Check for an active ladder/shootout session the viewer is signed
+  // up for. Two gates: (a) the group has a shootout_session that
+  // isn't session_complete, (b) the viewer appears on that sheet's
+  // confirmed-or-waitlist roster. We only expose the "View Active
+  // Session" button when both hold so non-registered members don't
+  // see a link into a roster they aren't part of.
+  let activeLadderSessionId: string | null = null;
+  if (!isFreePlay && isMember && profile) {
+    const { data: activeLadder } = await supabase
+      .from("shootout_sessions")
+      .select("id, sheet_id, sheet:signup_sheets!inner(group_id)")
+      .eq("sheet.group_id", group.id)
+      .neq("status", "session_complete")
+      .limit(1);
+    const row = (activeLadder ?? [])[0] as { id: string; sheet_id: string } | undefined;
+    if (row) {
+      const { data: myReg } = await supabase
+        .from("registrations")
+        .select("id")
+        .eq("sheet_id", row.sheet_id)
+        .eq("player_id", profile.id)
+        .in("status", ["confirmed", "waitlist"])
+        .maybeSingle();
+      if (myReg) activeLadderSessionId = row.id;
+    }
+  }
+
   // Build the "next" URL to use when redirecting unauthenticated users to login
   const nextUrl = token
     ? `/groups/${slug}?token=${token}`
@@ -332,6 +359,36 @@ export default async function GroupPage({
       {/* Stats (ladder league only) */}
       {!isFreePlay && (
         <div className="space-y-4">
+          {/* Live-session CTA. Only shows to members who are on the
+              current sheet — so a player not registered for today's
+              event doesn't see a link into a live roster they're not
+              part of. */}
+          {activeLadderSessionId && (
+            <Link
+              href={`/sessions/${activeLadderSessionId}`}
+              className="card flex items-center justify-between gap-3 ring-1 ring-brand-vivid/40 hover:ring-2 transition-shadow"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-brand-vivid">
+                  Live now
+                </p>
+                <p className="mt-0.5 text-base font-semibold text-dark-100">
+                  View Active Session
+                </p>
+              </div>
+              <svg
+                className="h-5 w-5 text-brand-vivid"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+              </svg>
+            </Link>
+          )}
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="card card-static">
               <p className="text-sm text-surface-muted">Members</p>
