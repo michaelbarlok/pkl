@@ -67,7 +67,9 @@ export default function HowItWorksPage() {
             <li>
               <strong>Court Promotion</strong> — each court plays through a session, then 1st place moves up one
               court and last place moves down one court. Players carry their specific court assignment forward
-              between sessions that happen on the same day.
+              between sessions that happen on the same day. Your step and Points % are still updated after every
+              Court Promotion session — the court-move just decides where you start next time, not whether your
+              stats count.
             </li>
             <li>
               <strong>Dynamic Ranking</strong> — after each session, everyone&apos;s step and Points % are updated,
