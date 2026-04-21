@@ -174,14 +174,17 @@ export function ScoreEntryModal({
           </header>
 
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            {/* min-w-0 on each column lets the `truncate` label collapse
-                under its own text width. Without it, the 1fr tracks
-                floor at the label's intrinsic width and push the whole
-                grid past the modal's right edge on long names. */}
+            {/* min-w-0 on each column lets long names wrap inside the
+                track instead of pushing the whole grid past the modal's
+                right edge. Names are stacked one per line (no "&" on a
+                single line that then truncates) so partners are always
+                both fully visible. */}
             <div className="min-w-0">
-              <label className="block text-xs font-semibold text-surface-muted mb-2 text-center uppercase tracking-wider truncate">
-                {formatTeam(target.team1)}
-              </label>
+              <div className="mb-2 text-xs font-semibold text-surface-muted text-center uppercase tracking-wider leading-tight break-words space-y-0.5">
+                {target.team1.map((id) => (
+                  <div key={id}>{playerNames.get(id) ?? "?"}</div>
+                ))}
+              </div>
               <input
                 ref={firstInputRef}
                 type="number"
@@ -196,9 +199,11 @@ export function ScoreEntryModal({
             </div>
             <span className="text-lg font-bold text-surface-muted mt-6">—</span>
             <div className="min-w-0">
-              <label className="block text-xs font-semibold text-surface-muted mb-2 text-center uppercase tracking-wider truncate">
-                {formatTeam(target.team2)}
-              </label>
+              <div className="mb-2 text-xs font-semibold text-surface-muted text-center uppercase tracking-wider leading-tight break-words space-y-0.5">
+                {target.team2.map((id) => (
+                  <div key={id}>{playerNames.get(id) ?? "?"}</div>
+                ))}
+              </div>
               <input
                 type="number"
                 min={0}
