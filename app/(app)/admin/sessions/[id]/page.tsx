@@ -436,7 +436,15 @@ export default function AdminSessionDetailPage() {
   }, [participants]);
 
   const courtMatchSchedule = useMemo(() => {
-    const playerIds = courtPlayers.map((p) => p.player_id);
+    // MUST match the ordering used by the Play tab's generateMatchSchedule
+    // and the score-entry page — they both sort the player IDs before
+    // assigning a/b/c/d/e. Without this sort here the admin page's
+    // pairings diverge from the pairings that were actually played, so
+    // the set-equality lookup below only occasionally matches a slot
+    // to its DB row (G1 was the lucky one on court 2 of session
+    // dc9ddfd8; G2–G5 showed "Enter score" even though the rows
+    // existed).
+    const playerIds = courtPlayers.map((p) => p.player_id).sort();
     const n = playerIds.length;
     if (n < 4) return [];
 
