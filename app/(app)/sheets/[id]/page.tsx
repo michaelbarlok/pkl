@@ -17,7 +17,7 @@ import { ShareButton } from "./share-button";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { PlayerAvatar } from "@/components/player-avatar";
-import { computeCourtPreview, CourtPreviewSection } from "./court-preview";
+import { CourtPreviewSection } from "./court-preview";
 import { LiveRosterCount } from "./live-roster-count";
 
 export const dynamic = "force-dynamic";
@@ -173,29 +173,39 @@ export default async function SheetDetailPage({
     confirmed.length >= 4 &&
     (hasAdminView || viewerIsConfirmed);
 
-  let preview: ReturnType<typeof computeCourtPreview> = null;
+  // Fetch the raw data the client-side preview needs. We don't
+  // pre-compute courts here any more — the preview is a client
+  // component with a dropdown that lets the admin re-seed at a
+  // different court count without a server round-trip.
+  let previewConfirmed: Array<{
+    player_id: string;
+    player?: { id?: string; display_name?: string; avatar_url?: string | null };
+  }> | null = null;
+  let previewMemberships: Array<{
+    player_id: string;
+    current_step: number;
+    win_pct: number;
+    total_sessions: number;
+    last_played_at: string | null;
+  }> = [];
   if (shouldShowPreview && sheet.group_id) {
-    // Pull each confirmed player's ladder stats from the same group so the
-    // preview uses the exact sort keys seedSession1 uses at start-time.
     const confirmedIds = confirmed.map((r) => r.player_id);
     const { data: memberships } = await supabase
       .from("group_memberships")
       .select("player_id, current_step, win_pct, total_sessions, last_played_at")
       .eq("group_id", sheet.group_id)
       .in("player_id", confirmedIds);
-    preview = computeCourtPreview(
-      confirmed.map((r) => ({
-        player_id: r.player_id,
-        player: r.player
-          ? {
-              id: r.player.id,
-              display_name: r.player.display_name,
-              avatar_url: r.player.avatar_url,
-            }
-          : undefined,
-      })),
-      memberships ?? []
-    );
+    previewConfirmed = confirmed.map((r) => ({
+      player_id: r.player_id,
+      player: r.player
+        ? {
+            id: r.player.id,
+            display_name: r.player.display_name,
+            avatar_url: r.player.avatar_url,
+          }
+        : undefined,
+    }));
+    previewMemberships = memberships ?? [];
   }
 
   // Add-member eligibility: admins always; regular members only when the
@@ -483,10 +493,10 @@ export default async function SheetDetailPage({
       )}
 
       {/* ── Court preview (pre-session only) ───────────────────── */}
-      {preview && (
+      {previewConfirmed && (
         <CourtPreviewSection
-          courts={preview.courts}
-          numCourts={preview.numCourts}
+          confirmed={previewConfirmed}
+          memberships={previewMemberships}
           viewerPlayerId={profile.id}
           viewMode={hasAdminView ? "all" : "own"}
         />
