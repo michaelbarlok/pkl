@@ -6,6 +6,7 @@ import { MissingProfile } from "./missing-profile";
 import { LandingNav } from "./landing-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { ThemeListener } from "@/components/theme-listener";
+import { ActiveSessionAlert } from "@/components/active-session-alert";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
 
@@ -120,6 +121,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <MobileNav profile={profile} isGroupAdmin={isGroupAdmin} />
       <ThemeListener />
+      {/* Global fallback for push-off users: if any session the
+           viewer is checked in to transitions to round_active, this
+           modal pops on whatever page they happen to be on and
+           deep-links to the Play tab. Uses the same localStorage ack
+           key as the Play-tab modal so they don't double-fire. */}
+      <ActiveSessionAlert profileId={profile.id} />
     </div>
   );
 }
