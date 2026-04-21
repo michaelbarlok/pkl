@@ -9,15 +9,18 @@
  *     or `withdraw_closes_at` admins set, they're capped at `event_time`.
  *     No one should be able to join or leave a sheet after play has started.
  *
- *  2. **Sheets are hidden 12 hours after event start.** The event is over;
- *     players don't need to see it, and admins still get a 12-hour grace
- *     window to review the roster before it drops off. Admin access can
- *     bypass this by opting in — see `sheetIsVisibleToPlayer`.
+ *  2. **Sheets are hidden 3 hours after event start.** The event is over;
+ *     players don't need to see it, and admins still get a short grace
+ *     window to review the roster before it drops off the list / detail /
+ *     dashboard surfaces. Admin access can bypass this by opting in —
+ *     see `sheetIsVisibleToPlayer`. The `/admin/sheets` management
+ *     page never applies this filter, so admins can still pull up
+ *     old rosters there indefinitely.
  */
 
 /** Window in milliseconds after event start during which a sheet remains
  *  visible to players. After this, the list / detail / dashboard drop it. */
-export const SHEET_VISIBLE_WINDOW_MS = 12 * 60 * 60 * 1000;
+export const SHEET_VISIBLE_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 type SheetLifecycleShape = {
   event_time?: string | null;
@@ -60,7 +63,7 @@ export function sheetWithdrawClosed(
   return false;
 }
 
-/** True once we've passed the 12-hour visibility window after event start.
+/** True once we've passed the 3-hour visibility window after event start.
  *  Surfaces that render to regular players should treat this as "gone". */
 export function sheetIsExpired(
   sheet: SheetLifecycleShape,
