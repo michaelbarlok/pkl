@@ -63,6 +63,12 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
   const [mergeSearchSecondary, setMergeSearchSecondary] = useState("");
   const [mergePrimary, setMergePrimary] = useState<Profile | null>(null);
   const [mergeSecondary, setMergeSecondary] = useState<Profile | null>(null);
+  // Let the admin opt in to keeping the SECONDARY account's email /
+  // avatar on the surviving primary profile. Stats always follow the
+  // primary — these two toggles just handle cosmetic / auth-login
+  // identity, which are independent of play history.
+  const [keepSecondaryEmail, setKeepSecondaryEmail] = useState(false);
+  const [keepSecondaryAvatar, setKeepSecondaryAvatar] = useState(false);
   const [merging, setMerging] = useState(false);
 
   const filtered = useMemo(() => {
@@ -272,9 +278,23 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
 
   async function handleMerge() {
     if (!mergePrimary || !mergeSecondary) return;
+
+    // Spell out the post-merge identity in the confirmation copy so
+    // the admin sees exactly what will change.
+    const finalEmail = keepSecondaryEmail ? mergeSecondary.email : mergePrimary.email;
+    const description = [
+      `Stats (step, %, sessions) from "${mergePrimary.display_name}" are preserved.`,
+      `All play history from "${mergeSecondary.display_name}" transfers over.`,
+      `Final login email: ${finalEmail}.`,
+      keepSecondaryAvatar ? "Profile photo: taken from the secondary." : null,
+      "The secondary account is deactivated. This cannot be undone.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
     const ok = await confirm({
       title: "Merge accounts?",
-      description: `All data from "${mergeSecondary.display_name}" will be transferred to "${mergePrimary.display_name}". The secondary account will be deactivated. This cannot be undone.`,
+      description,
       confirmLabel: "Merge",
       variant: "danger",
     });
@@ -285,7 +305,12 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
       const res = await fetch("/api/admin/merge-accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ primaryId: mergePrimary.id, secondaryId: mergeSecondary.id }),
+        body: JSON.stringify({
+          primaryId: mergePrimary.id,
+          secondaryId: mergeSecondary.id,
+          keepSecondaryEmail,
+          keepSecondaryAvatar,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -297,6 +322,8 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
         setMergeSecondary(null);
         setMergeSearchPrimary("");
         setMergeSearchSecondary("");
+        setKeepSecondaryEmail(false);
+        setKeepSecondaryAvatar(false);
         router.refresh();
       }
     } catch {
@@ -522,6 +549,51 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
               )}
             </div>
 
+            {/* Identity overrides — only meaningful once both profiles
+                 are picked. Stats always follow the primary; these two
+                 let the admin peel off the cosmetic / login bits when
+                 the "better" source differs per field. */}
+            {mergePrimary && mergeSecondary && (
+              <div className="rounded-lg border border-surface-border bg-surface-overlay/40 p-3 space-y-2">
+                <p className="text-xs font-medium text-dark-200">
+                  Optional — use from the secondary instead of the primary:
+                </p>
+                <label className="flex items-start gap-2 text-xs text-dark-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={keepSecondaryEmail}
+                    onChange={(e) => setKeepSecondaryEmail(e.target.checked)}
+                    className="mt-0.5 accent-brand-vivid"
+                  />
+                  <span>
+                    <span className="font-medium text-dark-100">Keep secondary's email</span>
+                    <span className="block text-surface-muted">
+                      Final login email: {keepSecondaryEmail ? mergeSecondary.email : mergePrimary.email}
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-xs text-dark-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={keepSecondaryAvatar}
+                    onChange={(e) => setKeepSecondaryAvatar(e.target.checked)}
+                    className="mt-0.5 accent-brand-vivid"
+                    disabled={!mergeSecondary.avatar_url}
+                  />
+                  <span>
+                    <span className="font-medium text-dark-100">Keep secondary's profile photo</span>
+                    <span className="block text-surface-muted">
+                      {mergeSecondary.avatar_url
+                        ? keepSecondaryAvatar
+                          ? "Will replace the primary's photo."
+                          : "Primary's photo kept."
+                        : "Secondary has no photo to copy."}
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-1">
               <button
                 onClick={handleMerge}
@@ -537,6 +609,8 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                   setMergeSecondary(null);
                   setMergeSearchPrimary("");
                   setMergeSearchSecondary("");
+                  setKeepSecondaryEmail(false);
+                  setKeepSecondaryAvatar(false);
                 }}
                 className="btn-secondary flex-1"
                 disabled={merging}
