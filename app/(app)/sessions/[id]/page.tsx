@@ -431,37 +431,114 @@ export default function PlayerSessionPage() {
 
       {/* Your Court hero (only if assigned). Colors sit on top of the
            shared surface tokens so the hero reads on both themes
-           instead of vanishing against a white background. */}
-      {myCourt != null && (
-        <div className="card bg-surface-overlay ring-1 ring-brand-vivid/40">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-1 text-brand-vivid">Your Court</p>
-          <p className="text-4xl font-bold text-dark-100">Court {myCourt}</p>
-          {participants.filter((p) => p.court_number === myCourt).length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {participants
-                .filter((p) => p.court_number === myCourt)
-                .map((p) => {
-                  const name = p.player?.display_name ?? "?";
-                  const isMe = p.player_id === myPlayerId;
-                  return (
-                    <span
-                      key={p.player_id}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-surface-raised text-dark-200 ${
-                        isMe ? "ring-1 ring-brand-vivid/50" : ""
-                      }`}
-                    >
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-surface-overlay text-[9px] font-bold text-dark-100 shrink-0">
-                        {name.charAt(0).toUpperCase()}
+           instead of vanishing against a white background.
+
+           When the session is complete, the results (finish, W-L,
+           step change, next court) render INSIDE this same card at
+           the top — one card is easier to read than two stacked. */}
+      {myCourt != null && (() => {
+        // Compute results-only pieces lazily; they're only used when
+        // isComplete is true, and null-safely skip their own rows when
+        // the underlying datum isn't available.
+        const me = participants.find((p) => p.player_id === myPlayerId);
+        const myCourtPlayers = participants.filter((p) => p.court_number === myCourt);
+        const myCourtScores = scores.filter((s) => s.pool_number === myCourt);
+        const myStanding = me
+          ? computeStandings(myCourtPlayers as any, myCourtScores).find(
+              (s) => s.playerId === myPlayerId
+            )
+          : undefined;
+        const finish = (me as any)?.pool_finish as number | null;
+        const stepBefore = me?.step_before ?? null;
+        const stepAfter = me?.step_after ?? null;
+        const targetCourtNext = (me as any)?.target_court_next as number | null;
+        const isCourtPromotion = (session as any).group?.ladder_type === "court_promotion";
+        const stepUp = stepAfter != null && stepBefore != null && stepAfter < stepBefore;
+        const stepDown = stepAfter != null && stepBefore != null && stepAfter > stepBefore;
+
+        return (
+          <div className="card bg-surface-overlay ring-1 ring-brand-vivid/40 space-y-4">
+            {isComplete && (
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-brand-vivid">
+                    Your Results
+                  </p>
+                  <p className="text-lg font-bold text-dark-100 mt-0.5">Session Complete</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {finish != null && myCourt != null && (
+                    <div className="rounded-lg bg-surface-raised px-3 py-2.5">
+                      <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Finish</p>
+                      <p className="text-xl font-bold text-dark-100">{ordinal(finish)}</p>
+                      <p className="text-xs text-surface-muted">Court {myCourt}</p>
+                    </div>
+                  )}
+                  {myStanding && (
+                    <div className="rounded-lg bg-surface-raised px-3 py-2.5">
+                      <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Record</p>
+                      <p className="text-xl font-bold text-dark-100">
+                        <span className="text-teal-500">{myStanding.wins}W</span>
+                        <span className="text-surface-muted text-sm mx-0.5">–</span>
+                        <span className="text-red-500">{myStanding.losses}L</span>
+                      </p>
+                    </div>
+                  )}
+                  {stepBefore != null && stepAfter != null && (
+                    <div className="rounded-lg bg-surface-raised px-3 py-2.5">
+                      <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Step</p>
+                      <p className={`text-xl font-bold ${stepUp ? "text-teal-500" : stepDown ? "text-red-500" : "text-dark-100"}`}>
+                        {stepBefore}→{stepAfter}
+                        {stepUp && " ↑"}
+                        {stepDown && " ↓"}
+                      </p>
+                    </div>
+                  )}
+                  {isCourtPromotion && targetCourtNext != null && myCourt != null && (
+                    <div className="rounded-lg bg-surface-raised px-3 py-2.5">
+                      <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Next Session</p>
+                      <p className={`text-xl font-bold ${targetCourtNext < myCourt ? "text-teal-500" : targetCourtNext > myCourt ? "text-red-500" : "text-dark-100"}`}>
+                        Court {targetCourtNext}
+                        {targetCourtNext < myCourt && " ↑"}
+                        {targetCourtNext > myCourt && " ↓"}
+                        {targetCourtNext === myCourt && " →"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="h-px bg-surface-border" />
+              </div>
+            )}
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-1 text-brand-vivid">Your Court</p>
+              <p className="text-4xl font-bold text-dark-100">Court {myCourt}</p>
+              {myCourtPlayers.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {myCourtPlayers.map((p) => {
+                    const name = p.player?.display_name ?? "?";
+                    const isMe = p.player_id === myPlayerId;
+                    return (
+                      <span
+                        key={p.player_id}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-surface-raised text-dark-200 ${
+                          isMe ? "ring-1 ring-brand-vivid/50" : ""
+                        }`}
+                      >
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-surface-overlay text-[9px] font-bold text-dark-100 shrink-0">
+                          {name.charAt(0).toUpperCase()}
+                        </span>
+                        {name}
+                        {isMe && <span className="text-brand-vivid">(you)</span>}
                       </span>
-                      {name}
-                      {isMe && <span className="text-brand-vivid">(you)</span>}
-                    </span>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {/* Active-session court view.
            Regular players see THEIR court fully expanded at the top,
@@ -762,74 +839,12 @@ export default function PlayerSessionPage() {
       {session.status === "seeding" && (
         <EmptyState title="Courts are being assigned" description="Your court number will appear here shortly." />
       )}
-      {isComplete && (() => {
-        const me = participants.find((p) => p.player_id === myPlayerId);
-        if (!me) return null;
-
-        const myCourtPlayers = participants.filter((p) => p.court_number === me.court_number);
-        const myCourtScores = scores.filter((s) => s.pool_number === me.court_number);
-        const myStanding = computeStandings(myCourtPlayers as any, myCourtScores)
-          .find((s) => s.playerId === myPlayerId);
-
-        const finish = (me as any).pool_finish as number | null;
-        const stepBefore = me.step_before;
-        const stepAfter = me.step_after ?? null;
-        const courtNum = me.court_number ?? null;
-        const targetCourtNext = (me as any).target_court_next as number | null;
-        const isCourtPromotion = (session as any).group?.ladder_type === "court_promotion";
-        const stepUp = stepAfter != null && stepBefore != null && stepAfter < stepBefore;
-        const stepDown = stepAfter != null && stepBefore != null && stepAfter > stepBefore;
-
-        return (
-          <div className="card space-y-4 border border-brand-500/20 bg-brand-950/20">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-brand-400">Your Results</p>
-              <p className="text-xl font-bold text-dark-100 mt-0.5">Session Complete</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {finish != null && courtNum != null && (
-                <div className="rounded-lg bg-surface-overlay px-3 py-2.5">
-                  <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Finish</p>
-                  <p className="text-xl font-bold text-dark-100">{ordinal(finish)}</p>
-                  <p className="text-xs text-surface-muted">Court {courtNum}</p>
-                </div>
-              )}
-              {myStanding && (
-                <div className="rounded-lg bg-surface-overlay px-3 py-2.5">
-                  <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Record</p>
-                  <p className="text-xl font-bold text-dark-100">
-                    <span className="text-teal-300">{myStanding.wins}W</span>
-                    <span className="text-surface-muted text-sm mx-0.5">–</span>
-                    <span className="text-red-400">{myStanding.losses}L</span>
-                  </p>
-                </div>
-              )}
-              {stepBefore != null && stepAfter != null && (
-                <div className="rounded-lg bg-surface-overlay px-3 py-2.5">
-                  <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Step</p>
-                  <p className={`text-xl font-bold ${stepUp ? "text-teal-300" : stepDown ? "text-red-400" : "text-dark-100"}`}>
-                    {stepBefore}→{stepAfter}
-                    {stepUp && " ↑"}
-                    {stepDown && " ↓"}
-                  </p>
-                </div>
-              )}
-              {isCourtPromotion && targetCourtNext != null && courtNum != null && (
-                <div className="rounded-lg bg-surface-overlay px-3 py-2.5">
-                  <p className="text-[11px] text-surface-muted uppercase tracking-wider mb-0.5">Next Session</p>
-                  <p className={`text-xl font-bold ${targetCourtNext < courtNum ? "text-teal-300" : targetCourtNext > courtNum ? "text-red-400" : "text-dark-100"}`}>
-                    Court {targetCourtNext}
-                    {targetCourtNext < courtNum && " ↑"}
-                    {targetCourtNext > courtNum && " ↓"}
-                    {targetCourtNext === courtNum && " →"}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+      {isComplete && participants.find((p) => p.player_id === myPlayerId) == null && (
+        <EmptyState
+          title="Session complete"
+          description="You weren't checked in for this session — there are no personal results to show."
+        />
+      )}
 
       {/* Session-ended overlay. Only shown on a LIVE transition to
            session_complete so everyone who was mid-session gets a

@@ -15,6 +15,7 @@ import type {
 } from "@/types/database";
 import { US_STATES } from "@/lib/us-states";
 import { GroupSchedulesSection } from "./group-schedules-section";
+import { RollingSessionsSetting } from "@/app/(app)/groups/[slug]/rolling-sessions-setting";
 
 // ============================================================
 // Types
@@ -1135,8 +1136,30 @@ export default function AdminGroupDetailPage() {
         </div>
       )}
 
-      {/* Preferences Tab */}
-      {activeTab === "preferences" && preferences && (
+      {/* Preferences Tab — Free Play.
+           Free-play groups don't use steps or ladder math; the only
+           setting that affects their stats is the rolling window of
+           recent sessions used to compute wins / losses / point
+           differential. No percentage tracking at all for this type. */}
+      {activeTab === "preferences" && group?.group_type === "free_play" && (
+        <div className="card space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-dark-100">Stats Window</h3>
+            <p className="mt-0.5 text-xs text-surface-muted">
+              Free Play groups track wins, losses, and point differential
+              only — no percentages and no ladder steps. Sessions older
+              than the window below are excluded from the standings.
+            </p>
+          </div>
+          <RollingSessionsSetting
+            groupId={id}
+            currentValue={group.rolling_sessions_count ?? 14}
+          />
+        </div>
+      )}
+
+      {/* Preferences Tab — Ladder League. */}
+      {activeTab === "preferences" && preferences && group?.group_type !== "free_play" && (
         <form onSubmit={savePreferences} className="card space-y-6">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
@@ -1328,7 +1351,9 @@ export default function AdminGroupDetailPage() {
       {activeTab === "schedule" && (
         <div className="space-y-4">
           <p className="text-sm text-surface-muted">
-            Configure one or more play times for this group. Each play time can have its own auto-post schedule for sign-up sheets.
+            {group?.group_type === "free_play"
+              ? "Set regularly scheduled play times for this group (for example, every Tuesday at 6pm). This is for the recurring meet-up — not just the next upcoming date."
+              : "Configure one or more play times for this group. Each play time can have its own auto-post schedule for sign-up sheets."}
           </p>
           <GroupSchedulesSection groupId={id} />
         </div>

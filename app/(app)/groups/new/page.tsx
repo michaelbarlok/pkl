@@ -130,7 +130,12 @@ export default function CreateGroupPage() {
     );
 
     revalidatePath("/groups");
-    redirect(`/groups/${newGroup.slug}`);
+    // Send the creator straight into the admin settings for their new
+    // group. Both group types land on the Preferences tab — which for
+    // ladder renders the step/game-limit/ladder-mode form, and for
+    // free play renders the stats-window control. The creator can jump
+    // to Schedule from the same admin page to set play times.
+    redirect(`/admin/groups/${newGroup.id}?tab=preferences`);
   }
 
   return (
