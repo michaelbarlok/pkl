@@ -345,6 +345,36 @@
     @apply badge bg-dark-600 text-dark-100;
   }
 
+  /* ── Play-tab / in-session pills ────────────────────────────────
+     Every "pill" on the active-session view needs to read in both
+     themes. Each of these composes the existing alert-* CSS vars so
+     the colors flip automatically with the .light class. */
+  .badge-first-choice {
+    @apply inline-flex items-center gap-1 rounded-full px-1.5 py-0.5
+           text-[9px] sm:px-2 sm:text-[10px]
+           font-semibold uppercase tracking-wide;
+    background-color: var(--alert-warning-bg);
+    color: var(--alert-warning-text);
+    box-shadow: inset 0 0 0 1px var(--alert-warning-ring);
+  }
+  .badge-admin {
+    @apply inline-flex items-center rounded-full px-2 py-0.5
+           text-[10px] font-medium uppercase tracking-wide;
+    background-color: var(--alert-warning-bg);
+    color: var(--alert-warning-text);
+  }
+  .badge-your-court {
+    @apply inline-flex items-center rounded-full px-2 py-0.5
+           text-xs font-medium;
+    background-color: var(--alert-info-bg);
+    color: var(--alert-info-text);
+    box-shadow: inset 0 0 0 1px var(--alert-info-ring);
+  }
+  .badge-bye {
+    @apply text-xs font-medium;
+    color: var(--alert-warning-text);
+  }
+
   /* ── Tables on dark ── */
   table {
     @apply text-dark-100;

@@ -10,8 +10,9 @@ export function FirstChoiceBadge({ className }: { className?: string }) {
       title="This team chooses to serve/return first OR chooses which side of the court they play on."
       aria-label="First choice — chooses to serve/return first OR chooses court side"
       className={
-        "inline-flex items-center gap-1 rounded-full bg-accent-500/15 px-1.5 py-0.5 text-[9px] sm:px-2 sm:text-[10px] font-semibold uppercase tracking-wide text-accent-300 ring-1 ring-accent-500/30" +
-        (className ? ` ${className}` : "")
+        // Colors live in the `.badge-first-choice` CSS token in
+        // globals.css so they flip with the .light theme class.
+        "badge-first-choice" + (className ? ` ${className}` : "")
       }
     >
       <svg
