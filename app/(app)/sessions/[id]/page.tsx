@@ -4,6 +4,10 @@ import { EmptyState } from "@/components/empty-state";
 import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { matchFirstChoice } from "@/lib/first-choice";
+// Pool standings + the 5-level tiebreaker live in lib/pool-standings so
+// the Play tab, Admin > Sessions, and server-side pool_finish agree
+// on who ranks where (and why, via tiebreakerReason).
+import { computePoolStandings, type RankedMember } from "@/lib/pool-standings";
 import { expectedGamesPerCourt } from "@/lib/round-progress";
 import type { ShootoutSession, SessionParticipant, GameResult } from "@/types/database";
 import { useParams, useSearchParams } from "next/navigation";
@@ -12,99 +16,6 @@ import { formatDate } from "@/lib/utils";
 import { SESSION_STATUS_LABELS as STATUS_LABELS, SESSION_STATUS_COLORS as STATUS_COLORS } from "@/lib/status-colors";
 import { ScoreEntryModal, type ScoreEntryTarget } from "./score-entry-modal";
 import { SessionAdminControls } from "./session-admin-controls";
-
-// ============================================================
-// Standings Calculation
-// ============================================================
-
-interface Standing {
-  playerId: string;
-  displayName: string;
-  wins: number;
-  losses: number;
-  pointDiff: number;
-}
-
-/** Pre-session ranking snapshot, keyed by player_id. The recompute
- *  that writes pool_finish on the server uses this same shape to
- *  break ties in the "head-to-head tied" case, so we match it here
- *  so the live standings on the Play tab can't disagree with the
- *  eventual step-movement outcome. */
-type RankedMember = { step: number; winPct: number };
-
-function computeStandings(
-  courtPlayers: { player_id: string; player?: { display_name: string } }[],
-  courtScores: GameResult[],
-  memberMap?: Map<string, RankedMember>
-): Standing[] {
-  // Track head-to-head so tied W / point-diff players can be broken
-  // by "who beat whom head-to-head" before falling back to the
-  // overall-ranking tiebreaker.
-  type S = Standing & { h2hPoints: Map<string, number> };
-  const standings = new Map<string, S>();
-
-  for (const p of courtPlayers) {
-    standings.set(p.player_id, {
-      playerId: p.player_id,
-      displayName: p.player?.display_name ?? "Unknown",
-      wins: 0,
-      losses: 0,
-      pointDiff: 0,
-      h2hPoints: new Map(),
-    });
-  }
-
-  for (const game of courtScores) {
-    const teamAIds = [game.team_a_p1, game.team_a_p2].filter(Boolean) as string[];
-    const teamBIds = [game.team_b_p1, game.team_b_p2].filter(Boolean) as string[];
-    const aWon = game.score_a > game.score_b;
-
-    for (const pid of teamAIds) {
-      const s = standings.get(pid);
-      if (!s) continue;
-      if (aWon) s.wins++;
-      else s.losses++;
-      s.pointDiff += game.score_a - game.score_b;
-      for (const opp of teamBIds) {
-        s.h2hPoints.set(opp, (s.h2hPoints.get(opp) ?? 0) + game.score_a);
-      }
-    }
-
-    for (const pid of teamBIds) {
-      const s = standings.get(pid);
-      if (!s) continue;
-      if (!aWon) s.wins++;
-      else s.losses++;
-      s.pointDiff += game.score_b - game.score_a;
-      for (const opp of teamAIds) {
-        s.h2hPoints.set(opp, (s.h2hPoints.get(opp) ?? 0) + game.score_b);
-      }
-    }
-  }
-
-  // Five-level tiebreaker — matches lib/session-recompute.ts exactly so
-  // the mid-session display and the final pool_finish never disagree
-  // when a tie comes down to the overall-ranking wire.
-  //   1. Wins (desc)
-  //   2. Point differential (desc)
-  //   3. Head-to-head points the two players scored vs each other (desc)
-  //   4. Lower overall-ranking step (asc) — the higher-ranked player moves up
-  //   5. Higher overall Points % (desc) — last-resort tiebreaker
-  const sorted = Array.from(standings.values()).sort((a, b) => {
-    if (a.wins !== b.wins) return b.wins - a.wins;
-    if (a.pointDiff !== b.pointDiff) return b.pointDiff - a.pointDiff;
-    const aH2H = a.h2hPoints.get(b.playerId) ?? 0;
-    const bH2H = b.h2hPoints.get(a.playerId) ?? 0;
-    if (aH2H !== bH2H) return bH2H - aH2H;
-    const mA = memberMap?.get(a.playerId) ?? { step: 99, winPct: 0 };
-    const mB = memberMap?.get(b.playerId) ?? { step: 99, winPct: 0 };
-    if (mA.step !== mB.step) return mA.step - mB.step;
-    return mB.winPct - mA.winPct;
-  });
-
-  // Strip the internal h2hPoints map before handing back.
-  return sorted.map(({ h2hPoints: _h2h, ...rest }) => rest);
-}
 
 // ============================================================
 // Match Schedule Generation
@@ -522,7 +433,7 @@ export default function PlayerSessionPage() {
         const myCourtPlayers = participants.filter((p) => p.court_number === myCourt);
         const myCourtScores = scores.filter((s) => s.pool_number === myCourt);
         const myStanding = me
-          ? computeStandings(myCourtPlayers as any, myCourtScores, memberRanks).find(
+          ? computePoolStandings(myCourtPlayers as any, myCourtScores, memberRanks).find(
               (s) => s.playerId === myPlayerId
             )
           : undefined;
@@ -632,7 +543,7 @@ export default function PlayerSessionPage() {
         const renderCourt = (courtNum: number) => {
           const courtPlayers = participants.filter((p) => p.court_number === courtNum);
           const courtScores = scores.filter((s) => s.pool_number === courtNum);
-          const standings = computeStandings(courtPlayers as any, courtScores, memberRanks);
+          const standings = computePoolStandings(courtPlayers as any, courtScores, memberRanks);
           const schedule = generateMatchSchedule(
             courtPlayers.map((p) => p.player_id),
             playerNames,
@@ -677,40 +588,56 @@ export default function PlayerSessionPage() {
                 })}
               </div>
 
-              {/* Standings */}
-              {standings.length > 0 && courtScores.length > 0 && (
-                <div className="card overflow-x-auto p-0">
-                  <table className="min-w-full divide-y divide-surface-border">
-                    <thead className="bg-surface-overlay">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-6">#</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
-                        <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">W</th>
-                        <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">L</th>
-                        <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">+/-</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-surface-border bg-surface-raised">
-                      {standings.map((s, i) => (
-                        <tr key={s.playerId} className={s.playerId === myPlayerId ? "bg-surface-overlay" : ""}>
-                          <td className="px-3 py-2 text-sm text-surface-muted">{i + 1}</td>
-                          <td className="px-3 py-2 text-sm font-medium text-dark-100">
-                            {s.displayName}
-                            {s.playerId === myPlayerId && <span className="ml-1 text-xs text-brand-vivid">(you)</span>}
-                          </td>
-                          <td className="px-3 py-2 text-center text-sm font-semibold text-teal-500">{s.wins}</td>
-                          <td className="px-3 py-2 text-center text-sm font-semibold text-red-500">{s.losses}</td>
-                          <td className="px-3 py-2 text-center text-sm font-semibold">
-                            <span className={s.pointDiff > 0 ? "text-teal-500" : s.pointDiff < 0 ? "text-red-500" : "text-surface-muted"}>
-                              {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
-                            </span>
-                          </td>
+              {/* Standings. Tiebreaker reason is only surfaced once
+                   the court's full set of games has scores — before
+                   that, W / +-  totals can still shift and showing a
+                   tiebreaker would be misleading. */}
+              {standings.length > 0 && courtScores.length > 0 && (() => {
+                const allGamesScored =
+                  courtScores.length >= expectedGamesPerCourt(courtPlayers.length);
+                return (
+                  <div className="card overflow-x-auto p-0">
+                    <table className="min-w-full divide-y divide-surface-border">
+                      <thead className="bg-surface-overlay">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-6">#</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">W</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">L</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">+/-</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-surface-border bg-surface-raised">
+                        {standings.map((s, i) => (
+                          <tr key={s.playerId} className={s.playerId === myPlayerId ? "bg-surface-overlay" : ""}>
+                            <td className="px-3 py-2 text-sm text-surface-muted">{i + 1}</td>
+                            <td className="px-3 py-2 text-sm font-medium text-dark-100">
+                              <div className="flex flex-col">
+                                <span>
+                                  {s.displayName}
+                                  {s.playerId === myPlayerId && <span className="ml-1 text-xs text-brand-vivid">(you)</span>}
+                                </span>
+                                {allGamesScored && s.tiebreakerReason && (
+                                  <span className="text-[11px] italic text-surface-muted">
+                                    Tiebreaker: {s.tiebreakerReason}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-center text-sm font-semibold text-teal-500">{s.wins}</td>
+                            <td className="px-3 py-2 text-center text-sm font-semibold text-red-500">{s.losses}</td>
+                            <td className="px-3 py-2 text-center text-sm font-semibold">
+                              <span className={s.pointDiff > 0 ? "text-teal-500" : s.pointDiff < 0 ? "text-red-500" : "text-surface-muted"}>
+                                {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
 
               {/* Match schedule */}
               {schedule.length > 0 && (

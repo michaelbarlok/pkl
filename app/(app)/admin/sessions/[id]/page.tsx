@@ -6,6 +6,8 @@ import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { matchFirstChoice } from "@/lib/first-choice";
+import { computePoolStandings, type RankedMember } from "@/lib/pool-standings";
+import { expectedGamesPerCourt } from "@/lib/round-progress";
 import type { ShootoutSession, SessionParticipant, ShootoutGroup, GameResult } from "@/types/database";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
@@ -47,6 +49,10 @@ export default function AdminSessionDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [scores, setScores] = useState<GameResult[]>([]);
   const [selectedCourt, setSelectedCourt] = useState<number>(1);
+  // Pre-session overall-ranking snapshot used to tiebreak standings
+  // the same way the server's pool_finish recompute does. Populated
+  // in loadAll below.
+  const [memberRanks, setMemberRanks] = useState<Map<string, RankedMember>>(new Map());
   const [editingScore, setEditingScore] = useState<string | null>(null);
   const [editScoreA, setEditScoreA] = useState("");
   const [editScoreB, setEditScoreB] = useState("");
@@ -85,6 +91,28 @@ export default function AdminSessionDetailPage() {
         .eq("session_id", id)
         .order("id");
       setScores(gameScores ?? []);
+
+      // Pre-session ranking snapshot for tiebreaker annotation.
+      if (p && p.length > 0 && s) {
+        const groupId = (s as any).group?.id ?? (s as any).group_id;
+        const playerIds = (p as any[]).map((row) => row.player_id);
+        if (groupId) {
+          const { data: memberships } = await supabase
+            .from("group_memberships")
+            .select("player_id, current_step, win_pct")
+            .eq("group_id", groupId)
+            .in("player_id", playerIds);
+          const next = new Map<string, RankedMember>();
+          for (const m of (memberships ?? []) as Array<{
+            player_id: string;
+            current_step: number;
+            win_pct: number;
+          }>) {
+            next.set(m.player_id, { step: m.current_step, winPct: m.win_pct });
+          }
+          setMemberRanks(next);
+        }
+      }
 
       setLoading(false);
     }
@@ -397,37 +425,13 @@ export default function AdminSessionDetailPage() {
     [scores, selectedCourt]
   );
 
-  const courtStandings = useMemo(() => {
-    const standings = new Map<string, { playerId: string; name: string; wins: number; losses: number; pointDiff: number }>();
-    for (const p of courtPlayers) {
-      standings.set(p.player_id, {
-        playerId: p.player_id,
-        name: (p as any).player?.display_name ?? "Unknown",
-        wins: 0, losses: 0, pointDiff: 0,
-      });
-    }
-    for (const game of courtScores) {
-      const teamAIds = [game.team_a_p1, game.team_a_p2].filter(Boolean) as string[];
-      const teamBIds = [game.team_b_p1, game.team_b_p2].filter(Boolean) as string[];
-      const aWon = game.score_a > game.score_b;
-      for (const pid of teamAIds) {
-        const s = standings.get(pid);
-        if (!s) continue;
-        if (aWon) s.wins++; else s.losses++;
-        s.pointDiff += game.score_a - game.score_b;
-      }
-      for (const pid of teamBIds) {
-        const s = standings.get(pid);
-        if (!s) continue;
-        if (!aWon) s.wins++; else s.losses++;
-        s.pointDiff += game.score_b - game.score_a;
-      }
-    }
-    return Array.from(standings.values()).sort((a, b) => {
-      if (a.wins !== b.wins) return b.wins - a.wins;
-      return b.pointDiff - a.pointDiff;
-    });
-  }, [courtPlayers, courtScores]);
+  // Shared lib applies the same 5-level tiebreaker the server uses
+  // for pool_finish, and annotates each standing with tiebreakerReason
+  // so the UI can surface WHY a tied player got the nod.
+  const courtStandings = useMemo(
+    () => computePoolStandings(courtPlayers as any, courtScores, memberRanks),
+    [courtPlayers, courtScores, memberRanks]
+  );
 
   const playerNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -806,10 +810,22 @@ export default function AdminSessionDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-border bg-surface-raised">
-                  {courtStandings.map((s, i) => (
+                  {(() => {
+                    const allGamesScored =
+                      courtScores.length >= expectedGamesPerCourt(courtPlayers.length);
+                    return courtStandings.map((s, i) => (
                     <tr key={s.playerId}>
                       <td className="px-2 sm:px-4 py-2 text-sm font-medium text-surface-muted">{i + 1}</td>
-                      <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">{s.name}</td>
+                      <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">
+                        <div className="flex flex-col">
+                          <span>{s.displayName}</span>
+                          {allGamesScored && s.tiebreakerReason && (
+                            <span className="text-[11px] italic text-surface-muted">
+                              Tiebreaker: {s.tiebreakerReason}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-teal-300">{s.wins}</td>
                       <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-red-400">{s.losses}</td>
                       <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold">
@@ -829,7 +845,8 @@ export default function AdminSessionDetailPage() {
                         </td>
                       )}
                     </tr>
-                  ))}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
