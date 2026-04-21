@@ -5,11 +5,11 @@ import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { matchFirstChoice } from "@/lib/first-choice";
 import type { ShootoutSession, SessionParticipant, GameResult } from "@/types/database";
-import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { formatDate } from "@/lib/utils";
 import { SESSION_STATUS_LABELS as STATUS_LABELS, SESSION_STATUS_COLORS as STATUS_COLORS } from "@/lib/status-colors";
+import { ScoreEntryModal, type ScoreEntryTarget } from "./score-entry-modal";
 
 // ============================================================
 // Standings Calculation
@@ -168,6 +168,15 @@ export default function PlayerSessionPage() {
   // one non-own court is shown at a time so regular members aren't
   // overwhelmed scrolling past every court's full standings.
   const [viewingOtherCourt, setViewingOtherCourt] = useState<number | null>(null);
+  // Score-entry modal target. null = modal closed.
+  const [entryTarget, setEntryTarget] = useState<ScoreEntryTarget | null>(null);
+
+  // Remember what status the session was in when this tab opened so we
+  // can detect an admin ending the session WHILE the user is watching.
+  // Players who navigate to an already-complete session (e.g. coming
+  // back to check the recap) shouldn't get the "refresh now" prompt —
+  // the banner is only for mid-view transitions to session_complete.
+  const initialStatusRef = useRef<string | null>(null);
 
   async function refetchAll() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -187,6 +196,12 @@ export default function PlayerSessionPage() {
       .eq("id", sessionId)
       .single();
     setSession(sess as any);
+    // Snapshot the starting status exactly once per mount so the
+    // "Session Complete" overlay only fires on a LIVE admin-ends
+    // transition, not on loads of already-complete sessions.
+    if (initialStatusRef.current === null && sess) {
+      initialStatusRef.current = (sess as any).status ?? null;
+    }
 
     // Determine admin status after we know the group
     if (profile && sess) {
@@ -568,14 +583,22 @@ export default function PlayerSessionPage() {
                     const firstChoice = matchFirstChoice(sessionId, courtNum, match.gameNumber);
 
                     if (canEnter) {
-                      const href = isAdmin && !isMyCourtSection
-                        ? `/sessions/${sessionId}/score?court=${courtNum}&game=${match.gameNumber}`
-                        : `/sessions/${sessionId}/score?game=${match.gameNumber}`;
+                      // Open the in-page modal instead of navigating to
+                      // /sessions/[id]/score. The modal submits to the
+                      // same API and lets Realtime refresh this page.
                       return (
-                        <Link
+                        <button
                           key={match.gameNumber}
-                          href={href}
-                          className="block rounded-lg overflow-hidden ring-1 ring-surface-border hover:ring-brand-500/50 transition-all group"
+                          type="button"
+                          onClick={() =>
+                            setEntryTarget({
+                              courtNum,
+                              gameNumber: match.gameNumber,
+                              team1: match.team1,
+                              team2: match.team2,
+                            })
+                          }
+                          className="w-full text-left block rounded-lg overflow-hidden ring-1 ring-surface-border hover:ring-brand-500/50 transition-all group"
                         >
                           <div className="flex items-center justify-between px-3 py-1.5 bg-surface-overlay border-b border-surface-border">
                             <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
@@ -595,7 +618,7 @@ export default function PlayerSessionPage() {
                               <span className="badge-bye">Bye: {playerNames.get(match.bye) ?? "?"}</span>
                             </div>
                           )}
-                        </Link>
+                        </button>
                       );
                     }
 
@@ -737,6 +760,57 @@ export default function PlayerSessionPage() {
           </div>
         );
       })()}
+
+      {/* Session-ended overlay. Only shown on a LIVE transition to
+           session_complete so everyone who was mid-session gets a
+           deliberate "the session is over" checkpoint — the button
+           hard-reloads the page so stale match rows / standings
+           can't hang around on someone's phone. */}
+      {initialStatusRef.current !== null &&
+        initialStatusRef.current !== "session_complete" &&
+        session.status === "session_complete" && (
+          <div
+            className="fixed inset-0 z-[250] flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="session-complete-title"
+          >
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in" />
+            <div className="relative z-10 w-full max-w-sm rounded-2xl bg-surface-raised shadow-2xl ring-1 ring-surface-border animate-scale-in p-6 text-center space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full alert-success">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-6 w-6">
+                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h2 id="session-complete-title" className="text-lg font-semibold text-dark-100">
+                  Session Complete
+                </h2>
+                <p className="mt-1 text-sm text-surface-muted">
+                  The admin has ended this session. Refresh to see the final
+                  results.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="btn-primary w-full"
+              >
+                Session Complete
+              </button>
+            </div>
+          </div>
+        )}
+
+      {/* Score-entry dialog. Renders nothing until a match is picked. */}
+      <ScoreEntryModal
+        sessionId={sessionId}
+        target={entryTarget}
+        currentRound={session.current_round || 1}
+        playerNames={playerNames}
+        onClose={() => setEntryTarget(null)}
+        onSaved={refetchAll}
+      />
     </div>
   );
 }

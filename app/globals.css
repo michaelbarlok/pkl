@@ -111,6 +111,72 @@
   --status-cancelled-text: var(--alert-danger-text);
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   Light-mode palette override for hardcoded Tailwind tints.
+   Tailwind's brand/accent/teal scales aren't CSS-variable driven, so
+   classes like `text-brand-300` and `text-accent-400` hold a bright
+   dark-on-dark value that disappears on a pale background. We remap
+   those foreground-text tokens to a darker, readable tone only when
+   the html.light class is present — dark mode is unchanged.
+
+   We ONLY override text-* (and the adjacent ring/border tokens used
+   as accents). Background tints like `bg-brand-900/40` stay as-is
+   because those are semi-transparent overlays meant for dark
+   surfaces; components that rely on them got fixed separately at
+   the component level.
+   ────────────────────────────────────────────────────────────────── */
+.light .text-brand-200,
+.light .text-brand-300,
+.light .text-brand-400,
+.light .text-brand-500,
+.light .hover\:text-brand-200:hover,
+.light .hover\:text-brand-300:hover,
+.light .hover\:text-brand-400:hover {
+  /* brand-700 — matches the brand-vivid light-mode value. */
+  color: #0f766e;
+}
+.light .group:hover .group-hover\:text-brand-200,
+.light .group:hover .group-hover\:text-brand-300,
+.light .group:hover .group-hover\:text-brand-400 {
+  color: #0f766e;
+}
+.light .text-brand-600 {
+  /* Used sparingly for "you" inline tags — keep a distinct darker tone. */
+  color: #115e59;
+}
+
+.light .text-accent-200,
+.light .text-accent-300,
+.light .text-accent-400 {
+  /* accent-700 — legible amber on pale surfaces. */
+  color: #b45309;
+}
+
+.light .text-teal-200,
+.light .text-teal-300,
+.light .text-teal-400 {
+  color: #0f766e; /* teal-700 */
+}
+.light .text-yellow-300,
+.light .text-yellow-400,
+.light .text-yellow-500 {
+  color: #92400e; /* amber-800 */
+}
+.light .text-red-300,
+.light .text-red-400 {
+  color: #991b1b; /* red-800 */
+}
+
+/* Borders that were intended as accent outlines on dark surfaces
+   disappear against pale backgrounds. Map them to the mid-tone brand
+   token so the outline still reads. */
+.light .border-brand-500,
+.light .border-brand-500\/30,
+.light .border-brand-500\/40,
+.light .border-brand-500\/50 {
+  border-color: rgba(14, 116, 110, 0.5); /* brand-700 @ 50% */
+}
+
 @layer base {
   body {
     @apply bg-dark-950 text-dark-100 antialiased;

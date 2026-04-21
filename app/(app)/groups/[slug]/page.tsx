@@ -569,6 +569,7 @@ export default async function GroupPage({
         members={members as any}
         currentPlayerId={profile?.id ?? null}
         isFreePlay={isFreePlay}
+        windowSize={group.group_preferences?.pct_window_sessions}
       />
     </div>
   );
