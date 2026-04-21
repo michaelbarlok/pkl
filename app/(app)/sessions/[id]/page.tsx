@@ -25,11 +25,23 @@ interface Standing {
   pointDiff: number;
 }
 
+/** Pre-session ranking snapshot, keyed by player_id. The recompute
+ *  that writes pool_finish on the server uses this same shape to
+ *  break ties in the "head-to-head tied" case, so we match it here
+ *  so the live standings on the Play tab can't disagree with the
+ *  eventual step-movement outcome. */
+type RankedMember = { step: number; winPct: number };
+
 function computeStandings(
   courtPlayers: { player_id: string; player?: { display_name: string } }[],
-  courtScores: GameResult[]
+  courtScores: GameResult[],
+  memberMap?: Map<string, RankedMember>
 ): Standing[] {
-  const standings = new Map<string, Standing>();
+  // Track head-to-head so tied W / point-diff players can be broken
+  // by "who beat whom head-to-head" before falling back to the
+  // overall-ranking tiebreaker.
+  type S = Standing & { h2hPoints: Map<string, number> };
+  const standings = new Map<string, S>();
 
   for (const p of courtPlayers) {
     standings.set(p.player_id, {
@@ -38,35 +50,60 @@ function computeStandings(
       wins: 0,
       losses: 0,
       pointDiff: 0,
+      h2hPoints: new Map(),
     });
   }
 
   for (const game of courtScores) {
-    const teamAIds = [game.team_a_p1, game.team_a_p2].filter(Boolean);
-    const teamBIds = [game.team_b_p1, game.team_b_p2].filter(Boolean);
+    const teamAIds = [game.team_a_p1, game.team_a_p2].filter(Boolean) as string[];
+    const teamBIds = [game.team_b_p1, game.team_b_p2].filter(Boolean) as string[];
     const aWon = game.score_a > game.score_b;
 
     for (const pid of teamAIds) {
-      const s = standings.get(pid!);
+      const s = standings.get(pid);
       if (!s) continue;
       if (aWon) s.wins++;
       else s.losses++;
       s.pointDiff += game.score_a - game.score_b;
+      for (const opp of teamBIds) {
+        s.h2hPoints.set(opp, (s.h2hPoints.get(opp) ?? 0) + game.score_a);
+      }
     }
 
     for (const pid of teamBIds) {
-      const s = standings.get(pid!);
+      const s = standings.get(pid);
       if (!s) continue;
       if (!aWon) s.wins++;
       else s.losses++;
       s.pointDiff += game.score_b - game.score_a;
+      for (const opp of teamAIds) {
+        s.h2hPoints.set(opp, (s.h2hPoints.get(opp) ?? 0) + game.score_b);
+      }
     }
   }
 
-  return Array.from(standings.values()).sort((a, b) => {
+  // Five-level tiebreaker — matches lib/session-recompute.ts exactly so
+  // the mid-session display and the final pool_finish never disagree
+  // when a tie comes down to the overall-ranking wire.
+  //   1. Wins (desc)
+  //   2. Point differential (desc)
+  //   3. Head-to-head points the two players scored vs each other (desc)
+  //   4. Lower overall-ranking step (asc) — the higher-ranked player moves up
+  //   5. Higher overall Points % (desc) — last-resort tiebreaker
+  const sorted = Array.from(standings.values()).sort((a, b) => {
     if (a.wins !== b.wins) return b.wins - a.wins;
-    return b.pointDiff - a.pointDiff;
+    if (a.pointDiff !== b.pointDiff) return b.pointDiff - a.pointDiff;
+    const aH2H = a.h2hPoints.get(b.playerId) ?? 0;
+    const bH2H = b.h2hPoints.get(a.playerId) ?? 0;
+    if (aH2H !== bH2H) return bH2H - aH2H;
+    const mA = memberMap?.get(a.playerId) ?? { step: 99, winPct: 0 };
+    const mB = memberMap?.get(b.playerId) ?? { step: 99, winPct: 0 };
+    if (mA.step !== mB.step) return mA.step - mB.step;
+    return mB.winPct - mA.winPct;
   });
+
+  // Strip the internal h2hPoints map before handing back.
+  return sorted.map(({ h2hPoints: _h2h, ...rest }) => rest);
 }
 
 // ============================================================
@@ -163,6 +200,12 @@ export default function PlayerSessionPage() {
   const [session, setSession] = useState<(ShootoutSession & { group: { id: string; name: string }; sheet: { event_date: string; location: string } }) | null>(null);
   const [participants, setParticipants] = useState<(SessionParticipant & { player: { display_name: string; avatar_url: string | null } })[]>([]);
   const [scores, setScores] = useState<GameResult[]>([]);
+  // Pre-session overall-ranking snapshot for every checked-in player
+  // on this court. Fed into computeStandings so a pool-play tie
+  // (same W / same point-diff / same H2H) gets broken by whoever
+  // stood higher overall — the same rule the server uses when it
+  // writes pool_finish.
+  const [memberRanks, setMemberRanks] = useState<Map<string, RankedMember>>(new Map());
   const [myPlayerId, setMyPlayerId] = useState<string>("");
   const [myCourt, setMyCourt] = useState<number | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -257,6 +300,30 @@ export default function PlayerSessionPage() {
       .eq("session_id", sessionId)
       .order("id");
     setScores(gameScores ?? []);
+
+    // Pull each checked-in player's pre-session overall ranking so
+    // computeStandings can tie-break by step ASC → Points % DESC
+    // the same way the server's pool_finish recompute does.
+    if (parts && sess) {
+      const playerIds = (parts as any[]).map((p) => p.player_id);
+      const groupId = (sess as any).group?.id ?? (sess as any).group_id;
+      if (playerIds.length > 0 && groupId) {
+        const { data: memberships } = await supabase
+          .from("group_memberships")
+          .select("player_id, current_step, win_pct")
+          .eq("group_id", groupId)
+          .in("player_id", playerIds);
+        const next = new Map<string, RankedMember>();
+        for (const m of (memberships ?? []) as Array<{
+          player_id: string;
+          current_step: number;
+          win_pct: number;
+        }>) {
+          next.set(m.player_id, { step: m.current_step, winPct: m.win_pct });
+        }
+        setMemberRanks(next);
+      }
+    }
 
     setLoading(false);
   }
@@ -455,7 +522,7 @@ export default function PlayerSessionPage() {
         const myCourtPlayers = participants.filter((p) => p.court_number === myCourt);
         const myCourtScores = scores.filter((s) => s.pool_number === myCourt);
         const myStanding = me
-          ? computeStandings(myCourtPlayers as any, myCourtScores).find(
+          ? computeStandings(myCourtPlayers as any, myCourtScores, memberRanks).find(
               (s) => s.playerId === myPlayerId
             )
           : undefined;
@@ -565,7 +632,7 @@ export default function PlayerSessionPage() {
         const renderCourt = (courtNum: number) => {
           const courtPlayers = participants.filter((p) => p.court_number === courtNum);
           const courtScores = scores.filter((s) => s.pool_number === courtNum);
-          const standings = computeStandings(courtPlayers as any, courtScores);
+          const standings = computeStandings(courtPlayers as any, courtScores, memberRanks);
           const schedule = generateMatchSchedule(
             courtPlayers.map((p) => p.player_id),
             playerNames,
