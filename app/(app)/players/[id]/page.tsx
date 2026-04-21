@@ -1,6 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/utils";
+import { displaySessionsForGroup, formatDate } from "@/lib/utils";
 import { getPlayerBadges, getBadgeStats } from "@/lib/queries/badges";
 import type { Profile, GroupMembership, GameResult, Registration, BadgeCategory } from "@/types/database";
 import Link from "next/link";
@@ -39,7 +39,7 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
     badgeStats,
     { data: sessionParticipations },
   ] = await Promise.all([
-    supabase.from("group_memberships").select("*, group:shootout_groups(*)").eq("player_id", id).returns<(GroupMembership & { group: NonNullable<GroupMembership["group"]> })[]>(),
+    supabase.from("group_memberships").select("*, group:shootout_groups(*, group_preferences(pct_window_sessions))").eq("player_id", id).returns<(GroupMembership & { group: NonNullable<GroupMembership["group"]> })[]>(),
     supabase.from("game_results").select("*").or(`team_a_p1.eq.${id},team_a_p2.eq.${id},team_b_p1.eq.${id},team_b_p2.eq.${id}`).order("created_at", { ascending: false }).limit(10).returns<GameResult[]>(),
     supabase.from("registrations").select("*, sheet:signup_sheets(*, group:shootout_groups(name, slug))").eq("player_id", id).order("signed_up_at", { ascending: false }).limit(10).returns<(Registration & { sheet: { id: string; event_date: string; location: string; group: { name: string; slug: string } | null } })[]>(),
     supabase.auth.getUser(),
@@ -57,10 +57,24 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
   const isOwnProfile = currentProfile?.id === id;
   const isAdmin = currentProfile?.role === "admin";
 
-  // Compute aggregate stats
-  const totalSessions = (memberships ?? []).reduce((s, m) => s + (m.total_sessions ?? 0), 0);
+  // Compute aggregate stats. Each membership contributes the
+  // display-capped session count (lifetime total clamped to the
+  // group's pct_window_sessions) so the profile strip matches what
+  // that same player sees on each group's rankings page.
+  const displayedSessionsByMembership = (memberships ?? []).map((m) =>
+    displaySessionsForGroup(
+      m.total_sessions,
+      (m.group as any)?.group_preferences?.pct_window_sessions
+    )
+  );
+  const totalSessions = displayedSessionsByMembership.reduce((s, n) => s + n, 0);
   const weightedWinPct = totalSessions > 0
-    ? Math.round((memberships ?? []).reduce((s, m) => s + (m.win_pct ?? 0) * (m.total_sessions ?? 0), 0) / totalSessions)
+    ? Math.round(
+        (memberships ?? []).reduce(
+          (s, m, i) => s + (m.win_pct ?? 0) * displayedSessionsByMembership[i],
+          0
+        ) / totalSessions
+      )
     : null;
 
   // Attendance streak (consecutive checked-in sessions, most recent first)
@@ -295,25 +309,30 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
                     {m.group.group_type === "free_play" ? "Free Play" : "Ladder"}
                   </span>
                 </div>
-                {m.group.group_type !== "free_play" && (
-                  <div className="grid grid-cols-3 gap-1 text-center mt-3">
-                    <div>
-                      <p className="text-base font-bold text-dark-100">{m.current_step}</p>
-                      <p className="text-[10px] text-surface-muted uppercase tracking-wide">Step</p>
+                {(() => {
+                  const shownSessions = displaySessionsForGroup(
+                    m.total_sessions,
+                    (m.group as any)?.group_preferences?.pct_window_sessions
+                  );
+                  return m.group.group_type !== "free_play" ? (
+                    <div className="grid grid-cols-3 gap-1 text-center mt-3">
+                      <div>
+                        <p className="text-base font-bold text-dark-100">{m.current_step}</p>
+                        <p className="text-[10px] text-surface-muted uppercase tracking-wide">Step</p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-dark-100">{m.win_pct}%</p>
+                        <p className="text-[10px] text-surface-muted uppercase tracking-wide">Pts</p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-dark-100">{shownSessions}</p>
+                        <p className="text-[10px] text-surface-muted uppercase tracking-wide">Sessions</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-base font-bold text-dark-100">{m.win_pct}%</p>
-                      <p className="text-[10px] text-surface-muted uppercase tracking-wide">Pts</p>
-                    </div>
-                    <div>
-                      <p className="text-base font-bold text-dark-100">{m.total_sessions}</p>
-                      <p className="text-[10px] text-surface-muted uppercase tracking-wide">Sessions</p>
-                    </div>
-                  </div>
-                )}
-                {m.group.group_type === "free_play" && (
-                  <p className="text-sm text-surface-muted">{m.total_sessions} sessions</p>
-                )}
+                  ) : (
+                    <p className="text-sm text-surface-muted">{shownSessions} sessions</p>
+                  );
+                })()}
                 {m.last_played_at && (
                   <p className="mt-2 text-xs text-surface-muted">Last played {formatDate(m.last_played_at)}</p>
                 )}

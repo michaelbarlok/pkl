@@ -3,7 +3,7 @@ import { getGroupBySlug, getGroupMembers } from "@/lib/queries/group";
 import { getPlayerStats } from "@/lib/queries/free-play";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, displaySessionsForGroup, formatDate } from "@/lib/utils";
 import { FreePlayLeaderboard } from "../leaderboard";
 
 export default async function LadderPage({
@@ -114,10 +114,22 @@ export default async function LadderPage({
                     <p className="text-sm font-medium text-dark-100 truncate">
                       {member.player?.display_name}
                     </p>
-                    <p className="text-xs text-surface-muted mt-0.5">
-                      {member.total_sessions} session{member.total_sessions !== 1 ? "s" : ""} &middot;{" "}
-                      {member.last_played_at ? formatDate(member.last_played_at) : "Never played"}
-                    </p>
+                    {/* Cap the displayed session count at the group's
+                         rolling-pt% window — anything older can't
+                         influence the % so it shouldn't look like it
+                         still counts. See lib/utils.displaySessionsForGroup. */}
+                    {(() => {
+                      const shown = displaySessionsForGroup(
+                        member.total_sessions,
+                        group.group_preferences?.pct_window_sessions
+                      );
+                      return (
+                        <p className="text-xs text-surface-muted mt-0.5">
+                          {shown} session{shown !== 1 ? "s" : ""} &middot;{" "}
+                          {member.last_played_at ? formatDate(member.last_played_at) : "Never played"}
+                        </p>
+                      );
+                    })()}
                   </div>
 
                   {/* Step + Pt% */}

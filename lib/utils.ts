@@ -181,3 +181,27 @@ export function isTestUser(
   return false;
   return false;
 }
+
+/**
+ * Clamp a per-group cumulative session count to the group's rolling
+ * point% window for display purposes. The raw `total_sessions` we
+ * store on `group_memberships` is the lifetime count (CSV import
+ * baseline + real sessions played) because the win% blend math in
+ * lib/session-recompute needs it uncapped. But anywhere we SHOW a
+ * "sessions" number on a per-group surface (rankings, leaderboard,
+ * dashboard mini-card, player profile), the max that can contribute
+ * to the rolling %. is the group's `pct_window_sessions`. Showing
+ * "16" when only the last 14 matter confuses members and invites
+ * questions about why the percentage didn't drop to reflect a bad
+ * session 15 games ago.
+ *
+ * This is a display cap only — the DB value is untouched.
+ */
+export function displaySessionsForGroup(
+  totalSessions: number | null | undefined,
+  windowSize: number | null | undefined
+): number {
+  const t = totalSessions ?? 0;
+  if (!windowSize || windowSize <= 0) return t;
+  return Math.min(t, windowSize);
+}

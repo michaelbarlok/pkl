@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PlayerAvatar } from "@/components/player-avatar";
-import { cn } from "@/lib/utils";
+import { cn, displaySessionsForGroup } from "@/lib/utils";
 
 interface Member {
   player_id: string;
@@ -26,10 +26,15 @@ export function MembersGrid({
   members,
   currentPlayerId,
   isFreePlay,
+  // Group's rolling-point% window. Used to cap the displayed session
+  // count — anything older than the window stops influencing the %
+  // and showing it alongside implies otherwise.
+  windowSize,
 }: {
   members: Member[];
   currentPlayerId: string | null;
   isFreePlay: boolean;
+  windowSize?: number | null;
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -107,26 +112,29 @@ export function MembersGrid({
                     )}
                   </div>
                 </div>
-                {!isFreePlay ? (
-                  <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <dt className="text-[10px] uppercase text-surface-muted">Step</dt>
-                      <dd className="text-sm font-bold text-dark-100">{m.current_step}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[10px] uppercase text-surface-muted">Pt %</dt>
-                      <dd className="text-sm font-bold text-dark-100">{m.win_pct}%</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[10px] uppercase text-surface-muted">Sess</dt>
-                      <dd className="text-sm font-bold text-dark-100">{m.total_sessions}</dd>
-                    </div>
-                  </dl>
-                ) : (
-                  <p className="mt-3 text-xs text-surface-muted">
-                    {m.total_sessions} session{m.total_sessions === 1 ? "" : "s"}
-                  </p>
-                )}
+                {(() => {
+                  const shown = displaySessionsForGroup(m.total_sessions, windowSize);
+                  return !isFreePlay ? (
+                    <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <dt className="text-[10px] uppercase text-surface-muted">Step</dt>
+                        <dd className="text-sm font-bold text-dark-100">{m.current_step}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] uppercase text-surface-muted">Pt %</dt>
+                        <dd className="text-sm font-bold text-dark-100">{m.win_pct}%</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] uppercase text-surface-muted">Sess</dt>
+                        <dd className="text-sm font-bold text-dark-100">{shown}</dd>
+                      </div>
+                    </dl>
+                  ) : (
+                    <p className="mt-3 text-xs text-surface-muted">
+                      {shown} session{shown === 1 ? "" : "s"}
+                    </p>
+                  );
+                })()}
               </div>
             )}
           </li>

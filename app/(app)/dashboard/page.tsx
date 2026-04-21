@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getBadgeStats } from "@/lib/queries/badges";
 import { groupGradient } from "@/lib/group-gradient";
 import { sheetIsExpired } from "@/lib/sheet-lifecycle";
+import { displaySessionsForGroup } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatTime } from "@/lib/utils";
@@ -42,7 +43,7 @@ export default async function DashboardPage() {
     { data: activeParticipant },
     badgeStats,
   ] = await Promise.all([
-    supabase.from("group_memberships").select("*, group:shootout_groups(*)").eq("player_id", profile.id),
+    supabase.from("group_memberships").select("*, group:shootout_groups(*, group_preferences(pct_window_sessions))").eq("player_id", profile.id),
     supabase.from("signup_sheets").select("*, group:shootout_groups(name, slug, is_active)").eq("status", "open").order("event_date", { ascending: true }).limit(5),
     supabase.from("tournament_registrations").select("tournament_id, division, status, tournament:tournaments(id, title, start_date, start_time, location, status)").eq("player_id", profile.id).neq("status", "withdrawn"),
     supabase.from("tournaments").select("id, title, start_date, start_time, location, status").eq("created_by", profile.id).not("status", "in", '("completed","cancelled")'),
@@ -60,11 +61,26 @@ export default async function DashboardPage() {
   );
   const groupIds = activeGroupMemberships.map((m) => m.group_id);
 
-  // Aggregate stats
-  const totalSessions = activeGroupMemberships.reduce((s, m) => s + (m.total_sessions ?? 0), 0);
+  // Aggregate stats. We use the per-group DISPLAY count (capped at
+  // each group's rolling-pt% window) so the dashboard stats line up
+  // with what members see on each group's ranking page. Uncapped
+  // lifetime sessions would still weight a group that stopped
+  // affecting its % 10 sessions ago.
+  const displayedSessionsByGroup = activeGroupMemberships.map((m) =>
+    displaySessionsForGroup(
+      m.total_sessions,
+      (m as any).group?.group_preferences?.pct_window_sessions
+    )
+  );
+  const totalSessions = displayedSessionsByGroup.reduce((s, n) => s + n, 0);
   const groupCount = activeGroupMemberships.length;
   const weightedWinPct = totalSessions > 0
-    ? Math.round(activeGroupMemberships.reduce((s, m) => s + (m.win_pct ?? 0) * (m.total_sessions ?? 0), 0) / totalSessions)
+    ? Math.round(
+        activeGroupMemberships.reduce(
+          (s, m, i) => s + (m.win_pct ?? 0) * displayedSessionsByGroup[i],
+          0
+        ) / totalSessions
+      )
     : null;
 
   // Build tournament lists
@@ -367,7 +383,15 @@ export default async function DashboardPage() {
                     <div className="mt-2 grid grid-cols-3 gap-1 text-center">
                       <GroupMiniStat label="Step" value={String(m.current_step)} />
                       <GroupMiniStat label="Pts" value={`${m.win_pct}%`} />
-                      <GroupMiniStat label="Sessions" value={String(m.total_sessions)} />
+                      <GroupMiniStat
+                        label="Sessions"
+                        value={String(
+                          displaySessionsForGroup(
+                            m.total_sessions,
+                            g?.group_preferences?.pct_window_sessions
+                          )
+                        )}
+                      />
                     </div>
                   </div>
                 </Link>
