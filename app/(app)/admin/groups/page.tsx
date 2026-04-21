@@ -241,6 +241,8 @@ export default async function AdminGroupsPage() {
           group_type: g.group_type,
           visibility: g.visibility,
           is_active: g.is_active,
+          city: g.city ?? null,
+          state: g.state ?? null,
           memberCount:
             (g.group_memberships as unknown as { count: number }[])?.[0]?.count ?? 0,
           lastSession: lastSessionMap.get(g.id) ?? null,
