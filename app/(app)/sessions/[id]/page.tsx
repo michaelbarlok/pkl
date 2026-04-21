@@ -6,7 +6,7 @@ import { useSupabase } from "@/components/providers/supabase-provider";
 import { matchFirstChoice } from "@/lib/first-choice";
 import { expectedGamesPerCourt } from "@/lib/round-progress";
 import type { ShootoutSession, SessionParticipant, GameResult } from "@/types/database";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { formatDate } from "@/lib/utils";
 import { SESSION_STATUS_LABELS as STATUS_LABELS, SESSION_STATUS_COLORS as STATUS_COLORS } from "@/lib/status-colors";
@@ -152,6 +152,13 @@ function formatTeam(ids: string[], names: Map<string, string>): string {
 
 export default function PlayerSessionPage() {
   const { id: sessionId } = useParams<{ id: string }>();
+  // When the session is opened from the /my-sessions history list, we
+  // treat this page as a read-only viewer — admin score edits + the
+  // full admin controls card are hidden. Admins who need to edit go
+  // to /admin/sessions/[id] directly. Normal Play-tab visits (no
+  // `from` param) keep the full admin affordances.
+  const searchParams = useSearchParams();
+  const fromHistory = searchParams.get("from") === "history";
   const { supabase } = useSupabase();
   const [session, setSession] = useState<(ShootoutSession & { group: { id: string; name: string }; sheet: { event_date: string; location: string } }) | null>(null);
   const [participants, setParticipants] = useState<(SessionParticipant & { player: { display_name: string; avatar_url: string | null } })[]>([]);
@@ -411,8 +418,10 @@ export default function PlayerSessionPage() {
 
       {/* Admin lifecycle + action controls. Regular players never see
            this card — it's gated on isAdmin, which covers both site
-           admins and group admins (matches the add/remove rules). */}
-      {isAdmin && (
+           admins and group admins (matches the add/remove rules).
+           Also hidden when the page is opened from /my-sessions so
+           that read-through path doesn't expose admin actions. */}
+      {isAdmin && !fromHistory && (
         <SessionAdminControls
           session={session as any}
           participants={participants as any}
@@ -475,8 +484,10 @@ export default function PlayerSessionPage() {
             courtScores
           );
           const isMyCourtSection = courtNum === myCourt;
-          // A player can enter scores on their own court; admins on any court.
-          const canEnter = isAdmin || isMyCourtSection;
+          // A player can enter scores on their own court; admins on any
+          // court. When reached via My Sessions (?from=history) the
+          // whole page is read-only so even admins can't enter here.
+          const canEnter = (isAdmin || isMyCourtSection) && !fromHistory;
 
           return (
             <div key={courtNum} className="space-y-3">
@@ -562,7 +573,12 @@ export default function PlayerSessionPage() {
                             <span className="text-xs font-semibold text-surface-muted uppercase tracking-wider">Game {match.gameNumber}</span>
                             <div className="flex items-center gap-2">
                               {match.bye && <span className="badge-bye">Bye: {playerNames.get(match.bye) ?? "?"}</span>}
-                              {isAdmin && !isEditingThis && (
+                              {/* Edits are suppressed when the session
+                                   was reached via My Sessions — that
+                                   route is a history viewer, not an
+                                   admin surface. Regular Play-tab
+                                   visits keep the inline Edit. */}
+                              {isAdmin && !fromHistory && !isEditingThis && (
                                 <button
                                   onClick={() => startEdit(match.result!.id, match.result!.scoreA, match.result!.scoreB)}
                                   className="text-xs font-medium text-brand-vivid hover:opacity-80 transition-opacity"

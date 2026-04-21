@@ -86,7 +86,11 @@ export default async function MySessionsPage() {
       return {
         kind: "ladder" as const,
         id: s.id,
-        href: `/sessions/${s.id}`,
+        // ?from=history tells the session page to render read-only
+        // (hides admin score-edit + admin lifecycle controls). Admins
+        // who want to edit from this entry point get nudged toward
+        // /admin/sessions/[id] instead.
+        href: `/sessions/${s.id}?from=history`,
         groupId: s.group?.id ?? s.group_id,
         groupName: s.group?.name ?? "—",
         groupSlug: s.group?.slug ?? null,
@@ -153,9 +157,11 @@ export default async function MySessionsPage() {
         kind: "free_play" as const,
         id: s.id,
         // Free-play session detail page lives under the group.
+        // Same ?from=history flag as the ladder link so that page can
+        // go read-only if / when it picks up the signal.
         href: s.group?.slug
-          ? `/groups/${s.group.slug}/sessions/${s.id}`
-          : `/groups/${s.group_id}/sessions/${s.id}`,
+          ? `/groups/${s.group.slug}/sessions/${s.id}?from=history`
+          : `/groups/${s.group_id}/sessions/${s.id}?from=history`,
         groupId: s.group?.id ?? s.group_id,
         groupName: s.group?.name ?? "—",
         groupSlug: s.group?.slug ?? null,
