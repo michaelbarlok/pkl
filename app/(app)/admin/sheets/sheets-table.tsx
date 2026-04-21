@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { DataTable, type Column } from "@/components/data-table";
 import { EmptyIllustrationCalendar } from "@/components/empty-state";
 import { DeleteSheetButton } from "./delete-sheet-button";
+import { sheetSignupClosed } from "@/lib/sheet-lifecycle";
 import { formatDate } from "@/lib/utils";
 
 const statusClass: Record<string, string> = {
@@ -22,12 +23,26 @@ const statusLabel: Record<string, string> = {
 export type SheetRow = {
   id: string;
   event_date: string;
+  event_time: string | null;
   player_limit: number;
   status: string;
   group: { id: string; name: string } | null;
   confirmed: number;
   waitlisted: number;
 };
+
+/**
+ * Raw `status` stays "open" forever unless an admin explicitly closes
+ * or cancels — nothing flips it at event time. For display we compute
+ * an effective status: once the event has started (via the shared
+ * sheetSignupClosed helper), render "Closed" even when the column
+ * still says "open". Cancelled stays cancelled.
+ */
+function effectiveStatus(s: SheetRow): string {
+  if (s.status !== "open") return s.status;
+  if (sheetSignupClosed(s)) return "closed";
+  return "open";
+}
 
 type SortKey = "date" | "group";
 type SortDir = "asc" | "desc";
@@ -87,11 +102,14 @@ export function SheetsTable({
     {
       key: "status",
       header: "Status",
-      cell: (s) => (
-        <span className={statusClass[s.status] ?? "status-closed"}>
-          {statusLabel[s.status] ?? s.status}
-        </span>
-      ),
+      cell: (s) => {
+        const es = effectiveStatus(s);
+        return (
+          <span className={statusClass[es] ?? "status-closed"}>
+            {statusLabel[es] ?? es}
+          </span>
+        );
+      },
       priority: "primary",
     },
     {
@@ -201,46 +219,59 @@ export function SheetsTable({
         </div>
 
         <ul className="divide-y divide-surface-border rounded-xl ring-1 ring-surface-border bg-surface-raised overflow-hidden">
-          {sortedForMobile.map((s) => (
-            <li key={s.id} className={s.status === "cancelled" ? "bg-red-500/5" : ""}>
-              <Link
-                href={`/admin/sheets/${s.id}`}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-surface-overlay/50 transition-colors active:bg-surface-overlay"
+          {sortedForMobile.map((s) => {
+            const es = effectiveStatus(s);
+            return (
+              <li
+                key={s.id}
+                className={`flex items-stretch ${
+                  s.status === "cancelled" ? "bg-red-500/5" : ""
+                }`}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-dark-100 truncate">
-                      {formatDate(s.event_date)}
-                    </p>
-                    <span className={`${statusClass[s.status] ?? "status-closed"} shrink-0`}>
-                      {statusLabel[s.status] ?? s.status}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-surface-muted truncate">
-                    <span className="font-medium text-dark-200">{s.group?.name ?? "—"}</span>
-                    <span className="mx-1.5">·</span>
-                    {s.confirmed}/{s.player_limit} signed up
-                    {s.waitlisted > 0 && (
-                      <>
-                        <span className="mx-1.5">·</span>
-                        {s.waitlisted} waitlisted
-                      </>
-                    )}
-                  </p>
-                </div>
-                <svg
-                  className="h-4 w-4 shrink-0 text-surface-muted"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden
+                {/* Main row → sheet detail. Delete sits outside the
+                    Link so tapping it doesn't also navigate. */}
+                <Link
+                  href={`/admin/sheets/${s.id}`}
+                  className="flex items-center gap-3 flex-1 min-w-0 px-4 py-3 hover:bg-surface-overlay/50 transition-colors active:bg-surface-overlay"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
-                </svg>
-              </Link>
-            </li>
-          ))}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-dark-100 truncate">
+                        {formatDate(s.event_date)}
+                      </p>
+                      <span className={`${statusClass[es] ?? "status-closed"} shrink-0`}>
+                        {statusLabel[es] ?? es}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-surface-muted truncate">
+                      <span className="font-medium text-dark-200">{s.group?.name ?? "—"}</span>
+                      <span className="mx-1.5">·</span>
+                      {s.confirmed}/{s.player_limit} signed up
+                      {s.waitlisted > 0 && (
+                        <>
+                          <span className="mx-1.5">·</span>
+                          {s.waitlisted} waitlisted
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <svg
+                    className="h-4 w-4 shrink-0 text-surface-muted"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+                  </svg>
+                </Link>
+                <div className="flex items-center border-l border-surface-border px-3">
+                  <DeleteSheetButton sheetId={s.id} />
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </>

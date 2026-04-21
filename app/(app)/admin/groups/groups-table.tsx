@@ -240,10 +240,14 @@ export function GroupsTable({
 
         <ul className="divide-y divide-surface-border rounded-xl ring-1 ring-surface-border bg-surface-raised overflow-hidden">
           {sortedForMobile.map((g) => (
-            <li key={g.id}>
+            <li key={g.id} className="flex items-stretch">
+              {/* Main row: tap to open the edit page. Flex child is the
+                  Link, not the li, so the destructive action button
+                  can sit beside it without nesting a <button> inside
+                  an <a> (invalid HTML + event bubbling headaches). */}
               <Link
                 href={`/admin/groups/${g.id}`}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-surface-overlay/50 transition-colors active:bg-surface-overlay"
+                className="flex items-center gap-3 flex-1 min-w-0 px-4 py-3 hover:bg-surface-overlay/50 transition-colors active:bg-surface-overlay"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
@@ -289,6 +293,35 @@ export function GroupsTable({
                   <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
                 </svg>
               </Link>
+              {/* Trailing destructive action — Deactivate for active
+                  groups (soft-delete), Activate for inactive ones.
+                  Rename stays on the detail page to keep the list
+                  compact. */}
+              <div className="flex items-center border-l border-surface-border px-3">
+                {g.is_active ? (
+                  <ConfirmFormButton
+                    action={toggleActive}
+                    hiddenInputs={{ groupId: g.id, currentActive: "true" }}
+                    label="Deactivate"
+                    confirmTitle={`Deactivate "${g.name}"?`}
+                    confirmDescription="Members will no longer be able to access this group until it is reactivated."
+                    confirmLabel="Deactivate"
+                    variant="danger"
+                    className="text-xs font-medium text-adaptive-red hover:text-red-500 px-1 py-2"
+                  />
+                ) : (
+                  <form action={toggleActive} className="inline">
+                    <input type="hidden" name="groupId" value={g.id} />
+                    <input type="hidden" name="currentActive" value="false" />
+                    <button
+                      type="submit"
+                      className="text-xs font-medium text-teal-500 hover:opacity-80 px-1 py-2"
+                    >
+                      Activate
+                    </button>
+                  </form>
+                )}
+              </div>
             </li>
           ))}
         </ul>
