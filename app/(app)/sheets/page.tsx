@@ -45,11 +45,12 @@ export default async function SheetsPage() {
     }
   }
 
-  // Hide sheets more than 12 hours after their event start time.
+  // Hide sheets more than 3 hours after their event start time.
   // event_date is a date string (YYYY-MM-DD) and event_time is a time string (HH:MM).
-  // We fetch a generous date window then filter precisely in JS using event_time.
+  // We still fetch yesterday's rows so a late-night event that ended
+  // after midnight UTC can be filtered precisely in JS via event_time.
   const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 1); // fetch up to yesterday to cover edge cases
+  cutoffDate.setDate(cutoffDate.getDate() - 1);
 
   const { data: sheets, error } = await supabase
     .from("signup_sheets")
@@ -63,7 +64,7 @@ export default async function SheetsPage() {
     );
   }
 
-  // Drop any sheet whose event started more than 12 hours ago
+  // Drop any sheet whose event started more than 3 hours ago
   const filteredSheets = (sheets ?? []).filter((s) => !sheetIsExpired(s));
 
   // Sort: active sheets first (most recent on top), then cancelled (most recent on top)
