@@ -23,6 +23,14 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: payload.body ?? "",
+    // `icon` = the large circle on the right side of an Android
+    // Chrome notification. Without it, Chrome generates a letter
+    // avatar from the origin ("T" for tristarpickleball.com) which
+    // looks like we forgot to set one. Pointing at our shipped 192px
+    // PNG makes that slot render the Tri-Star logo instead.
+    // iOS Safari ignores this field — it shows only the apple-touch
+    // icon, so this is effectively Android-only polish.
+    icon: "/TriStarPB-icon-192.png",
     badge: "/ic_notification_xxxhdpi_96px.png",
     data: { url: payload.link ?? "/" },
     vibrate: [100, 50, 100],
