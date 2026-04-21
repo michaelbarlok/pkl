@@ -984,8 +984,12 @@ export default function AdminSessionDetailPage() {
                     </>
                   )}
                   {match.bye && (
-                    <p className="text-[11px] text-accent-300/80 mt-1">
-                      Bye: {playerNameMap.get(match.bye) ?? "?"}
+                    <p className="mt-1">
+                      {/* badge-bye reads on both themes — the raw
+                          text-accent-300/80 was invisible on white. */}
+                      <span className="badge-bye">
+                        Bye: {playerNameMap.get(match.bye) ?? "?"}
+                      </span>
                     </p>
                   )}
                 </div>

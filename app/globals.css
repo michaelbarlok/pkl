@@ -154,7 +154,8 @@
 
 .light .text-teal-200,
 .light .text-teal-300,
-.light .text-teal-400 {
+.light .text-teal-400,
+.light .text-teal-500 {
   color: #0f766e; /* teal-700 */
 }
 .light .text-yellow-300,
@@ -163,7 +164,8 @@
   color: #92400e; /* amber-800 */
 }
 .light .text-red-300,
-.light .text-red-400 {
+.light .text-red-400,
+.light .text-red-500 {
   color: #991b1b; /* red-800 */
 }
 
@@ -175,6 +177,57 @@
 .light .border-brand-500\/40,
 .light .border-brand-500\/50 {
   border-color: rgba(14, 116, 110, 0.5); /* brand-700 @ 50% */
+}
+.light .border-red-500,
+.light .border-red-500\/30,
+.light .border-red-500\/40,
+.light .border-red-500\/50 {
+  border-color: rgba(220, 38, 38, 0.55); /* red-600 */
+}
+.light .border-teal-500,
+.light .border-teal-500\/30,
+.light .border-teal-500\/50 {
+  border-color: rgba(14, 116, 110, 0.5);
+}
+
+/* Dark-on-dark translucent background tints (bg-brand-900/*, bg-teal-900/*,
+   bg-red-900/*, bg-accent-900/*, bg-yellow-900/*) render as invisible
+   smudges on a white surface. Remap each family to a pale tinted fill
+   that stands out without drowning the surrounding text.
+
+   Each family uses the "-100" Tailwind stop (the light-mode-friendly
+   pastel) at ~65% opacity so the surface-muted text on top still reads. */
+.light .bg-brand-900\/20,
+.light .bg-brand-900\/30,
+.light .bg-brand-900\/40,
+.light .bg-brand-900\/50,
+.light .bg-teal-900\/20,
+.light .bg-teal-900\/30,
+.light .bg-teal-900\/40,
+.light .bg-teal-900\/50 {
+  background-color: rgba(153, 246, 241, 0.55); /* teal-200 */
+}
+.light .bg-brand-500\/5,
+.light .bg-brand-500\/10,
+.light .bg-brand-500\/20,
+.light .bg-brand-500\/30 {
+  background-color: rgba(204, 251, 248, 0.7); /* teal-100 */
+}
+.light .bg-red-900\/20,
+.light .bg-red-900\/30,
+.light .bg-red-900\/40 {
+  background-color: rgba(254, 226, 226, 0.75); /* red-100 */
+}
+.light .bg-accent-900\/20,
+.light .bg-accent-900\/30,
+.light .bg-accent-900\/40,
+.light .bg-accent-500\/15 {
+  background-color: rgba(254, 243, 199, 0.75); /* amber-100 */
+}
+.light .bg-yellow-900\/20,
+.light .bg-yellow-900\/30,
+.light .bg-yellow-900\/40 {
+  background-color: rgba(254, 243, 199, 0.75); /* amber-100 */
 }
 
 @layer base {
