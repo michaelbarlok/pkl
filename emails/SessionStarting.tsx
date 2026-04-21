@@ -8,17 +8,36 @@ interface Props {
   eventTime?: string;
   timezone?: string;
   sheetId?: string;
+  /** "starting soon" | "today" | "tomorrow". Threaded from the cron
+   *  route so the heading matches reality for same-day reminders. */
+  whenWord?: string;
 }
 
-export default function SessionStarting({ groupName, eventDate, eventTime, timezone, sheetId }: Props) {
+export default function SessionStarting({
+  groupName,
+  eventDate,
+  eventTime,
+  timezone,
+  sheetId,
+  whenWord,
+}: Props) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const tz = timezone ?? "America/New_York";
+  const when = whenWord ?? "tomorrow";
+  // Capitalize for the heading: "Today" / "Tomorrow" / "Starting Soon"
+  const whenHeading = when
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 
   return (
-    <BaseEmail preview="You're signed up for tomorrow's session" heading="Session Tomorrow!">
+    <BaseEmail
+      preview={`You're signed up for ${when === "starting soon" ? "a session starting soon" : `${when}'s session`}`}
+      heading={`Session ${whenHeading}!`}
+    >
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
         Just a reminder — you&apos;re confirmed for <strong>{groupName ?? "the event"}</strong>
-        {eventDate ? ` on ${formatDateInZone(eventDate, tz)}` : " tomorrow"}
+        {eventDate ? ` on ${formatDateInZone(eventDate, tz)}` : ` ${when}`}
         {eventTime ? ` at ${formatTimeInZone(eventTime, tz)}` : ""}.
       </Text>
       <Text style={{ color: "#374151", fontSize: "14px", lineHeight: "24px" }}>
