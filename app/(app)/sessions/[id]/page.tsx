@@ -179,6 +179,17 @@ export default function PlayerSessionPage() {
   const [viewingOtherCourt, setViewingOtherCourt] = useState<number | null>(null);
   // Score-entry modal target. null = modal closed.
   const [entryTarget, setEntryTarget] = useState<ScoreEntryTarget | null>(null);
+  // Tracks whether the viewer has dismissed the "Session started —
+  // head to your court" overlay for this session. Persisted in
+  // localStorage so a refresh (or visiting from a different tab)
+  // doesn't re-pop the modal after they've seen it. This is the
+  // fallback path for players whose push notifications are off.
+  const [startedAck, setStartedAck] = useState(true);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = `session-started-ack:${sessionId}`;
+    setStartedAck(window.localStorage.getItem(key) === "1");
+  }, [sessionId]);
 
   // Remember what status the session was in when this tab opened so we
   // can detect an admin ending the session WHILE the user is watching.
@@ -882,6 +893,64 @@ export default function PlayerSessionPage() {
                 className="btn-primary w-full"
               >
                 Session Complete
+              </button>
+            </div>
+          </div>
+        )}
+
+      {/* "Session Started" overlay. Fallback for players with push
+           notifications off: when they open the Play tab during an
+           active round, this modal tells them their court number and
+           blocks the UI until they acknowledge. localStorage-keyed by
+           sessionId so it shows once per session per device. Admins
+           see it too but can dismiss the same way. Hidden when they
+           arrived via My Sessions (fromHistory) — that's a read-only
+           path and the session is long over. */}
+      {!fromHistory &&
+        !startedAck &&
+        session.status === "round_active" &&
+        myCourt != null && (
+          <div
+            className="fixed inset-0 z-[250] flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="session-started-title"
+          >
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in" />
+            <div className="relative z-10 w-full max-w-sm rounded-2xl bg-surface-raised shadow-2xl ring-1 ring-surface-border animate-scale-in p-6 text-center space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full alert-info">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-6 w-6">
+                  <path d="M10 3.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5ZM1.25 10a8.75 8.75 0 1 1 17.5 0 8.75 8.75 0 0 1-17.5 0Zm9.75-3a1 1 0 1 0-2 0v3.5a1 1 0 0 0 .55.9l2.5 1.25a1 1 0 0 0 .9-1.8L11 10.38V7Z" />
+                </svg>
+              </div>
+              <div>
+                <h2 id="session-started-title" className="text-lg font-semibold text-dark-100">
+                  Session Started
+                </h2>
+                <p className="mt-2 text-sm text-surface-muted">
+                  You&apos;re on
+                </p>
+                <p className="mt-1 text-3xl font-bold text-brand-vivid">
+                  Court {myCourt}
+                </p>
+                <p className="mt-2 text-sm text-surface-muted">
+                  Head there now to start playing.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem(
+                      `session-started-ack:${sessionId}`,
+                      "1"
+                    );
+                  }
+                  setStartedAck(true);
+                }}
+                className="btn-primary w-full"
+              >
+                Got it
               </button>
             </div>
           </div>
