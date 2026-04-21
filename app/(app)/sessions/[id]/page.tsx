@@ -484,8 +484,10 @@ export default function PlayerSessionPage() {
             courtScores
           );
           const isMyCourtSection = courtNum === myCourt;
-          // A player can enter scores on their own court; admins on any court.
-          const canEnter = isAdmin || isMyCourtSection;
+          // A player can enter scores on their own court; admins on any
+          // court. When reached via My Sessions (?from=history) the
+          // whole page is read-only so even admins can't enter here.
+          const canEnter = (isAdmin || isMyCourtSection) && !fromHistory;
 
           return (
             <div key={courtNum} className="space-y-3">
