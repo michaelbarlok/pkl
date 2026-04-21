@@ -39,3 +39,26 @@ export const SESSION_STATUS_COLORS: Record<string, string> = {
   round_complete: "status-upcoming",
   session_complete: "status-closed",
 };
+
+/** Terse labels for the admin lifecycle pill row (Created → Check-In
+ *  → Seeding → Round Active → Round Complete → Session Complete). The
+ *  longer SESSION_STATUS_LABELS above are used for the single-badge
+ *  "what is this session right now" renders; keep the two separate so
+ *  one can be tuned without breaking the other. */
+export const SESSION_LIFECYCLE_ORDER = [
+  "created",
+  "checking_in",
+  "seeding",
+  "round_active",
+  "round_complete",
+  "session_complete",
+] as const;
+
+export const SESSION_LIFECYCLE_LABELS: Record<string, string> = {
+  created: "Created",
+  checking_in: "Check-In",
+  seeding: "Seeding",
+  round_active: "Round Active",
+  round_complete: "Round Complete",
+  session_complete: "Session Complete",
+};

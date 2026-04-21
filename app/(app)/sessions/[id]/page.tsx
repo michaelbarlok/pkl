@@ -4,12 +4,14 @@ import { EmptyState } from "@/components/empty-state";
 import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { matchFirstChoice } from "@/lib/first-choice";
+import { expectedGamesPerCourt } from "@/lib/round-progress";
 import type { ShootoutSession, SessionParticipant, GameResult } from "@/types/database";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { formatDate } from "@/lib/utils";
 import { SESSION_STATUS_LABELS as STATUS_LABELS, SESSION_STATUS_COLORS as STATUS_COLORS } from "@/lib/status-colors";
 import { ScoreEntryModal, type ScoreEntryTarget } from "./score-entry-modal";
+import { SessionAdminControls } from "./session-admin-controls";
 
 // ============================================================
 // Standings Calculation
@@ -365,6 +367,58 @@ export default function PlayerSessionPage() {
           <span className="badge-admin">Admin</span>
         )}
       </div>
+
+      {/* Matches-remaining ticker. Visible to everyone once the
+           round is live so players can see progress at a glance and
+           admins can gauge whether it's safe to press Complete Round.
+           Expected games per court come from the same 4→3, 5→5 table
+           the /complete-round API uses for validation. */}
+      {(session.status === "round_active" || session.status === "round_complete") && (() => {
+        const currentRound = session.current_round || 1;
+        let expected = 0;
+        for (const court of allCourts) {
+          const count = participants.filter((p) => p.court_number === court).length;
+          expected += expectedGamesPerCourt(count);
+        }
+        const completed = scores.filter((s) => s.round_number === currentRound).length;
+        const remaining = Math.max(0, expected - completed);
+        const pct = expected > 0 ? Math.round((completed / expected) * 100) : 0;
+        return (
+          <div className="card space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-dark-100">
+                {completed} of {expected} matches played
+              </p>
+              <p className="text-xs text-surface-muted">
+                {remaining === 0 ? "All scores in" : `${remaining} remaining`}
+              </p>
+            </div>
+            <div
+              className="h-1.5 w-full overflow-hidden rounded-full bg-surface-overlay"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={expected}
+              aria-valuenow={completed}
+            >
+              <div
+                className="h-full bg-brand-vivid transition-[width] duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Admin lifecycle + action controls. Regular players never see
+           this card — it's gated on isAdmin, which covers both site
+           admins and group admins (matches the add/remove rules). */}
+      {isAdmin && (
+        <SessionAdminControls
+          session={session as any}
+          participants={participants as any}
+          onChange={refetchAll}
+        />
+      )}
 
       {/* Your Court hero (only if assigned). Colors sit on top of the
            shared surface tokens so the hero reads on both themes
