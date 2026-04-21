@@ -174,7 +174,11 @@ export function ScoreEntryModal({
           </header>
 
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <div>
+            {/* min-w-0 on each column lets the `truncate` label collapse
+                under its own text width. Without it, the 1fr tracks
+                floor at the label's intrinsic width and push the whole
+                grid past the modal's right edge on long names. */}
+            <div className="min-w-0">
               <label className="block text-xs font-semibold text-surface-muted mb-2 text-center uppercase tracking-wider truncate">
                 {formatTeam(target.team1)}
               </label>
@@ -191,7 +195,7 @@ export function ScoreEntryModal({
               />
             </div>
             <span className="text-lg font-bold text-surface-muted mt-6">—</span>
-            <div>
+            <div className="min-w-0">
               <label className="block text-xs font-semibold text-surface-muted mb-2 text-center uppercase tracking-wider truncate">
                 {formatTeam(target.team2)}
               </label>
