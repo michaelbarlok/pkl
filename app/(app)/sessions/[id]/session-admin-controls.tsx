@@ -76,6 +76,18 @@ export function SessionAdminControls({
         setUpdating(false);
         return;
       }
+    } else if (nextStatus === "round_active") {
+      // seeding → round_active goes through /start so every checked-in
+      // player gets a push with their court number in the same beat.
+      const res = await fetch(`/api/sessions/${session.id}/start`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAdvanceError(data.error ?? "Failed to start the round");
+        setUpdating(false);
+        return;
+      }
     } else {
       await supabase
         .from("shootout_sessions")
