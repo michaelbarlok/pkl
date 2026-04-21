@@ -35,6 +35,7 @@ export default async function AdminSheetsPage() {
   const all: SheetRow[] = (sheets ?? []).map((s: SignupSheet & { group?: { id: string; name: string } }) => ({
     id: s.id,
     event_date: s.event_date,
+    event_time: s.event_time ?? null,
     player_limit: s.player_limit,
     status: s.status,
     group: s.group ?? null,
