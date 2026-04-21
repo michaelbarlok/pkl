@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getBadgeStats } from "@/lib/queries/badges";
 import { groupGradient } from "@/lib/group-gradient";
 import { sheetIsExpired } from "@/lib/sheet-lifecycle";
-import { displaySessionsForGroup } from "@/lib/utils";
+import { displaySessionsForGroup, isTestUser } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatTime } from "@/lib/utils";
@@ -231,7 +231,17 @@ export default async function DashboardPage() {
           </>
         ),
       }))),
-      ...((recentMatches ?? []).map((m: any) => {
+      ...((recentMatches ?? [])
+        // Hide any match where the displayed winner OR the opposing
+        // team lead is a [TEST] account — the Recent Activity feed is
+        // visible to every member on their Dashboard and test users
+        // shouldn't surface in public-facing lists.
+        .filter(
+          (m: any) =>
+            !isTestUser(null, m.a1?.display_name) &&
+            !isTestUser(null, m.b1?.display_name)
+        )
+        .map((m: any) => {
         const winner = m.score_a > m.score_b ? m.a1?.display_name : m.b1?.display_name;
         return {
           id: `match-${m.id}`,
@@ -245,7 +255,10 @@ export default async function DashboardPage() {
           ),
         };
       })),
-      ...((recentBadges ?? []).map((b: any) => ({
+      ...((recentBadges ?? [])
+        // Same rule — no [TEST] accounts in the public badge ticker.
+        .filter((b: any) => !isTestUser(null, b.player?.display_name))
+        .map((b: any) => ({
         id: `badge-${b.id}`,
         when: b.earned_at,
         text: (
