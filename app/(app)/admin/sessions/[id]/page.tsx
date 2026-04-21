@@ -184,12 +184,22 @@ export default function AdminSessionDetailPage() {
     setAdvanceError(null);
 
     // round_active → round_complete: use complete-round API
-    // (validates all scores, computes pool_finish, updates win_pct/steps/target_courts)
+    // (validates all scores, computes pool_finish, updates win_pct/steps/target_courts).
+    // seeding → round_active: use /start API, which also pushes a
+    // "head to Court N" notification to every checked-in player.
     if (nextStatus === "round_complete") {
       const res = await fetch(`/api/sessions/${id}/complete-round`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setAdvanceError(data.error ?? "Failed to complete round");
+        setUpdating(false);
+        return;
+      }
+    } else if (nextStatus === "round_active") {
+      const res = await fetch(`/api/sessions/${id}/start`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAdvanceError(data.error ?? "Failed to start the round");
         setUpdating(false);
         return;
       }
