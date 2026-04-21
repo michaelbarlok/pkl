@@ -54,9 +54,12 @@ export function courtOptionsForCount(playerCount: number): number[] {
 /**
  * Run Session-1 seeding for the given confirmed roster.
  *
- * If `forcedNumCourts` is a legal option it's used; otherwise the max
- * legal option (usually 4-per-court) wins — matching the default the
- * admin sees in Start Shootout.
+ * If `forcedNumCourts` is a legal option it's used; otherwise the
+ * default is the FEWEST courts with the MOST players each — e.g. 30
+ * confirmed defaults to 6 courts of 5 rather than 7 courts of 4–5.
+ * That matches how most leagues prefer to play (full 5-person pools
+ * over thinner 4-person pools). The admin can still flip to a
+ * different court count via the preview dropdown.
  *
  * Returns null when there are too few players (<4) or no legal 4-5
  * split works for the roster size.
@@ -75,10 +78,13 @@ export function computeCourtPreview(
   const options = courtOptionsForCount(confirmed.length);
   if (options.length === 0) return null;
 
+  // `courtOptionsForCount` loops n from 1 upward, so options[0] is
+  // the smallest legal court count — i.e. the most-players-per-court
+  // split.
   const numCourts =
     forcedNumCourts && options.includes(forcedNumCourts)
       ? forcedNumCourts
-      : options[options.length - 1];
+      : options[0];
 
   const membershipByPlayer = new Map(memberships.map((m) => [m.player_id, m]));
 

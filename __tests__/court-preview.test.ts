@@ -3,10 +3,12 @@
  *
  * computeCourtPreview wraps seedSession1 — the same logic that runs at
  * StartShootout time. These tests lock in the preview's guarantees:
- *   - it picks the max legal court count (4-per-court when possible)
- *   - it returns null when there are too few players or no legal split
- *   - it maps memberships onto players and preserves roster data
- *   - the court ordering matches the real seeding (step ASC → win% DESC)
+ *   - default is the FEWEST courts with the most players each (e.g.
+ *     30 confirmed → 6 courts of 5, not 7 courts of 4–5). Admins can
+ *     still override via the dropdown.
+ *   - returns null when there are too few players or no legal split
+ *   - maps memberships onto players and preserves roster data
+ *   - court ordering matches the real seeding (step ASC → win% DESC)
  */
 
 import { computeCourtPreview } from "@/app/(app)/sheets/[id]/court-preview";
@@ -55,12 +57,39 @@ describe("computeCourtPreview", () => {
     expect(result!.courts.map((c) => c.players.length)).toEqual([4, 4]);
   });
 
-  test("12 players → 3 courts of 4 (max courts wins)", () => {
+  test("12 players → 3 courts of 4 (only one legal split)", () => {
     const confirmed = Array.from({ length: 12 }, (_, i) => mkConfirmed(`p${i}`));
     const memberships = confirmed.map((r) => mkMembership(r.player_id, 1, 50));
     const result = computeCourtPreview(confirmed, memberships);
     expect(result!.numCourts).toBe(3);
     expect(result!.courts.map((c) => c.players.length)).toEqual([4, 4, 4]);
+  });
+
+  test("30 players → defaults to 6 courts of 5 (fewest courts, fullest pools)", () => {
+    // Both 6 (5-per-court) and 7 (4–5-per-court) are legal splits.
+    // Default must be 6 so the admin doesn't have to fix it every week.
+    const confirmed = Array.from({ length: 30 }, (_, i) => mkConfirmed(`p${i}`));
+    const memberships = confirmed.map((r) => mkMembership(r.player_id, 1, 50));
+    const result = computeCourtPreview(confirmed, memberships);
+    expect(result!.numCourts).toBe(6);
+    expect(result!.options).toEqual([6, 7]);
+    expect(result!.courts.every((c) => c.players.length === 5)).toBe(true);
+  });
+
+  test("forcedNumCourts overrides the default when legal", () => {
+    // Same 30-player roster, admin picks the other option from the
+    // dropdown — the preview honors it.
+    const confirmed = Array.from({ length: 30 }, (_, i) => mkConfirmed(`p${i}`));
+    const memberships = confirmed.map((r) => mkMembership(r.player_id, 1, 50));
+    const result = computeCourtPreview(confirmed, memberships, 7);
+    expect(result!.numCourts).toBe(7);
+  });
+
+  test("forcedNumCourts falls back to default when not a legal option", () => {
+    const confirmed = Array.from({ length: 30 }, (_, i) => mkConfirmed(`p${i}`));
+    const memberships = confirmed.map((r) => mkMembership(r.player_id, 1, 50));
+    const result = computeCourtPreview(confirmed, memberships, 99);
+    expect(result!.numCourts).toBe(6);
   });
 
   test("13 players → 3 courts with 5+4+4 (lower courts get extras)", () => {
