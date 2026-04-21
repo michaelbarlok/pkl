@@ -1,5 +1,22 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { PlayerAvatar } from "@/components/player-avatar";
-import { seedSession1, type RankedPlayer } from "@/lib/shootout-engine";
+import {
+  computeCourtPreview,
+  type ConfirmedPlayer,
+  type PreviewPlayer,
+} from "@/lib/court-preview-math";
+
+// Re-export the math + types so existing callers (and the unit tests
+// at __tests__/court-preview.test.ts) don't need to change their
+// import paths. The actual logic now lives in lib/court-preview-math.
+export {
+  computeCourtPreview,
+  courtOptionsForCount,
+  type ConfirmedPlayer,
+  type PreviewPlayer,
+} from "@/lib/court-preview-math";
 
 interface MembershipRow {
   player_id: string;
@@ -7,83 +24,6 @@ interface MembershipRow {
   win_pct: number;
   total_sessions: number;
   last_played_at: string | null;
-}
-
-export interface PreviewPlayer {
-  id: string;
-  displayName: string;
-  avatarUrl: string | null;
-  currentStep: number;
-  winPct: number;
-}
-
-/**
- * Given the ordered list of confirmed player ids and the matching memberships,
- * run the same Session 1 seeding used at start-time and return courts. Returns
- * null when there aren't enough players or when the counts don't divide into
- * a valid 4–5-per-court distribution.
- *
- * numCourts picks the MAX legal option so courts land on 4-per-court when
- * possible — which is what admins typically choose in start-shootout.tsx.
- */
-export function computeCourtPreview(
-  confirmed: Array<{ player_id: string; player?: { id?: string; display_name?: string; avatar_url?: string | null } }>,
-  memberships: MembershipRow[],
-): { courts: Array<{ courtNumber: number; players: PreviewPlayer[] }>; numCourts: number } | null {
-  if (confirmed.length < 4) return null;
-
-  // Same math as start-shootout's courtOptions, pick the largest.
-  const options: number[] = [];
-  for (let n = 1; n <= Math.floor(confirmed.length / 4); n++) {
-    const perCourt = confirmed.length / n;
-    if (perCourt >= 4 && perCourt <= 5) options.push(n);
-  }
-  if (options.length === 0) return null;
-  const numCourts = options[options.length - 1];
-
-  const membershipByPlayer = new Map(memberships.map((m) => [m.player_id, m]));
-
-  const ranked: RankedPlayer[] = confirmed.map((r) => {
-    const m = membershipByPlayer.get(r.player_id);
-    return {
-      id: r.player_id,
-      currentStep: m?.current_step ?? 99,
-      winPct: m?.win_pct ?? 0,
-      lastPlayedAt: m?.last_played_at ?? null,
-      totalSessions: m?.total_sessions ?? 0,
-    };
-  });
-
-  const positions = seedSession1(ranked, numCourts);
-
-  // Build a lookup of roster info so we can attach name/avatar to each seat.
-  const playerById = new Map<string, PreviewPlayer>();
-  for (const r of confirmed) {
-    const m = membershipByPlayer.get(r.player_id);
-    playerById.set(r.player_id, {
-      id: r.player_id,
-      displayName: r.player?.display_name ?? "Unknown",
-      avatarUrl: r.player?.avatar_url ?? null,
-      currentStep: m?.current_step ?? 99,
-      winPct: m?.win_pct ?? 0,
-    });
-  }
-
-  // Group positions by court, preserving the seeded order within each court.
-  const byCourt = new Map<number, PreviewPlayer[]>();
-  for (const pos of positions) {
-    const player = playerById.get(pos.playerId);
-    if (!player) continue;
-    const list = byCourt.get(pos.courtNumber) ?? [];
-    list.push(player);
-    byCourt.set(pos.courtNumber, list);
-  }
-
-  const courts = Array.from(byCourt.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([courtNumber, players]) => ({ courtNumber, players }));
-
-  return { courts, numCourts };
 }
 
 /**
@@ -154,21 +94,64 @@ export function CourtCard({
 }
 
 /**
- * Entire preview section. Renders either the viewer's own court
- * (`viewMode="own"`) or every court (`viewMode="all"` — admins). Returns null
- * when there's nothing to show.
+ * Court Preview section. Receives RAW confirmed roster + memberships so
+ * the user can flip the court count via the dropdown without a server
+ * round-trip — the seeding re-runs locally via computeCourtPreview.
+ *
+ * Court counts in the dropdown come from confirmed sign-ups only;
+ * waitlist is excluded so the preview reflects the actual starting
+ * roster, not a wishful one.
  */
 export function CourtPreviewSection({
-  courts,
-  numCourts,
+  confirmed,
+  memberships,
   viewerPlayerId,
   viewMode,
 }: {
-  courts: Array<{ courtNumber: number; players: PreviewPlayer[] }>;
-  numCourts: number;
+  confirmed: ConfirmedPlayer[];
+  memberships: MembershipRow[];
   viewerPlayerId: string | null;
   viewMode: "own" | "all";
 }) {
+  // Default to the maximum legal court count — same as Start Shootout.
+  // null means "use the default", recomputed any time the roster shifts.
+  const [forcedNumCourts, setForcedNumCourts] = useState<number | null>(null);
+
+  const preview = useMemo(
+    () => computeCourtPreview(confirmed, memberships, forcedNumCourts ?? undefined),
+    [confirmed, memberships, forcedNumCourts]
+  );
+
+  if (!preview) return null;
+  const { courts, numCourts, options } = preview;
+
+  const showSelector = options.length > 1;
+  const playersPerCourt = (n: number) => Math.floor(confirmed.length / n);
+  const remainder = (n: number) => confirmed.length % n;
+  const selectorLabel = (n: number) => {
+    const base = playersPerCourt(n);
+    const extra = remainder(n);
+    if (extra === 0) return `${n} court${n === 1 ? "" : "s"} · ${base} players each`;
+    return `${n} court${n === 1 ? "" : "s"} · ${base}–${base + 1} players each`;
+  };
+
+  const selector = showSelector ? (
+    <label className="flex items-center gap-2 text-xs text-surface-muted">
+      <span className="font-medium text-dark-200">Courts</span>
+      <select
+        value={numCourts}
+        onChange={(e) => setForcedNumCourts(parseInt(e.target.value, 10))}
+        className="input py-1 text-xs"
+      >
+        {options.map((n) => (
+          <option key={n} value={n}>
+            {selectorLabel(n)}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : null;
+
   if (viewMode === "own") {
     if (!viewerPlayerId) return null;
     const myCourt = courts.find((c) =>
@@ -182,6 +165,7 @@ export function CourtPreviewSection({
           title="Your court (preview)"
           subtitle={`If the shootout started now, here's who you'd be on court ${myCourt.courtNumber} with.`}
           badge={`${numCourts} court${numCourts === 1 ? "" : "s"} total`}
+          selector={selector}
         />
         <CourtCard
           courtNumber={myCourt.courtNumber}
@@ -205,6 +189,7 @@ export function CourtPreviewSection({
         title="Court preview"
         subtitle="Here's how the courts would seed if the shootout started right now."
         badge={`${numCourts} court${numCourts === 1 ? "" : "s"}`}
+        selector={selector}
       />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {courts.map((c) => (
@@ -229,10 +214,12 @@ function SectionHeader({
   title,
   subtitle,
   badge,
+  selector,
 }: {
   title: string;
   subtitle: string;
   badge: string;
+  selector?: React.ReactNode;
 }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-2">
@@ -240,7 +227,10 @@ function SectionHeader({
         <h2 className="text-sm font-semibold text-dark-100">{title}</h2>
         <p className="text-xs text-surface-muted max-w-xl">{subtitle}</p>
       </div>
-      <span className="badge-gray shrink-0">{badge}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        {selector}
+        <span className="badge-gray shrink-0">{badge}</span>
+      </div>
     </header>
   );
 }
