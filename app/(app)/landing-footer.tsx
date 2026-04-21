@@ -61,6 +61,11 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/how-it-works" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
+                  How it Works
+                </Link>
+              </li>
+              <li>
                 <Link href="/privacy" className="text-sm text-dark-200 hover:text-dark-100 transition-colors">
                   Privacy Policy
                 </Link>
