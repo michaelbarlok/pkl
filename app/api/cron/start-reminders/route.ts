@@ -5,6 +5,7 @@ import { notifyMany } from "@/lib/notify";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { formatDateInZone, formatTimeInZone } from "@/lib/utils";
+import { reminderWhenWord } from "@/lib/reminder-when";
 
 export async function GET(request: NextRequest) {
   const authError = verifyCronSecret(request);
@@ -48,10 +49,13 @@ export async function GET(request: NextRequest) {
       const tz = (sheet.timezone as string) ?? "America/New_York";
       const dateDisplay = eventTimeStr ? formatDateInZone(eventTimeStr, tz) : "";
       const timeDisplay = eventTimeStr ? formatTimeInZone(eventTimeStr, tz) : "";
+      const whenWord = eventTimeStr
+        ? reminderWhenWord(eventTimeStr, tz)
+        : "tomorrow";
 
       await notifyMany(playerIds, {
         type: "session_starting",
-        title: `Session tomorrow: ${gName}`,
+        title: `Session ${whenWord}: ${gName}`,
         body: `You're confirmed for ${gName} on ${dateDisplay}${timeDisplay ? ` at ${timeDisplay}` : ""}. Can't make it? Please withdraw so someone on the waitlist can play.`,
         link: `/sheets/${sheet.id}`,
         groupId: sheet.group_id,
@@ -62,6 +66,7 @@ export async function GET(request: NextRequest) {
           eventTime: eventTimeStr,
           timezone: tz,
           sheetId: sheet.id,
+          whenWord,
         },
       });
 
