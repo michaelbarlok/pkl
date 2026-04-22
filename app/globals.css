@@ -160,7 +160,10 @@
 }
 .light .text-yellow-300,
 .light .text-yellow-400,
-.light .text-yellow-500 {
+.light .text-yellow-500,
+.light .text-amber-200,
+.light .text-amber-300,
+.light .text-amber-400 {
   color: #92400e; /* amber-800 */
 }
 .light .text-red-300,
@@ -203,6 +206,11 @@
 .light .border-teal-500\/30,
 .light .border-teal-500\/50 {
   border-color: rgba(14, 116, 110, 0.5);
+}
+.light .border-amber-500\/30,
+.light .border-amber-500\/40,
+.light .border-amber-500\/50 {
+  border-color: rgba(146, 64, 14, 0.45); /* amber-800 */
 }
 .light .border-blue-500\/30,
 .light .border-blue-500\/40,
@@ -256,7 +264,10 @@
 }
 .light .bg-yellow-900\/20,
 .light .bg-yellow-900\/30,
-.light .bg-yellow-900\/40 {
+.light .bg-yellow-900\/40,
+.light .bg-amber-900\/20,
+.light .bg-amber-900\/30,
+.light .bg-amber-900\/40 {
   background-color: rgba(254, 243, 199, 0.75); /* amber-100 */
 }
 .light .bg-blue-900\/20,
