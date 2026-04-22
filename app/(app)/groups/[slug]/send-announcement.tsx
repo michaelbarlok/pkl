@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   groupId: string;
@@ -17,6 +17,18 @@ export function SendAnnouncement({ groupId, memberCount }: Props) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-grow the textarea so admins can see the full draft as they
+  // type (including blank lines between paragraphs) instead of
+  // scrolling inside a 4-row window. Clamp with a CSS max-height so a
+  // runaway message doesn't push the submit button off screen.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [message]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +59,7 @@ export function SendAnnouncement({ groupId, memberCount }: Props) {
         <h3 className="text-sm font-semibold text-dark-100">Send Announcement</h3>
         <p className="text-xs text-surface-muted mt-0.5">
           Sends a push notification and email to all {memberCount} group member
-          {memberCount !== 1 ? "s" : ""}.
+          {memberCount !== 1 ? "s" : ""}. Press Enter for a new line.
         </p>
       </div>
       <div>
@@ -69,16 +81,17 @@ export function SendAnnouncement({ groupId, memberCount }: Props) {
           Message <span className="text-red-400">*</span>
         </label>
         <textarea
+          ref={textareaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          maxLength={1000}
+          maxLength={2000}
           required
           rows={4}
-          className="input w-full resize-none"
+          className="input w-full resize-y min-h-[6rem] max-h-[60vh] overflow-y-auto"
           placeholder="Write your message to all group members..."
         />
         <p className="text-[11px] text-surface-muted mt-1 text-right">
-          {message.length}/1000
+          {message.length}/2000
         </p>
       </div>
       {result && (

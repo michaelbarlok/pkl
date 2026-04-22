@@ -19,7 +19,7 @@ export async function POST(
 
   const body = await request.json();
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 100) : "";
-  const message = typeof body.message === "string" ? body.message.trim().slice(0, 1000) : "";
+  const message = typeof body.message === "string" ? body.message.trim().slice(0, 2000) : "";
 
   if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
   if (!message) return NextResponse.json({ error: "Message is required" }, { status: 400 });
