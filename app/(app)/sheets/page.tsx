@@ -52,11 +52,35 @@ export default async function SheetsPage() {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - 1);
 
-  const { data: sheets, error } = await supabase
+  // Members-only visibility — only show sheets from groups the
+  // current player belongs to (site admins see everything).
+  // Defence-in-depth: RLS (migration 088) enforces the same rule at
+  // the DB level, so this filter primarily exists to make the
+  // intention explicit and to avoid a wasted round-trip for users
+  // with no memberships.
+  let groupIdFilter: string[] | null = null;
+  if (profile && profile.role !== "admin") {
+    const { data: memberGroups } = await supabase
+      .from("group_memberships")
+      .select("group_id")
+      .eq("player_id", profile.id);
+    groupIdFilter = (memberGroups ?? []).map((m) => m.group_id);
+  }
+
+  let sheetsQuery = supabase
     .from("signup_sheets")
     .select("*, group:shootout_groups(id, name, slug)")
     .gte("event_date", cutoffDate.toISOString().split("T")[0])
     .order("event_date", { ascending: false });
+
+  if (groupIdFilter !== null) {
+    // Placeholder id forces an empty result when the user has no
+    // memberships — PostgREST rejects `.in("col", [])`.
+    const ids = groupIdFilter.length === 0 ? ["__none__"] : groupIdFilter;
+    sheetsQuery = sheetsQuery.in("group_id", ids);
+  }
+
+  const { data: sheets, error } = await sheetsQuery;
 
   if (error) {
     return (
