@@ -24,6 +24,27 @@ export async function POST(
   if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
   if (!message) return NextResponse.json({ error: "Message is required" }, { status: 400 });
 
+  // Optional attachment metadata — we only accept URLs from our own
+  // Supabase storage bucket to prevent admins (or a spoofed client)
+  // from embedding arbitrary external links in a broadcast.
+  let attachmentUrl: string | null = null;
+  let attachmentType: string | null = null;
+  let attachmentName: string | null = null;
+  if (body.attachment && typeof body.attachment === "object") {
+    const { url, type, name } = body.attachment as { url?: unknown; type?: unknown; name?: unknown };
+    if (typeof url !== "string" || typeof type !== "string" || typeof name !== "string") {
+      return NextResponse.json({ error: "Invalid attachment" }, { status: 400 });
+    }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const expectedPrefix = `${supabaseUrl}/storage/v1/object/public/announcement-attachments/`;
+    if (!supabaseUrl || !url.startsWith(expectedPrefix)) {
+      return NextResponse.json({ error: "Attachment must live in our storage bucket" }, { status: 400 });
+    }
+    attachmentUrl = url;
+    attachmentType = type.slice(0, 100);
+    attachmentName = name.slice(0, 200);
+  }
+
   // Fetch group info — we need `slug` to build the deep-link that the
   // notification "View" button + push click target.
   const { data: group } = await auth.supabase
@@ -45,6 +66,9 @@ export async function POST(
       sent_by: auth.profile.id,
       title,
       body: message,
+      attachment_url: attachmentUrl,
+      attachment_type: attachmentType,
+      attachment_name: attachmentName,
     })
     .select("id")
     .single();
@@ -75,7 +99,14 @@ export async function POST(
     link: `/groups/${group.slug}/announcements/${announcement.id}`,
     groupId,
     emailTemplate: "GroupAnnouncement",
-    emailData: { groupName: group.name, title, message },
+    emailData: {
+      groupName: group.name,
+      title,
+      message,
+      attachmentUrl: attachmentUrl ?? undefined,
+      attachmentName: attachmentName ?? undefined,
+      attachmentType: attachmentType ?? undefined,
+    },
   });
 
   return NextResponse.json({ sent: playerIds.length, announcementId: announcement.id });

@@ -1,14 +1,25 @@
-import { Link, Text } from "@react-email/components";
+import { Img, Link, Text } from "@react-email/components";
 import BaseEmail from "./BaseEmail";
 
 interface Props {
   groupName?: string;
   title?: string;
   message?: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentType?: string;
 }
 
-export default function GroupAnnouncement({ groupName, title, message }: Props) {
+export default function GroupAnnouncement({
+  groupName,
+  title,
+  message,
+  attachmentUrl,
+  attachmentName,
+  attachmentType,
+}: Props) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const isImage = attachmentType?.startsWith("image/");
 
   return (
     <BaseEmail
@@ -34,6 +45,27 @@ export default function GroupAnnouncement({ groupName, title, message }: Props) 
       >
         {message}
       </Text>
+
+      {attachmentUrl && isImage && (
+        <Img
+          src={attachmentUrl}
+          alt={attachmentName ?? "Attachment"}
+          style={{
+            maxWidth: "100%",
+            borderRadius: "6px",
+            border: "1px solid #e2e8f0",
+            margin: "0 0 16px",
+          }}
+        />
+      )}
+
+      {attachmentUrl && !isImage && (
+        <Text style={{ margin: "0 0 16px", fontSize: "13px" }}>
+          <Link href={attachmentUrl} style={{ color: "#14b8a6", textDecoration: "underline" }}>
+            📎 {attachmentName ?? "Open attachment"}
+          </Link>
+        </Text>
+      )}
 
       <Text style={{ color: "#6b7280", fontSize: "13px" }}>
         <Link href={`${appUrl}/groups`} style={{ color: "#14b8a6", textDecoration: "underline" }}>

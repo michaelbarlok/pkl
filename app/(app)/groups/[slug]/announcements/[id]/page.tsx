@@ -34,7 +34,9 @@ export default async function AnnouncementPage({ params }: Props) {
 
   const { data: announcement } = await supabase
     .from("group_announcements")
-    .select("id, title, body, created_at, group_id, sender:profiles!sent_by(display_name)")
+    .select(
+      "id, title, body, created_at, group_id, attachment_url, attachment_type, attachment_name, sender:profiles!sent_by(display_name)"
+    )
     .eq("id", id)
     .eq("group_id", group.id)
     .maybeSingle();
@@ -81,6 +83,37 @@ export default async function AnnouncementPage({ params }: Props) {
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-dark-200">
           {announcement.body}
         </p>
+
+        {announcement.attachment_url && (
+          <div className="pt-2 border-t border-surface-border">
+            {announcement.attachment_type?.startsWith("image/") ? (
+              <a
+                href={announcement.attachment_url}
+                target="_blank"
+                rel="noreferrer"
+                className="block"
+              >
+                <img
+                  src={announcement.attachment_url}
+                  alt={announcement.attachment_name ?? "Attachment"}
+                  className="max-h-[60vh] w-auto rounded-md border border-surface-border"
+                />
+              </a>
+            ) : (
+              <a
+                href={announcement.attachment_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-brand-400 hover:text-brand-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+                {announcement.attachment_name ?? "Open attachment"}
+              </a>
+            )}
+          </div>
+        )}
       </article>
 
       <div>

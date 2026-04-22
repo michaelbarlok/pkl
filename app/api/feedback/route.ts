@@ -2,6 +2,13 @@ import { requireAuth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 type FeedbackKind = "feature" | "bug";
+type FeedbackAttachment = { name: string; type: string; data: string };
+
+// Matches the client-side cap in components/feedback-button.tsx. We
+// check raw-decoded size (not base64 length) to stay consistent with
+// the "3 MB" the user sees.
+const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = /^(image\/(png|jpe?g|gif|webp|heic|heif)|application\/pdf)$/i;
 
 /**
  * POST /api/feedback
@@ -15,10 +22,11 @@ export async function POST(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json().catch(() => ({}));
-  const { kind, title, description } = body as {
+  const { kind, title, description, attachment } = body as {
     kind?: FeedbackKind;
     title?: string;
     description?: string;
+    attachment?: FeedbackAttachment;
   };
 
   const safeKind: FeedbackKind = kind === "bug" ? "bug" : "feature";
@@ -28,6 +36,33 @@ export async function POST(request: NextRequest) {
   }
   if (description.trim().length > 2000) {
     return NextResponse.json({ error: "Description too long" }, { status: 400 });
+  }
+
+  // Validate the attachment envelope before we hand bytes to Resend.
+  let resendAttachments: { filename: string; content: string }[] | undefined;
+  if (attachment) {
+    if (
+      typeof attachment.name !== "string" ||
+      typeof attachment.type !== "string" ||
+      typeof attachment.data !== "string"
+    ) {
+      return NextResponse.json({ error: "Invalid attachment" }, { status: 400 });
+    }
+    if (!ALLOWED_ATTACHMENT_TYPES.test(attachment.type)) {
+      return NextResponse.json({ error: "Unsupported attachment type" }, { status: 400 });
+    }
+    // base64 length → raw bytes: every 4 chars ≈ 3 bytes (minus padding).
+    const padding = (attachment.data.match(/=+$/) ?? [""])[0].length;
+    const rawBytes = Math.floor((attachment.data.length * 3) / 4) - padding;
+    if (rawBytes > MAX_ATTACHMENT_BYTES) {
+      return NextResponse.json({ error: "Attachment too large" }, { status: 400 });
+    }
+    resendAttachments = [
+      {
+        filename: attachment.name.slice(0, 200) || "attachment",
+        content: attachment.data,
+      },
+    ];
   }
 
   const { data: fullProfile } = await auth.supabase
@@ -77,6 +112,7 @@ export async function POST(request: NextRequest) {
     replyTo: playerEmail || undefined,
     subject: `${subjectPrefix} ${headline} // Tri-Star Pickleball`,
     html,
+    attachments: resendAttachments,
   });
 
   if (error) {
