@@ -1,9 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type FeedbackKind = "feature" | "bug";
+
+// Keep attachments well under the default 4MB Next.js API body limit.
+// We base64-encode the file which adds ~33% overhead, so a 3MB raw
+// cap lands around 4MB post-encode once wrapped in JSON.
+const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024;
+const ACCEPTED_ATTACHMENT_TYPES = "image/*,application/pdf";
+
+async function fileToBase64(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buf);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 /**
  * Feedback button used in the desktop sidebar + mobile "More" menu.
@@ -35,6 +58,7 @@ export function FeedbackButton({
   const [kind, setKind] = useState<FeedbackKind>("feature");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -43,17 +67,52 @@ export function FeedbackButton({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-grow the description so a long bug write-up doesn't force
+  // the author to scroll inside a 5-row window.
+  useEffect(() => {
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description, open]);
+
   function openModal() {
     setOpen(true);
     setSuccess(false);
     setError("");
     setTitle("");
     setDescription("");
+    setAttachment(null);
     setKind("feature");
+    if (fileInputRef.current) fileInputRef.current.value = "";
     // Collapse the parent (mobile More drawer) so the modal is the
     // only visible layer. Without this, tapping the hamburger again
     // while the modal is open would leave it orphaned on screen.
     onDone?.();
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setAttachment(null);
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setError(`Attachment too large — max ${formatBytes(MAX_ATTACHMENT_BYTES)}.`);
+      e.target.value = "";
+      setAttachment(null);
+      return;
+    }
+    setError("");
+    setAttachment(file);
+  }
+
+  function clearAttachment() {
+    setAttachment(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function closeModal() {
@@ -86,10 +145,29 @@ export function FeedbackButton({
     setError("");
     setSubmitting(true);
 
+    // Base64-encode the attachment (if any) so we can pass it as JSON
+    // and the API can hand it straight to Resend without hitting the
+    // filesystem.
+    let attachmentPayload: { name: string; type: string; data: string } | undefined;
+    if (attachment) {
+      try {
+        const data = await fileToBase64(attachment);
+        attachmentPayload = {
+          name: attachment.name,
+          type: attachment.type || "application/octet-stream",
+          data,
+        };
+      } catch {
+        setError("Couldn't read the attachment. Please try a different file.");
+        setSubmitting(false);
+        return;
+      }
+    }
+
     const res = await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, title, description }),
+      body: JSON.stringify({ kind, title, description, attachment: attachmentPayload }),
     });
 
     setSubmitting(false);
@@ -216,17 +294,72 @@ export function FeedbackButton({
                 <span className="text-red-400">*</span>
               </label>
               <textarea
+                ref={descriptionRef}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={2000}
                 rows={5}
                 required
                 placeholder={descriptionPlaceholder}
-                className="input w-full resize-none"
+                className="input w-full resize-y min-h-[7rem] max-h-[50vh] overflow-y-auto"
               />
               <p className="text-right text-xs text-surface-muted mt-1">
                 {description.length}/2000
               </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-dark-200 mb-1">
+                Attachment{" "}
+                <span className="text-surface-muted font-normal">
+                  (optional — photo or PDF, max {formatBytes(MAX_ATTACHMENT_BYTES)})
+                </span>
+              </label>
+              {attachment ? (
+                <div className="flex items-center gap-2 rounded-md bg-surface-overlay px-3 py-2 text-xs">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    className="h-4 w-4 shrink-0 text-surface-muted"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"
+                    />
+                  </svg>
+                  <span className="flex-1 truncate text-dark-200">{attachment.name}</span>
+                  <span className="text-surface-muted">{formatBytes(attachment.size)}</span>
+                  <button
+                    type="button"
+                    onClick={clearAttachment}
+                    className="text-surface-muted hover:text-red-300"
+                    aria-label="Remove attachment"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn-secondary w-full text-xs"
+                >
+                  Add a file
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_ATTACHMENT_TYPES}
+                onChange={handleFileChange}
+                className="hidden"
+              />
             </div>
 
             {error && <p className="text-sm text-red-400">{error}</p>}
