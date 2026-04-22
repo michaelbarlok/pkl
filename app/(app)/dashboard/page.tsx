@@ -54,12 +54,19 @@ export default async function DashboardPage() {
 
   // Filter to active groups only
   const activeGroupMemberships = (memberships ?? []).filter((m) => (m as any).group?.is_active !== false);
-  // Hide sheets whose event is 12+ hours past — matches the sheets-list rule
-  // so the dashboard doesn't keep surfacing a finished event.
-  const activeSheets = (sheets ?? []).filter(
-    (s: any) => s.group?.is_active !== false && !sheetIsExpired(s)
-  );
   const groupIds = activeGroupMemberships.map((m) => m.group_id);
+  const memberGroupIds = new Set(groupIds);
+  // Hide sheets whose event is 12+ hours past — matches the sheets-list rule
+  // so the dashboard doesn't keep surfacing a finished event. Also scope
+  // to the user's own groups so a site admin who isn't a member of every
+  // group doesn't get their personal dashboard flooded with unrelated
+  // sheets (RLS is the real gate — this is UI scoping).
+  const activeSheets = (sheets ?? []).filter(
+    (s: any) =>
+      s.group?.is_active !== false &&
+      !sheetIsExpired(s) &&
+      memberGroupIds.has(s.group_id)
+  );
 
   // Aggregate stats. We use the per-group DISPLAY count (capped at
   // each group's rolling-pt% window) so the dashboard stats line up
