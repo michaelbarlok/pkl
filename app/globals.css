@@ -168,6 +168,21 @@
 .light .text-red-500 {
   color: #991b1b; /* red-800 */
 }
+.light .text-blue-200,
+.light .text-blue-300,
+.light .text-blue-400 {
+  color: #1e40af; /* blue-800 */
+}
+.light .text-violet-200,
+.light .text-violet-300,
+.light .text-violet-400 {
+  color: #5b21b6; /* violet-800 */
+}
+.light .text-rose-200,
+.light .text-rose-300,
+.light .text-rose-400 {
+  color: #9f1239; /* rose-800 */
+}
 
 /* Borders that were intended as accent outlines on dark surfaces
    disappear against pale backgrounds. Map them to the mid-tone brand
@@ -188,6 +203,21 @@
 .light .border-teal-500\/30,
 .light .border-teal-500\/50 {
   border-color: rgba(14, 116, 110, 0.5);
+}
+.light .border-blue-500\/30,
+.light .border-blue-500\/40,
+.light .border-blue-500\/50 {
+  border-color: rgba(30, 64, 175, 0.45); /* blue-800 */
+}
+.light .border-violet-500\/30,
+.light .border-violet-500\/40,
+.light .border-violet-500\/50 {
+  border-color: rgba(91, 33, 182, 0.45); /* violet-800 */
+}
+.light .border-rose-500\/30,
+.light .border-rose-500\/40,
+.light .border-rose-500\/50 {
+  border-color: rgba(159, 18, 57, 0.45); /* rose-800 */
 }
 
 /* Dark-on-dark translucent background tints (bg-brand-900/*, bg-teal-900/*,
@@ -228,6 +258,21 @@
 .light .bg-yellow-900\/30,
 .light .bg-yellow-900\/40 {
   background-color: rgba(254, 243, 199, 0.75); /* amber-100 */
+}
+.light .bg-blue-900\/20,
+.light .bg-blue-900\/30,
+.light .bg-blue-900\/40 {
+  background-color: rgba(219, 234, 254, 0.75); /* blue-100 */
+}
+.light .bg-violet-900\/20,
+.light .bg-violet-900\/30,
+.light .bg-violet-900\/40 {
+  background-color: rgba(237, 233, 254, 0.75); /* violet-100 */
+}
+.light .bg-rose-900\/20,
+.light .bg-rose-900\/30,
+.light .bg-rose-900\/40 {
+  background-color: rgba(255, 228, 230, 0.75); /* rose-100 */
 }
 
 @layer base {

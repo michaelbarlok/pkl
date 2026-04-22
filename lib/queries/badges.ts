@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isTestUser } from "@/lib/test-users";
 import type { BadgeDefinition, PlayerBadge } from "@/types/database";
 
 // ============================================================
@@ -88,28 +89,25 @@ export async function getBadgeLeaderboard(
     countMap.set(row.player_id, (countMap.get(row.player_id) ?? 0) + 1);
   }
 
-  // Sort by count descending and take top N
-  const sorted = [...countMap.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit);
+  if (countMap.size === 0) return [];
 
-  if (sorted.length === 0) return [];
-
-  // Fetch profiles for these players
-  const playerIds = sorted.map(([id]) => id);
+  // Fetch profiles for ALL players with at least one badge, not just
+  // the pre-sorted top N — we need the display name to filter [TEST]
+  // accounts out BEFORE slicing, otherwise the leaderboard could show
+  // fewer than `limit` real players.
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, display_name, avatar_url")
-    .in("id", playerIds);
+    .in("id", Array.from(countMap.keys()));
 
-  const profileMap = new Map(
-    (profiles ?? []).map((p) => [p.id, p])
-  );
-
-  return sorted.map(([id, count]) => ({
-    player_id: id,
-    badge_count: count,
-    display_name: profileMap.get(id)?.display_name ?? "Unknown",
-    avatar_url: profileMap.get(id)?.avatar_url ?? null,
-  }));
+  return (profiles ?? [])
+    .filter((p) => !isTestUser(p.display_name))
+    .map((p) => ({
+      player_id: p.id,
+      badge_count: countMap.get(p.id) ?? 0,
+      display_name: p.display_name ?? "Unknown",
+      avatar_url: p.avatar_url ?? null,
+    }))
+    .sort((a, b) => b.badge_count - a.badge_count)
+    .slice(0, limit);
 }
