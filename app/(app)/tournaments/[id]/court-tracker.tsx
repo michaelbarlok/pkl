@@ -4,6 +4,7 @@ import { useSupabase } from "@/components/providers/supabase-provider";
 import { getDivisionLabel } from "@/lib/divisions";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 export interface CourtTrackerMatch {
   id: string;
@@ -283,13 +284,25 @@ function ScoreEntryModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Freeze body scroll while the modal is up so long bracket pages
-  // don't keep scrolling behind a visible dialog.
+  // Portals need document, so gate mount to avoid SSR/hydration
+  // mismatches.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Freeze body scroll while the modal is up, and compensate the
+  // now-missing scrollbar with padding-right so the viewport doesn't
+  // jump sideways (the Chrome "twitch" reported on hover).
   useEffect(() => {
-    const prev = document.body.style.overflow;
+    const scrollbar = window.innerWidth - document.documentElement.clientWidth;
+    const prevOverflow = document.body.style.overflow;
+    const prevPadding = document.body.style.paddingRight;
     document.body.style.overflow = "hidden";
+    if (scrollbar > 0) {
+      document.body.style.paddingRight = `${scrollbar}px`;
+    }
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPadding;
     };
   }, []);
 
@@ -333,12 +346,11 @@ function ScoreEntryModal({
   const teamA = formatTeam(match.player1_name, match.partner1_name);
   const teamB = formatTeam(match.player2_name, match.partner2_name);
 
-  // Single-element wrapper carries both the backdrop styling and the
-  // close handler — the old split (backdrop div + panel div) was
-  // fragile on some browsers where pointer-events order let clicks
-  // fall through the backdrop without firing. The panel stops click
-  // propagation so typing/clicking inside doesn't dismiss.
-  return (
+  // Portal to document.body so the modal lives outside the
+  // tournament page's stacking context — that was the source of the
+  // hover-twitch (some ancestor's realtime-driven repaint bled
+  // through the overlay).
+  const modal = (
     <div
       className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/60"
       role="dialog"
@@ -422,6 +434,8 @@ function ScoreEntryModal({
       </div>
     </div>
   );
+
+  return mounted ? createPortal(modal, document.body) : null;
 }
 
 function formatTeam(p1: string | null, p2: string | null): string {

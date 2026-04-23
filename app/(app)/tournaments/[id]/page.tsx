@@ -17,6 +17,7 @@ import {
 } from "./partner-request-buttons";
 import { DeleteTournamentButton } from "@/components/delete-tournament-button";
 import { CoOrganizerManager } from "@/components/co-organizer-manager";
+import { CollapsibleCard } from "./collapsible-card";
 import { getDivisionLabel } from "@/lib/divisions";
 import { DivisionBrackets } from "./division-brackets";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
@@ -303,8 +304,19 @@ export default async function TournamentDetailPage({
         );
       })()}
 
-      {/* Details — a scannable label/value list rather than a long info-dump card */}
-      <div className="card space-y-4">
+      {/* Tournament details — collapsible once play is underway so
+          the Court Tracker and Live Divisions cards own the viewport
+          during matches. Co-organizer management lives inside so we
+          only render the editable list in one place. */}
+      <CollapsibleCard
+        title="Tournament Details"
+        subtitle={
+          tournament.status === "in_progress"
+            ? "Dates, payments, divisions, and organizer list"
+            : undefined
+        }
+        defaultOpen={tournament.status !== "in_progress"}
+      >
         <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
           <DetailRow label={`Organizer${coOrganizers.length > 0 ? "s" : ""}`}>
             <span className="text-sm text-dark-100">
@@ -431,7 +443,21 @@ export default async function TournamentDetailPage({
             </div>
           </div>
         )}
-      </div>
+
+        {/* Co-Organizer management — folded into the details card so
+            the same organizer data isn't duplicated in a separate
+            panel. Only the creator or a site admin can manage here. */}
+        {(isCreator || isAdmin) && (
+          <div className="pt-3 border-t border-surface-border">
+            <CoOrganizerManager
+              tournamentId={id}
+              coOrganizers={coOrganizers}
+              creatorId={tournament.created_by}
+              embedded
+            />
+          </div>
+        )}
+      </CollapsibleCard>
 
       {/* Registration Action */}
       <div id="register" />
@@ -543,14 +569,8 @@ export default async function TournamentDetailPage({
         </>
       )}
 
-      {/* Co-Organizer Management — only creator or admin can manage */}
-      {(isCreator || isAdmin) && (
-        <CoOrganizerManager
-          tournamentId={id}
-          coOrganizers={coOrganizers}
-          creatorId={tournament.created_by}
-        />
-      )}
+      {/* (Co-Organizer management moved inside the Tournament
+          Details card above — redundant panel removed.) */}
 
       {/* Brackets by Division — tabbed UI when in_progress with multiple divisions.
           Regular registered players don't need the full bracket grid from
@@ -574,6 +594,7 @@ export default async function TournamentDetailPage({
           myDivision={myDivision}
           partnerMap={partnerMap}
           isRoundRobin={tournament.format === "round_robin"}
+          activeDivisions={activeDivisions}
         />
       )}
 

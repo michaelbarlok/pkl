@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TournamentBracketView } from "@/components/tournament-bracket";
 import type { PartnerMap } from "@/components/tournament-bracket";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
@@ -10,6 +10,8 @@ interface DivisionEntry {
   division: string;
   matches: TournamentMatch[];
 }
+
+type DivisionStatus = "live" | "upcoming" | "complete";
 
 interface Props {
   divisionMatchesEntries: DivisionEntry[];
@@ -24,6 +26,21 @@ interface Props {
   myDivision?: string;
   partnerMap: PartnerMap;
   isRoundRobin: boolean;
+  /** Divisions currently in tournament_active_divisions. */
+  activeDivisions?: string[];
+}
+
+function divisionStatus(
+  entry: DivisionEntry,
+  activeSet: Set<string>
+): DivisionStatus {
+  if (entry.matches.length === 0) return "upcoming";
+  const allDone = entry.matches.every(
+    (m) => m.status === "completed" || m.status === "bye"
+  );
+  if (allDone) return "complete";
+  if (activeSet.has(entry.division)) return "live";
+  return "upcoming";
 }
 
 export function DivisionBrackets({
@@ -34,19 +51,40 @@ export function DivisionBrackets({
   myDivision,
   partnerMap,
   isRoundRobin,
+  activeDivisions,
 }: Props) {
-  const hasMultipleDivisions = divisionMatchesEntries.length > 1;
+  const activeSet = useMemo(
+    () => new Set(activeDivisions ?? []),
+    [activeDivisions]
+  );
 
-  // Default to user's division, or first division
+  // Reorder the tabs: live first, then upcoming, then complete. Keep
+  // the input order stable within each bucket. A stable sort is
+  // guaranteed in ES2019+, which is what Next targets.
+  const orderedEntries = useMemo(() => {
+    const rank: Record<DivisionStatus, number> = {
+      live: 0,
+      upcoming: 1,
+      complete: 2,
+    };
+    return [...divisionMatchesEntries].sort(
+      (a, b) => rank[divisionStatus(a, activeSet)] - rank[divisionStatus(b, activeSet)]
+    );
+  }, [divisionMatchesEntries, activeSet]);
+
+  const hasMultipleDivisions = orderedEntries.length > 1;
+
+  // Default to user's division, or first division in the reordered
+  // list (which is now the first live division if any).
   const [selectedDivision, setSelectedDivision] = useState<string>(
-    myDivision && divisionMatchesEntries.some((e) => e.division === myDivision)
+    myDivision && orderedEntries.some((e) => e.division === myDivision)
       ? myDivision
-      : divisionMatchesEntries[0]?.division ?? "__none__"
+      : orderedEntries[0]?.division ?? "__none__"
   );
 
   // Single division — no tabs needed
   if (!hasMultipleDivisions) {
-    const entry = divisionMatchesEntries[0];
+    const entry = orderedEntries[0];
     if (!entry) return null;
     return (
       <div>
@@ -77,36 +115,70 @@ export function DivisionBrackets({
   }
 
   // Multiple divisions — pill/tab navigation
-  const selectedEntry = divisionMatchesEntries.find((e) => e.division === selectedDivision);
+  const selectedEntry = orderedEntries.find((e) => e.division === selectedDivision);
 
   return (
     <div>
-      {/* Division Tabs */}
+      {/* Division Tabs — live divisions float to the front so the
+          organizer can hop between whichever pools are currently
+          playing; completed divisions sink to the end with a ✓.  */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {divisionMatchesEntries.map(({ division }) => {
-          const isActive = division === selectedDivision;
+        {orderedEntries.map((entry) => {
+          const { division } = entry;
+          const isSelected = division === selectedDivision;
           const isMyDiv = division === myDivision;
+          const status = divisionStatus(entry, activeSet);
+
+          const base = "rounded-full pl-3 pr-3.5 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5";
+          let style: string;
+          if (isSelected) {
+            style = "bg-brand-500 text-white ring-1 ring-brand-400";
+          } else if (status === "live") {
+            style = "bg-brand-500/15 text-brand-vivid ring-1 ring-brand-500/40 hover:bg-brand-500/25";
+          } else if (status === "complete") {
+            // Deprioritised but still legible so organizers can go back
+            // and review final standings.
+            style = "bg-surface-overlay text-surface-muted ring-1 ring-surface-border hover:text-dark-200";
+          } else if (isMyDiv) {
+            style = "bg-brand-500/10 text-brand-vivid ring-1 ring-brand-500/30 hover:bg-brand-500/20";
+          } else {
+            style = "bg-surface-overlay text-dark-100 hover:bg-surface-raised";
+          }
+
           return (
             <button
               key={division}
               onClick={() => setSelectedDivision(division)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                isActive
-                  ? // brand-500 is darker than brand-300; white text stays
-                    // legible on it in both themes. brand-300 was too pale
-                    // and the white text washed out.
-                    "bg-brand-500 text-white ring-1 ring-brand-400"
-                  : isMyDiv
-                    ? "bg-brand-500/15 text-brand-vivid ring-1 ring-brand-500/40 hover:bg-brand-500/25"
-                    : // text-dark-100 is the primary body tone; bumping
-                      // up from text-surface-muted fixes the low-contrast
-                      // inactive pills in both light and dark modes.
-                      "bg-surface-overlay text-dark-100 hover:bg-surface-raised"
-              }`}
+              className={`${base} ${style}`}
+              aria-current={isSelected ? "true" : undefined}
             >
-              {division === "__none__" ? "All" : getDivisionLabel(division)}
-              {isMyDiv && !isActive && (
-                <span className="ml-1 text-[10px]">(You)</span>
+              {status === "live" && (
+                <span
+                  className={
+                    "h-1.5 w-1.5 rounded-full animate-pulse " +
+                    (isSelected ? "bg-white" : "bg-brand-vivid")
+                  }
+                  aria-label="Live"
+                />
+              )}
+              {status === "complete" && (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  className="h-3 w-3"
+                  aria-label="Complete"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+              )}
+              <span>
+                {division === "__none__" ? "All" : getDivisionLabel(division)}
+              </span>
+              {isMyDiv && !isSelected && (
+                <span className="text-[10px] opacity-80">(You)</span>
               )}
             </button>
           );
