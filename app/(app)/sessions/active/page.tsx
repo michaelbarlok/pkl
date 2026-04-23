@@ -63,13 +63,16 @@ export default async function ActiveSessionPage() {
 
   // 3. Active tournament division. Find registrations tied to a
   //    tournament whose status is in_progress AND whose division is
-  //    in tournament_active_divisions.
+  //    in tournament_active_divisions. `.or` so we catch users who
+  //    joined as a partner via Ask-to-Partner (their row has them
+  //    in partner_id, not player_id) — the old `.eq("player_id")`
+  //    silently missed half of every team.
   const { data: tRegs } = await supabase
     .from("tournament_registrations")
     .select(
       "tournament_id, division, status, tournament:tournaments(id, status)"
     )
-    .eq("player_id", profile.id)
+    .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
     .neq("status", "withdrawn");
 
   const candidate = (tRegs ?? []).find(

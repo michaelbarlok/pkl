@@ -292,11 +292,20 @@ export async function PUT(
     if (recipients.size > 0) {
       const divLabel = getDivisionLabel(division);
       const title = tournamentInfo?.title ?? "Your tournament";
+      const playoffsTitle = `${divLabel} playoffs are starting`;
+      const playoffsBody = `${title} — ${seededPlayerIds.length} team${seededPlayerIds.length === 1 ? "" : "s"} advanced. Head to the Play tab for your next match.`;
       await notifyMany(Array.from(recipients), {
         type: "tournament_playoffs_starting",
-        title: `${divLabel} playoffs are starting`,
-        body: `${title} — ${seededPlayerIds.length} team${seededPlayerIds.length === 1 ? "" : "s"} advanced. Head to the Play tab for your next match.`,
+        title: playoffsTitle,
+        body: playoffsBody,
         link: `/tournaments/${tournamentId}/live`,
+        emailTemplate: "TournamentAlert",
+        emailData: {
+          tournamentTitle: title,
+          alertTitle: playoffsTitle,
+          alertBody: playoffsBody,
+          link: `/tournaments/${tournamentId}/live`,
+        },
       });
     }
 

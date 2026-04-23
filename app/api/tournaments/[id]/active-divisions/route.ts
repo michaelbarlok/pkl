@@ -97,13 +97,14 @@ export async function POST(
       type: "tournament_division_started",
       title: `${tournament.title}: your division is live`,
       body: "Head to the Play tab to see your bracket and next match.",
-      link: `/play`,
-      emailTemplate: "GroupAnnouncement",
+      link: `/sessions/active`,
+      emailTemplate: "TournamentAlert",
       emailData: {
-        groupName: tournament.title,
-        title: "Your tournament division is live",
-        message:
+        tournamentTitle: tournament.title,
+        alertTitle: "Your tournament division is live",
+        alertBody:
           "Your division has started. Open the app and tap the Play tab at the bottom to view your bracket, live standings, and your next match.",
+        link: "/sessions/active",
       },
     });
   }
