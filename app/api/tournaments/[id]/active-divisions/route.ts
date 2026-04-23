@@ -34,7 +34,7 @@ export async function POST(
   // accurate (only divisions with actual registrants need activation).
   const { data: tournament } = await auth.supabase
     .from("tournaments")
-    .select("id, slug, title, status, divisions")
+    .select("id, title, status, divisions")
     .eq("id", tournamentId)
     .single();
   if (!tournament) return NextResponse.json({ error: "Not found" }, { status: 404 });
