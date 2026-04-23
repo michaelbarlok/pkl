@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { FormError } from "@/components/form-error";
 import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { freePlayMatchFirstChoice } from "@/lib/first-choice";
+import { RosterManagerModal } from "./roster-manager-modal";
 
 interface PlayerStanding {
   playerId: string;
@@ -304,6 +305,7 @@ function ActivePhase({
 
   // Admin edit mode — override current round assignments
   const [editMode, setEditMode] = useState(false);
+  const [rosterOpen, setRosterOpen] = useState(false);
   const [draftMatches, setDraftMatches] = useState<
     { teamA: [string, string]; teamB: [string, string] }[]
   >([]);
@@ -630,13 +632,22 @@ function ActivePhase({
               {checkedInPlayerIds.length} players
             </span>
             {isAdmin && !editMode && (
-              <button
-                type="button"
-                onClick={enterEditMode}
-                className="btn-secondary text-xs px-2 py-1"
-              >
-                Edit Assignments
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setRosterOpen(true)}
+                  className="btn-secondary text-xs px-2 py-1"
+                >
+                  Roster
+                </button>
+                <button
+                  type="button"
+                  onClick={enterEditMode}
+                  className="btn-secondary text-xs px-2 py-1"
+                >
+                  Edit Assignments
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -1109,6 +1120,19 @@ function ActivePhase({
           </div>
         );
       })()}
+
+      {isAdmin && rosterOpen && (
+        <RosterManagerModal
+          groupId={group.id}
+          sessionId={session.id}
+          members={members.map((m) => ({ id: m.id, display_name: m.displayName }))}
+          checkedInIds={checkedInPlayerIds}
+          onClose={() => setRosterOpen(false)}
+          onChanged={() => {
+            onUpdate();
+          }}
+        />
+      )}
     </div>
   );
 }
