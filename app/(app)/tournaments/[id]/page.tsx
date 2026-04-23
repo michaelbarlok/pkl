@@ -170,19 +170,15 @@ export default async function TournamentDetailPage({
     }
   }
 
-  // Regular players (non-organizers) should only see their own division
-  // bracket. Organizers see everything. Viewers with no registration
-  // and no manage rights see nothing — the DivisionBrackets section
-  // below renders the empty case gracefully.
-  const visibleMatches = canManage
-    ? matches
-    : myDivision
-      ? matches.filter((m: any) => m.division === myDivision)
-      : [];
+  // Only organizers see the bracket grid on the tournament page —
+  // regular registered players are pointed to the Play tab for their
+  // own pool. The group-by-division build below only feeds
+  // DivisionBrackets which is canManage-gated further down.
+  const matchesForBracket = canManage ? matches : [];
 
   // Group matches by division for display, using tournament.divisions order for stability
   const divisionMatchesTmp = new Map<string, typeof matches>();
-  for (const m of visibleMatches) {
+  for (const m of matchesForBracket) {
     const div = (m as any).division ?? "__none__";
     if (!divisionMatchesTmp.has(div)) divisionMatchesTmp.set(div, []);
     divisionMatchesTmp.get(div)!.push(m);
@@ -493,8 +489,12 @@ export default async function TournamentDetailPage({
         />
       )}
 
-      {/* Brackets by Division — tabbed UI when in_progress with multiple divisions */}
-      {matches.length > 0 && (
+      {/* Brackets by Division — tabbed UI when in_progress with multiple divisions.
+          Regular registered players don't need the full bracket grid from
+          the tournament page: once the event is underway they go to the
+          Play tab to see their own pool. Only organizers keep the
+          tab view here so they can enter scores for every division. */}
+      {matches.length > 0 && canManage && (
         <DivisionBrackets
           divisionMatchesEntries={Array.from(divisionMatches.entries()).map(([div, divMatches]) => ({
             division: div,
@@ -512,6 +512,34 @@ export default async function TournamentDetailPage({
           partnerMap={partnerMap}
           isRoundRobin={tournament.format === "round_robin"}
         />
+      )}
+
+      {/* Regular registered players get a pointer to the Play tab once
+          the tournament is live. They don't see other divisions' brackets
+          here — the Play tab is their focused view. If the organizer has
+          already marked their division live, link straight to the live
+          view; otherwise explain they're waiting. */}
+      {tournament.status === "in_progress" && !canManage && myDivision && (
+        <div className="card space-y-2">
+          <h2 className="text-sm font-semibold text-dark-100">Your matches</h2>
+          {activeDivisions.includes(myDivision) ? (
+            <>
+              <p className="text-xs text-surface-muted">
+                Your division is live. Head to the Play tab to see your pool, next match, and court assignments.
+              </p>
+              <Link
+                href="/sessions/active"
+                className="btn-primary inline-flex items-center gap-2 text-sm"
+              >
+                View my pool &rarr;
+              </Link>
+            </>
+          ) : (
+            <p className="text-xs text-surface-muted">
+              Waiting for the organizer to activate {getDivisionLabel(myDivision)}. You&apos;ll get a push notification the moment it goes live.
+            </p>
+          )}
+        </div>
       )}
 
       {/* Pending partner requests — viewer may be a target (incoming)
