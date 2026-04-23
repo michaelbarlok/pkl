@@ -11,6 +11,8 @@ export interface CourtTrackerMatch {
   round: number;
   match_number: number;
   bracket: string;
+  player1_id: string | null;
+  player2_id: string | null;
   player1_name: string | null;
   partner1_name: string | null;
   player2_name: string | null;
@@ -49,6 +51,7 @@ export function CourtTracker({
   const { supabase } = useSupabase();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [scoring, setScoring] = useState<CourtTrackerMatch | null>(null);
 
   useEffect(() => {
     const channel = supabase
@@ -144,16 +147,25 @@ export function CourtTracker({
               </span>
             </div>
             {match ? (
-              <div className="mt-1 text-xs space-y-0.5">
-                <p className="text-dark-100">
-                  {formatTeam(match.player1_name, match.partner1_name)}
-                  <span className="text-surface-muted"> vs </span>
-                  {formatTeam(match.player2_name, match.partner2_name)}
-                </p>
-                <p className="text-surface-muted">
-                  {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
-                  {bracketLabel(match.bracket)} · Round {match.round}
-                </p>
+              <div className="mt-1 text-xs space-y-1.5">
+                <div className="space-y-0.5">
+                  <p className="text-dark-100">
+                    {formatTeam(match.player1_name, match.partner1_name)}
+                    <span className="text-surface-muted"> vs </span>
+                    {formatTeam(match.player2_name, match.partner2_name)}
+                  </p>
+                  <p className="text-surface-muted">
+                    {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
+                    {bracketLabel(match.bracket)} · Round {match.round}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScoring(match)}
+                  className="btn-primary text-[11px] py-1 px-2.5"
+                >
+                  Enter Score
+                </button>
               </div>
             ) : (
               <p className="mt-1 text-xs text-surface-muted">
@@ -223,6 +235,151 @@ export function CourtTracker({
       </div>
 
       {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {scoring && (
+        <ScoreEntryModal
+          match={scoring}
+          tournamentId={tournamentId}
+          onClose={() => setScoring(null)}
+          onSaved={() => {
+            setScoring(null);
+            router.refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Inline score-entry modal. Single-game entry — enough for pool
+ * play and the common playoff case. Winner is derived from the
+ * higher score; the API still performs its own validation and the
+ * auto-queue engine runs once the score is saved.
+ */
+function ScoreEntryModal({
+  match,
+  tournamentId,
+  onClose,
+  onSaved,
+}: {
+  match: CourtTrackerMatch;
+  tournamentId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [s1, setS1] = useState("");
+  const [s2, setS2] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setError("");
+    const score1 = parseInt(s1);
+    const score2 = parseInt(s2);
+    if (!Number.isFinite(score1) || !Number.isFinite(score2) || score1 < 0 || score2 < 0) {
+      setError("Enter both scores as non-negative numbers.");
+      return;
+    }
+    if (score1 === score2) {
+      setError("Tie scores aren't allowed — someone has to win.");
+      return;
+    }
+    if (!match.player1_id || !match.player2_id) {
+      setError("Match is missing a player id.");
+      return;
+    }
+    const winner_id = score1 > score2 ? match.player1_id : match.player2_id;
+    setSaving(true);
+    const res = await fetch(`/api/tournaments/${tournamentId}/bracket`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        match_id: match.id,
+        score1: [score1],
+        score2: [score2],
+        winner_id,
+      }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      onSaved();
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "Could not save score");
+  }
+
+  const teamA = formatTeam(match.player1_name, match.partner1_name);
+  const teamB = formatTeam(match.player2_name, match.partner2_name);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md rounded-t-xl sm:rounded-xl bg-surface-raised border border-surface-border shadow-2xl p-5 space-y-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-surface-muted">
+            Court {match.court_number}
+          </p>
+          <h2 className="text-base font-semibold text-dark-100">Enter Score</h2>
+          <p className="text-xs text-surface-muted mt-0.5">
+            Saving flips this match to completed, frees the court, and the queue promotes the next match automatically.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-dark-200 mb-1">
+              {teamA}
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={s1}
+              onChange={(e) => setS1(e.target.value)}
+              className="input w-full"
+              placeholder="Score"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-dark-200 mb-1">
+              {teamB}
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={s2}
+              onChange={(e) => setS2(e.target.value)}
+              className="input w-full"
+              placeholder="Score"
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="btn-primary flex-1 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save Score"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-secondary"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

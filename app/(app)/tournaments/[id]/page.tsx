@@ -491,6 +491,8 @@ export default async function TournamentDetailPage({
                 round: m.round,
                 match_number: m.match_number,
                 bracket: m.bracket,
+                player1_id: m.player1_id ?? null,
+                player2_id: m.player2_id ?? null,
                 player1_name: m.player1?.display_name ?? null,
                 partner1_name: m.player1_id ? partnerMap.get(m.player1_id) ?? null : null,
                 player2_name: m.player2?.display_name ?? null,
@@ -805,6 +807,18 @@ export default async function TournamentDetailPage({
         </div>
       )}
 
+      {/* End Tournament — lives just above the Danger Zone so the
+          organizer scrolls past all live data before ending play. */}
+      {canManage && tournament.status === "in_progress" && (
+        <div className="card">
+          <h2 className="text-sm font-semibold text-dark-200 mb-3">End Tournament</h2>
+          <p className="text-xs text-surface-muted mb-3">
+            Ending the tournament locks all results and emails a recap to every player and organizer. You can&apos;t end it until every match has a score.
+          </p>
+          <EndTournamentButton tournamentId={id} />
+        </div>
+      )}
+
       {/* Danger Zone — at the very bottom */}
       {canManage && tournament.status !== "cancelled" && (
         <div className="card border border-red-500/30">
@@ -851,20 +865,10 @@ function OrganizerControls({
     registration_closed: { label: "Reopen Registration", next: "registration_open", variant: "secondary" },
   };
 
-  // in_progress → completed goes through a dedicated endpoint that
-  // gates on all-scored matches, deactivates divisions, and sends
-  // the recap notifications.
-  if (status === "in_progress") {
-    return (
-      <div className="card">
-        <h2 className="text-sm font-semibold text-dark-200 mb-3">Organizer Controls</h2>
-        <p className="text-xs text-surface-muted mb-3">
-          Ending the tournament locks all results and emails a recap to every player and organizer. You can&apos;t end it until every match has a score.
-        </p>
-        <EndTournamentButton tournamentId={tournamentId} />
-      </div>
-    );
-  }
+  // in_progress → completed moves to the bottom of the page (just
+  // above the Danger Zone) so the organizer has to scroll past all
+  // the live data before ending things. Rendered separately below.
+  if (status === "in_progress") return null;
 
   const action = nextAction[status];
   if (!action) return null;
