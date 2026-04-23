@@ -467,6 +467,96 @@ describe("generateDoubleElimination", () => {
   });
 });
 
+// ─── partial / over-full round-robin randomization ───────────────────────────
+
+/**
+ * Deterministic RNG for the randomization tests. Mulberry32-style —
+ * gives us repeatable sequences so we can assert on match shapes
+ * without depending on Math.random.
+ */
+function seededRng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+describe("generateRoundRobin — gamesPerTeam < opponents (partial)", () => {
+  test("6 teams @ 4 games → 4 rounds × 3 matches, every team plays 4 games", () => {
+    const ids = makeIds(6);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 4, rng: seededRng(7) });
+    // Full round robin would be 5 rounds; we want exactly 4.
+    expect(Math.max(...m.map((x) => x.round))).toBe(4);
+    // Each round in an even pool is a perfect matching: 3 matches.
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(12);
+    // Each team shows up in exactly 4 matches.
+    const counts = new Map<string, number>();
+    for (const x of m) {
+      if (x.player1_id) counts.set(x.player1_id, (counts.get(x.player1_id) ?? 0) + 1);
+      if (x.player2_id) counts.set(x.player2_id, (counts.get(x.player2_id) ?? 0) + 1);
+    }
+    for (const c of counts.values()) expect(c).toBe(4);
+  });
+
+  test("different rngs pick different rounds (actually randomized)", () => {
+    const ids = makeIds(6);
+    const a = generateRoundRobin(ids, { gamesPerTeam: 4, rng: seededRng(1) });
+    const b = generateRoundRobin(ids, { gamesPerTeam: 4, rng: seededRng(42) });
+    // Flatten the unique matchups per schedule — they should differ.
+    const keys = (matches: ReturnType<typeof generateRoundRobin>) =>
+      new Set(
+        matches
+          .filter((x) => x.player1_id && x.player2_id && x.status !== "bye")
+          .map((x) => [x.player1_id!, x.player2_id!].sort().join("|"))
+      );
+    const aKeys = [...keys(a)].sort().join(",");
+    const bKeys = [...keys(b)].sort().join(",");
+    expect(aKeys).not.toBe(bKeys);
+  });
+});
+
+describe("generateRoundRobin — gamesPerTeam > opponents (over-full)", () => {
+  test("6 teams @ 6 games → full RR + 1 random extra round, each team plays 6", () => {
+    const ids = makeIds(6);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 6, rng: seededRng(3) });
+    expect(Math.max(...m.map((x) => x.round))).toBe(6);
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(18);
+
+    // Every team still has at least one match against every other
+    // team (full round robin subsumed).
+    const pairCounts = new Map<string, number>();
+    for (const x of m) {
+      if (!x.player1_id || !x.player2_id || x.status === "bye") continue;
+      const k = [x.player1_id, x.player2_id].sort().join("|");
+      pairCounts.set(k, (pairCounts.get(k) ?? 0) + 1);
+    }
+    const ids6 = makeIds(6);
+    for (let i = 0; i < ids6.length; i++) {
+      for (let j = i + 1; j < ids6.length; j++) {
+        const k = [ids6[i], ids6[j]].sort().join("|");
+        expect(pairCounts.get(k) ?? 0).toBeGreaterThanOrEqual(1);
+      }
+    }
+    // Exactly one pairing is duplicated (3 matches in the extra round
+    // — 3 pairs each see each other a second time).
+    const dupePairs = [...pairCounts.values()].filter((c) => c === 2).length;
+    expect(dupePairs).toBe(3);
+  });
+
+  test("5 teams @ 5 games (odd over-full) → 1 full lap + 1 extra round", () => {
+    const ids = makeIds(5);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 5, rng: seededRng(11) });
+    // 1 lap (roundsPerLap=5) + 1 extra round = 6 rounds total.
+    expect(Math.max(...m.map((x) => x.round))).toBe(6);
+    // Real matches: 2 per round × 6 = 12.
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(12);
+  });
+});
+
 // ─── generateRoundRobin ───────────────────────────────────────────────────────
 
 describe("generateRoundRobin — small divisions (3-6 teams → single pool)", () => {
