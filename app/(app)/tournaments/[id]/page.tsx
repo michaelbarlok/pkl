@@ -684,26 +684,37 @@ export default async function TournamentDetailPage({
         </div>
       )}
 
-      {/* Registrations List */}
-      <div>
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <h2 className="text-lg font-semibold text-dark-100">
-            Registered ({confirmedRegistrations.length}{tournament.player_cap ? `/${tournament.player_cap}` : ""})
-          </h2>
-          {canManage && tournament.entry_fee && confirmedRegistrations.length > 0 && (() => {
-            const paidCount = confirmedRegistrations.filter((r: any) => r.paid).length;
-            const unpaidCount = confirmedRegistrations.length - paidCount;
-            return (
+      {/* Registrations List — once the tournament goes live the
+          registered list takes a back seat to the Court Tracker +
+          Live Divisions cards, so collapse it by default (organizer
+          can expand to look up a specific team or handle payments). */}
+      {(() => {
+        const shouldCollapse =
+          tournament.status === "in_progress" || tournament.status === "completed";
+        const paidCount = confirmedRegistrations.filter((r: any) => r.paid).length;
+        const unpaidCount = confirmedRegistrations.length - paidCount;
+        const registeredCountLabel = `Registered (${confirmedRegistrations.length}${tournament.player_cap ? `/${tournament.player_cap}` : ""})`;
+        const paidSubtitle = canManage && tournament.entry_fee && confirmedRegistrations.length > 0
+          ? `${paidCount} of ${confirmedRegistrations.length} paid`
+          : undefined;
+
+        const headerRow = (
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <h2 className="text-lg font-semibold text-dark-100">
+              {registeredCountLabel}
+            </h2>
+            {canManage && tournament.entry_fee && confirmedRegistrations.length > 0 && (
               <>
                 <span className="text-xs text-surface-muted">
                   {paidCount} of {confirmedRegistrations.length} paid
                 </span>
                 <PaymentReminderButton tournamentId={id} unpaidCount={unpaidCount} />
               </>
-            );
-          })()}
-        </div>
-        {confirmedRegistrations.length > 0 ? (
+            )}
+          </div>
+        );
+
+        const tableOrEmpty = confirmedRegistrations.length > 0 ? (
           <div className="card overflow-x-auto p-0">
             <table className="min-w-full divide-y divide-surface-border">
               <thead className="bg-surface-overlay">
@@ -791,8 +802,35 @@ export default async function TournamentDetailPage({
             title="No registrations yet"
             description="Be the first to register for this tournament."
           />
-        )}
-      </div>
+        );
+
+        if (shouldCollapse) {
+          // Payment reminder UI is tucked into the body because it
+          // has interactive state; CollapsibleCard only carries the
+          // plain count + paid-summary in its subtitle.
+          return (
+            <CollapsibleCard
+              title={registeredCountLabel}
+              subtitle={paidSubtitle}
+              defaultOpen={false}
+            >
+              {canManage && tournament.entry_fee && confirmedRegistrations.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <PaymentReminderButton tournamentId={id} unpaidCount={unpaidCount} />
+                </div>
+              )}
+              {tableOrEmpty}
+            </CollapsibleCard>
+          );
+        }
+
+        return (
+          <div>
+            {headerRow}
+            {tableOrEmpty}
+          </div>
+        );
+      })()}
 
       {/* Waitlist */}
       {waitlistRegistrations.length > 0 && (
