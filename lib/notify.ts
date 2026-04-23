@@ -4,6 +4,23 @@ import { sendPushNotification } from "@/lib/push";
 import { isTestUser } from "@/lib/utils";
 import type { NotificationType } from "@/types/database";
 
+/**
+ * Notifications that are too time-sensitive to let a user opt out
+ * of — tournament live-play pings. A player who silences these
+ * could miss their court assignment and hold the whole schedule up,
+ * so we ignore the per-type "off" switch for this set and fire on
+ * whichever of push/email the user has in their global preferences
+ * (falling back to email if neither is configured). In-app rows are
+ * always written regardless.
+ */
+const REQUIRED_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
+  "tournament_division_started",
+  "tournament_up_next",
+  "tournament_in_3rd",
+  "tournament_court_assigned",
+  "tournament_playoffs_starting",
+]);
+
 interface NotifyParams {
   profileId: string;
   type: NotificationType;
@@ -65,8 +82,11 @@ export async function notify({
     return null;
   })();
 
-  // If the user explicitly turned this notification type off entirely, do nothing
-  if (typeChannels && typeChannels.size === 0) return;
+  const isRequired = REQUIRED_NOTIFICATION_TYPES.has(type);
+
+  // Required types bypass the per-type opt-out. For anything else,
+  // an empty per-type channel list means "off" and we bail.
+  if (!isRequired && typeChannels && typeChannels.size === 0) return;
 
   // 2. Write in-app notification
   try {
@@ -85,10 +105,23 @@ export async function notify({
     console.error("Notification insert threw:", e);
   }
 
-  // Per-type prefs take priority; missing entries fall back to the global
-  // preferred_notify list. Both channels can be active simultaneously.
-  const shouldEmail = typeChannels ? typeChannels.has("email") : prefs.includes("email");
-  const shouldPush = typeChannels ? typeChannels.has("push") : prefs.includes("push");
+  // Channel resolution:
+  //   - Required: always use the viewer's global prefs, dropping
+  //     the per-type override. If they've set neither push nor
+  //     email globally, force email as a last-resort channel so
+  //     the ping reaches them somehow.
+  //   - Optional: per-type overrides global (existing behaviour).
+  let shouldEmail: boolean;
+  let shouldPush: boolean;
+  if (isRequired) {
+    const hasPush = prefs.includes("push");
+    const hasEmail = prefs.includes("email");
+    shouldPush = hasPush;
+    shouldEmail = hasEmail || !hasPush; // at least email when neither is set
+  } else {
+    shouldEmail = typeChannels ? typeChannels.has("email") : prefs.includes("email");
+    shouldPush = typeChannels ? typeChannels.has("push") : prefs.includes("push");
+  }
 
   // 3. Fire email, SMS, and push in parallel. Previously these were
   // awaited one after the other, so a push was delayed by however long
