@@ -90,6 +90,14 @@ export function TournamentRegistrationButton({
       return;
     }
 
+    // Flip the spinner off as soon as the server ack comes back. The
+    // tournament page still runs router.refresh() in the background,
+    // and once the fresh `myRegistration` prop lands this component
+    // swaps to the "You're registered!" branch on its own. Without
+    // this, the button reads "Registering…" for as long as the full
+    // server render takes, which can be several seconds on big
+    // tournaments with lots of joins.
+    setLoading(false);
     router.refresh();
   }
 
