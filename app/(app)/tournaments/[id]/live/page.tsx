@@ -231,7 +231,7 @@ export default async function TournamentLivePage({
 
       <NextUpQueue
         tournamentId={tournamentId}
-        myPlayerId={profile.id}
+        myTeamPrimaryId={teamPrimaryId}
         myDivision={myDivision}
       />
 
