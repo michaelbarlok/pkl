@@ -6,6 +6,7 @@ import { TournamentBracketView } from "@/components/tournament-bracket";
 import type { PartnerMap } from "@/components/tournament-bracket";
 import { TournamentRealtimeSubscription } from "@/components/tournament-realtime";
 import { DivisionReview } from "@/components/division-review";
+import { ActiveDivisionsManager } from "./active-divisions-manager";
 import { DeleteTournamentButton } from "@/components/delete-tournament-button";
 import { CoOrganizerManager } from "@/components/co-organizer-manager";
 import { getDivisionLabel } from "@/lib/divisions";
@@ -88,8 +89,15 @@ export default async function TournamentDetailPage({
   // reused for the organizers fetch without an extra createClient() call.
   const supabase = await createClient();
 
-  const [tournament, registrations, matches, myRegistration, organizersResult, { data: { user } }] =
-    await Promise.all([
+  const [
+    tournament,
+    registrations,
+    matches,
+    myRegistration,
+    organizersResult,
+    activeDivisionsResult,
+    { data: { user } },
+  ] = await Promise.all([
       getTournament(id),
       getTournamentRegistrations(id),
       getTournamentMatches(id),
@@ -97,6 +105,10 @@ export default async function TournamentDetailPage({
       supabase
         .from("tournament_organizers")
         .select("profile_id, added_at, profile:profiles!profile_id(id, display_name)")
+        .eq("tournament_id", id),
+      supabase
+        .from("tournament_active_divisions")
+        .select("division")
         .eq("tournament_id", id),
       supabase.auth.getUser(),
     ]);
@@ -110,6 +122,7 @@ export default async function TournamentDetailPage({
   const isAdmin = profile?.role === "admin";
 
   const coOrganizers = (organizersResult.data ?? []) as any[];
+  const activeDivisions = ((activeDivisionsResult.data ?? []) as any[]).map((r) => r.division as string);
   const isCoOrganizer = profile ? coOrganizers.some((o: any) => o.profile_id === profile.id) : false;
   const canManage = isCreator || isAdmin || isCoOrganizer;
 
@@ -426,6 +439,16 @@ export default async function TournamentDetailPage({
               tournamentId={id}
               divisions={divisionCounts}
               format={tournament.format}
+            />
+          )}
+
+          {/* Live division management (shown once brackets are generated) */}
+          {tournament.status === "in_progress" && divisionCounts.length > 0 && (
+            <ActiveDivisionsManager
+              tournamentId={id}
+              numCourts={(tournament as any).num_courts ?? null}
+              divisions={divisionCounts.map((d) => ({ division: d.division, count: d.count }))}
+              initialActive={activeDivisions}
             />
           )}
 

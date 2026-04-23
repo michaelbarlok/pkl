@@ -28,6 +28,7 @@ export default function CreateTournamentPage() {
   const [registrationOpensAt, setRegistrationOpensAt] = useState("");
   const [registrationClosesAt, setRegistrationClosesAt] = useState("");
   const [scoreToWinPool, setScoreToWinPool] = useState("11");
+  const [numCourts, setNumCourts] = useState("");
   const [scoreToWinPlayoff, setScoreToWinPlayoff] = useState("11");
   const [finalsBestOf3, setFinalsBestOf3] = useState(false);
 
@@ -128,6 +129,7 @@ export default function CreateTournamentPage() {
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
+        num_courts: numCourts ? parseInt(numCourts) || null : null,
         status: "draft",
         created_by: profile.id,
       })
@@ -207,6 +209,24 @@ export default function CreateTournamentPage() {
               <option value="singles">Singles</option>
             </select>
           </div>
+        </div>
+
+        {/* Live-play logistics */}
+        <div>
+          <label className="block text-sm font-medium text-dark-200 mb-1">
+            Number of courts available
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={numCourts}
+            onChange={(e) => setNumCourts(e.target.value)}
+            className="input"
+            placeholder="e.g. 4"
+          />
+          <p className="text-xs text-surface-muted mt-1">
+            Used when divisions go live to auto-assign matches to courts. Leave blank if unknown.
+          </p>
         </div>
 
         {/* Round Robin Settings */}
