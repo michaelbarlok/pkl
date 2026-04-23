@@ -88,6 +88,101 @@ export async function clearDivisionQueue(
     .eq("status", "pending");
 }
 
+/**
+ * Manual-promote: organizer explicitly sends a queued match onto a
+ * specific court. Bypasses the automatic FIFO in runAssignmentPass
+ * but keeps the same invariants (court must be free, match must be
+ * eligible + queued + non-BYE, both teams must not be on another
+ * court). Fires the usual "Head to Court N" notifications.
+ *
+ * Returns { ok: true } on success, { ok: false, error } otherwise —
+ * API layer maps error codes to HTTP status.
+ */
+export async function promoteMatchToCourt(
+  tournamentId: string,
+  matchId: string,
+  courtNumber: number
+): Promise<{ ok: true } | { ok: false, error: string }> {
+  const service = await createServiceClient();
+
+  const { data: tournamentRaw } = await service
+    .from("tournaments")
+    .select("id, title, num_courts")
+    .eq("id", tournamentId)
+    .single();
+  if (!tournamentRaw) return { ok: false, error: "Tournament not found" };
+  const tournament = tournamentRaw as Tournament;
+  const numCourts = tournament.num_courts ?? 0;
+  if (courtNumber < 1 || courtNumber > numCourts) {
+    return { ok: false, error: `Court ${courtNumber} is out of range` };
+  }
+
+  const { data: activeDivs } = await service
+    .from("tournament_active_divisions")
+    .select("division")
+    .eq("tournament_id", tournamentId);
+  const activeSet = new Set((activeDivs ?? []).map((r: any) => r.division));
+
+  const { data: matchesRaw } = await service
+    .from("tournament_matches")
+    .select(
+      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at"
+    )
+    .eq("tournament_id", tournamentId);
+  const matches = (matchesRaw ?? []) as TournamentMatch[];
+
+  const match = matches.find((m) => m.id === matchId);
+  if (!match) return { ok: false, error: "Match not found" };
+  if (!isEligibleForQueue(match, matches, activeSet)) {
+    return { ok: false, error: "Match isn't eligible to be scheduled yet" };
+  }
+
+  // Court must be free — no other pending match holds it.
+  const courtHolder = matches.find(
+    (m) => m.court_number === courtNumber && m.status === "pending"
+  );
+  if (courtHolder && courtHolder.id !== matchId) {
+    return { ok: false, error: `Court ${courtNumber} is in use` };
+  }
+
+  // Neither team can be on another court right now.
+  const busyPlayers = new Set<string>();
+  for (const m of matches) {
+    if (m.status !== "pending" || m.court_number === null) continue;
+    if (m.id === matchId) continue;
+    if (m.player1_id) busyPlayers.add(m.player1_id);
+    if (m.player2_id) busyPlayers.add(m.player2_id);
+  }
+  if (
+    (match.player1_id && busyPlayers.has(match.player1_id)) ||
+    (match.player2_id && busyPlayers.has(match.player2_id))
+  ) {
+    return { ok: false, error: "One of the teams is on another court already" };
+  }
+
+  await service
+    .from("tournament_matches")
+    .update({ court_number: courtNumber })
+    .eq("id", matchId);
+
+  const playerIds = [match.player1_id, match.player2_id].filter(
+    (x): x is string => !!x
+  );
+  if (playerIds.length > 0) {
+    const divLabel = match.division ? getDivisionLabel(match.division) : "";
+    await notifyMany(playerIds, {
+      type: "tournament_court_assigned",
+      title: `Head to Court ${courtNumber}`,
+      body: divLabel
+        ? `${tournament.title} — ${divLabel}. Your match is ready.`
+        : `${tournament.title}. Your match is ready.`,
+      link: `/tournaments/${tournamentId}/live`,
+    });
+  }
+
+  return { ok: true };
+}
+
 async function runAssignmentPass(tournamentId: string): Promise<void> {
   const service = await createServiceClient();
 
