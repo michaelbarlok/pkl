@@ -547,13 +547,37 @@ describe("generateRoundRobin — gamesPerTeam > opponents (over-full)", () => {
     expect(dupePairs).toBe(3);
   });
 
-  test("5 teams @ 5 games (odd over-full) → 1 full lap + 1 extra round", () => {
+  test("5 teams @ 5 games (odd, invalid) rounds UP to 8 games for balance", () => {
     const ids = makeIds(5);
     const m = generateRoundRobin(ids, { gamesPerTeam: 5, rng: seededRng(11) });
-    // 1 lap (roundsPerLap=5) + 1 extra round = 6 rounds total.
-    expect(Math.max(...m.map((x) => x.round))).toBe(6);
-    // Real matches: 2 per round × 6 = 12.
-    expect(m.filter((x) => x.status !== "bye")).toHaveLength(12);
+    // Odd pool can only balance at whole-lap multiples (gamesPerTeam
+    // must be a multiple of opponents=4). 5 rounds up to the next
+    // valid value: 2 full laps × 5 rounds = 10 rounds.
+    expect(Math.max(...m.map((x) => x.round))).toBe(10);
+    // Real matches: 2 per round × 10 = 20; each team plays 8.
+    const real = m.filter((x) => x.status !== "bye");
+    expect(real).toHaveLength(20);
+    const counts = new Map<string, number>();
+    for (const x of real) {
+      if (x.player1_id) counts.set(x.player1_id, (counts.get(x.player1_id) ?? 0) + 1);
+      if (x.player2_id) counts.set(x.player2_id, (counts.get(x.player2_id) ?? 0) + 1);
+    }
+    for (const c of counts.values()) expect(c).toBe(8);
+  });
+
+  test("odd pool balance — 3@3 rounds up to 2 full laps (4 games each)", () => {
+    const ids = makeIds(3);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 3, rng: seededRng(5) });
+    const real = m.filter((x) => x.status !== "bye");
+    const counts = new Map<string, number>();
+    for (const x of real) {
+      if (x.player1_id) counts.set(x.player1_id, (counts.get(x.player1_id) ?? 0) + 1);
+      if (x.player2_id) counts.set(x.player2_id, (counts.get(x.player2_id) ?? 0) + 1);
+    }
+    // Every team plays the same number of games — that's the
+    // invariant the organizer asked for.
+    const uniqueCounts = new Set(counts.values());
+    expect(uniqueCounts.size).toBe(1);
   });
 });
 

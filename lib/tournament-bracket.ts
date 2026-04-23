@@ -356,14 +356,29 @@ function generatePoolMatches(
   const matchesPerRound = numPlayers / 2;
   const opponents = n - 1; // "real" opponents per team
 
-  const fullLaps = Math.max(0, Math.floor(gamesPerTeam / opponents));
-  const extras = Math.max(0, gamesPerTeam % opponents);
-
-  // Build the sequence of lap-round indices to emit.
-  //   - Each full lap contributes every rotation 0..roundsPerLap-1.
-  //   - Extras contribute a random subset of size `extras` from that
-  //     same range. Round order within a lap is otherwise preserved.
+  // Every team in the pool must play the same number of games.
+  //
+  // EVEN pools: each round in the circle rotation is a perfect
+  //   matching (everyone plays), so any subset of rounds gives
+  //   every team the same game count. We can emit full laps + a
+  //   random partial lap for extras.
+  //
+  // ODD pools: each round has one BYE. A partial lap gives some
+  //   teams more games than others depending on BYE distribution,
+  //   so balance is impossible without whole laps. We round
+  //   gamesPerTeam UP to the nearest multiple of opponents and emit
+  //   that many full laps — no random extras.
   const roundSequence: number[] = [];
+  let fullLaps: number;
+  let extras: number;
+  if (isOdd) {
+    fullLaps = Math.max(1, Math.ceil(gamesPerTeam / opponents));
+    extras = 0;
+  } else {
+    fullLaps = Math.max(0, Math.floor(gamesPerTeam / opponents));
+    extras = Math.max(0, gamesPerTeam % opponents);
+  }
+
   for (let lap = 0; lap < fullLaps; lap++) {
     for (let r = 0; r < roundsPerLap; r++) roundSequence.push(r);
   }
