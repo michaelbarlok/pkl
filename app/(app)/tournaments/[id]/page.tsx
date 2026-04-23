@@ -10,6 +10,7 @@ import { ActiveDivisionsManager } from "./active-divisions-manager";
 import { CourtTracker } from "./court-tracker";
 import type { CourtTrackerMatch } from "./court-tracker";
 import { EndTournamentButton } from "./end-tournament-button";
+import { interleaveQueueByDivision } from "@/lib/tournament-queue";
 import {
   AskToPartnerButton,
   RespondToRequestButtons,
@@ -509,8 +510,8 @@ export default async function TournamentDetailPage({
                 )
                 .map(toTracker);
 
-              const queuedMatches = matches
-                .filter(
+              const queuedMatches = interleaveQueueByDivision(
+                matches.filter(
                   (m: any) =>
                     m.status === "pending" &&
                     m.court_number == null &&
@@ -519,15 +520,8 @@ export default async function TournamentDetailPage({
                     m.player2_id &&
                     m.division &&
                     activeSet.has(m.division)
-                )
-                .sort((a: any, b: any) => {
-                  const ta = new Date(a.queue_entered_at).getTime();
-                  const tb = new Date(b.queue_entered_at).getTime();
-                  if (ta !== tb) return ta - tb;
-                  if (a.round !== b.round) return a.round - b.round;
-                  return a.match_number - b.match_number;
-                })
-                .map(toTracker);
+                ) as any
+              ).map(toTracker);
 
               return (
                 <CourtTracker

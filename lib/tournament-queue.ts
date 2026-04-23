@@ -52,6 +52,66 @@ interface Tournament {
 }
 
 /**
+ * Interleave a queue of matches across divisions. Within each
+ * division the pool-play order (round asc, match_number asc) is
+ * preserved — this matters so BYEs rotate correctly — but when
+ * several divisions are live at once we pluck one from each in
+ * turn so the first batch of court assignments spreads across
+ * divisions instead of piling onto whichever alphabetises first.
+ *
+ * Pass `rng` to shuffle the starting division order (used on
+ * activation so different divisions get court #1 across runs).
+ * Without `rng` the order is stable (Map insertion order after
+ * timestamp/round/match sort), which is what we want for the
+ * CourtTracker UI and the "next up" widget.
+ */
+export function interleaveQueueByDivision<
+  T extends {
+    division: string | null;
+    round: number;
+    match_number: number;
+    queue_entered_at: string | null;
+  }
+>(matches: T[], rng?: () => number): T[] {
+  const sorted = [...matches].sort((a, b) => {
+    const ta = a.queue_entered_at ? new Date(a.queue_entered_at).getTime() : 0;
+    const tb = b.queue_entered_at ? new Date(b.queue_entered_at).getTime() : 0;
+    if (ta !== tb) return ta - tb;
+    if (a.round !== b.round) return a.round - b.round;
+    return a.match_number - b.match_number;
+  });
+
+  const byDivision = new Map<string, T[]>();
+  for (const m of sorted) {
+    const key = m.division ?? "__none__";
+    if (!byDivision.has(key)) byDivision.set(key, []);
+    byDivision.get(key)!.push(m);
+  }
+
+  const divisionKeys = Array.from(byDivision.keys());
+  if (rng) {
+    for (let i = divisionKeys.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [divisionKeys[i], divisionKeys[j]] = [divisionKeys[j], divisionKeys[i]];
+    }
+  }
+
+  const result: T[] = [];
+  for (let idx = 0; ; idx++) {
+    let any = false;
+    for (const key of divisionKeys) {
+      const arr = byDivision.get(key)!;
+      if (arr.length > idx) {
+        result.push(arr[idx]);
+        any = true;
+      }
+    }
+    if (!any) break;
+  }
+  return result;
+}
+
+/**
  * Called after an organizer records a match score (the caller has
  * already flipped the match to completed + cleared court_number).
  * Mirrors a division-activation pass — same queue logic applies.
@@ -247,26 +307,22 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
     if (m.player2_id) busyPlayers.add(m.player2_id);
   }
 
-  // ── Step 3: walk the queue and assign.
-  const queue = matches
-    .filter(
-      (m) =>
-        m.status === "pending" &&
-        m.court_number === null &&
-        m.queue_entered_at !== null &&
-        m.division &&
-        activeSet.has(m.division) &&
-        m.player1_id &&
-        m.player2_id
-    )
-    .sort((a, b) => {
-      // queue_entered_at cannot be null here (filter above).
-      const ta = new Date(a.queue_entered_at!).getTime();
-      const tb = new Date(b.queue_entered_at!).getTime();
-      if (ta !== tb) return ta - tb;
-      if (a.round !== b.round) return a.round - b.round;
-      return a.match_number - b.match_number;
-    });
+  // ── Step 3: walk the queue and assign. Cross-division
+  // interleave so the first batch of assignments spreads across
+  // every live division, not just whichever sorted first. Shuffle
+  // the division order on each pass so different divisions take
+  // turns getting court #1.
+  const eligible = matches.filter(
+    (m) =>
+      m.status === "pending" &&
+      m.court_number === null &&
+      m.queue_entered_at !== null &&
+      m.division &&
+      activeSet.has(m.division) &&
+      m.player1_id &&
+      m.player2_id
+  );
+  const queue = interleaveQueueByDivision(eligible, Math.random);
 
   const freeCourts = Math.max(0, numCourts - onCourt.length);
   const assignments: { match: TournamentMatch; court: number }[] = [];
