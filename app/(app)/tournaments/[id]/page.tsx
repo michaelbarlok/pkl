@@ -7,7 +7,10 @@ import type { PartnerMap } from "@/components/tournament-bracket";
 import { TournamentRealtimeSubscription } from "@/components/tournament-realtime";
 import { DivisionReview } from "@/components/division-review";
 import { ActiveDivisionsManager } from "./active-divisions-manager";
+import { CourtTracker } from "./court-tracker";
+import type { CourtTrackerMatch } from "./court-tracker";
 import { EndTournamentButton } from "./end-tournament-button";
+import { interleaveQueueByDivision } from "@/lib/tournament-queue";
 import {
   AskToPartnerButton,
   RespondToRequestButtons,
@@ -471,6 +474,64 @@ export default async function TournamentDetailPage({
               initialActive={activeDivisions}
             />
           )}
+
+          {/* Live court tracker (shown when we know num_courts and
+              at least one division is active). Organizers see every
+              court, the matches on them, and the queue of eligible
+              matches with Send-to-Court buttons. */}
+          {tournament.status === "in_progress" &&
+            ((tournament as any).num_courts ?? 0) > 0 &&
+            activeDivisions.length > 0 &&
+            (() => {
+              const numCourts = (tournament as any).num_courts as number;
+              const activeSet = new Set(activeDivisions);
+              const toTracker = (m: any): CourtTrackerMatch => ({
+                id: m.id,
+                division: m.division ?? null,
+                round: m.round,
+                match_number: m.match_number,
+                bracket: m.bracket,
+                player1_name: m.player1?.display_name ?? null,
+                partner1_name: m.player1_id ? partnerMap.get(m.player1_id) ?? null : null,
+                player2_name: m.player2?.display_name ?? null,
+                partner2_name: m.player2_id ? partnerMap.get(m.player2_id) ?? null : null,
+                court_number: m.court_number ?? null,
+                queue_entered_at: m.queue_entered_at ?? null,
+                status: m.status,
+              });
+
+              const onCourtMatches = matches
+                .filter(
+                  (m: any) =>
+                    m.status === "pending" &&
+                    m.court_number != null &&
+                    m.division &&
+                    activeSet.has(m.division)
+                )
+                .map(toTracker);
+
+              const queuedMatches = interleaveQueueByDivision(
+                matches.filter(
+                  (m: any) =>
+                    m.status === "pending" &&
+                    m.court_number == null &&
+                    m.queue_entered_at != null &&
+                    m.player1_id &&
+                    m.player2_id &&
+                    m.division &&
+                    activeSet.has(m.division)
+                ) as any
+              ).map(toTracker);
+
+              return (
+                <CourtTracker
+                  tournamentId={id}
+                  numCourts={numCourts}
+                  onCourt={onCourtMatches}
+                  queue={queuedMatches}
+                />
+              );
+            })()}
 
           {/* Simple status controls for non-bracket transitions */}
           <OrganizerControls

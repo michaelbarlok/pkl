@@ -469,6 +469,59 @@ describe("generateDoubleElimination", () => {
   });
 });
 
+// ─── interleaveQueueByDivision ───────────────────────────────────────────────
+
+import { interleaveQueueByDivision } from "@/lib/tournament-queue";
+
+describe("interleaveQueueByDivision", () => {
+  function mk(division: string, round: number, mn: number, ts = "2026-01-01T00:00:00Z") {
+    return {
+      division,
+      round,
+      match_number: mn,
+      queue_entered_at: ts,
+    };
+  }
+
+  test("pool-play order is preserved within each division", () => {
+    const matches = [
+      mk("A", 1, 1),
+      mk("A", 1, 2),
+      mk("A", 2, 1),
+      mk("B", 1, 1),
+    ];
+    const out = interleaveQueueByDivision(matches);
+    // Within A: (1,1) before (1,2) before (2,1)
+    const aOrder = out.filter((m) => m.division === "A").map((m) => `${m.round}-${m.match_number}`);
+    expect(aOrder).toEqual(["1-1", "1-2", "2-1"]);
+  });
+
+  test("divisions interleave — first batch spans divisions before filling each", () => {
+    const matches = [
+      mk("A", 1, 1),
+      mk("A", 1, 2),
+      mk("A", 1, 3),
+      mk("B", 1, 1),
+      mk("B", 1, 2),
+      mk("C", 1, 1),
+    ];
+    const out = interleaveQueueByDivision(matches);
+    // First three entries must cover all three divisions.
+    expect(new Set(out.slice(0, 3).map((m) => m.division))).toEqual(new Set(["A", "B", "C"]));
+  });
+
+  test("earlier queue_entered_at wins over later even with interleave", () => {
+    // A's match was eligible an hour earlier — it should still come
+    // first because the primary sort is timestamp.
+    const matches = [
+      mk("A", 1, 1, "2026-01-01T00:00:00Z"),
+      mk("B", 1, 1, "2026-01-01T01:00:00Z"),
+    ];
+    const out = interleaveQueueByDivision(matches);
+    expect(out[0].division).toBe("A");
+  });
+});
+
 // ─── isValidGamesPerTeam ─────────────────────────────────────────────────────
 
 describe("isValidGamesPerTeam", () => {
