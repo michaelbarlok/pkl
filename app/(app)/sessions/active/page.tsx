@@ -5,7 +5,8 @@ import { notFound, redirect } from "next/navigation";
  * /sessions/active — the Play tab. Routes the player to whichever
  * live experience applies right now, in this priority order:
  *   1. An active shootout session they're checked into.
- *   2. A tournament division that an organizer has marked active
+ *   2. An active free-play session where they're checked in.
+ *   3. A tournament division that an organizer has marked active
  *      and in which they're registered (tournament.status = in_progress).
  * Falls back to a "nothing active" empty state.
  */
@@ -41,7 +42,26 @@ export default async function ActiveSessionPage() {
     redirect(`/sessions/${active.session_id}`);
   }
 
-  // 2. Active tournament division. Find registrations tied to a
+  // 2. Active free-play session the viewer is checked into. The
+  //    session page lives at /groups/<slug>/session so we need the
+  //    group's slug for the redirect.
+  const { data: freePlayRows } = await supabase
+    .from("free_play_session_players")
+    .select(
+      "session:free_play_sessions!inner(id, status, group:shootout_groups!inner(slug))"
+    )
+    .eq("player_id", profile.id)
+    .limit(10);
+
+  const activeFreePlay = (freePlayRows ?? []).find(
+    (r: any) => r.session?.status === "active"
+  ) as any;
+
+  if (activeFreePlay?.session?.group?.slug) {
+    redirect(`/groups/${activeFreePlay.session.group.slug}/session`);
+  }
+
+  // 3. Active tournament division. Find registrations tied to a
   //    tournament whose status is in_progress AND whose division is
   //    in tournament_active_divisions.
   const { data: tRegs } = await supabase
@@ -77,7 +97,7 @@ export default async function ActiveSessionPage() {
       </div>
       <h1 className="text-xl font-bold text-dark-100">Nothing to play right now</h1>
       <p className="text-surface-muted">
-        When you&apos;re checked into a group session or an organizer flips your tournament division live, this tab will take you straight to your bracket or court.
+        When you&apos;re checked into a group session (ladder or free play) or an organizer flips your tournament division live, this tab will take you straight to your bracket or court.
       </p>
     </div>
   );
