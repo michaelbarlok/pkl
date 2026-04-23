@@ -520,6 +520,36 @@ describe("interleaveQueueByDivision", () => {
     const out = interleaveQueueByDivision(matches);
     expect(out[0].division).toBe("A");
   });
+
+  test("works as the 'enqueue order' source for a FIFO queue", () => {
+    // The engine uses this helper once — at enqueue time — and
+    // stamps each match with a sequential timestamp. Reading the
+    // queue later is pure FIFO. Simulate by running the helper,
+    // sorting by the result index, then asserting read-back order
+    // matches enqueue order.
+    const matches = [
+      mk("A", 1, 1),
+      mk("A", 1, 2),
+      mk("B", 1, 1),
+      mk("B", 1, 2),
+    ];
+    const enqueued = interleaveQueueByDivision(matches);
+    const staggered = enqueued.map((m, i) => ({
+      ...m,
+      queue_entered_at: `2026-01-01T00:00:00.00${i}Z`,
+    }));
+    const readBack = [...staggered].sort(
+      (a, b) =>
+        new Date(a.queue_entered_at!).getTime() -
+        new Date(b.queue_entered_at!).getTime()
+    );
+    expect(readBack.map((m) => `${m.division}-${m.match_number}`)).toEqual([
+      "A-1",
+      "B-1",
+      "A-2",
+      "B-2",
+    ]);
+  });
 });
 
 // ─── isValidGamesPerTeam ─────────────────────────────────────────────────────
