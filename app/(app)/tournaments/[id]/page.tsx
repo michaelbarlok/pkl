@@ -574,6 +574,7 @@ export default async function TournamentDetailPage({
           myDivision={myDivision}
           partnerMap={partnerMap}
           isRoundRobin={tournament.format === "round_robin"}
+          activeDivisions={activeDivisions}
         />
       )}
 
