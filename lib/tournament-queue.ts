@@ -43,6 +43,7 @@ interface TournamentMatch {
   court_number: number | null;
   queue_entered_at: string | null;
   up_next_notified_at: string | null;
+  in_3rd_notified_at: string | null;
 }
 
 interface Tournament {
@@ -186,7 +187,7 @@ export async function promoteMatchToCourt(
   const { data: matchesRaw } = await service
     .from("tournament_matches")
     .select(
-      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at"
+      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at, in_3rd_notified_at"
     )
     .eq("tournament_id", tournamentId);
   const matches = (matchesRaw ?? []) as TournamentMatch[];
@@ -265,7 +266,7 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
   const { data: matchesRaw } = await service
     .from("tournament_matches")
     .select(
-      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at"
+      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at, in_3rd_notified_at"
     )
     .eq("tournament_id", tournamentId);
   const matches = (matchesRaw ?? []) as TournamentMatch[];
@@ -386,32 +387,63 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
     });
   }
 
-  // ── Step 5: "You're up next" for the new top of queue.
+  // ── Step 5: queue-position pushes. Fires once per transition.
+  // Position 1 ("Up next") and position 3 ("3rd in line") are the
+  // two stops we notify at. Each uses its own _notified_at column
+  // so a match only gets each ping a single time (a match can only
+  // move forward in the line, so we never unset these).
   const stillQueued = queue.filter(
     (m) => !assignments.some((a) => a.match.id === m.id)
   );
-  const topOfQueue = stillQueued[0];
-  if (topOfQueue && !topOfQueue.up_next_notified_at) {
-    const playerIds = [topOfQueue.player1_id, topOfQueue.player2_id].filter(
-      (x): x is string => !!x
-    );
-    if (playerIds.length > 0) {
-      const divLabel = topOfQueue.division
-        ? getDivisionLabel(topOfQueue.division)
-        : "";
-      await notifyMany(playerIds, {
-        type: "tournament_up_next",
-        title: "You're up next",
-        body: divLabel
+  const nowStampIso = new Date().toISOString();
+
+  const positionTargets: Array<{
+    match: TournamentMatch | undefined;
+    column: "up_next_notified_at" | "in_3rd_notified_at";
+    type: "tournament_up_next" | "tournament_in_3rd";
+    title: string;
+    body: (divLabel: string) => string;
+  }> = [
+    {
+      match: stillQueued[0],
+      column: "up_next_notified_at",
+      type: "tournament_up_next",
+      title: "You're up next",
+      body: (divLabel) =>
+        divLabel
           ? `${tournament.title} — ${divLabel}. Start warming up; a court will open soon.`
           : `${tournament.title}. Start warming up; a court will open soon.`,
-        link: `/tournaments/${tournamentId}/live`,
-      });
-      await service
-        .from("tournament_matches")
-        .update({ up_next_notified_at: new Date().toISOString() })
-        .eq("id", topOfQueue.id);
-    }
+    },
+    {
+      match: stillQueued[2],
+      column: "in_3rd_notified_at",
+      type: "tournament_in_3rd",
+      title: "You're 3rd in the queue",
+      body: (divLabel) =>
+        divLabel
+          ? `${tournament.title} — ${divLabel}. Two matches ahead of you; be nearby.`
+          : `${tournament.title}. Two matches ahead of you; be nearby.`,
+    },
+  ];
+
+  for (const t of positionTargets) {
+    if (!t.match) continue;
+    if (t.match[t.column]) continue;
+    const playerIds = [t.match.player1_id, t.match.player2_id].filter(
+      (x): x is string => !!x
+    );
+    if (playerIds.length === 0) continue;
+    const divLabel = t.match.division ? getDivisionLabel(t.match.division) : "";
+    await notifyMany(playerIds, {
+      type: t.type,
+      title: t.title,
+      body: t.body(divLabel),
+      link: `/tournaments/${tournamentId}/live`,
+    });
+    await service
+      .from("tournament_matches")
+      .update({ [t.column]: nowStampIso })
+      .eq("id", t.match.id);
   }
 }
 

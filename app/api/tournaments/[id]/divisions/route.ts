@@ -7,8 +7,10 @@ import {
   computePoolStandings,
   getPoolBrackets,
 } from "@/lib/tournament-bracket";
-import { getDivision, SKILLS } from "@/lib/divisions";
+import { getDivision, getDivisionLabel, SKILLS } from "@/lib/divisions";
 import { getTournamentManager } from "@/lib/tournament-auth";
+import { notifyMany } from "@/lib/notify";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * PUT: Merge or cancel divisions
@@ -264,6 +266,38 @@ export async function PUT(
           .eq("match_number", bye.match_number)
           .eq("bracket", bye.bracket);
       }
+    }
+
+    // Notify everyone who played pool play in this division that
+    // the playoff bracket is live. Source is tournament_registrations
+    // (so partners get the push too) filtered to the division. Test
+    // users are suppressed inside notify().
+    const { data: tournamentInfo } = await supabase
+      .from("tournaments")
+      .select("title")
+      .eq("id", tournamentId)
+      .single();
+    const service = await createServiceClient();
+    const { data: divisionRegs } = await service
+      .from("tournament_registrations")
+      .select("player_id, partner_id")
+      .eq("tournament_id", tournamentId)
+      .eq("division", division)
+      .neq("status", "withdrawn");
+    const recipients = new Set<string>();
+    for (const r of (divisionRegs ?? []) as any[]) {
+      if (r.player_id) recipients.add(r.player_id);
+      if (r.partner_id) recipients.add(r.partner_id);
+    }
+    if (recipients.size > 0) {
+      const divLabel = getDivisionLabel(division);
+      const title = tournamentInfo?.title ?? "Your tournament";
+      await notifyMany(Array.from(recipients), {
+        type: "tournament_playoffs_starting",
+        title: `${divLabel} playoffs are starting`,
+        body: `${title} — ${seededPlayerIds.length} team${seededPlayerIds.length === 1 ? "" : "s"} advanced. Head to the Play tab for your next match.`,
+        link: `/tournaments/${tournamentId}/live`,
+      });
     }
 
     return NextResponse.json({ ok: true, playoff_teams: seededPlayerIds.length });
