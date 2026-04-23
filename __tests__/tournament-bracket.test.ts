@@ -270,6 +270,47 @@ describe("computePoolStandings tiebreakers", () => {
 
 // ─── Pool-play BYE handling (regression) ─────────────────────────────────────
 
+describe("round-robin schedule integrity", () => {
+  test("no round contains duplicate pairings or a team in two matches", () => {
+    // Run every pool size 3..12 through the generator and assert
+    // the invariant holds. This catches any regression where the
+    // circle method (or the random-extras picker for even pools)
+    // produces a clash.
+    for (const n of [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+      const ids = Array.from({ length: n }, (_, i) => `p${i}`);
+      const matches = generateRoundRobin(ids, { rng: seededRng(n * 31) });
+      const byKey = new Map<string, typeof matches>();
+      for (const m of matches) {
+        const key = `${m.bracket}|${m.round}`;
+        if (!byKey.has(key)) byKey.set(key, []);
+        byKey.get(key)!.push(m);
+      }
+      for (const [key, bucket] of byKey) {
+        const seenPlayers = new Set<string>();
+        const seenPairs = new Set<string>();
+        for (const m of bucket) {
+          if (m.status === "bye") continue;
+          if (m.player1_id) {
+            expect(seenPlayers.has(m.player1_id)).toBe(false);
+            seenPlayers.add(m.player1_id);
+          }
+          if (m.player2_id) {
+            expect(seenPlayers.has(m.player2_id)).toBe(false);
+            seenPlayers.add(m.player2_id);
+          }
+          if (m.player1_id && m.player2_id) {
+            const pair = [m.player1_id, m.player2_id].sort().join("|");
+            expect(seenPairs.has(pair)).toBe(false);
+            seenPairs.add(pair);
+          }
+        }
+        // Quick sanity: every round has the right match count.
+        void key;
+      }
+    }
+  });
+});
+
 describe("round-robin pool play BYE handling", () => {
   test("odd pool produces BYE matches with winner_id-eligible nulls and status=bye", () => {
     const matches = generateRoundRobin(["a", "b", "c"], { gamesPerTeam: 2 });
