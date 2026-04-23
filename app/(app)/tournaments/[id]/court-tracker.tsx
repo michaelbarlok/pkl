@@ -199,7 +199,7 @@ export function CourtTracker({
             {queue.map((m) => (
               <li
                 key={m.id}
-                className="flex items-start justify-between gap-3 rounded-md bg-surface-overlay px-3 py-2"
+                className="flex items-start justify-between gap-3 rounded-md bg-surface-overlay ring-1 ring-dark-500 shadow-sm px-3 py-2"
               >
                 <div className="text-xs min-w-0">
                   <p className="text-dark-100 truncate">

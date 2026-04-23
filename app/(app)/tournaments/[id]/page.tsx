@@ -499,7 +499,7 @@ export default async function TournamentDetailPage({
             <CollapsibleCard
               title="Live Divisions"
               subtitle={`${activeDivisions.length} of ${divisionCounts.length} live`}
-              defaultOpen
+              defaultOpen={false}
             >
               <ActiveDivisionsManager
                 tournamentId={id}

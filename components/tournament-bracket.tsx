@@ -922,7 +922,20 @@ function MatchCard({
   const p2MatchWinner = bestOf3 ? (p2GameWins >= 2) : p2Won;
 
   return (
-    <div className={`rounded-lg overflow-hidden ring-1 transition-shadow ${isCompleted ? "ring-surface-border" : isBye ? "ring-surface-border/40" : "ring-surface-border hover:ring-brand-500/40"}`}>
+    <div
+      className={
+        "rounded-lg overflow-hidden ring-1 shadow-sm transition-shadow " +
+        // Stronger ring colour so each match reads as a distinct card
+        // against the page background in both themes — the old
+        // ring-surface-border was too close to bg-surface-overlay in
+        // dark mode and matches blended together in long pool lists.
+        (isCompleted
+          ? "ring-dark-500"
+          : isBye
+            ? "ring-surface-border/50"
+            : "ring-dark-500 hover:ring-brand-500/50")
+      }
+    >
       {isBye && (
         <div className="px-3 py-2.5 bg-surface-raised/60">
           <span className="text-sm text-dark-200">

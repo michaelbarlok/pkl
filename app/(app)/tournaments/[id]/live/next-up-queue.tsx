@@ -161,10 +161,10 @@ export async function NextUpQueue({
               <li
                 key={m.id}
                 className={
-                  "flex items-center justify-between gap-3 rounded-md px-3 py-2 " +
+                  "flex items-center justify-between gap-3 rounded-md px-3 py-2 shadow-sm ring-1 " +
                   (includesMe
-                    ? "bg-accent-500/10 ring-1 ring-accent-500/40"
-                    : "bg-surface-overlay")
+                    ? "bg-accent-500/10 ring-accent-500/40"
+                    : "bg-surface-overlay ring-dark-500")
                 }
               >
                 <div className="flex items-start gap-2 min-w-0 text-xs">
