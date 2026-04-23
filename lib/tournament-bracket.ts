@@ -302,7 +302,56 @@ export function generateRoundRobin(
     const perPoolGames = gamesPerTeam ?? (pools[i].length - 1);
     allMatches.push(...generatePoolMatches(pools[i], bracketNames[i], perPoolGames, rng));
   }
+  // Defensive invariant check: no pool-play round should contain
+  // duplicate pairings or place any team in more than one real
+  // match. If the generator ever produces such a schedule (the real
+  // tournament that hit this bug had 3 corrupted rows we still
+  // don't have a perfect repro for), fail loudly now instead of
+  // silently writing a broken bracket.
+  assertValidRoundRobinSchedule(allMatches);
   return allMatches;
+}
+
+/**
+ * Throw if any round of any bracket has a team in two non-BYE
+ * matches or the same pairing twice. Called at the end of
+ * generateRoundRobin so the caller never sees a corrupted schedule.
+ */
+function assertValidRoundRobinSchedule(matches: BracketMatch[]): void {
+  const byRoundBracket = new Map<string, BracketMatch[]>();
+  for (const m of matches) {
+    const key = `${m.bracket}|${m.round}`;
+    if (!byRoundBracket.has(key)) byRoundBracket.set(key, []);
+    byRoundBracket.get(key)!.push(m);
+  }
+  for (const [key, bucket] of byRoundBracket) {
+    const seenPlayers = new Set<string>();
+    const seenPairs = new Set<string>();
+    for (const m of bucket) {
+      if (m.status === "bye") continue;
+      if (m.player1_id && seenPlayers.has(m.player1_id)) {
+        throw new Error(
+          `Round-robin generator produced an invalid schedule — player ${m.player1_id} is in two matches of ${key}`
+        );
+      }
+      if (m.player2_id && seenPlayers.has(m.player2_id)) {
+        throw new Error(
+          `Round-robin generator produced an invalid schedule — player ${m.player2_id} is in two matches of ${key}`
+        );
+      }
+      if (m.player1_id) seenPlayers.add(m.player1_id);
+      if (m.player2_id) seenPlayers.add(m.player2_id);
+      if (m.player1_id && m.player2_id) {
+        const pair = [m.player1_id, m.player2_id].sort().join("|");
+        if (seenPairs.has(pair)) {
+          throw new Error(
+            `Round-robin generator produced an invalid schedule — pair ${pair} appears twice in ${key}`
+          );
+        }
+        seenPairs.add(pair);
+      }
+    }
+  }
 }
 
 /**
