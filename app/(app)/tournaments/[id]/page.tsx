@@ -6,6 +6,8 @@ import { TournamentBracketView } from "@/components/tournament-bracket";
 import type { PartnerMap } from "@/components/tournament-bracket";
 import { TournamentRealtimeSubscription } from "@/components/tournament-realtime";
 import { DivisionReview } from "@/components/division-review";
+import { ActiveDivisionsManager } from "./active-divisions-manager";
+import { EndTournamentButton } from "./end-tournament-button";
 import { DeleteTournamentButton } from "@/components/delete-tournament-button";
 import { CoOrganizerManager } from "@/components/co-organizer-manager";
 import { getDivisionLabel } from "@/lib/divisions";
@@ -88,8 +90,15 @@ export default async function TournamentDetailPage({
   // reused for the organizers fetch without an extra createClient() call.
   const supabase = await createClient();
 
-  const [tournament, registrations, matches, myRegistration, organizersResult, { data: { user } }] =
-    await Promise.all([
+  const [
+    tournament,
+    registrations,
+    matches,
+    myRegistration,
+    organizersResult,
+    activeDivisionsResult,
+    { data: { user } },
+  ] = await Promise.all([
       getTournament(id),
       getTournamentRegistrations(id),
       getTournamentMatches(id),
@@ -97,6 +106,10 @@ export default async function TournamentDetailPage({
       supabase
         .from("tournament_organizers")
         .select("profile_id, added_at, profile:profiles!profile_id(id, display_name)")
+        .eq("tournament_id", id),
+      supabase
+        .from("tournament_active_divisions")
+        .select("division")
         .eq("tournament_id", id),
       supabase.auth.getUser(),
     ]);
@@ -110,6 +123,7 @@ export default async function TournamentDetailPage({
   const isAdmin = profile?.role === "admin";
 
   const coOrganizers = (organizersResult.data ?? []) as any[];
+  const activeDivisions = ((activeDivisionsResult.data ?? []) as any[]).map((r) => r.division as string);
   const isCoOrganizer = profile ? coOrganizers.some((o: any) => o.profile_id === profile.id) : false;
   const canManage = isCreator || isAdmin || isCoOrganizer;
 
@@ -143,9 +157,19 @@ export default async function TournamentDetailPage({
     }
   }
 
+  // Regular players (non-organizers) should only see their own division
+  // bracket. Organizers see everything. Viewers with no registration
+  // and no manage rights see nothing — the DivisionBrackets section
+  // below renders the empty case gracefully.
+  const visibleMatches = canManage
+    ? matches
+    : myDivision
+      ? matches.filter((m: any) => m.division === myDivision)
+      : [];
+
   // Group matches by division for display, using tournament.divisions order for stability
   const divisionMatchesTmp = new Map<string, typeof matches>();
-  for (const m of matches) {
+  for (const m of visibleMatches) {
     const div = (m as any).division ?? "__none__";
     if (!divisionMatchesTmp.has(div)) divisionMatchesTmp.set(div, []);
     divisionMatchesTmp.get(div)!.push(m);
@@ -429,6 +453,16 @@ export default async function TournamentDetailPage({
             />
           )}
 
+          {/* Live division management (shown once brackets are generated) */}
+          {tournament.status === "in_progress" && divisionCounts.length > 0 && (
+            <ActiveDivisionsManager
+              tournamentId={id}
+              numCourts={(tournament as any).num_courts ?? null}
+              divisions={divisionCounts.map((d) => ({ division: d.division, count: d.count }))}
+              initialActive={activeDivisions}
+            />
+          )}
+
           {/* Simple status controls for non-bracket transitions */}
           <OrganizerControls
             tournamentId={id}
@@ -644,11 +678,24 @@ function OrganizerControls({
     draft: { label: "Open Registration", next: "registration_open" },
     registration_open: { label: "Close Registration", next: "registration_closed" },
     registration_closed: { label: "Reopen Registration", next: "registration_open", variant: "secondary" },
-    in_progress: { label: "Mark Complete", next: "completed" },
   };
 
-  const action = nextAction[status];
+  // in_progress → completed goes through a dedicated endpoint that
+  // gates on all-scored matches, deactivates divisions, and sends
+  // the recap notifications.
+  if (status === "in_progress") {
+    return (
+      <div className="card">
+        <h2 className="text-sm font-semibold text-dark-200 mb-3">Organizer Controls</h2>
+        <p className="text-xs text-surface-muted mb-3">
+          Ending the tournament locks all results and emails a recap to every player and organizer. You can&apos;t end it until every match has a score.
+        </p>
+        <EndTournamentButton tournamentId={tournamentId} />
+      </div>
+    );
+  }
 
+  const action = nextAction[status];
   if (!action) return null;
 
   return (

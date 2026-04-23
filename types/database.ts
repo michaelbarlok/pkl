@@ -42,6 +42,10 @@ export type NotificationType =
   | "tournament_withdrawal"
   | "tournament_reminder"
   | "tournament_cancelled"
+  | "tournament_division_started"
+  | "tournament_up_next"
+  | "tournament_court_assigned"
+  | "tournament_recap"
   | "badge_earned"
   | "session_recap"
   | "group_announcement";

@@ -43,6 +43,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
   const [error, setError] = useState("");
   const [gamesPerTeam, setGamesPerTeam] = useState<Record<string, string>>({});
   const [numPoolsOverride, setNumPoolsOverride] = useState<Record<string, string>>({});
+  const [playoffAdvancing, setPlayoffAdvancing] = useState<Record<string, string>>({});
 
   // Seeding state
   const [seedingOpen, setSeedingOpen] = useState<Record<string, boolean>>({});
@@ -152,15 +153,17 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
 
     const divisionSettings: Record<
       string,
-      { games_per_team?: number; num_pools?: number }
+      { games_per_team?: number; num_pools?: number; playoff_advancing?: number }
     > = {};
     if (isRoundRobin) {
       for (const d of divisions) {
-        const settings: { games_per_team?: number; num_pools?: number } = {};
+        const settings: { games_per_team?: number; num_pools?: number; playoff_advancing?: number } = {};
         const gpt = parseInt(gamesPerTeam[d.division] ?? "");
         if (gpt > 0) settings.games_per_team = gpt;
         const np = parseInt(numPoolsOverride[d.division] ?? "");
         if (np > 0) settings.num_pools = np;
+        const pa = parseInt(playoffAdvancing[d.division] ?? "");
+        if (pa > 0) settings.playoff_advancing = pa;
         if (Object.keys(settings).length > 0) {
           divisionSettings[d.division] = settings;
         }
@@ -532,6 +535,43 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                           className="input w-20 py-1 text-center text-xs"
                         />
                         <span className="text-xs text-surface-muted">{description}</span>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Playoff teams advancing — defaults to the size-based
+                      rule (4 / 3 / 2 depending on pool count). Organizer
+                      can override to make a smaller or larger bracket. */}
+                  {(() => {
+                    const pa = parseInt(playoffAdvancing[d.division] ?? "") || null;
+                    const defaultAdvancing =
+                      poolStructure.numPools === 1
+                        ? 4
+                        : poolStructure.numPools === 2
+                        ? 6
+                        : poolStructure.numPools * 2;
+                    const maxAdvancing = poolStructure.poolSizes.reduce((a, b) => a + b, 0);
+                    const hint = pa
+                      ? `${pa} team${pa === 1 ? "" : "s"} advance to playoff bracket`
+                      : `default: ${defaultAdvancing} team${defaultAdvancing === 1 ? "" : "s"} advance`;
+                    return (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <label className="text-xs font-medium text-dark-200">Playoff teams:</label>
+                        <input
+                          type="number"
+                          min={2}
+                          max={maxAdvancing}
+                          placeholder="default"
+                          value={playoffAdvancing[d.division] ?? ""}
+                          onChange={(e) =>
+                            setPlayoffAdvancing((prev) => ({
+                              ...prev,
+                              [d.division]: e.target.value,
+                            }))
+                          }
+                          className="input w-20 py-1 text-center text-xs"
+                        />
+                        <span className="text-xs text-surface-muted">{hint}</span>
                       </div>
                     );
                   })()}

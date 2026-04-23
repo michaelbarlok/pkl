@@ -2,8 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 
 /**
- * /sessions/active — redirects to the player's current active session.
- * If no active session, shows a message.
+ * /sessions/active — the Play tab. Routes the player to whichever
+ * live experience applies right now, in this priority order:
+ *   1. An active shootout session they're checked into.
+ *   2. A tournament division that an organizer has marked active
+ *      and in which they're registered (tournament.status = in_progress).
+ * Falls back to a "nothing active" empty state.
  */
 export default async function ActiveSessionPage() {
   const supabase = await createClient();
@@ -19,7 +23,8 @@ export default async function ActiveSessionPage() {
 
   if (!profile) notFound();
 
-  // Find active sessions where this player is checked in
+  // 1. Active shootout session takes priority — it's usually the
+  //    shorter-running event and the tab was originally built for it.
   const { data: participants } = await supabase
     .from("session_participants")
     .select("session_id, session:shootout_sessions(id, status)")
@@ -34,6 +39,33 @@ export default async function ActiveSessionPage() {
 
   if (active) {
     redirect(`/sessions/${active.session_id}`);
+  }
+
+  // 2. Active tournament division. Find registrations tied to a
+  //    tournament whose status is in_progress AND whose division is
+  //    in tournament_active_divisions.
+  const { data: tRegs } = await supabase
+    .from("tournament_registrations")
+    .select(
+      "tournament_id, division, status, tournament:tournaments(id, status)"
+    )
+    .eq("player_id", profile.id)
+    .neq("status", "withdrawn");
+
+  const candidate = (tRegs ?? []).find(
+    (r: any) => r.tournament?.status === "in_progress"
+  ) as any;
+
+  if (candidate) {
+    const { data: active } = await supabase
+      .from("tournament_active_divisions")
+      .select("division")
+      .eq("tournament_id", candidate.tournament_id)
+      .eq("division", candidate.division)
+      .maybeSingle();
+    if (active) {
+      redirect(`/tournaments/${candidate.tournament_id}/live`);
+    }
   }
 
   return (

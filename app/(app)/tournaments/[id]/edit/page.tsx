@@ -31,6 +31,7 @@ export default function EditTournamentPage() {
   const [scoreToWinPool, setScoreToWinPool] = useState("11");
   const [scoreToWinPlayoff, setScoreToWinPlayoff] = useState("11");
   const [finalsBestOf3, setFinalsBestOf3] = useState(false);
+  const [numCourts, setNumCourts] = useState("");
 
   const [savedLocations, setSavedLocations] = useState<{ name: string; cityState: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +74,7 @@ export default function EditTournamentPage() {
         setScoreToWinPool(data.score_to_win_pool?.toString() ?? "11");
         setScoreToWinPlayoff(data.score_to_win_playoff?.toString() ?? "11");
         setFinalsBestOf3(data.finals_best_of_3 ?? false);
+        setNumCourts((data as any).num_courts?.toString() ?? "");
       }
 
       // Build location dropdown options
@@ -136,6 +138,7 @@ export default function EditTournamentPage() {
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
+        num_courts: numCourts ? parseInt(numCourts) || null : null,
       })
       .eq("id", id);
 
@@ -181,6 +184,24 @@ export default function EditTournamentPage() {
               <option value="singles">Singles</option>
             </select>
           </div>
+        </div>
+
+        {/* Live-play logistics */}
+        <div>
+          <label className="block text-sm font-medium text-dark-200 mb-1">
+            Number of courts available
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={numCourts}
+            onChange={(e) => setNumCourts(e.target.value)}
+            className="input"
+            placeholder="e.g. 4"
+          />
+          <p className="text-xs text-surface-muted mt-1">
+            Used when divisions go live to auto-assign matches to courts. Leave blank if unknown.
+          </p>
         </div>
 
         {/* Round Robin Settings */}

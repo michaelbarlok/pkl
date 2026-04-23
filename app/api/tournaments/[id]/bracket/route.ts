@@ -5,6 +5,7 @@ import {
   generateRoundRobin,
 } from "@/lib/tournament-bracket";
 import { getTournamentManager } from "@/lib/tournament-auth";
+import { onMatchCompleted } from "@/lib/tournament-queue";
 
 /**
  * POST: Generate bracket and advance tournament to in_progress.
@@ -174,7 +175,8 @@ export async function PUT(
   const isEdit = previousWinner !== null;
   const winnerChanged = isEdit && previousWinner !== winner_id;
 
-  // Update match score
+  // Update match score — also free the court so the assignment
+  // engine can hand it to the next queued match.
   const { data: match, error: updateError } = await supabase
     .from("tournament_matches")
     .update({
@@ -182,6 +184,7 @@ export async function PUT(
       score2: score2 ?? [],
       winner_id,
       status: "completed",
+      court_number: null,
     })
     .eq("id", match_id)
     .select()
@@ -416,6 +419,15 @@ export async function PUT(
         .update({ status: "completed" })
         .eq("id", tournamentId);
     }
+  }
+
+  // Promote the next queued match to the freed court (if any). Fire
+  // and forget — a failure in the engine shouldn't roll back the
+  // score that was just recorded.
+  try {
+    await onMatchCompleted(tournamentId);
+  } catch (err) {
+    console.error("tournament-queue: onMatchCompleted failed", err);
   }
 
   return NextResponse.json(match);

@@ -92,10 +92,16 @@ export function DivisionBrackets({
               onClick={() => setSelectedDivision(division)}
               className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
                 isActive
-                  ? "bg-brand-300 text-white"
+                  ? // brand-500 is darker than brand-300; white text stays
+                    // legible on it in both themes. brand-300 was too pale
+                    // and the white text washed out.
+                    "bg-brand-500 text-white ring-1 ring-brand-400"
                   : isMyDiv
-                    ? "bg-brand-300/20 text-brand-300 hover:bg-brand-300/30"
-                    : "bg-surface-overlay text-surface-muted hover:text-dark-200 hover:bg-surface-raised"
+                    ? "bg-brand-500/15 text-brand-vivid ring-1 ring-brand-500/40 hover:bg-brand-500/25"
+                    : // text-dark-100 is the primary body tone; bumping
+                      // up from text-surface-muted fixes the low-contrast
+                      // inactive pills in both light and dark modes.
+                      "bg-surface-overlay text-dark-100 hover:bg-surface-raised"
               }`}
             >
               {division === "__none__" ? "All" : getDivisionLabel(division)}
