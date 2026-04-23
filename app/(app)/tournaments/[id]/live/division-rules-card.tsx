@@ -84,6 +84,18 @@ export function DivisionRulesCard({
         )}
       </dl>
 
+      {/* Score-reporting etiquette — organizers own the data entry,
+          but someone on the winning team has to carry the result
+          back so the court can get its next match. */}
+      <div className="border-t border-surface-border pt-2.5">
+        <p className="text-xs text-dark-200">
+          <span className="font-medium text-accent-300">Winning team:</span>{" "}
+          please report the final score to an organizer after the match. The
+          organizer enters it, your court frees up, and the queue promotes
+          the next match automatically.
+        </p>
+      </div>
+
       {isRoundRobin && (
         <div className="border-t border-surface-border pt-2.5 space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted">
