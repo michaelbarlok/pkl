@@ -2,7 +2,11 @@
 
 import { FormError } from "@/components/form-error";
 import { getDivision, getDivisionLabel, SKILLS } from "@/lib/divisions";
-import { getPoolStructure, poolGamesInfo } from "@/lib/tournament-bracket";
+import {
+  getPoolStructure,
+  isValidGamesPerTeam,
+  poolGamesInfo,
+} from "@/lib/tournament-bracket";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -148,6 +152,28 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
       return;
     }
 
+    // Block unschedulable games-per-team choices before we hit the
+    // server. The same check runs in the pool panel renderer to show
+    // the inline error, so the user has already seen the reason.
+    const invalidLabels: string[] = [];
+    if (isRoundRobin) {
+      for (const d of divisions) {
+        const gpt = parseInt(gamesPerTeam[d.division] ?? "");
+        if (!gpt || gpt <= 0) continue;
+        const poolOverride = parseInt(numPoolsOverride[d.division] ?? "") || undefined;
+        const structure = getPoolStructure(d.count, { numPools: poolOverride });
+        if (structure.poolSizes.some((s) => !isValidGamesPerTeam(s, gpt))) {
+          invalidLabels.push(getDivisionLabel(d.division));
+        }
+      }
+    }
+    if (invalidLabels.length > 0) {
+      setError(
+        `Pick a valid "Games per team" for: ${invalidLabels.join(", ")}. Odd-sized pools need whole-lap multiples (see the hint under the input).`
+      );
+      return;
+    }
+
     setGenerating(true);
     setError("");
 
@@ -280,6 +306,26 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
   // ─────────────────────────────────────────────────────────────
 
   const hasSmallDivisions = divisions.some((d) => d.count < MIN_PLAYERS);
+
+  // Compute which divisions have an unschedulable gamesPerTeam value
+  // for at least one of their pools — used to gate the Generate
+  // button and surface an inline error under the offending input.
+  const divisionsWithInvalidGames = new Set<string>();
+  if (isRoundRobin) {
+    for (const d of divisions) {
+      const raw = gamesPerTeam[d.division];
+      const gpt = parseInt(raw ?? "");
+      if (!gpt || gpt <= 0) continue;
+      const poolOverride = parseInt(numPoolsOverride[d.division] ?? "") || undefined;
+      const structure = getPoolStructure(d.count, { numPools: poolOverride });
+      for (const size of structure.poolSizes) {
+        if (!isValidGamesPerTeam(size, gpt)) {
+          divisionsWithInvalidGames.add(d.division);
+          break;
+        }
+      }
+    }
+  }
 
   return (
     <div className="card space-y-4">
@@ -520,21 +566,58 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                       }
                     }
 
+                    // An odd-sized pool only accepts gamesPerTeam
+                    // values that are whole-lap multiples
+                    // (opponents, 2·opponents, …). If the organizer
+                    // picks otherwise we surface a red hint that
+                    // lists what's allowed and block the Generate
+                    // button — silent round-up would break the "every
+                    // team plays the same count" invariant.
+                    const invalidForPools = gpt
+                      ? poolStructure.poolSizes.filter(
+                          (s) => !isValidGamesPerTeam(s, gpt)
+                        )
+                      : [];
+                    const invalid = invalidForPools.length > 0;
+                    const allowedForOdd = Array.from(
+                      new Set(poolStructure.poolSizes.filter((s) => s % 2 === 1))
+                    ).map((s) => {
+                      const opp = s - 1;
+                      const max = poolStructure.maxGamesPerTeam;
+                      const options: number[] = [];
+                      for (let k = opp; k <= max; k += opp) options.push(k);
+                      return { poolSize: s, options };
+                    });
+
                     return (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <label className="text-xs font-medium text-dark-200">Games per team:</label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={poolStructure.maxGamesPerTeam}
-                          placeholder="default"
-                          value={gamesPerTeam[d.division] ?? ""}
-                          onChange={(e) =>
-                            setGamesPerTeam((prev) => ({ ...prev, [d.division]: e.target.value }))
-                          }
-                          className="input w-20 py-1 text-center text-xs"
-                        />
-                        <span className="text-xs text-surface-muted">{description}</span>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <label className="text-xs font-medium text-dark-200">Games per team:</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={poolStructure.maxGamesPerTeam}
+                            placeholder="default"
+                            value={gamesPerTeam[d.division] ?? ""}
+                            onChange={(e) =>
+                              setGamesPerTeam((prev) => ({ ...prev, [d.division]: e.target.value }))
+                            }
+                            className={
+                              "input w-20 py-1 text-center text-xs " +
+                              (invalid ? "ring-1 ring-red-500/60" : "")
+                            }
+                          />
+                          <span className="text-xs text-surface-muted">{description}</span>
+                        </div>
+                        {invalid && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {gpt} won&apos;t schedule cleanly for the odd pool{invalidForPools.length > 1 ? "s" : ""} of {invalidForPools.join(", ")}. {" "}
+                            {allowedForOdd
+                              .map((a) => `${a.poolSize}-team allows ${a.options.join(", ")}`)
+                              .join(" · ")}
+                            .
+                          </p>
+                        )}
                       </div>
                     );
                   })()}
@@ -604,7 +687,11 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
       <div className="pt-2 border-t border-surface-border flex flex-wrap gap-2">
         <button
           onClick={handleGenerate}
-          disabled={generating || divisions.length === 0}
+          disabled={
+            generating ||
+            divisions.length === 0 ||
+            divisionsWithInvalidGames.size > 0
+          }
           className="btn-primary"
         >
           {generating

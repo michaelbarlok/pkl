@@ -175,10 +175,14 @@ export function getPoolStructure(
   // at most floor(teamCount/2) so every pool still has ≥2 teams.
   const override = options?.numPools;
   const maxReasonable = Math.max(1, Math.floor(teamCount / 2));
-  const numPools =
-    override && override >= 1
-      ? Math.min(override, maxReasonable)
-      : Math.max(1, Math.ceil(teamCount / 6)); // auto: as few pools as possible, max 6/pool
+  const numPools = override && override >= 1
+    ? Math.min(override, maxReasonable)
+    // 7 teams is a special case: we'd rather run one pool of 7 (full
+    // pool play, up to 6 games per team) than split into 4+3. Past 7,
+    // the usual max-6-per-pool rule kicks in.
+    : teamCount === 7
+      ? 1
+      : Math.max(1, Math.ceil(teamCount / 6));
 
   // Distribute as evenly as possible (larger pools first)
   const baseSize = Math.floor(teamCount / numPools);
@@ -208,17 +212,44 @@ export function getPoolStructure(
 export function poolGamesInfo(
   poolSize: number,
   gamesPerTeam: number
-): { actualGamesPerTeam: number; timesVsEachOpponent: number | null } {
+): {
+  actualGamesPerTeam: number;
+  timesVsEachOpponent: number | null;
+  valid: boolean;
+} {
   const opponents = poolSize - 1;
   if (poolSize % 2 === 1) {
-    // Odd pool: round up to complete laps so balance is guaranteed
+    // Odd pool: only whole-lap multiples schedule cleanly. Anything
+    // else would give different teams different game counts because
+    // of the BYE rotation. Callers should block the submit rather
+    // than silently round up.
+    const valid = gamesPerTeam % opponents === 0;
     const laps = Math.ceil(gamesPerTeam / opponents);
-    return { actualGamesPerTeam: laps * opponents, timesVsEachOpponent: laps };
+    return {
+      actualGamesPerTeam: laps * opponents,
+      timesVsEachOpponent: laps,
+      valid,
+    };
   } else {
-    // Even pool: exactly gamesPerTeam games per team
+    // Even pool: any integer ≥ 1 works — each round is a perfect
+    // matching so every team plays exactly gamesPerTeam games.
     const times = gamesPerTeam % opponents === 0 ? gamesPerTeam / opponents : null;
-    return { actualGamesPerTeam: gamesPerTeam, timesVsEachOpponent: times };
+    return {
+      actualGamesPerTeam: gamesPerTeam,
+      timesVsEachOpponent: times,
+      valid: gamesPerTeam >= 1,
+    };
   }
+}
+
+/**
+ * Convenience: does this gamesPerTeam value schedule cleanly for a
+ * pool of `poolSize` teams? (Wrapper over poolGamesInfo.valid.)
+ */
+export function isValidGamesPerTeam(poolSize: number, gamesPerTeam: number): boolean {
+  if (!Number.isInteger(gamesPerTeam) || gamesPerTeam < 1) return false;
+  if (poolSize < 2) return false;
+  return poolGamesInfo(poolSize, gamesPerTeam).valid;
 }
 
 /**
