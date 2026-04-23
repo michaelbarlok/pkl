@@ -1,17 +1,7 @@
 // ============================================================
 // Tournament Division Definitions
-//
-// Men's and Women's break down by age (All Ages / Senior 60+) AND
-// skill (3.0 – 4.5+). Mixed is intentionally flat: one "All Ages"
-// pool and one "Senior 60+" pool, no skill split — that's the
-// organizer convention for this league.
-//
-// Division codes:
-//   - Men's/Women's: `<gender>_<age>_<skill>` e.g. mens_senior_4.0
-//   - Mixed:         `mixed_<age>`           e.g. mixed_all_ages
-// Older rows may still carry `mixed_<age>_<skill>` from before this
-// change; getDivisionLabel() falls through to a generic parser so
-// they still render readable labels.
+// A division is a permutation of Gender × Age × Skill Level.
+// Codes follow `<gender>_<age>_<skill>`, e.g. mens_senior_4.0.
 // ============================================================
 
 export const GENDERS = [
@@ -36,48 +26,22 @@ export interface Division {
   code: string;
   gender: string;
   age: string;
-  skill: string | null;
+  skill: string;
   label: string;
 }
 
-function mkDivision(
-  gender: (typeof GENDERS)[number],
-  age: (typeof AGES)[number],
-  skill: (typeof SKILLS)[number] | null
-): Division {
-  return {
-    code: skill
-      ? `${gender.value}_${age.value}_${skill.value}`
-      : `${gender.value}_${age.value}`,
-    gender: gender.value,
-    age: age.value,
-    skill: skill ? skill.value : null,
-    label: skill
-      ? `${gender.label} ${age.label} ${skill.label}`
-      : `${gender.label} ${age.label}`,
-  };
-}
-
-/**
- * Canonical division list.
- *   Men's × {All Ages, Senior} × {3.0, 3.5, 4.0, 4.5+}  = 8
- *   Women's × {All Ages, Senior} × {3.0, 3.5, 4.0, 4.5+} = 8
- *   Mixed × {All Ages, Senior}                          = 2
- *   Total: 18 divisions.
- */
-export const ALL_DIVISIONS: Division[] = (() => {
-  const list: Division[] = [];
-  for (const gender of GENDERS) {
-    if (gender.value === "mixed") {
-      for (const age of AGES) list.push(mkDivision(gender, age, null));
-    } else {
-      for (const age of AGES) {
-        for (const skill of SKILLS) list.push(mkDivision(gender, age, skill));
-      }
-    }
-  }
-  return list;
-})();
+/** All 24 possible division permutations (3 genders × 2 ages × 4 skills). */
+export const ALL_DIVISIONS: Division[] = GENDERS.flatMap((g) =>
+  AGES.flatMap((a) =>
+    SKILLS.map((s) => ({
+      code: `${g.value}_${a.value}_${s.value}`,
+      gender: g.value,
+      age: a.value,
+      skill: s.value,
+      label: `${g.label} ${a.label} ${s.label}`,
+    }))
+  )
+);
 
 /** All division codes */
 export const ALL_DIVISION_CODES = ALL_DIVISIONS.map((d) => d.code);
