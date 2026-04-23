@@ -491,14 +491,25 @@ export default async function TournamentDetailPage({
             />
           )}
 
-          {/* Live division management (shown once brackets are generated) */}
+          {/* Live division management (shown once brackets are
+              generated). Collapsible so organizers can tuck it away
+              once every division they care about is activated and
+              focus on the Court Tracker. Default open so the first
+              activation flow is front-and-center. */}
           {tournament.status === "in_progress" && divisionCounts.length > 0 && (
-            <ActiveDivisionsManager
-              tournamentId={id}
-              numCourts={(tournament as any).num_courts ?? null}
-              divisions={divisionCounts.map((d) => ({ division: d.division, count: d.count }))}
-              initialActive={activeDivisions}
-            />
+            <CollapsibleCard
+              title="Live Divisions"
+              subtitle={`${activeDivisions.length} of ${divisionCounts.length} live`}
+              defaultOpen
+            >
+              <ActiveDivisionsManager
+                tournamentId={id}
+                numCourts={(tournament as any).num_courts ?? null}
+                divisions={divisionCounts.map((d) => ({ division: d.division, count: d.count }))}
+                initialActive={activeDivisions}
+                embedded
+              />
+            </CollapsibleCard>
           )}
 
           {/* Live court tracker (shown when we know num_courts and
