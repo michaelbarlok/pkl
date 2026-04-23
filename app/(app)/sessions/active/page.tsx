@@ -75,9 +75,9 @@ export default async function ActiveSessionPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
       </div>
-      <h1 className="text-xl font-bold text-dark-100">No Active Session</h1>
+      <h1 className="text-xl font-bold text-dark-100">Nothing to play right now</h1>
       <p className="text-surface-muted">
-        You don&apos;t have an active session right now. When you&apos;re checked into a session, you&apos;ll be taken straight to your court.
+        When you&apos;re checked into a group session or an organizer flips your tournament division live, this tab will take you straight to your bracket or court.
       </p>
     </div>
   );

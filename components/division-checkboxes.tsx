@@ -68,9 +68,7 @@ export function DivisionCheckboxes({ selected, onChange }: Props) {
                                 onChange={() => toggle(d.code)}
                                 className="rounded border-surface-border text-brand-500 focus:ring-brand-500"
                               />
-                              <span className="text-sm text-dark-200">
-                                {d.skill ?? age.label}
-                              </span>
+                              <span className="text-sm text-dark-200">{d.skill}</span>
                             </label>
                           );
                         })}
