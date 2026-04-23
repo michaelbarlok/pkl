@@ -174,43 +174,48 @@ export async function PUT(
     // Detect pool structure from bracket labels.
     // With max 6 teams per pool: 3-6 teams → 1 pool, 7-12 → 2 pools, 13+ → 3+ pools.
     const poolBrackets = getPoolBrackets(poolMatches);
-    const isMultiPool = poolBrackets.length >= 3;
+    const numPools = poolBrackets.length;
+
+    // Organizer-configured override for total advancing teams. When
+    // set, we split it across the pools (top K each, with leftover
+    // spots going to the largest "best remaining" sweep).
+    const { data: tournamentForSettings } = await supabase
+      .from("tournaments")
+      .select("division_settings")
+      .eq("id", tournamentId)
+      .single();
+    const overrideAdvancing = (tournamentForSettings as any)?.division_settings?.[division]?.playoff_advancing as
+      | number
+      | undefined;
+
+    // Defaults if the organizer didn't pick: 4 / 6 / 2-per-pool.
+    const defaultAdvancing =
+      numPools === 1 ? 4 : numPools === 2 ? 6 : numPools * 2;
+    const totalAdvancing = overrideAdvancing && overrideAdvancing >= 2
+      ? overrideAdvancing
+      : defaultAdvancing;
 
     // Use organizer-provided seeding if given, otherwise compute from standings
     let seededPlayerIds: string[];
 
     if (seeded_players && seeded_players.length >= 2) {
       seededPlayerIds = seeded_players;
-    } else if (isMultiPool) {
-      // 3+ pools (13+ teams): top 2 from each pool, ranked across all pools
+    } else {
+      const perPoolBase = Math.floor(totalAdvancing / Math.max(1, numPools));
+      const remainder = totalAdvancing % Math.max(1, numPools);
+
+      // Collect per-pool standings and pick the top K from each, where
+      // K = base + (1 for the first `remainder` pools — largest pools
+      // first, which matches the ladder-layout convention).
       const allQualifiers: { id: string; wins: number; losses: number; pointDiff: number }[] = [];
-      for (const bracket of poolBrackets) {
+      poolBrackets.forEach((bracket, idx) => {
         const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
         const standings = computePoolStandings(bracketMatches);
-        allQualifiers.push(...standings.slice(0, 2));
-      }
+        const take = perPoolBase + (idx < remainder ? 1 : 0);
+        allQualifiers.push(...standings.slice(0, Math.min(take, standings.length)));
+      });
       allQualifiers.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
       seededPlayerIds = allQualifiers.map((s) => s.id);
-    } else if (poolBrackets.length === 2) {
-      // 2 pools (7-12 teams): top 3 from each (slice naturally caps if a pool has fewer)
-      const poolAMatches = poolMatches.filter((m) => m.bracket === poolBrackets[0]);
-      const poolBMatches = poolMatches.filter((m) => m.bracket === poolBrackets[1]);
-
-      const poolAStandings = computePoolStandings(poolAMatches);
-      const poolBStandings = computePoolStandings(poolBMatches);
-
-      const poolATop3 = poolAStandings.slice(0, 3);
-      const poolBTop3 = poolBStandings.slice(0, 3);
-
-      const allQualifiers = [...poolATop3, ...poolBTop3].sort(
-        (a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff
-      );
-
-      seededPlayerIds = allQualifiers.map((s) => s.id);
-    } else {
-      // Single pool: top 4
-      const standings = computePoolStandings(poolMatches);
-      seededPlayerIds = standings.slice(0, Math.min(4, standings.length)).map((s) => s.id);
     }
 
     if (seededPlayerIds.length < 2) {
@@ -308,7 +313,7 @@ export async function POST(
   const body = await request.json().catch(() => ({}));
   const divisionSettings: Record<
     string,
-    { games_per_team?: number; num_pools?: number }
+    { games_per_team?: number; num_pools?: number; playoff_advancing?: number }
   > = body.division_settings ?? {};
 
   // Save division_settings to tournament

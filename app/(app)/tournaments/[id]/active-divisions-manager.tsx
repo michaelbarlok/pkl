@@ -1,8 +1,9 @@
 "use client";
 
 import { getDivisionLabel } from "@/lib/divisions";
+import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface DivisionCount {
   division: string;
@@ -30,9 +31,31 @@ export function ActiveDivisionsManager({
   initialActive,
 }: Props) {
   const router = useRouter();
+  const { supabase } = useSupabase();
   const [active, setActive] = useState<Set<string>>(new Set(initialActive));
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  // Mirror tournament_active_divisions into local state so co-organizers
+  // operating from another device see the live status without refresh.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`active-divs-mgr-${tournamentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tournament_active_divisions",
+          filter: `tournament_id=eq.${tournamentId}`,
+        },
+        () => router.refresh()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, router, tournamentId]);
 
   async function activate(divisions: string[], all = false) {
     if (divisions.length === 0 && !all) return;
