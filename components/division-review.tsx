@@ -568,54 +568,74 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
 
                     // An odd-sized pool only accepts gamesPerTeam
                     // values that are whole-lap multiples
-                    // (opponents, 2·opponents, …). If the organizer
-                    // picks otherwise we surface a red hint that
-                    // lists what's allowed and block the Generate
-                    // button — silent round-up would break the "every
-                    // team plays the same count" invariant.
+                    // (opponents, 2·opponents, …). Filter the full
+                    // 1..maxGames range by every pool's validator so
+                    // the resulting list of "allowed" values is the
+                    // intersection across every pool in the
+                    // division. For all-even divisions this is 1..max
+                    // (any integer works); as soon as one odd pool
+                    // exists the list collapses to multiples of its
+                    // (n − 1).
+                    const allowedValues: number[] = [];
+                    for (let v = 1; v <= poolStructure.maxGamesPerTeam; v++) {
+                      if (poolStructure.poolSizes.every((s) => isValidGamesPerTeam(s, v))) {
+                        allowedValues.push(v);
+                      }
+                    }
+                    const hasOddPool = poolStructure.poolSizes.some((s) => s % 2 === 1);
                     const invalidForPools = gpt
                       ? poolStructure.poolSizes.filter(
                           (s) => !isValidGamesPerTeam(s, gpt)
                         )
                       : [];
                     const invalid = invalidForPools.length > 0;
-                    const allowedForOdd = Array.from(
-                      new Set(poolStructure.poolSizes.filter((s) => s % 2 === 1))
-                    ).map((s) => {
-                      const opp = s - 1;
-                      const max = poolStructure.maxGamesPerTeam;
-                      const options: number[] = [];
-                      for (let k = opp; k <= max; k += opp) options.push(k);
-                      return { poolSize: s, options };
-                    });
 
                     return (
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <label className="text-xs font-medium text-dark-200">Games per team:</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={poolStructure.maxGamesPerTeam}
-                            placeholder="default"
-                            value={gamesPerTeam[d.division] ?? ""}
-                            onChange={(e) =>
-                              setGamesPerTeam((prev) => ({ ...prev, [d.division]: e.target.value }))
-                            }
-                            className={
-                              "input w-20 py-1 text-center text-xs " +
-                              (invalid ? "ring-1 ring-red-500/60" : "")
-                            }
-                          />
+                          {hasOddPool ? (
+                            // Odd pools are narrow enough that a
+                            // dropdown of valid values is a better
+                            // control than free-text — the organizer
+                            // literally can't pick something that
+                            // won't schedule cleanly.
+                            <select
+                              value={gamesPerTeam[d.division] ?? ""}
+                              onChange={(e) =>
+                                setGamesPerTeam((prev) => ({
+                                  ...prev,
+                                  [d.division]: e.target.value,
+                                }))
+                              }
+                              className="input w-auto py-1 text-center text-xs"
+                            >
+                              <option value="">default</option>
+                              {allowedValues.map((v) => (
+                                <option key={v} value={v}>{v}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="number"
+                              min={1}
+                              max={poolStructure.maxGamesPerTeam}
+                              placeholder="default"
+                              value={gamesPerTeam[d.division] ?? ""}
+                              onChange={(e) =>
+                                setGamesPerTeam((prev) => ({ ...prev, [d.division]: e.target.value }))
+                              }
+                              className={
+                                "input w-20 py-1 text-center text-xs " +
+                                (invalid ? "ring-1 ring-red-500/60" : "")
+                              }
+                            />
+                          )}
                           <span className="text-xs text-surface-muted">{description}</span>
                         </div>
                         {invalid && (
                           <p className="mt-1 text-xs text-red-400">
-                            {gpt} won&apos;t schedule cleanly for the odd pool{invalidForPools.length > 1 ? "s" : ""} of {invalidForPools.join(", ")}. {" "}
-                            {allowedForOdd
-                              .map((a) => `${a.poolSize}-team allows ${a.options.join(", ")}`)
-                              .join(" · ")}
-                            .
+                            {gpt} won&apos;t schedule cleanly for the odd pool{invalidForPools.length > 1 ? "s" : ""} of {invalidForPools.join(", ")}. Allowed: {allowedValues.join(", ")}.
                           </p>
                         )}
                       </div>
