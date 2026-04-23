@@ -864,7 +864,11 @@ function MatchCard({
           <span className="text-sm text-dark-200">
             {match.player1_id ? p1Name : p2Name}
           </span>
-          <p className="text-xs text-surface-muted mt-0.5">BYE — advances automatically</p>
+          <p className="text-xs text-surface-muted mt-0.5">
+            {match.bracket === "playoff"
+              ? "BYE — advances automatically"
+              : "BYE — sits out this round"}
+          </p>
         </div>
       )}
 
