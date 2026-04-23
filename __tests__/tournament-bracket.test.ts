@@ -591,6 +591,46 @@ describe("interleaveQueueByDivision", () => {
       "B-2",
     ]);
   });
+
+  test("first-batch balance — 3 divs × 4 matches, top-K never exceeds one 'extra' per div", () => {
+    // Simulates the first activation: 3 divisions all go live at
+    // once, each with 4 round-1 matches. For any K free courts,
+    // the first K enqueued matches should have a per-division
+    // count of either floor(K/3) or floor(K/3)+1, never more.
+    const matches: ReturnType<typeof mk>[] = [];
+    for (const d of ["A", "B", "C"]) {
+      for (let mn = 1; mn <= 4; mn++) matches.push(mk(d, 1, mn));
+    }
+    const out = interleaveQueueByDivision(matches);
+
+    for (const k of [3, 4, 5, 6, 7, 8, 9]) {
+      const slice = out.slice(0, k);
+      const counts = new Map<string, number>();
+      for (const m of slice) {
+        counts.set(m.division, (counts.get(m.division) ?? 0) + 1);
+      }
+      const base = Math.floor(k / 3);
+      for (const [, c] of counts) {
+        expect(c).toBeGreaterThanOrEqual(base);
+        expect(c).toBeLessThanOrEqual(base + 1);
+      }
+    }
+  });
+
+  test("first-batch balance — different-sized divisions don't pile up", () => {
+    // Division A has 6 round-1 matches (big pool), B has 2. Large
+    // first court batches should still pull from B up to its
+    // capacity before racing through A's backlog.
+    const matches = [
+      ...[1, 2, 3, 4, 5, 6].map((mn) => mk("A", 1, mn)),
+      ...[1, 2].map((mn) => mk("B", 1, mn)),
+    ];
+    const out = interleaveQueueByDivision(matches);
+    // First 4 entries should include both B matches so B isn't
+    // locked out by A's larger queue.
+    const firstFourDivs = out.slice(0, 4).map((m) => m.division);
+    expect(firstFourDivs.filter((d) => d === "B").length).toBe(2);
+  });
 });
 
 // ─── isValidGamesPerTeam ─────────────────────────────────────────────────────
