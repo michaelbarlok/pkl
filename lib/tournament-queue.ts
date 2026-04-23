@@ -271,22 +271,36 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
   const matches = (matchesRaw ?? []) as TournamentMatch[];
 
   // ── Step 1: stamp queue_entered_at on newly-eligible matches.
-  const nowIso = new Date().toISOString();
-  const newlyEligibleIds: string[] = [];
+  //
+  // A queue is strict FIFO from this point on — the assignment loop
+  // and the UI both read this column, sort ascending, and that's it.
+  // To still give the first activation batch cross-division
+  // fairness, we build an interleaved order here (A.1, B.1, C.1,
+  // A.2, B.2, C.2, …) and stamp each match with a unique timestamp
+  // 1ms apart, so they enter the queue in the interleaved order
+  // *once* and then the queue never reshuffles.
+  const newlyEligible: TournamentMatch[] = [];
   for (const m of matches) {
     if (!isEligibleForQueue(m, matches, activeSet)) continue;
     if (m.queue_entered_at) continue;
-    newlyEligibleIds.push(m.id);
+    newlyEligible.push(m);
   }
-  if (newlyEligibleIds.length > 0) {
-    await service
-      .from("tournament_matches")
-      .update({ queue_entered_at: nowIso })
-      .in("id", newlyEligibleIds);
-    // Reflect the write in our local copy so the rest of this pass
-    // treats them as queued.
-    for (const m of matches) {
-      if (newlyEligibleIds.includes(m.id)) m.queue_entered_at = nowIso;
+  if (newlyEligible.length > 0) {
+    const orderedNewlyEligible = interleaveQueueByDivision(
+      newlyEligible,
+      Math.random
+    );
+    const nowMs = Date.now();
+    for (let i = 0; i < orderedNewlyEligible.length; i++) {
+      const ts = new Date(nowMs + i).toISOString();
+      await service
+        .from("tournament_matches")
+        .update({ queue_entered_at: ts })
+        .eq("id", orderedNewlyEligible[i].id);
+      // Reflect the write in our local copy so the rest of this pass
+      // treats the match as queued with the right ordering.
+      const local = matches.find((m) => m.id === orderedNewlyEligible[i].id);
+      if (local) local.queue_entered_at = ts;
     }
   }
 
@@ -307,22 +321,27 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
     if (m.player2_id) busyPlayers.add(m.player2_id);
   }
 
-  // ── Step 3: walk the queue and assign. Cross-division
-  // interleave so the first batch of assignments spreads across
-  // every live division, not just whichever sorted first. Shuffle
-  // the division order on each pass so different divisions take
-  // turns getting court #1.
-  const eligible = matches.filter(
-    (m) =>
-      m.status === "pending" &&
-      m.court_number === null &&
-      m.queue_entered_at !== null &&
-      m.division &&
-      activeSet.has(m.division) &&
-      m.player1_id &&
-      m.player2_id
-  );
-  const queue = interleaveQueueByDivision(eligible, Math.random);
+  // ── Step 3: walk the queue and assign. Pure FIFO by
+  // queue_entered_at — the interleave already happened at enqueue
+  // time (Step 1), so reading is strictly "whoever was in line
+  // first goes first", skipping matches whose teams are currently
+  // on another court.
+  const queue = matches
+    .filter(
+      (m) =>
+        m.status === "pending" &&
+        m.court_number === null &&
+        m.queue_entered_at !== null &&
+        m.division &&
+        activeSet.has(m.division) &&
+        m.player1_id &&
+        m.player2_id
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.queue_entered_at!).getTime() -
+        new Date(b.queue_entered_at!).getTime()
+    );
 
   const freeCourts = Math.max(0, numCourts - onCourt.length);
   const assignments: { match: TournamentMatch; court: number }[] = [];
@@ -390,7 +409,7 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
       });
       await service
         .from("tournament_matches")
-        .update({ up_next_notified_at: nowIso })
+        .update({ up_next_notified_at: new Date().toISOString() })
         .eq("id", topOfQueue.id);
     }
   }

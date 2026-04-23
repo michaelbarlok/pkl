@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getDivisionLabel } from "@/lib/divisions";
 import { TournamentBracketView } from "@/components/tournament-bracket";
 import type { PartnerMap } from "@/components/tournament-bracket";
+import { CollapsibleCard } from "../collapsible-card";
 import { LiveTournamentRealtime } from "./live-realtime";
 import { MyCourtCard } from "./my-court-card";
 import { NextUpQueue } from "./next-up-queue";
@@ -182,6 +183,29 @@ export default async function TournamentLivePage({
     };
   }
 
+  // Queue position for the collapsed "Match queue" card subtitle so
+  // players see their wait time even before they expand the list.
+  const { data: queueRowsRaw } = await supabase
+    .from("tournament_matches")
+    .select("player1_id, player2_id, division")
+    .eq("tournament_id", tournamentId)
+    .is("court_number", null)
+    .eq("status", "pending")
+    .not("queue_entered_at", "is", null)
+    .order("queue_entered_at", { ascending: true });
+  const queueRows = (queueRowsRaw ?? []).filter(
+    (m: any) => m.division && activeDivisionSet.has(m.division)
+  );
+  const myQueueIdx = queueRows.findIndex(
+    (m: any) => m.player1_id === teamPrimaryId || m.player2_id === teamPrimaryId
+  );
+  const queueSubtitle =
+    myQueueIdx >= 0
+      ? `You're ${ordinal(myQueueIdx + 1)} in line of ${queueRows.length}`
+      : queueRows.length > 0
+        ? `${queueRows.length} waiting`
+        : "Empty";
+
   return (
     <div className="space-y-5 pb-24 animate-fade-in">
       <div className="flex items-center gap-2 text-xs">
@@ -208,14 +232,42 @@ export default async function TournamentLivePage({
         numCourts={tournament.num_courts ?? null}
       />
 
-      <DivisionRulesCard
-        division={myDivision}
-        format={tournament.format}
-        scoreToWinPool={tournament.score_to_win_pool ?? undefined}
-        scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
-        finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
-        divisionSettings={(tournament as any).division_settings?.[myDivision] ?? null}
-      />
+      {/* Rules — collapsed by default during live play. The rulebook
+          doesn't change once the event is underway, so it's off the
+          screen until the player wants to double-check scoring or
+          tiebreakers. */}
+      <CollapsibleCard
+        title={`${getDivisionLabel(myDivision)} — Rules`}
+        subtitle="Scoring, format, and tiebreakers"
+        defaultOpen={false}
+      >
+        <DivisionRulesCard
+          division={myDivision}
+          format={tournament.format}
+          scoreToWinPool={tournament.score_to_win_pool ?? undefined}
+          scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
+          finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
+          divisionSettings={(tournament as any).division_settings?.[myDivision] ?? null}
+          embedded
+        />
+      </CollapsibleCard>
+
+      {/* Match queue — collapsed by default, but the card subtitle
+          shows queue position even collapsed so the player sees how
+          far away their match is at a glance. Expand for the full
+          FIFO list with highlighted self-row. */}
+      <CollapsibleCard
+        title="Match queue"
+        subtitle={queueSubtitle}
+        defaultOpen={false}
+      >
+        <NextUpQueue
+          tournamentId={tournamentId}
+          myTeamPrimaryId={teamPrimaryId}
+          myDivision={myDivision}
+          embedded
+        />
+      </CollapsibleCard>
 
       <TournamentBracketView
         matches={(matches ?? []) as any}
@@ -229,13 +281,13 @@ export default async function TournamentLivePage({
         partnerMap={partnerMap}
       />
 
-      <NextUpQueue
-        tournamentId={tournamentId}
-        myPlayerId={profile.id}
-        myDivision={myDivision}
-      />
-
       <LiveTournamentRealtime tournamentId={tournamentId} />
     </div>
   );
+}
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
 }

@@ -10,7 +10,6 @@ import { ActiveDivisionsManager } from "./active-divisions-manager";
 import { CourtTracker } from "./court-tracker";
 import type { CourtTrackerMatch } from "./court-tracker";
 import { EndTournamentButton } from "./end-tournament-button";
-import { interleaveQueueByDivision } from "@/lib/tournament-queue";
 import {
   AskToPartnerButton,
   RespondToRequestButtons,
@@ -549,8 +548,11 @@ export default async function TournamentDetailPage({
                 )
                 .map(toTracker);
 
-              const queuedMatches = interleaveQueueByDivision(
-                matches.filter(
+              // Strict FIFO — queue_entered_at is staggered at enqueue
+              // time (engine does the cross-division interleave there),
+              // so the read path is a pure timestamp sort.
+              const queuedMatches = (matches
+                .filter(
                   (m: any) =>
                     m.status === "pending" &&
                     m.court_number == null &&
@@ -559,8 +561,11 @@ export default async function TournamentDetailPage({
                     m.player2_id &&
                     m.division &&
                     activeSet.has(m.division)
-                ) as any
-              ).map(toTracker);
+                )
+                .sort((a: any, b: any) =>
+                  new Date(a.queue_entered_at).getTime() -
+                  new Date(b.queue_entered_at).getTime()
+                ) as any[]).map(toTracker);
 
               return (
                 <CourtTracker
