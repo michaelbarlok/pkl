@@ -11,6 +11,9 @@ interface Props {
     num_pools?: number;
     playoff_advancing?: number;
   } | null;
+  /** Render without the outer `.card` wrapper + heading — the
+   *  caller is already providing a card frame (e.g. CollapsibleCard). */
+  embedded?: boolean;
 }
 
 /**
@@ -26,16 +29,19 @@ export function DivisionRulesCard({
   scoreToWinPlayoff,
   finalsBestOf3,
   divisionSettings,
+  embedded = false,
 }: Props) {
   const isRoundRobin = format === "round_robin";
   const playoffAdvancing = divisionSettings?.playoff_advancing;
   const gamesPerTeam = divisionSettings?.games_per_team;
 
   return (
-    <div className="card border border-brand-500/30 space-y-3">
-      <h2 className="text-sm font-semibold text-dark-100">
-        {getDivisionLabel(division)} — Rules
-      </h2>
+    <div className={embedded ? "space-y-3" : "card border border-brand-500/30 space-y-3"}>
+      {!embedded && (
+        <h2 className="text-sm font-semibold text-dark-100">
+          {getDivisionLabel(division)} — Rules
+        </h2>
+      )}
 
       <dl className="text-xs text-dark-200 space-y-1.5">
         {isRoundRobin ? (

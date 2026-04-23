@@ -455,6 +455,23 @@ function PoolSection({
 }) {
   const rounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b);
 
+  // Default the round pill to the first round that still has matches
+  // to play — keeps the viewer on the "current" round instead of
+  // always landing on Round 1 after refresh. Falls back to the
+  // earliest round when everything is complete.
+  const initialRound = (() => {
+    for (const r of rounds) {
+      const any = matches.some(
+        (m) => m.round === r && m.status !== "completed" && m.status !== "bye"
+      );
+      if (any) return r;
+    }
+    return rounds[0];
+  })();
+  const [selectedRound, setSelectedRound] = useState<number | null>(
+    initialRound ?? null
+  );
+
   // Compute standings
   const standings = computeStandings(matches, partnerMap);
 
@@ -494,15 +511,62 @@ function PoolSection({
         </div>
       )}
 
-      {/* Matches by Round */}
-      {rounds.map((round) => {
+      {/* Round pill selector — tapping a round reveals just that
+          round's matches so the pool isn't a long scroll when the
+          schedule has a lot of rounds. */}
+      {rounds.length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {rounds.map((round) => {
+            const isActive = selectedRound === round;
+            const complete = matches
+              .filter((m) => m.round === round)
+              .every((m) => m.status === "completed" || m.status === "bye");
+            return (
+              <button
+                key={round}
+                type="button"
+                onClick={() => setSelectedRound(round)}
+                className={
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors " +
+                  (isActive
+                    ? "bg-brand-500 text-white ring-1 ring-brand-400"
+                    : complete
+                      ? "bg-surface-overlay text-surface-muted ring-1 ring-surface-border hover:text-dark-200"
+                      : "bg-surface-overlay text-dark-100 hover:bg-surface-raised")
+                }
+                aria-current={isActive ? "true" : undefined}
+              >
+                Round {round}
+                {complete && (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    className="h-3 w-3"
+                    aria-label="Complete"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Matches for the selected round (or all rounds if only one). */}
+      {(selectedRound != null ? [selectedRound] : rounds).map((round) => {
         const roundMatches = matches
           .filter((m) => m.round === round)
           .sort((a, b) => a.match_number - b.match_number);
 
         return (
           <div key={round}>
-            <h4 className="text-sm font-semibold text-dark-200 mb-2">Round {round}</h4>
+            {rounds.length === 1 && (
+              <h4 className="text-sm font-semibold text-dark-200 mb-2">Round {round}</h4>
+            )}
             <div className="space-y-2">
               {roundMatches.map((match) => (
                 <MatchCard

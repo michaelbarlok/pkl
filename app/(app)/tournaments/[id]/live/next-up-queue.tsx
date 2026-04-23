@@ -7,6 +7,10 @@ interface Props {
    *  player2_id. Used to highlight the viewer's team in the queue. */
   myTeamPrimaryId: string;
   myDivision: string;
+  /** Drop the internal header + position summary because the
+   *  caller's already rendering those in the surrounding collapsible
+   *  card. */
+  embedded?: boolean;
 }
 
 /**
@@ -25,6 +29,7 @@ export async function NextUpQueue({
   tournamentId,
   myTeamPrimaryId,
   myDivision,
+  embedded = false,
 }: Props) {
   const supabase = await createClient();
 
@@ -103,17 +108,19 @@ export async function NextUpQueue({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-end justify-between gap-3 flex-wrap">
-        <h2 className="text-sm font-semibold text-dark-200">Match queue</h2>
-        {myQueueIndex >= 0 ? (
-          <p className="text-xs text-accent-300">
-            You&apos;re <span className="font-semibold">{ordinal(myQueueIndex + 1)}</span> in line
-            <span className="text-surface-muted"> of {queue.length}</span>
-          </p>
-        ) : queue.length > 0 ? (
-          <p className="text-xs text-surface-muted">{queue.length} waiting</p>
-        ) : null}
-      </div>
+      {!embedded && (
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <h2 className="text-sm font-semibold text-dark-200">Match queue</h2>
+          {myQueueIndex >= 0 ? (
+            <p className="text-xs text-accent-300">
+              You&apos;re <span className="font-semibold">{ordinal(myQueueIndex + 1)}</span> in line
+              <span className="text-surface-muted"> of {queue.length}</span>
+            </p>
+          ) : queue.length > 0 ? (
+            <p className="text-xs text-surface-muted">{queue.length} waiting</p>
+          ) : null}
+        </div>
+      )}
 
       {onCourt.length > 0 && (
         <ul className="space-y-1.5">
