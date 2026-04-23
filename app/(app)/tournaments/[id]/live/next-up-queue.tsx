@@ -129,13 +129,15 @@ export async function NextUpQueue({
               key={m.id}
               className="card flex items-center justify-between gap-3 border border-brand-500/40 bg-brand-500/10"
             >
-              <div className="text-xs min-w-0">
-                <p className="text-dark-100 font-medium truncate">
+              <div className="text-xs min-w-0 flex-1">
+                <p className="text-dark-100 font-medium break-words">
                   {teamLabel(m.player1_id, m.player1?.display_name)}
-                  <span className="text-surface-muted"> vs </span>
+                </p>
+                <p className="text-[10px] text-surface-muted leading-tight">vs</p>
+                <p className="text-dark-100 font-medium break-words">
                   {teamLabel(m.player2_id, m.player2?.display_name)}
                 </p>
-                <p className="text-surface-muted">
+                <p className="text-surface-muted mt-1">
                   {getDivisionLabel(m.division)} · Round {m.round}
                 </p>
               </div>
@@ -181,13 +183,17 @@ export async function NextUpQueue({
                   >
                     #{idx + 1}
                   </span>
-                  <div className="min-w-0">
-                    <p className="text-dark-100 truncate">
+                  <div className="min-w-0 flex-1">
+                    {/* Stack team rows so long doubles names wrap
+                        instead of truncating on mobile. */}
+                    <p className="text-dark-100 break-words">
                       {teamLabel(m.player1_id, m.player1?.display_name)}
-                      <span className="text-surface-muted"> vs </span>
+                    </p>
+                    <p className="text-[10px] text-surface-muted leading-tight">vs</p>
+                    <p className="text-dark-100 break-words">
                       {teamLabel(m.player2_id, m.player2?.display_name)}
                     </p>
-                    <p className="text-surface-muted">
+                    <p className="text-surface-muted mt-1">
                       {getDivisionLabel(m.division)} · Round {m.round}
                     </p>
                   </div>

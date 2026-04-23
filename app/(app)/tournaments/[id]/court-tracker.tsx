@@ -149,13 +149,18 @@ export function CourtTracker({
             </div>
             {match ? (
               <div className="mt-1 text-xs space-y-1.5">
-                <div className="space-y-0.5">
-                  <p className="text-dark-100">
+                {/* Teams stacked with a small "vs" row so partner
+                    names line up neatly instead of running together
+                    in a long horizontal string on narrow cards. */}
+                <div>
+                  <p className="text-dark-100 break-words">
                     {formatTeam(match.player1_name, match.partner1_name)}
-                    <span className="text-surface-muted"> vs </span>
+                  </p>
+                  <p className="text-[10px] text-surface-muted leading-tight">vs</p>
+                  <p className="text-dark-100 break-words">
                     {formatTeam(match.player2_name, match.partner2_name)}
                   </p>
-                  <p className="text-surface-muted">
+                  <p className="text-surface-muted mt-1">
                     {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
                     {bracketLabel(match.bracket)} · Round {match.round}
                   </p>
@@ -201,13 +206,15 @@ export function CourtTracker({
                 key={m.id}
                 className="flex items-start justify-between gap-3 rounded-md bg-surface-overlay ring-1 ring-dark-500 shadow-sm px-3 py-2"
               >
-                <div className="text-xs min-w-0">
-                  <p className="text-dark-100 truncate">
+                <div className="text-xs min-w-0 flex-1">
+                  <p className="text-dark-100 break-words">
                     {formatTeam(m.player1_name, m.partner1_name)}
-                    <span className="text-surface-muted"> vs </span>
+                  </p>
+                  <p className="text-[10px] text-surface-muted leading-tight">vs</p>
+                  <p className="text-dark-100 break-words">
                     {formatTeam(m.player2_name, m.partner2_name)}
                   </p>
-                  <p className="text-surface-muted">
+                  <p className="text-surface-muted mt-1">
                     {m.division ? getDivisionLabel(m.division) : ""} ·{" "}
                     {bracketLabel(m.bracket)} · Round {m.round}
                   </p>
