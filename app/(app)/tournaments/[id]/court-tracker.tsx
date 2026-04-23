@@ -128,56 +128,61 @@ export function CourtTracker({
           <div
             key={court}
             className={
-              "rounded-md border px-3 py-2.5 " +
+              "rounded-lg border shadow-sm px-4 py-3 " +
               (match
                 ? "border-brand-500/40 bg-brand-500/10"
                 : "border-surface-border bg-surface-overlay")
             }
           >
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-dark-200">
+            <div className="flex items-center justify-between pb-2 border-b border-surface-border/60">
+              <p className="text-sm font-semibold text-dark-100">
                 Court {court}
               </p>
               <span
                 className={
-                  "text-[10px] font-semibold uppercase tracking-wide " +
+                  "inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide " +
                   (match ? "text-brand-vivid" : "text-surface-muted")
                 }
               >
+                {match && <span className="h-1.5 w-1.5 rounded-full bg-brand-vivid animate-pulse" />}
                 {match ? "Live" : "Open"}
               </span>
             </div>
             {match ? (
-              <div className="mt-1 text-xs space-y-1.5">
-                {/* Team A left-aligned, Team B right-aligned with a
-                    centred "vs" — both teams get half the card
-                    width and can wrap independently on narrow
-                    screens without clipping. */}
-                <div>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                    <p className="text-dark-100 break-words min-w-0 text-left">
-                      {formatTeam(match.player1_name, match.partner1_name)}
-                    </p>
-                    <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
-                    <p className="text-dark-100 break-words min-w-0 text-right">
-                      {formatTeam(match.player2_name, match.partner2_name)}
-                    </p>
+              <div className="mt-2 space-y-2.5">
+                {/* Teams stacked full-width with a centred "vs"
+                    divider. On the live court cards the
+                    side-by-side 1fr·auto·1fr grid made wrap
+                    points jagged when one team had long doubles
+                    names and the other didn't — every card reads
+                    consistently when each team gets a full row. */}
+                <div className="space-y-1">
+                  <p className="text-sm text-dark-100 font-medium break-words">
+                    {formatTeam(match.player1_name, match.partner1_name)}
+                  </p>
+                  <div className="flex items-center gap-2 text-[10px] text-surface-muted uppercase tracking-wide">
+                    <span className="h-px flex-1 bg-surface-border" />
+                    <span>vs</span>
+                    <span className="h-px flex-1 bg-surface-border" />
                   </div>
-                  <p className="text-surface-muted mt-1">
-                    {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
-                    {bracketLabel(match.bracket)} · Round {match.round}
+                  <p className="text-sm text-dark-100 font-medium break-words">
+                    {formatTeam(match.player2_name, match.partner2_name)}
                   </p>
                 </div>
+                <p className="text-xs text-surface-muted">
+                  {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
+                  {bracketLabel(match.bracket)} · Round {match.round}
+                </p>
                 <button
                   type="button"
                   onClick={() => setScoring(match)}
-                  className="btn-primary text-[11px] py-1 px-2.5"
+                  className="btn-primary text-xs py-1.5 px-3 w-full sm:w-auto"
                 >
                   Enter Score
                 </button>
               </div>
             ) : (
-              <p className="mt-1 text-xs text-surface-muted">
+              <p className="mt-2 text-xs text-surface-muted">
                 Send a queued match to start play.
               </p>
             )}
