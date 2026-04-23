@@ -46,6 +46,9 @@ export type NotificationType =
   | "tournament_up_next"
   | "tournament_court_assigned"
   | "tournament_recap"
+  | "tournament_partner_request"
+  | "tournament_partner_accepted"
+  | "tournament_partner_declined"
   | "badge_earned"
   | "session_recap"
   | "group_announcement";
