@@ -273,6 +273,26 @@ function ScoreEntryModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Escape-key close — standard modal UX. Locked to this modal
+  // instance; removed on unmount.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Freeze body scroll while the modal is up so long bracket pages
+  // don't keep scrolling behind a visible dialog.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   async function save() {
     setError("");
     const score1 = parseInt(s1);
@@ -313,22 +333,42 @@ function ScoreEntryModal({
   const teamA = formatTeam(match.player1_name, match.partner1_name);
   const teamB = formatTeam(match.player2_name, match.partner2_name);
 
+  // Single-element wrapper carries both the backdrop styling and the
+  // close handler — the old split (backdrop div + panel div) was
+  // fragile on some browsers where pointer-events order let clicks
+  // fall through the backdrop without firing. The panel stops click
+  // propagation so typing/clicking inside doesn't dismiss.
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4"
+      className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/60"
       role="dialog"
       aria-modal="true"
+      onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md rounded-t-xl sm:rounded-xl bg-surface-raised border border-surface-border shadow-2xl p-5 space-y-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-wider text-surface-muted">
-            Court {match.court_number}
-          </p>
-          <h2 className="text-base font-semibold text-dark-100">Enter Score</h2>
-          <p className="text-xs text-surface-muted mt-0.5">
-            Saving flips this match to completed, frees the court, and the queue promotes the next match automatically.
-          </p>
+      <div
+        className="relative w-full sm:max-w-md rounded-t-xl sm:rounded-xl bg-surface-raised border border-surface-border shadow-2xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-surface-muted">
+              Court {match.court_number}
+            </p>
+            <h2 className="text-base font-semibold text-dark-100">Enter Score</h2>
+            <p className="text-xs text-surface-muted mt-0.5">
+              Saving flips this match to completed, frees the court, and the queue promotes the next match automatically.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-surface-muted hover:text-dark-100"
+            aria-label="Close"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <div className="space-y-3">
