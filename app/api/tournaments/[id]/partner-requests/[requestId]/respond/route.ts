@@ -118,27 +118,22 @@ export async function POST(
 
   const division = req.division || targetReg.division;
 
-  // Link partner_id on the target's row.
+  // A team is ONE row in tournament_registrations — the partner is
+  // tracked as partner_id on that row, not as a second row. Keep the
+  // target's row as the single source of truth and link the
+  // requester there; if the requester had their own row (e.g. they
+  // also posted Need Partner in this tournament) delete it so we
+  // don't end up with two rows representing the same team.
   await service
     .from("tournament_registrations")
-    .update({ partner_id: req.requester_id })
+    .update({ partner_id: req.requester_id, division })
     .eq("id", targetReg.id);
 
-  // Create the requester's registration if they didn't have one,
-  // or update their partner_id if they did (need-partner → confirmed).
   if (requesterReg) {
     await service
       .from("tournament_registrations")
-      .update({ partner_id: req.target_id, division })
+      .delete()
       .eq("id", requesterReg.id);
-  } else {
-    await service.from("tournament_registrations").insert({
-      tournament_id: tournamentId,
-      player_id: req.requester_id,
-      partner_id: req.target_id,
-      division,
-      status: targetReg.status, // inherit confirmed/waitlist
-    });
   }
 
   // Flip this request to confirmed; cascade-decline anything else
