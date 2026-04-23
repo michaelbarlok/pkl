@@ -3,7 +3,7 @@
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { getDivisionLabel } from "@/lib/divisions";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 export interface CourtTrackerMatch {
@@ -273,16 +273,25 @@ function ScoreEntryModal({
   const [s2, setS2] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const firstInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Escape-key close — standard modal UX. Locked to this modal
-  // instance; removed on unmount.
+  // Escape closes (unless we're mid-save so a click/keyboard race
+  // doesn't kill the in-flight request).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !saving) onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, saving]);
+
+  // Autofocus the first score input so the organizer can start
+  // typing as soon as the modal is up — same pattern as the ladder
+  // session score modal.
+  useEffect(() => {
+    const t = setTimeout(() => firstInputRef.current?.focus(), 20);
+    return () => clearTimeout(t);
+  }, []);
 
   // Portals need document, so gate mount to avoid SSR/hydration
   // mismatches.
@@ -291,7 +300,7 @@ function ScoreEntryModal({
 
   // Freeze body scroll while the modal is up, and compensate the
   // now-missing scrollbar with padding-right so the viewport doesn't
-  // jump sideways (the Chrome "twitch" reported on hover).
+  // jump sideways on Chrome.
   useEffect(() => {
     const scrollbar = window.innerWidth - document.documentElement.clientWidth;
     const prevOverflow = document.body.style.overflow;
@@ -306,7 +315,8 @@ function ScoreEntryModal({
     };
   }, []);
 
-  async function save() {
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
     setError("");
     const score1 = parseInt(s1);
     const score2 = parseInt(s2);
@@ -334,103 +344,122 @@ function ScoreEntryModal({
         winner_id,
       }),
     });
-    setSaving(false);
     if (res.ok) {
       onSaved();
       return;
     }
+    setSaving(false);
     const data = await res.json().catch(() => ({}));
     setError(data.error ?? "Could not save score");
   }
 
-  const teamA = formatTeam(match.player1_name, match.partner1_name);
-  const teamB = formatTeam(match.player2_name, match.partner2_name);
+  // Stack partner names vertically inside each score column for
+  // consistency with the ladder session modal — partners are fully
+  // visible on one row each instead of being squashed together.
+  const teamANames = [match.player1_name, match.partner1_name].filter(
+    (x): x is string => !!x
+  );
+  const teamBNames = [match.player2_name, match.partner2_name].filter(
+    (x): x is string => !!x
+  );
 
-  // Portal to document.body so the modal lives outside the
-  // tournament page's stacking context — that was the source of the
-  // hover-twitch (some ancestor's realtime-driven repaint bled
-  // through the overlay).
+  // Portal to document.body so the modal lives outside the tournament
+  // page's stacking context.
   const modal = (
     <div
-      className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/60"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      onClick={onClose}
+      aria-labelledby="tournament-score-entry-title"
     >
       <div
-        className="relative w-full sm:max-w-md rounded-t-xl sm:rounded-xl bg-surface-raised border border-surface-border shadow-2xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] uppercase tracking-wider text-surface-muted">
-              Court {match.court_number}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+        onClick={() => {
+          if (!saving) onClose();
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-surface-raised shadow-2xl ring-1 ring-surface-border animate-scale-in">
+        <form onSubmit={submit} className="p-5 sm:p-6 space-y-4">
+          <header className="text-center space-y-1">
+            <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider">
+              Court {match.court_number} ·{" "}
+              {match.division ? getDivisionLabel(match.division) : ""} · Round{" "}
+              {match.round}
             </p>
-            <h2 className="text-base font-semibold text-dark-100">Enter Score</h2>
-            <p className="text-xs text-surface-muted mt-0.5">
-              Saving flips this match to completed, frees the court, and the queue promotes the next match automatically.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-surface-muted hover:text-dark-100"
-            aria-label="Close"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+            <h2
+              id="tournament-score-entry-title"
+              className="text-base font-semibold text-dark-100"
+            >
+              {teamANames.join(" & ") || "Team A"}
+            </h2>
+            <p className="text-xs text-surface-muted">vs</p>
+            <h2 className="text-base font-semibold text-dark-100">
+              {teamBNames.join(" & ") || "Team B"}
+            </h2>
+          </header>
 
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-dark-200 mb-1">
-              {teamA}
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={s1}
-              onChange={(e) => setS1(e.target.value)}
-              className="input w-full"
-              placeholder="Score"
-            />
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <div className="min-w-0">
+              <div className="mb-2 text-xs font-semibold text-surface-muted text-center uppercase tracking-wider leading-tight break-words space-y-0.5">
+                {teamANames.length > 0
+                  ? teamANames.map((n, i) => <div key={i}>{n}</div>)
+                  : <div>Team A</div>}
+              </div>
+              <input
+                ref={firstInputRef}
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={s1}
+                onChange={(e) => setS1(e.target.value)}
+                className="input text-center text-3xl font-bold py-5 sm:text-2xl sm:py-3 w-full"
+                placeholder="0"
+                required
+              />
+            </div>
+            <span className="text-lg font-bold text-surface-muted mt-6">—</span>
+            <div className="min-w-0">
+              <div className="mb-2 text-xs font-semibold text-surface-muted text-center uppercase tracking-wider leading-tight break-words space-y-0.5">
+                {teamBNames.length > 0
+                  ? teamBNames.map((n, i) => <div key={i}>{n}</div>)
+                  : <div>Team B</div>}
+              </div>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={s2}
+                onChange={(e) => setS2(e.target.value)}
+                className="input text-center text-3xl font-bold py-5 sm:text-2xl sm:py-3 w-full"
+                placeholder="0"
+                required
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-dark-200 mb-1">
-              {teamB}
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={s2}
-              onChange={(e) => setS2(e.target.value)}
-              className="input w-full"
-              placeholder="Score"
-            />
+
+          {error && (
+            <p className="text-sm text-red-400 text-center">{error}</p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving || s1 === "" || s2 === ""}
+              className="btn-primary flex-1"
+            >
+              {saving ? "Submitting..." : "Submit"}
+            </button>
           </div>
-        </div>
-
-        {error && <p className="text-xs text-red-400">{error}</p>}
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="btn-primary flex-1 disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save Score"}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-secondary"
-          >
-            Cancel
-          </button>
-        </div>
+        </form>
       </div>
     </div>
   );
