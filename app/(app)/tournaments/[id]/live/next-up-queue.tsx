@@ -130,13 +130,19 @@ export async function NextUpQueue({
               className="card flex items-center justify-between gap-3 border border-brand-500/40 bg-brand-500/10"
             >
               <div className="text-xs min-w-0 flex-1">
-                <p className="text-dark-100 font-medium break-words">
-                  {teamLabel(m.player1_id, m.player1?.display_name)}
-                </p>
-                <p className="text-[10px] text-surface-muted leading-tight">vs</p>
-                <p className="text-dark-100 font-medium break-words">
-                  {teamLabel(m.player2_id, m.player2?.display_name)}
-                </p>
+                {/* Team A left-aligned, Team B right-aligned with
+                    a "vs" separator — balances names across the
+                    available width and lets each side wrap
+                    independently without clipping on mobile. */}
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <p className="text-dark-100 font-medium break-words min-w-0 text-left">
+                    {teamLabel(m.player1_id, m.player1?.display_name)}
+                  </p>
+                  <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
+                  <p className="text-dark-100 font-medium break-words min-w-0 text-right">
+                    {teamLabel(m.player2_id, m.player2?.display_name)}
+                  </p>
+                </div>
                 <p className="text-surface-muted mt-1">
                   {getDivisionLabel(m.division)} · Round {m.round}
                 </p>
@@ -184,15 +190,15 @@ export async function NextUpQueue({
                     #{idx + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    {/* Stack team rows so long doubles names wrap
-                        instead of truncating on mobile. */}
-                    <p className="text-dark-100 break-words">
-                      {teamLabel(m.player1_id, m.player1?.display_name)}
-                    </p>
-                    <p className="text-[10px] text-surface-muted leading-tight">vs</p>
-                    <p className="text-dark-100 break-words">
-                      {teamLabel(m.player2_id, m.player2?.display_name)}
-                    </p>
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <p className="text-dark-100 break-words min-w-0 text-left">
+                        {teamLabel(m.player1_id, m.player1?.display_name)}
+                      </p>
+                      <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
+                      <p className="text-dark-100 break-words min-w-0 text-right">
+                        {teamLabel(m.player2_id, m.player2?.display_name)}
+                      </p>
+                    </div>
                     <p className="text-surface-muted mt-1">
                       {getDivisionLabel(m.division)} · Round {m.round}
                     </p>

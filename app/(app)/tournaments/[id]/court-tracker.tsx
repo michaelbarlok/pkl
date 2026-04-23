@@ -149,17 +149,20 @@ export function CourtTracker({
             </div>
             {match ? (
               <div className="mt-1 text-xs space-y-1.5">
-                {/* Teams stacked with a small "vs" row so partner
-                    names line up neatly instead of running together
-                    in a long horizontal string on narrow cards. */}
+                {/* Team A left-aligned, Team B right-aligned with a
+                    centred "vs" — both teams get half the card
+                    width and can wrap independently on narrow
+                    screens without clipping. */}
                 <div>
-                  <p className="text-dark-100 break-words">
-                    {formatTeam(match.player1_name, match.partner1_name)}
-                  </p>
-                  <p className="text-[10px] text-surface-muted leading-tight">vs</p>
-                  <p className="text-dark-100 break-words">
-                    {formatTeam(match.player2_name, match.partner2_name)}
-                  </p>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <p className="text-dark-100 break-words min-w-0 text-left">
+                      {formatTeam(match.player1_name, match.partner1_name)}
+                    </p>
+                    <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
+                    <p className="text-dark-100 break-words min-w-0 text-right">
+                      {formatTeam(match.player2_name, match.partner2_name)}
+                    </p>
+                  </div>
                   <p className="text-surface-muted mt-1">
                     {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
                     {bracketLabel(match.bracket)} · Round {match.round}
@@ -207,13 +210,15 @@ export function CourtTracker({
                 className="flex items-start justify-between gap-3 rounded-md bg-surface-overlay ring-1 ring-dark-500 shadow-sm px-3 py-2"
               >
                 <div className="text-xs min-w-0 flex-1">
-                  <p className="text-dark-100 break-words">
-                    {formatTeam(m.player1_name, m.partner1_name)}
-                  </p>
-                  <p className="text-[10px] text-surface-muted leading-tight">vs</p>
-                  <p className="text-dark-100 break-words">
-                    {formatTeam(m.player2_name, m.partner2_name)}
-                  </p>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <p className="text-dark-100 break-words min-w-0 text-left">
+                      {formatTeam(m.player1_name, m.partner1_name)}
+                    </p>
+                    <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
+                    <p className="text-dark-100 break-words min-w-0 text-right">
+                      {formatTeam(m.player2_name, m.partner2_name)}
+                    </p>
+                  </div>
                   <p className="text-surface-muted mt-1">
                     {m.division ? getDivisionLabel(m.division) : ""} ·{" "}
                     {bracketLabel(m.bracket)} · Round {m.round}
