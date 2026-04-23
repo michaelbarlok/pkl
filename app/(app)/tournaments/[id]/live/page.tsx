@@ -5,6 +5,7 @@ import { getDivisionLabel } from "@/lib/divisions";
 import { TournamentBracketView } from "@/components/tournament-bracket";
 import type { PartnerMap } from "@/components/tournament-bracket";
 import { LiveTournamentRealtime } from "./live-realtime";
+import { MyCourtCard } from "./my-court-card";
 import { NextUpQueue } from "./next-up-queue";
 import { DivisionRulesCard } from "./division-rules-card";
 
@@ -54,11 +55,14 @@ export default async function TournamentLivePage({
         )
         .eq("id", tournamentId)
         .single(),
+      // `.or` so we find the registration whether the viewer is the
+      // team's primary (player_id) or the partner that got added via
+      // the Ask-to-Partner flow (partner_id).
       supabase
         .from("tournament_registrations")
-        .select("division, partner_id")
+        .select("division, player_id, partner_id")
         .eq("tournament_id", tournamentId)
-        .eq("player_id", profile.id)
+        .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
         .neq("status", "withdrawn")
         .maybeSingle(),
       supabase
@@ -71,6 +75,10 @@ export default async function TournamentLivePage({
   if (!registration) notFound();
 
   const myDivision = registration.division as string;
+  // The team's "primary" — what tournament_matches.player1_id /
+  // player2_id reference. Whether the viewer is the registration's
+  // player_id or the partner_id, the primary is the row's player_id.
+  const teamPrimaryId = registration.player_id as string;
   const activeDivisionSet = new Set(
     (activeDivs ?? []).map((r: any) => r.division as string)
   );
@@ -93,6 +101,18 @@ export default async function TournamentLivePage({
     .order("round", { ascending: true })
     .order("match_number", { ascending: true });
 
+  // Find the viewer's currently-assigned court (if any). Their team
+  // is on court when a pending match has them as player1 or player2
+  // and court_number is set. Partner display name is pulled from the
+  // partnerMap below; opponent label combines the other side's
+  // primary + partner.
+  const myOnCourtMatch = (matches ?? []).find(
+    (m: any) =>
+      m.status === "pending" &&
+      m.court_number != null &&
+      (m.player1_id === teamPrimaryId || m.player2_id === teamPrimaryId)
+  ) as any;
+
   // Partner map for doubles labels.
   const partnerMap: PartnerMap = new Map();
   if (tournament.type === "doubles") {
@@ -107,6 +127,59 @@ export default async function TournamentLivePage({
         partnerMap.set(r.player_id, r.partner?.display_name ?? "Partner");
       }
     }
+  }
+
+  // Build the hero-card payload from the on-court match. We figure
+  // out which side of the match is "us", then derive the opponent
+  // string and the viewer's partner display name.
+  let myCourtCardData:
+    | {
+        id: string;
+        court_number: number;
+        division: string | null;
+        round: number;
+        bracket: string;
+        partner_name: string | null;
+        opponent_team: string | null;
+      }
+    | null = null;
+  if (myOnCourtMatch) {
+    const meIsP1 = myOnCourtMatch.player1_id === teamPrimaryId;
+    const myPrimaryName = meIsP1
+      ? myOnCourtMatch.player1?.display_name
+      : myOnCourtMatch.player2?.display_name;
+    const opponentPrimaryName = meIsP1
+      ? myOnCourtMatch.player2?.display_name ?? "TBD"
+      : myOnCourtMatch.player1?.display_name ?? "TBD";
+    const opponentPrimaryId = meIsP1
+      ? myOnCourtMatch.player2_id
+      : myOnCourtMatch.player1_id;
+    const opponentPartnerName = opponentPrimaryId
+      ? partnerMap.get(opponentPrimaryId) ?? null
+      : null;
+    // Display the viewer's partner (the OTHER member of their team)
+    // — which is whoever is in partnerMap for our team's primary,
+    // unless the viewer themselves is that partner. Compare against
+    // profile.display_name to figure out which case we're in.
+    const partnerFromMap = partnerMap.get(teamPrimaryId) ?? null;
+    const partnerName =
+      partnerFromMap && partnerFromMap !== profile.display_name
+        ? partnerFromMap
+        : myPrimaryName && myPrimaryName !== profile.display_name
+          ? myPrimaryName
+          : null;
+
+    myCourtCardData = {
+      id: myOnCourtMatch.id,
+      court_number: myOnCourtMatch.court_number,
+      division: myOnCourtMatch.division ?? null,
+      round: myOnCourtMatch.round,
+      bracket: myOnCourtMatch.bracket,
+      partner_name: partnerName,
+      opponent_team: opponentPartnerName
+        ? `${opponentPrimaryName} / ${opponentPartnerName}`
+        : opponentPrimaryName,
+    };
   }
 
   return (
@@ -128,6 +201,12 @@ export default async function TournamentLivePage({
           </span>
         </p>
       </header>
+
+      <MyCourtCard
+        match={myCourtCardData}
+        tournamentId={tournamentId}
+        numCourts={tournament.num_courts ?? null}
+      />
 
       <DivisionRulesCard
         division={myDivision}
