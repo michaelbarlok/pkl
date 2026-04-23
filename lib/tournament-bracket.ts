@@ -235,9 +235,9 @@ export function poolGamesInfo(
  */
 export function generateRoundRobin(
   playerIds: string[],
-  options?: { gamesPerTeam?: number; seeded?: boolean; numPools?: number }
+  options?: { gamesPerTeam?: number; seeded?: boolean; numPools?: number; rng?: () => number }
 ): BracketMatch[] {
-  const { gamesPerTeam, seeded, numPools } = options ?? {};
+  const { gamesPerTeam, seeded, numPools, rng } = options ?? {};
   const n = playerIds.length;
   if (n < 2) return [];
 
@@ -269,7 +269,7 @@ export function generateRoundRobin(
   for (let i = 0; i < structure.numPools; i++) {
     // Default: full round robin for this specific pool (each team plays every opponent once)
     const perPoolGames = gamesPerTeam ?? (pools[i].length - 1);
-    allMatches.push(...generatePoolMatches(pools[i], bracketNames[i], perPoolGames));
+    allMatches.push(...generatePoolMatches(pools[i], bracketNames[i], perPoolGames, rng));
   }
   return allMatches;
 }
@@ -309,10 +309,40 @@ function snakeDistribute(playerIds: string[], poolSizes: number[]): string[][] {
  *   Odd pools:  rounded up to the next complete lap so every player
  *               plays the same number of real games.
  */
+/**
+ * Generate round robin pool play matches (deterministic per call by
+ * default; pass `rng` for a seeded RNG in tests).
+ *
+ * Rules for picking which matches to include:
+ *   - Full round robin (gamesPerTeam === opponents) → all rounds.
+ *   - Under-full (gamesPerTeam < opponents) → a random subset of
+ *     rounds of size gamesPerTeam. For even pools every team plays
+ *     exactly gamesPerTeam games; for odd pools a team may land a
+ *     BYE in a picked round and play one fewer (unavoidable given
+ *     the BYE rotation).
+ *   - Over-full (gamesPerTeam > opponents) → floor(gamesPerTeam /
+ *     opponents) complete laps + (gamesPerTeam % opponents) random
+ *     additional rounds. This is what gives the "each team plays
+ *     every opponent once plus N randomized extras" behavior.
+ *
+ * Rounds come from the standard circle method; we just pick which
+ * lap indices to emit and in what order.
+ *
+ *   Odd pools: per-lap contains `roundsPerLap = n` rotations (with
+ *   one BYE per round). Real games per lap = n - 1.
+ *   Even pools: per-lap contains `roundsPerLap = n - 1` rotations.
+ *   Real games per lap = n - 1.
+ *
+ * @param playerIds  Pool participants, already distributed.
+ * @param bracket    Label used on each match row (e.g. "winners").
+ * @param gamesPerTeam  How many pool games each team should play.
+ * @param rng        Optional RNG for tests; defaults to Math.random.
+ */
 function generatePoolMatches(
   playerIds: string[],
   bracket: string,
-  gamesPerTeam: number
+  gamesPerTeam: number,
+  rng: () => number = Math.random
 ): BracketMatch[] {
   const n = playerIds.length;
   if (n < 2) return [];
@@ -322,19 +352,50 @@ function generatePoolMatches(
   if (isOdd) players.push("BYE");
 
   const numPlayers = players.length; // always even
-  const roundsPerLap = numPlayers - 1; // rounds in one full round robin
+  const roundsPerLap = numPlayers - 1;
   const matchesPerRound = numPlayers / 2;
+  const opponents = n - 1; // "real" opponents per team
 
-  // Odd pools must complete whole laps to keep real game counts equal
-  const totalRounds = isOdd
-    ? Math.ceil(gamesPerTeam / (n - 1)) * roundsPerLap
-    : gamesPerTeam;
+  // Every team in the pool must play the same number of games.
+  //
+  // EVEN pools: each round in the circle rotation is a perfect
+  //   matching (everyone plays), so any subset of rounds gives
+  //   every team the same game count. We can emit full laps + a
+  //   random partial lap for extras.
+  //
+  // ODD pools: each round has one BYE. A partial lap gives some
+  //   teams more games than others depending on BYE distribution,
+  //   so balance is impossible without whole laps. We round
+  //   gamesPerTeam UP to the nearest multiple of opponents and emit
+  //   that many full laps — no random extras.
+  const roundSequence: number[] = [];
+  let fullLaps: number;
+  let extras: number;
+  if (isOdd) {
+    fullLaps = Math.max(1, Math.ceil(gamesPerTeam / opponents));
+    extras = 0;
+  } else {
+    fullLaps = Math.max(0, Math.floor(gamesPerTeam / opponents));
+    extras = Math.max(0, gamesPerTeam % opponents);
+  }
+
+  for (let lap = 0; lap < fullLaps; lap++) {
+    for (let r = 0; r < roundsPerLap; r++) roundSequence.push(r);
+  }
+  if (extras > 0) {
+    const idxs = Array.from({ length: roundsPerLap }, (_, i) => i);
+    for (let i = idxs.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
+    }
+    const picked = idxs.slice(0, extras).sort((a, b) => a - b);
+    roundSequence.push(...picked);
+  }
 
   const matches: BracketMatch[] = [];
 
-  for (let round = 0; round < totalRounds; round++) {
-    // lapRound wraps back to 0 at the start of each new lap
-    const lapRound = round % roundsPerLap;
+  for (let round = 0; round < roundSequence.length; round++) {
+    const lapRound = roundSequence[round];
 
     // Circle method: fix slot 0, rotate the rest by lapRound positions
     const rotated = [players[0]];
