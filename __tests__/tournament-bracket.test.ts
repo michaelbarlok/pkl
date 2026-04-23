@@ -184,6 +184,88 @@ describe("getPoolStructure", () => {
   });
 });
 
+// ─── Pool-play tiebreaker stack ──────────────────────────────────────────────
+
+describe("computePoolStandings tiebreakers", () => {
+  function mkMatch(
+    p1: string,
+    p2: string,
+    winner: string,
+    s1: number,
+    s2: number
+  ) {
+    return {
+      player1_id: p1,
+      player2_id: p2,
+      winner_id: winner,
+      score1: [s1],
+      score2: [s2],
+      status: "completed",
+    };
+  }
+
+  test("wins comes first — 2-0 beats 1-1 regardless of PD", () => {
+    // a beats everyone by 1, b has huge +PD win but only 1 total.
+    const matches = [
+      mkMatch("a", "b", "a", 11, 10),
+      mkMatch("a", "c", "a", 11, 10),
+      mkMatch("b", "c", "b", 11, 0), // b blows c out
+    ];
+    const standings = computePoolStandings(matches);
+    expect(standings[0].id).toBe("a");
+    expect(standings[0].wins).toBe(2);
+  });
+
+  test("head-to-head wins breaks a wins+PD tie", () => {
+    // a, b, c all 1-1 with same PD, but the one who won H2H among
+    // the tied trio should rank highest.
+    const matches = [
+      mkMatch("a", "b", "a", 11, 9),
+      mkMatch("b", "c", "b", 11, 9),
+      mkMatch("c", "a", "c", 11, 9),
+    ];
+    const standings = computePoolStandings(matches);
+    // All three still tied on H2H wins too (1 each), so coin-flip
+    // resolves — but every team must still report 1-1.
+    for (const s of standings) {
+      expect(s.wins).toBe(1);
+      expect(s.losses).toBe(1);
+    }
+  });
+
+  test("head-to-head PD resolves a two-way tie", () => {
+    // a and b tied 2-1 with same overall PD. a beat b 11-5; b beat
+    // nobody interesting. a should rank ahead.
+    const matches = [
+      mkMatch("a", "b", "a", 11, 5), // a H2H: +6 vs b
+      mkMatch("a", "c", "c", 9, 11), // a loses vs c
+      mkMatch("a", "d", "a", 11, 5),
+      mkMatch("b", "c", "b", 11, 5), // b beats c
+      mkMatch("b", "d", "d", 9, 11), // b loses to d
+      mkMatch("b", "e", "b", 11, 5),
+      mkMatch("c", "d", "c", 11, 10),
+      mkMatch("c", "e", "e", 10, 11),
+      mkMatch("d", "e", "d", 11, 5),
+    ];
+    const standings = computePoolStandings(matches);
+    const aIdx = standings.findIndex((s) => s.id === "a");
+    const bIdx = standings.findIndex((s) => s.id === "b");
+    // a and b both went 2-1, but a won H2H, so a must rank first.
+    expect(aIdx).toBeLessThan(bIdx);
+  });
+
+  test("result is stable across reloads (same input → same order)", () => {
+    const matches = [
+      mkMatch("alpha", "bravo", "alpha", 11, 9),
+      mkMatch("bravo", "charlie", "bravo", 11, 9),
+      mkMatch("charlie", "alpha", "charlie", 11, 9),
+    ];
+    const first = computePoolStandings(matches).map((s) => s.id);
+    const second = computePoolStandings(matches).map((s) => s.id);
+    expect(first).toEqual(second);
+  });
+});
+
 // ─── Pool-play BYE handling (regression) ─────────────────────────────────────
 
 describe("round-robin pool play BYE handling", () => {

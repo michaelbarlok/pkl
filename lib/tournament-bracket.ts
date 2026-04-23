@@ -572,21 +572,39 @@ function generateSixTeamPlayoff(players: string[]): BracketMatch[] {
 }
 
 /**
- * Compute standings from completed pool matches.
- * Returns player IDs sorted by: wins (desc), then point differential (desc).
+ * Compute pool-play standings with the full tiebreaker stack.
+ *
+ * Sort order:
+ *   1. Wins (desc)
+ *   2. Point differential (desc)
+ *   3. Head-to-head wins among the tied teams only (desc)
+ *   4. Head-to-head point differential among the tied teams only (desc)
+ *   5. Stable hash of player_id ("coin flip") — deterministic per
+ *      player so reloads don't reshuffle positions.
+ *
+ * BYE matches and unfinished matches are skipped (status !== "completed"
+ * or no winner_id).
  */
 export function computePoolStandings(
   matches: { player1_id: string | null; player2_id: string | null; winner_id: string | null; score1: number[]; score2: number[]; status: string }[]
 ): { id: string; wins: number; losses: number; pointDiff: number }[] {
   const stats = new Map<string, { wins: number; losses: number; pointDiff: number }>();
+  // h2hWins[a][b] = 1 if a beat b, summed across any repeat matchups.
+  const h2hWins = new Map<string, Map<string, number>>();
+  // h2hPointDiff[a][b] = a's signed point margin vs b, summed.
+  const h2hPointDiff = new Map<string, Map<string, number>>();
+
+  function ensurePlayer(id: string) {
+    if (!stats.has(id)) stats.set(id, { wins: 0, losses: 0, pointDiff: 0 });
+    if (!h2hWins.has(id)) h2hWins.set(id, new Map());
+    if (!h2hPointDiff.has(id)) h2hPointDiff.set(id, new Map());
+  }
 
   for (const m of matches) {
     if (m.status !== "completed" || !m.winner_id) continue;
 
     for (const pid of [m.player1_id, m.player2_id]) {
-      if (pid && !stats.has(pid)) {
-        stats.set(pid, { wins: 0, losses: 0, pointDiff: 0 });
-      }
+      if (pid) ensurePlayer(pid);
     }
 
     const s1sum = m.score1.reduce((a, b) => a + b, 0);
@@ -604,11 +622,92 @@ export function computePoolStandings(
       else s.losses++;
       s.pointDiff += s2sum - s1sum;
     }
+
+    // H2H tracking — only for matches where both sides exist (BYEs
+    // already filtered out via status/winner guards above).
+    if (m.player1_id && m.player2_id) {
+      const p1wins = h2hWins.get(m.player1_id)!;
+      const p2wins = h2hWins.get(m.player2_id)!;
+      if (m.winner_id === m.player1_id) {
+        p1wins.set(m.player2_id, (p1wins.get(m.player2_id) ?? 0) + 1);
+      } else if (m.winner_id === m.player2_id) {
+        p2wins.set(m.player1_id, (p2wins.get(m.player1_id) ?? 0) + 1);
+      }
+
+      const p1pd = h2hPointDiff.get(m.player1_id)!;
+      const p2pd = h2hPointDiff.get(m.player2_id)!;
+      p1pd.set(m.player2_id, (p1pd.get(m.player2_id) ?? 0) + (s1sum - s2sum));
+      p2pd.set(m.player1_id, (p2pd.get(m.player1_id) ?? 0) + (s2sum - s1sum));
+    }
   }
 
-  return Array.from(stats.entries())
-    .map(([id, s]) => ({ id, ...s }))
-    .sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
+  // Initial sort — just the "overall" metrics.
+  const entries = Array.from(stats.entries()).map(([id, s]) => ({ id, ...s }));
+  entries.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
+
+  // Resolve ties inside each cluster (same wins AND same pointDiff).
+  const output: { id: string; wins: number; losses: number; pointDiff: number }[] = [];
+  let i = 0;
+  while (i < entries.length) {
+    let j = i + 1;
+    while (
+      j < entries.length &&
+      entries[j].wins === entries[i].wins &&
+      entries[j].pointDiff === entries[i].pointDiff
+    ) {
+      j++;
+    }
+
+    if (j - i === 1) {
+      output.push(entries[i]);
+      i = j;
+      continue;
+    }
+
+    const cluster = entries.slice(i, j);
+    const clusterIds = new Set(cluster.map((e) => e.id));
+
+    // H2H wins / H2H pd — count only matches between cluster members.
+    const decorated = cluster.map((e) => {
+      const w = h2hWins.get(e.id) ?? new Map();
+      const p = h2hPointDiff.get(e.id) ?? new Map();
+      let h2hW = 0;
+      let h2hP = 0;
+      for (const opponent of clusterIds) {
+        if (opponent === e.id) continue;
+        h2hW += w.get(opponent) ?? 0;
+        h2hP += p.get(opponent) ?? 0;
+      }
+      return { ...e, _h2hW: h2hW, _h2hP: h2hP, _hash: stableIdHash(e.id) };
+    });
+
+    decorated.sort(
+      (a, b) =>
+        b._h2hW - a._h2hW ||
+        b._h2hP - a._h2hP ||
+        a._hash - b._hash
+    );
+
+    for (const d of decorated) {
+      const { _h2hW, _h2hP, _hash, ...rest } = d;
+      void _h2hW;
+      void _h2hP;
+      void _hash;
+      output.push(rest);
+    }
+    i = j;
+  }
+
+  return output;
+}
+
+/** Deterministic hash used as the final "coin flip" tiebreaker. */
+function stableIdHash(id: string): number {
+  let h = 0;
+  for (let k = 0; k < id.length; k++) {
+    h = (h * 31 + id.charCodeAt(k)) | 0;
+  }
+  return h;
 }
 
 /**
