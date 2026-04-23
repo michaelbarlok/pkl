@@ -8,6 +8,10 @@ import { TournamentRealtimeSubscription } from "@/components/tournament-realtime
 import { DivisionReview } from "@/components/division-review";
 import { ActiveDivisionsManager } from "./active-divisions-manager";
 import { EndTournamentButton } from "./end-tournament-button";
+import {
+  AskToPartnerButton,
+  RespondToRequestButtons,
+} from "./partner-request-buttons";
 import { DeleteTournamentButton } from "@/components/delete-tournament-button";
 import { CoOrganizerManager } from "@/components/co-organizer-manager";
 import { getDivisionLabel } from "@/lib/divisions";
@@ -97,6 +101,7 @@ export default async function TournamentDetailPage({
     myRegistration,
     organizersResult,
     activeDivisionsResult,
+    pendingPartnerRequestsResult,
     { data: { user } },
   ] = await Promise.all([
       getTournament(id),
@@ -111,6 +116,13 @@ export default async function TournamentDetailPage({
         .from("tournament_active_divisions")
         .select("division")
         .eq("tournament_id", id),
+      supabase
+        .from("tournament_partner_requests")
+        .select(
+          "id, tournament_id, division, requester_id, target_id, status, created_at, requester:profiles!requester_id(id, display_name), target:profiles!target_id(id, display_name)"
+        )
+        .eq("tournament_id", id)
+        .eq("status", "pending"),
       supabase.auth.getUser(),
     ]);
 
@@ -124,6 +136,7 @@ export default async function TournamentDetailPage({
 
   const coOrganizers = (organizersResult.data ?? []) as any[];
   const activeDivisions = ((activeDivisionsResult.data ?? []) as any[]).map((r) => r.division as string);
+  const pendingPartnerRequests = (pendingPartnerRequestsResult.data ?? []) as any[];
   const isCoOrganizer = profile ? coOrganizers.some((o: any) => o.profile_id === profile.id) : false;
   const canManage = isCreator || isAdmin || isCoOrganizer;
 
@@ -501,6 +514,48 @@ export default async function TournamentDetailPage({
         />
       )}
 
+      {/* Pending partner requests — viewer may be a target (incoming)
+          or a requester (outgoing). RLS on tournament_partner_requests
+          already ensures we only see rows that involve us or that we
+          organize, so we can render both roles from the same list. */}
+      {profile && pendingPartnerRequests.length > 0 && (
+        <div className="card space-y-3">
+          <h2 className="text-sm font-semibold text-dark-100">Partner Requests</h2>
+          <ul className="space-y-2">
+            {pendingPartnerRequests.map((rq) => {
+              const isIncoming = rq.target_id === profile.id;
+              const isOutgoing = rq.requester_id === profile.id;
+              if (!isIncoming && !isOutgoing && !canManage) return null;
+              const other = isIncoming
+                ? rq.requester?.display_name ?? "Someone"
+                : rq.target?.display_name ?? "Someone";
+              return (
+                <li
+                  key={rq.id}
+                  className="flex items-center justify-between gap-3 rounded-md bg-surface-overlay px-3 py-2"
+                >
+                  <div className="text-xs">
+                    <p className="text-dark-100">
+                      {isIncoming
+                        ? `${other} wants to partner with you`
+                        : `You asked ${other} to partner`}
+                    </p>
+                    <p className="text-surface-muted">
+                      {getDivisionLabel(rq.division)}
+                    </p>
+                  </div>
+                  {isIncoming ? (
+                    <RespondToRequestButtons tournamentId={id} requestId={rq.id} />
+                  ) : (
+                    <span className="text-xs text-surface-muted">Waiting on reply</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {/* Registrations List */}
       <div>
         <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -540,7 +595,18 @@ export default async function TournamentDetailPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-border bg-surface-raised">
-                {confirmedRegistrations.map((reg, i) => (
+                {confirmedRegistrations.map((reg, i) => {
+                  const playerId = (reg as any).player_id as string | undefined;
+                  const needsPartner =
+                    tournament.type === "doubles" &&
+                    !(reg as any).partner_id;
+                  const viewerCanAsk =
+                    needsPartner &&
+                    profile &&
+                    playerId &&
+                    profile.id !== playerId &&
+                    !myRegistration;
+                  return (
                   <tr key={reg.id}>
                     <td className="px-2 sm:px-4 py-2 text-sm text-surface-muted">{i + 1}</td>
                     <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">
@@ -548,7 +614,22 @@ export default async function TournamentDetailPage({
                     </td>
                     {tournament.type === "doubles" && (
                       <td className="px-2 sm:px-4 py-2 text-sm text-dark-200">
-                        {(reg as any).partner?.display_name ?? "—"}
+                        {(reg as any).partner?.display_name ? (
+                          (reg as any).partner.display_name
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-accent-500/15 text-accent-300 ring-1 ring-accent-500/40">
+                              Need Partner
+                            </span>
+                            {viewerCanAsk && playerId && (
+                              <AskToPartnerButton
+                                tournamentId={id}
+                                targetId={playerId}
+                                targetName={(reg as any).player?.display_name ?? "this player"}
+                              />
+                            )}
+                          </span>
+                        )}
                       </td>
                     )}
                     <td className="px-2 sm:px-4 py-2 text-xs">
@@ -572,7 +653,8 @@ export default async function TournamentDetailPage({
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -192,6 +192,9 @@ const EMAIL_TEMPLATES: Record<string, () => Promise<{ default: (props: any) => R
   FreePlayRecap: () => import("@/emails/FreePlayRecap"),
   GroupAnnouncement: () => import("@/emails/GroupAnnouncement"),
   TournamentRecap: () => import("@/emails/TournamentRecap"),
+  TournamentPartnerRequest: () => import("@/emails/TournamentPartnerRequest"),
+  TournamentPartnerAccepted: () => import("@/emails/TournamentPartnerAccepted"),
+  TournamentPartnerDeclined: () => import("@/emails/TournamentPartnerDeclined"),
 };
 
 async function sendEmail({

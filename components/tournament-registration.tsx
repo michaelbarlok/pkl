@@ -39,6 +39,10 @@ export function TournamentRegistrationButton({
   const [searchResults, setSearchResults] = useState<{ id: string; display_name: string }[]>([]);
   const [selectedPartner, setSelectedPartner] = useState<{ id: string; display_name: string } | null>(null);
   const [showPartnerSearch, setShowPartnerSearch] = useState(false);
+  // Doubles players who don't yet have a partner can opt into the
+  // need-partner pool; their registered-list entry renders a badge
+  // and other players can send them an "Ask to Partner" request.
+  const [needPartner, setNeedPartner] = useState(false);
 
   async function searchPartners(query: string) {
     setPartnerSearch(query);
@@ -58,8 +62,8 @@ export function TournamentRegistrationButton({
     setLoading(true);
     setError("");
 
-    if (tournamentType === "doubles" && !selectedPartner) {
-      setError("Please select a partner for doubles");
+    if (tournamentType === "doubles" && !selectedPartner && !needPartner) {
+      setError("Please select a partner or check \"I need a partner\"");
       setLoading(false);
       return;
     }
@@ -74,7 +78,7 @@ export function TournamentRegistrationButton({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        partner_id: selectedPartner?.id || null,
+        partner_id: needPartner ? null : selectedPartner?.id || null,
         division: selectedDivision || divisions[0] || null,
       }),
     });
@@ -179,7 +183,18 @@ export function TournamentRegistrationButton({
       {tournamentType === "doubles" && (
         <div>
           <label className="block text-sm font-medium text-dark-200 mb-1">Partner</label>
-          {selectedPartner ? (
+          {needPartner ? (
+            <div className="rounded-md bg-accent-500/10 border border-accent-500/40 px-3 py-2 text-xs text-dark-200">
+              You&apos;ll show up as <span className="font-medium text-accent-300">Need Partner</span> on the registered list. Other players can send you an &quot;Ask to Partner&quot; request.
+              <button
+                type="button"
+                onClick={() => setNeedPartner(false)}
+                className="ml-2 text-surface-muted hover:text-dark-100 underline"
+              >
+                Change
+              </button>
+            </div>
+          ) : selectedPartner ? (
             <div className="flex items-center gap-2">
               <span className="text-sm text-dark-100">{selectedPartner.display_name}</span>
               <button
@@ -190,7 +205,7 @@ export function TournamentRegistrationButton({
               </button>
             </div>
           ) : (
-            <div>
+            <div className="space-y-2">
               <input
                 type="text"
                 value={partnerSearch}
@@ -217,6 +232,18 @@ export function TournamentRegistrationButton({
                   ))}
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setNeedPartner(true);
+                  setShowPartnerSearch(false);
+                  setPartnerSearch("");
+                  setSearchResults([]);
+                }}
+                className="text-xs text-brand-vivid hover:underline"
+              >
+                I don&apos;t have a partner yet &mdash; find one for me
+              </button>
             </div>
           )}
         </div>
