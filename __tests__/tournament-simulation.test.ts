@@ -186,12 +186,11 @@ function runRoundRobinDivision(
   const generated = generateRoundRobin(playerIds, gamesPerTeam ? { gamesPerTeam } : undefined);
   const matches = makeSimMatches(generated, division);
 
-  // Complete all pool matches
+  // Complete all pool matches. BYE matches stay at status="bye" with
+  // no winner — in round-robin pool play a BYE means the team sits
+  // out that round, and granting a free win would pollute standings.
   for (const m of matches) {
-    if (m.status === "bye") {
-      simulateMatchResult(m);
-      continue;
-    }
+    if (m.status === "bye") continue;
     if (m.status === "pending" && m.player1_id && m.player2_id) {
       simulateMatchResult(m);
     }

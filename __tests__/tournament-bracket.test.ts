@@ -158,6 +158,109 @@ describe("getPoolStructure", () => {
     expect(s.numPools).toBe(4);
     expect(s.poolSizes.reduce((a, b) => a + b, 0)).toBe(20);
   });
+
+  test("organizer override: 12 teams into 2 pools of 6", () => {
+    const s = getPoolStructure(12, { numPools: 2 });
+    expect(s.numPools).toBe(2);
+    expect(s.poolSizes).toEqual([6, 6]);
+  });
+
+  test("organizer override: 10 teams into 4 pools splits 3/3/2/2", () => {
+    const s = getPoolStructure(10, { numPools: 4 });
+    expect(s.numPools).toBe(4);
+    expect(s.poolSizes).toEqual([3, 3, 2, 2]);
+  });
+
+  test("override clamps to floor(teamCount/2) to guarantee ≥2 per pool", () => {
+    const s = getPoolStructure(6, { numPools: 99 });
+    expect(s.numPools).toBe(3);
+    expect(s.poolSizes.every((size) => size >= 2)).toBe(true);
+  });
+
+  test("override of 0 or negative falls back to auto", () => {
+    const auto = getPoolStructure(8);
+    const zero = getPoolStructure(8, { numPools: 0 });
+    expect(zero).toEqual(auto);
+  });
+});
+
+// ─── Pool-play BYE handling (regression) ─────────────────────────────────────
+
+describe("round-robin pool play BYE handling", () => {
+  test("odd pool produces BYE matches with winner_id-eligible nulls and status=bye", () => {
+    const matches = generateRoundRobin(["a", "b", "c"], { gamesPerTeam: 2 });
+    const byeMatches = matches.filter((m) => m.status === "bye");
+    expect(byeMatches.length).toBeGreaterThan(0);
+    // Every BYE match has exactly one null side
+    for (const m of byeMatches) {
+      const nulls = [m.player1_id, m.player2_id].filter((x) => x === null).length;
+      expect(nulls).toBe(1);
+    }
+  });
+
+  test("computePoolStandings skips BYE matches — no free wins", () => {
+    // Build a 3-team pool manually: a beats b, b beats c, c beats a.
+    // Everyone is 1-1 with pointDiff=0. Each team also has one BYE
+    // round that must NOT add to their win count.
+    const matches = [
+      {
+        player1_id: "a",
+        player2_id: "b",
+        winner_id: "a",
+        score1: [11],
+        score2: [5],
+        status: "completed",
+      },
+      {
+        player1_id: "b",
+        player2_id: "c",
+        winner_id: "b",
+        score1: [11],
+        score2: [5],
+        status: "completed",
+      },
+      {
+        player1_id: "c",
+        player2_id: "a",
+        winner_id: "c",
+        score1: [11],
+        score2: [5],
+        status: "completed",
+      },
+      // BYE rounds — must be ignored by standings.
+      {
+        player1_id: "a",
+        player2_id: null,
+        winner_id: null,
+        score1: [],
+        score2: [],
+        status: "bye",
+      },
+      {
+        player1_id: "b",
+        player2_id: null,
+        winner_id: null,
+        score1: [],
+        score2: [],
+        status: "bye",
+      },
+      {
+        player1_id: "c",
+        player2_id: null,
+        winner_id: null,
+        score1: [],
+        score2: [],
+        status: "bye",
+      },
+    ];
+
+    const standings = computePoolStandings(matches);
+    // Each player should have exactly 1 win, 1 loss — BYEs don't count.
+    for (const s of standings) {
+      expect(s.wins).toBe(1);
+      expect(s.losses).toBe(1);
+    }
+  });
 });
 
 // ─── generateSingleElimination ───────────────────────────────────────────────

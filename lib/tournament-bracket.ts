@@ -157,15 +157,28 @@ export function generateDoubleElimination(playerIds: string[]): BracketMatch[] {
 /**
  * Determine pool structure for a given team count.
  *
- * Pools are sized automatically: as few pools as possible with at most 6 teams each,
- * distributed as evenly as possible (larger pools first).
+ * By default pools are sized automatically: as few pools as possible
+ * with at most 6 teams each, distributed as evenly as possible
+ * (larger pools first). Organizers can override the pool count per
+ * division — if they pass `numPools`, we split the teams across that
+ * many pools (as evenly as possible, larger pools first) instead.
  */
-export function getPoolStructure(teamCount: number): {
+export function getPoolStructure(
+  teamCount: number,
+  options?: { numPools?: number }
+): {
   numPools: number;
   poolSizes: number[];
   maxGamesPerTeam: number;
 } {
-  const numPools = Math.max(1, Math.ceil(teamCount / 6)); // as few pools as possible, max 6/pool
+  // Organizer override. Clamp into a sane range: at least 1 pool, and
+  // at most floor(teamCount/2) so every pool still has ≥2 teams.
+  const override = options?.numPools;
+  const maxReasonable = Math.max(1, Math.floor(teamCount / 2));
+  const numPools =
+    override && override >= 1
+      ? Math.min(override, maxReasonable)
+      : Math.max(1, Math.ceil(teamCount / 6)); // auto: as few pools as possible, max 6/pool
 
   // Distribute as evenly as possible (larger pools first)
   const baseSize = Math.floor(teamCount / numPools);
@@ -222,13 +235,13 @@ export function poolGamesInfo(
  */
 export function generateRoundRobin(
   playerIds: string[],
-  options?: { gamesPerTeam?: number; seeded?: boolean }
+  options?: { gamesPerTeam?: number; seeded?: boolean; numPools?: number }
 ): BracketMatch[] {
-  const { gamesPerTeam, seeded } = options ?? {};
+  const { gamesPerTeam, seeded, numPools } = options ?? {};
   const n = playerIds.length;
   if (n < 2) return [];
 
-  const structure = getPoolStructure(n);
+  const structure = getPoolStructure(n, { numPools });
 
   // Distribute players into pools
   let pools: string[][];

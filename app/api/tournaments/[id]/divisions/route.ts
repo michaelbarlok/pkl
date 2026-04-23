@@ -306,7 +306,10 @@ export async function POST(
 
   // Parse division_settings from request body
   const body = await request.json().catch(() => ({}));
-  const divisionSettings: Record<string, { games_per_team?: number }> = body.division_settings ?? {};
+  const divisionSettings: Record<
+    string,
+    { games_per_team?: number; num_pools?: number }
+  > = body.division_settings ?? {};
 
   // Save division_settings to tournament
   if (Object.keys(divisionSettings).length > 0) {
@@ -342,7 +345,8 @@ export async function POST(
     const hasSeeds = registrations.some((r) => r.seed != null);
 
     // Get pool settings for this division
-    const { games_per_team: gamesPerTeam } = divisionSettings[division] ?? {};
+    const { games_per_team: gamesPerTeam, num_pools: numPools } =
+      divisionSettings[division] ?? {};
 
     // Generate bracket
     let bracketMatches;
@@ -355,7 +359,11 @@ export async function POST(
         bracketMatches = generateDoubleElimination(playerIds);
         break;
       case "round_robin":
-        bracketMatches = generateRoundRobin(playerIds, { gamesPerTeam, seeded: hasSeeds });
+        bracketMatches = generateRoundRobin(playerIds, {
+          gamesPerTeam,
+          seeded: hasSeeds,
+          numPools,
+        });
         break;
       default:
         continue;
@@ -383,19 +391,26 @@ export async function POST(
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // Auto-advance byes
-    const byeMatches = bracketMatches.filter((m) => m.status === "bye");
-    for (const bye of byeMatches) {
-      const winnerId = bye.player1_id || bye.player2_id;
-      if (winnerId) {
-        await supabase
-          .from("tournament_matches")
-          .update({ winner_id: winnerId, status: "completed" })
-          .eq("tournament_id", tournamentId)
-          .eq("division", division)
-          .eq("round", bye.round)
-          .eq("match_number", bye.match_number)
-          .eq("bracket", bye.bracket);
+    // Auto-advance byes — ONLY for elimination brackets. In
+    // round-robin pool play a BYE means the team sits out the round;
+    // converting it to a "completed" match with a winner would give
+    // that team a free win in pool standings, which is wrong. Pool
+    // BYE rows stay at status="bye" with winner_id=null so
+    // computePoolStandings skips them entirely.
+    if (tournament.format !== "round_robin") {
+      const byeMatches = bracketMatches.filter((m) => m.status === "bye");
+      for (const bye of byeMatches) {
+        const winnerId = bye.player1_id || bye.player2_id;
+        if (winnerId) {
+          await supabase
+            .from("tournament_matches")
+            .update({ winner_id: winnerId, status: "completed" })
+            .eq("tournament_id", tournamentId)
+            .eq("division", division)
+            .eq("round", bye.round)
+            .eq("match_number", bye.match_number)
+            .eq("bracket", bye.bracket);
+        }
       }
     }
 

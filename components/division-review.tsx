@@ -6,6 +6,15 @@ import { getPoolStructure, poolGamesInfo } from "@/lib/tournament-bracket";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+function describePoolSplit(structure: { numPools: number; poolSizes: number[] }): string {
+  const { numPools, poolSizes } = structure;
+  const unique = [...new Set(poolSizes)];
+  if (unique.length === 1) {
+    return `${numPools} pool${numPools > 1 ? "s" : ""} of ${unique[0]} team${unique[0] > 1 ? "s" : ""}`;
+  }
+  return `${numPools} pools (${poolSizes.join(", ")} teams)`;
+}
+
 interface DivisionCount {
   division: string;
   count: number;
@@ -33,6 +42,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [gamesPerTeam, setGamesPerTeam] = useState<Record<string, string>>({});
+  const [numPoolsOverride, setNumPoolsOverride] = useState<Record<string, string>>({});
 
   // Seeding state
   const [seedingOpen, setSeedingOpen] = useState<Record<string, boolean>>({});
@@ -140,11 +150,20 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
     setGenerating(true);
     setError("");
 
-    const divisionSettings: Record<string, { games_per_team?: number }> = {};
+    const divisionSettings: Record<
+      string,
+      { games_per_team?: number; num_pools?: number }
+    > = {};
     if (isRoundRobin) {
       for (const d of divisions) {
+        const settings: { games_per_team?: number; num_pools?: number } = {};
         const gpt = parseInt(gamesPerTeam[d.division] ?? "");
-        if (gpt > 0) divisionSettings[d.division] = { games_per_team: gpt };
+        if (gpt > 0) settings.games_per_team = gpt;
+        const np = parseInt(numPoolsOverride[d.division] ?? "");
+        if (np > 0) settings.num_pools = np;
+        if (Object.keys(settings).length > 0) {
+          divisionSettings[d.division] = settings;
+        }
       }
     }
 
@@ -278,7 +297,15 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
           const hasPoolPanel = isRoundRobin && !isSmall;
           const hasAnyPanelBelow = isSeedOpen || hasPoolPanel;
 
-          const poolStructure = isRoundRobin ? getPoolStructure(d.count) : null;
+          // Default (auto) structure, so we can show it as the "if you
+          // pick nothing, this is what happens" hint even when the
+          // organizer has typed an override.
+          const autoPoolStructure = isRoundRobin ? getPoolStructure(d.count) : null;
+          const poolCountOverride = parseInt(numPoolsOverride[d.division] ?? "") || null;
+          const poolStructure = isRoundRobin
+            ? getPoolStructure(d.count, { numPools: poolCountOverride ?? undefined })
+            : null;
+          const maxPoolCount = Math.max(1, Math.floor(d.count / 2));
 
           return (
             <div key={d.division} className="space-y-0">
@@ -432,20 +459,34 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
               )}
 
               {/* Pool play configuration (round robin only) */}
-              {hasPoolPanel && poolStructure && (
+              {hasPoolPanel && poolStructure && autoPoolStructure && (
                 <div className="rounded-b-lg border border-t-0 border-surface-border bg-surface-overlay px-3 py-2.5 space-y-2">
-                  {/* Pool layout (automatic, read-only) */}
-                  <p className="text-xs text-surface-muted">
-                    {(() => {
-                      const { numPools: np, poolSizes } = poolStructure;
-                      const uniqueSizes = [...new Set(poolSizes)];
-                      if (uniqueSizes.length === 1) {
-                        return `${np} pool${np > 1 ? "s" : ""} of ${uniqueSizes[0]} team${uniqueSizes[0] > 1 ? "s" : ""}`;
+                  {/* Number of pools — organizer can override the auto-split. */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs font-medium text-dark-200">Number of pools:</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={maxPoolCount}
+                      placeholder="default"
+                      value={numPoolsOverride[d.division] ?? ""}
+                      onChange={(e) =>
+                        setNumPoolsOverride((prev) => ({
+                          ...prev,
+                          [d.division]: e.target.value,
+                        }))
                       }
-                      return `${np} pools (${poolSizes.join(", ")} teams)`;
-                    })()}
-                    {poolStructure.numPools >= 3 && " · top 2 per pool advance to bracket"}
-                  </p>
+                      className="input w-20 py-1 text-center text-xs"
+                    />
+                    <span className="text-xs text-surface-muted">
+                      {poolCountOverride
+                        ? describePoolSplit(poolStructure)
+                        : `default: ${describePoolSplit(autoPoolStructure)}`}
+                      {poolStructure.numPools >= 3 && " · top 2 per pool advance to bracket"}
+                      {poolStructure.numPools === 2 && " · top 3 per pool advance to bracket"}
+                      {poolStructure.numPools === 1 && " · top 4 advance to bracket"}
+                    </span>
+                  </div>
 
                   {/* Games per team */}
                   {(() => {
