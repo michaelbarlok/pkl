@@ -15,6 +15,12 @@ interface Props {
   numCourts: number | null;
   divisions: DivisionCount[];
   initialActive: string[];
+  /**
+   * Render without the outer `.card` wrapper and without the
+   * internal title/description row. Useful when the component lives
+   * inside another card (e.g. CollapsibleCard).
+   */
+  embedded?: boolean;
 }
 
 /**
@@ -33,6 +39,7 @@ export function ActiveDivisionsManager({
   numCourts,
   divisions,
   initialActive,
+  embedded = false,
 }: Props) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -121,20 +128,27 @@ export function ActiveDivisionsManager({
 
   const selectedCount = selected.size;
 
+  const courtsHint = numCourts
+    ? `You have ${numCourts} court${numCourts === 1 ? "" : "s"} configured.`
+    : "Set a court count on the tournament edit page before activating.";
+
   return (
-    <div className="card space-y-3">
+    <div className={embedded ? "space-y-3" : "card space-y-3"}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-sm font-semibold text-dark-200">Live Divisions</h2>
-          <p className="text-xs text-surface-muted mt-0.5">
-            Check the divisions you want live, then Activate Selected. Players in
-            those divisions get a push; their round-1 matches interleave across
-            divisions so each one gets court time in the first batch.
-            {numCourts
-              ? ` You have ${numCourts} court${numCourts === 1 ? "" : "s"} configured.`
-              : " Set a court count on the tournament edit page before activating."}
+        {!embedded ? (
+          <div>
+            <h2 className="text-sm font-semibold text-dark-200">Live Divisions</h2>
+            <p className="text-xs text-surface-muted mt-0.5">
+              Check the divisions you want live, then Activate Selected. Players in
+              those divisions get a push; their round-1 matches interleave across
+              divisions so each one gets court time in the first batch. {courtsHint}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-surface-muted flex-1 min-w-0">
+            Check the divisions you want live, then Activate Selected. {courtsHint}
           </p>
-        </div>
+        )}
         <div className="flex items-center gap-2">
           <button
             type="button"
