@@ -233,11 +233,21 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
       {/* More menu slide-up panel */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-14 z-50 md:hidden transform transition-transform duration-200 ease-out",
+          // bottom offset = tab-bar height (h-14) + iOS home-indicator
+          // safe-area. Without the env() term the menu slides behind
+          // the tab bar in installed-PWA mode on iPhone, hiding the
+          // Sign Out button at the bottom of the list.
+          "fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-50 md:hidden transform transition-transform duration-200 ease-out",
           moreOpen ? "translate-y-0" : "translate-y-full"
         )}
       >
-        <div ref={menuRef} className="mx-2 mb-1 rounded-xl bg-surface-raised shadow-2xl ring-1 ring-surface-border overflow-hidden">
+        <div
+          ref={menuRef}
+          // Cap the height so tall menus (admin sees lots of rows)
+          // stay scrollable on short viewports instead of overflowing
+          // the top of the screen.
+          className="mx-2 mb-1 rounded-xl bg-surface-raised shadow-2xl ring-1 ring-surface-border overflow-y-auto max-h-[calc(100dvh-6rem-env(safe-area-inset-bottom))]"
+        >
           {/* Profile header */}
           <div className="flex items-center gap-3 border-b border-surface-border px-4 py-3">
             {profile.avatar_url ? (
