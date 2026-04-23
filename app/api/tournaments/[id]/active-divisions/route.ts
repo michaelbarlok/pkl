@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTournamentManager } from "@/lib/tournament-auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notifyMany } from "@/lib/notify";
-import { activateDivisionQueue } from "@/lib/tournament-queue";
+import { activateDivisionQueue, clearDivisionQueue } from "@/lib/tournament-queue";
 
 /**
  * POST /api/tournaments/[id]/active-divisions
@@ -143,5 +143,11 @@ export async function DELETE(
     .eq("division", division);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Pull this division's queued matches out of the FIFO line so they
+  // don't sneak onto a freshly-freed court. Matches already on a
+  // court are left alone — the current game finishes normally.
+  await clearDivisionQueue(tournamentId, division);
+
   return NextResponse.json({ ok: true });
 }
