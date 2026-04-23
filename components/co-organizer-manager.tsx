@@ -8,9 +8,21 @@ interface CoOrganizerManagerProps {
   tournamentId: string;
   coOrganizers: { profile_id: string; profile?: { id: string; display_name: string } }[];
   creatorId: string;
+  /**
+   * When true, render without the outer `.card` wrapper so the
+   * component can be embedded inside another card (e.g. the
+   * collapsible tournament-details card). Defaults to false for
+   * backward compat with standalone usage.
+   */
+  embedded?: boolean;
 }
 
-export function CoOrganizerManager({ tournamentId, coOrganizers, creatorId }: CoOrganizerManagerProps) {
+export function CoOrganizerManager({
+  tournamentId,
+  coOrganizers,
+  creatorId,
+  embedded = false,
+}: CoOrganizerManagerProps) {
   const { supabase } = useSupabase();
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -92,7 +104,7 @@ export function CoOrganizerManager({ tournamentId, coOrganizers, creatorId }: Co
   }
 
   return (
-    <div className="card">
+    <div className={embedded ? "" : "card"}>
       <h2 className="text-sm font-semibold text-dark-200 mb-3">Co-Organizers</h2>
 
       {/* Current co-organizers */}
