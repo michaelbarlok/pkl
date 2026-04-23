@@ -25,6 +25,7 @@ import {
   getPoolLabel,
   getNextMatch,
   getPlayoffAdvancement,
+  isValidGamesPerTeam,
 } from "@/lib/tournament-bracket";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -99,11 +100,12 @@ describe("getPoolStructure", () => {
     expect(getPoolStructure(n)).toMatchObject(expected);
   });
 
-  test("7 teams → 2 pools [4, 3] (max 6/pool)", () => {
+  test("7 teams → single pool of 7 (special case, up to 6 games per team)", () => {
     const s = getPoolStructure(7);
-    expect(s.numPools).toBe(2);
-    expect(s.poolSizes).toEqual([4, 3]);
-    expect(s.maxGamesPerTeam).toBe(6); // 2*(4-1)
+    expect(s.numPools).toBe(1);
+    expect(s.poolSizes).toEqual([7]);
+    // Full double-round-robin cap stays at 2×(n-1) = 12.
+    expect(s.maxGamesPerTeam).toBe(12);
   });
 
   test("8 teams → 2 pools [4, 4]", () => {
@@ -467,6 +469,42 @@ describe("generateDoubleElimination", () => {
   });
 });
 
+// ─── isValidGamesPerTeam ─────────────────────────────────────────────────────
+
+describe("isValidGamesPerTeam", () => {
+  test("even pools accept any integer ≥ 1", () => {
+    for (const n of [4, 6, 8, 10]) {
+      for (let g = 1; g <= 2 * (n - 1); g++) {
+        expect(isValidGamesPerTeam(n, g)).toBe(true);
+      }
+    }
+  });
+
+  test("odd pools only accept whole-lap multiples of (n-1)", () => {
+    // 5-team pool: multiples of 4.
+    expect(isValidGamesPerTeam(5, 4)).toBe(true);
+    expect(isValidGamesPerTeam(5, 8)).toBe(true);
+    expect(isValidGamesPerTeam(5, 3)).toBe(false);
+    expect(isValidGamesPerTeam(5, 5)).toBe(false);
+    expect(isValidGamesPerTeam(5, 6)).toBe(false);
+    // 7-team pool: multiples of 6.
+    expect(isValidGamesPerTeam(7, 6)).toBe(true);
+    expect(isValidGamesPerTeam(7, 12)).toBe(true);
+    expect(isValidGamesPerTeam(7, 5)).toBe(false);
+    expect(isValidGamesPerTeam(7, 7)).toBe(false);
+    // 3-team pool: multiples of 2.
+    expect(isValidGamesPerTeam(3, 2)).toBe(true);
+    expect(isValidGamesPerTeam(3, 4)).toBe(true);
+    expect(isValidGamesPerTeam(3, 3)).toBe(false);
+  });
+
+  test("rejects 0, negatives, and non-integers", () => {
+    expect(isValidGamesPerTeam(6, 0)).toBe(false);
+    expect(isValidGamesPerTeam(6, -1)).toBe(false);
+    expect(isValidGamesPerTeam(6, 1.5)).toBe(false);
+  });
+});
+
 // ─── partial / over-full round-robin randomization ───────────────────────────
 
 /**
@@ -635,8 +673,8 @@ describe("generateRoundRobin — small divisions (3-6 teams → single pool)", (
   });
 });
 
-describe("generateRoundRobin — medium divisions (7-12 teams → 2 pools)", () => {
-  test.each([7, 8, 9, 10, 11, 12])("%i teams → 2 pools", (n) => {
+describe("generateRoundRobin — medium divisions (8-12 teams → 2 pools; 7 is the single-pool exception)", () => {
+  test.each([8, 9, 10, 11, 12])("%i teams → 2 pools", (n) => {
     const m = generateRoundRobin(makeIds(n));
     const brackets = new Set(m.map((x) => x.bracket));
     expect(brackets.has("winners")).toBe(true);
@@ -644,18 +682,25 @@ describe("generateRoundRobin — medium divisions (7-12 teams → 2 pools)", () 
     expect(brackets.size).toBe(2);
   });
 
-  test.each([7, 8, 9, 10, 11, 12])("%i teams → no self-play in either pool", (n) => {
+  test.each([7, 8, 9, 10, 11, 12])("%i teams → no self-play", (n) => {
     assertNoSelfPlay(generateRoundRobin(makeIds(n)));
   });
 
-  test("7 teams → 2 pools [4, 3], correct real match count", () => {
+  test("7 teams → single pool full RR, 21 real matches", () => {
     const ids = makeIds(7);
     const m = generateRoundRobin(ids);
-    // Default = full RR per pool (each team plays every opponent once)
-    // Pool of 4 (even): 3 rounds × 2 matches = 6 real
-    // Pool of 3 (odd, perPoolGames=2): laps=1, totalRounds=3, 3×1 real = 3 real
-    // Total = 9 real matches
-    expect(m.filter((x) => x.status !== "bye")).toHaveLength(9);
+    // 7 teams stay as one pool (special case). Default gamesPerTeam
+    // = opponents = 6 → 1 full lap of 7 rounds, 3 real matches per
+    // round (plus 1 BYE) = 21 real matches.
+    expect(m.filter((x) => x.status !== "bye")).toHaveLength(21);
+    // Every team plays 6 games.
+    const counts = new Map<string, number>();
+    for (const x of m) {
+      if (x.status === "bye") continue;
+      if (x.player1_id) counts.set(x.player1_id, (counts.get(x.player1_id) ?? 0) + 1);
+      if (x.player2_id) counts.set(x.player2_id, (counts.get(x.player2_id) ?? 0) + 1);
+    }
+    for (const c of counts.values()) expect(c).toBe(6);
   });
 
   test("8 teams → pool sizes [4, 4], each pool is full RR", () => {
