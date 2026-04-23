@@ -176,7 +176,10 @@ export async function PUT(
   const winnerChanged = isEdit && previousWinner !== winner_id;
 
   // Update match score — also free the court so the assignment
-  // engine can hand it to the next queued match.
+  // engine can hand it to the next queued match, and null out
+  // queue_entered_at so an in-queue match scored directly from the
+  // bracket view (skipping the court) gets cleanly removed from
+  // the queue.
   const { data: match, error: updateError } = await supabase
     .from("tournament_matches")
     .update({
@@ -185,6 +188,7 @@ export async function PUT(
       winner_id,
       status: "completed",
       court_number: null,
+      queue_entered_at: null,
     })
     .eq("id", match_id)
     .select()
