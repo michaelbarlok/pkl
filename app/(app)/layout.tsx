@@ -7,6 +7,7 @@ import { LandingNav } from "./landing-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { ThemeListener } from "@/components/theme-listener";
 import { ActiveSessionAlert } from "@/components/active-session-alert";
+import { TournamentCourtAlert } from "@/components/tournament-court-alert";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
 
@@ -127,6 +128,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
            deep-links to the Play tab. Uses the same localStorage ack
            key as the Play-tab modal so they don't double-fire. */}
       <ActiveSessionAlert profileId={profile.id} />
+
+      {/* Tournament counterpart: when a match the viewer's team is
+           on gets assigned a court, pop a modal wherever they are
+           and deep-link to the Play tab. Ack is per-match-id so a
+           second court assignment for the same team re-triggers. */}
+      <TournamentCourtAlert profileId={profile.id} />
     </div>
   );
 }

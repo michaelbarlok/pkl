@@ -106,18 +106,22 @@ export async function notify({
   }
 
   // Channel resolution:
-  //   - Required: always use the viewer's global prefs, dropping
-  //     the per-type override. If they've set neither push nor
-  //     email globally, force email as a last-resort channel so
-  //     the ping reaches them somehow.
+  //   - Required: if the viewer has ANY active push subscription
+  //     we send push (not email); otherwise we fall back to email.
+  //     We intentionally ignore preferred_notify here so a user can't
+  //     silence a live-play ping by un-ticking both channels in their
+  //     profile.
   //   - Optional: per-type overrides global (existing behaviour).
   let shouldEmail: boolean;
   let shouldPush: boolean;
   if (isRequired) {
-    const hasPush = prefs.includes("push");
-    const hasEmail = prefs.includes("email");
-    shouldPush = hasPush;
-    shouldEmail = hasEmail || !hasPush; // at least email when neither is set
+    const { count: pushCount } = await supabase
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profileId);
+    const hasPushSub = (pushCount ?? 0) > 0;
+    shouldPush = hasPushSub;
+    shouldEmail = !hasPushSub;
   } else {
     shouldEmail = typeChannels ? typeChannels.has("email") : prefs.includes("email");
     shouldPush = typeChannels ? typeChannels.has("push") : prefs.includes("push");
@@ -225,6 +229,7 @@ const EMAIL_TEMPLATES: Record<string, () => Promise<{ default: (props: any) => R
   FreePlayRecap: () => import("@/emails/FreePlayRecap"),
   GroupAnnouncement: () => import("@/emails/GroupAnnouncement"),
   TournamentRecap: () => import("@/emails/TournamentRecap"),
+  TournamentAlert: () => import("@/emails/TournamentAlert"),
   TournamentPartnerRequest: () => import("@/emails/TournamentPartnerRequest"),
   TournamentPartnerAccepted: () => import("@/emails/TournamentPartnerAccepted"),
   TournamentPartnerDeclined: () => import("@/emails/TournamentPartnerDeclined"),

@@ -231,13 +231,22 @@ export async function promoteMatchToCourt(
   );
   if (playerIds.length > 0) {
     const divLabel = match.division ? getDivisionLabel(match.division) : "";
+    const courtTitle = `Head to Court ${courtNumber}`;
+    const courtBody = divLabel
+      ? `${tournament.title} — ${divLabel}. Your match is ready.`
+      : `${tournament.title}. Your match is ready.`;
     await notifyMany(playerIds, {
       type: "tournament_court_assigned",
-      title: `Head to Court ${courtNumber}`,
-      body: divLabel
-        ? `${tournament.title} — ${divLabel}. Your match is ready.`
-        : `${tournament.title}. Your match is ready.`,
+      title: courtTitle,
+      body: courtBody,
       link: `/tournaments/${tournamentId}/live`,
+      emailTemplate: "TournamentAlert",
+      emailData: {
+        tournamentTitle: tournament.title,
+        alertTitle: courtTitle,
+        alertBody: courtBody,
+        link: `/tournaments/${tournamentId}/live`,
+      },
     });
   }
 
@@ -377,13 +386,22 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
     );
     if (playerIds.length === 0) continue;
     const divLabel = match.division ? getDivisionLabel(match.division) : "";
+    const courtTitle = `Head to Court ${court}`;
+    const courtBody = divLabel
+      ? `${tournament.title} — ${divLabel}. Your match is ready.`
+      : `${tournament.title}. Your match is ready.`;
     await notifyMany(playerIds, {
       type: "tournament_court_assigned",
-      title: `Head to Court ${court}`,
-      body: divLabel
-        ? `${tournament.title} — ${divLabel}. Your match is ready.`
-        : `${tournament.title}. Your match is ready.`,
+      title: courtTitle,
+      body: courtBody,
       link: `/tournaments/${tournamentId}/live`,
+      emailTemplate: "TournamentAlert",
+      emailData: {
+        tournamentTitle: tournament.title,
+        alertTitle: courtTitle,
+        alertBody: courtBody,
+        link: `/tournaments/${tournamentId}/live`,
+      },
     });
   }
 
@@ -434,11 +452,19 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
     );
     if (playerIds.length === 0) continue;
     const divLabel = t.match.division ? getDivisionLabel(t.match.division) : "";
+    const bodyText = t.body(divLabel);
     await notifyMany(playerIds, {
       type: t.type,
       title: t.title,
-      body: t.body(divLabel),
+      body: bodyText,
       link: `/tournaments/${tournamentId}/live`,
+      emailTemplate: "TournamentAlert",
+      emailData: {
+        tournamentTitle: tournament.title,
+        alertTitle: t.title,
+        alertBody: bodyText,
+        link: `/tournaments/${tournamentId}/live`,
+      },
     });
     await service
       .from("tournament_matches")
