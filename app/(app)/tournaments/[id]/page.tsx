@@ -287,21 +287,21 @@ export default async function TournamentDetailPage({
   ) : null;
 
   const hasRightColumn = !!(courtTrackerBlock || divisionBracketsBlock);
-  // On wider screens we split the secondary content into two lanes:
-  // Court Tracker in the middle, DivisionBrackets on the right.
-  // Falls back to 2-col (then 1-col) when only one or neither exists.
-  const has3Cols = !!(courtTrackerBlock && divisionBracketsBlock);
-  // Widen the container when we're in 3-col mode so each lane has
-  // enough room for player names + action buttons to breathe. In
-  // 3-col mode we fill up to the layout's new 120rem cap; in 2-col
-  // mode we stay narrower so the content doesn't feel sparse.
-  const containerMaxW = has3Cols
+  // Desktop layout:
+  //   - Main content (hero, details, registered, etc.) in the left
+  //     lane.
+  //   - Court Tracker gets its own sidebar lane when present — it's
+  //     a compact vertical dashboard that reads well at ~600px.
+  //   - Division Brackets drop BELOW the grid as a full-width band
+  //     when present. Elimination + round-robin playoff trees need
+  //     at least 900px to render without horizontal scroll; forcing
+  //     them into a sidebar lane was clipping half the bracket.
+  const hasCourtTrackerLane = !!courtTrackerBlock;
+  const containerMaxW = hasCourtTrackerLane || divisionBracketsBlock
     ? "max-w-3xl lg:max-w-none"
     : "max-w-3xl lg:max-w-7xl";
-  const gridClasses = has3Cols
-    ? "lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
-    : hasRightColumn
-    ? "lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
+  const gridClasses = hasCourtTrackerLane
+    ? "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
     : "space-y-6";
 
   return (
@@ -986,24 +986,23 @@ export default async function TournamentDetailPage({
       )}
         </div>
 
-        {/* Middle column on lg+ when we have a Court Tracker. On
-             narrower 2-col layouts (brackets exist but no tracker)
-             this slot is empty and the right column slides in. */}
+        {/* Court Tracker sidebar on lg+ — only shown when present. */}
         {courtTrackerBlock && (
           <div className="hidden lg:block space-y-6 min-w-0">
             {courtTrackerBlock}
           </div>
         )}
-
-        {/* Right column on lg+ when we have bracket pills. Lives
-             here whether we're 3-col (middle has tracker) or 2-col
-             (middle empty). */}
-        {divisionBracketsBlock && (
-          <div className="hidden lg:block space-y-6 min-w-0">
-            {divisionBracketsBlock}
-          </div>
-        )}
       </div>
+
+      {/* Division Brackets get the full container width on lg+ so
+           wide elimination trees (or round-robin playoff brackets
+           with multiple rounds) render without horizontal clipping.
+           Inline lg:hidden copies elsewhere handle the mobile view. */}
+      {divisionBracketsBlock && (
+        <div className="hidden lg:block space-y-6 min-w-0">
+          {divisionBracketsBlock}
+        </div>
+      )}
     </div>
   );
 }
