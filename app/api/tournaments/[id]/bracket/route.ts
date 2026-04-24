@@ -168,12 +168,21 @@ export async function PUT(
   // Fetch tournament format
   const { data: tournament } = await supabase
     .from("tournaments")
-    .select("format")
+    .select("format, status")
     .eq("id", tournamentId)
     .single();
 
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+  }
+
+  // Cancelled tournaments are frozen — no more scoring. The Danger
+  // Zone button sets this status and we treat it as terminal.
+  if (tournament.status === "cancelled") {
+    return NextResponse.json(
+      { error: "This tournament has been cancelled — scores can't be recorded." },
+      { status: 409 }
+    );
   }
 
   // Fetch existing match state to detect edits (winner change)

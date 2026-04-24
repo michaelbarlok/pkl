@@ -5,7 +5,11 @@ import { NextRequest, NextResponse } from "next/server";
  * POST: Add a co-organizer to a tournament.
  * DELETE: Remove a co-organizer from a tournament.
  *
- * Only the tournament creator or a global admin may manage co-organizers.
+ * Auth model: creators, co-organizers, and global admins can manage
+ * the list. Co-organizers can add help but cannot remove the creator
+ * or other co-organizers — only creators / admins can evict. This
+ * keeps the "one person holds the keys" bottleneck off the creator
+ * while preventing co-organizers from kicking each other.
  */
 
 async function authorize(tournamentId: string) {
@@ -19,10 +23,23 @@ async function authorize(tournamentId: string) {
     .single();
   if (!tournament) return null;
 
-  // Only creator or global admin can manage co-organizers
-  if (tournament.created_by !== auth.profile.id && auth.profile.role !== "admin") return null;
+  const isCreator = tournament.created_by === auth.profile.id;
+  const isAdmin = auth.profile.role === "admin";
 
-  return { profile: auth.profile, supabase: auth.supabase };
+  if (isCreator || isAdmin) {
+    return { profile: auth.profile, supabase: auth.supabase, tournament, isCreator: true };
+  }
+
+  // Co-organizer check
+  const { data: orgRow } = await auth.supabase
+    .from("tournament_organizers")
+    .select("profile_id")
+    .eq("tournament_id", tournamentId)
+    .eq("profile_id", auth.profile.id)
+    .maybeSingle();
+  if (!orgRow) return null;
+
+  return { profile: auth.profile, supabase: auth.supabase, tournament, isCreator: false };
 }
 
 export async function POST(
@@ -40,16 +57,10 @@ export async function POST(
     return NextResponse.json({ error: "profileId required" }, { status: 400 });
   }
 
-  const { supabase } = auth;
+  const { supabase, tournament } = auth;
 
   // Don't add the creator as a co-organizer
-  const { data: tournament } = await supabase
-    .from("tournaments")
-    .select("created_by")
-    .eq("id", tournamentId)
-    .single();
-
-  if (tournament && profileId === tournament.created_by) {
+  if (profileId === tournament.created_by) {
     return NextResponse.json({ error: "The creator is already the organizer" }, { status: 400 });
   }
 
@@ -77,6 +88,15 @@ export async function DELETE(
   const { profileId } = await request.json();
   if (!profileId) {
     return NextResponse.json({ error: "profileId required" }, { status: 400 });
+  }
+
+  // Co-organizers can remove themselves (step down) but not other
+  // co-organizers — only creators / admins can evict.
+  if (!auth.isCreator && profileId !== auth.profile.id) {
+    return NextResponse.json(
+      { error: "Only the tournament creator can remove other co-organizers" },
+      { status: 403 }
+    );
   }
 
   const { error } = await auth.supabase

@@ -113,6 +113,29 @@ export function CourtTracker({
     setError(data.error ?? "Could not send match");
   }
 
+  /**
+   * Pull a match off its court and back to the end of the queue.
+   * Used when a team can't play (injury, no-show) but the organizer
+   * doesn't want to record a forfeit yet. Confirms first so a stray
+   * tap doesn't disrupt an active game.
+   */
+  async function unassign(matchId: string) {
+    if (!confirm("Bump this match back to the end of the queue and free the court?")) return;
+    setBusy(`unassign:${matchId}`);
+    setError("");
+    const res = await fetch(
+      `/api/tournaments/${tournamentId}/queue/promote?match_id=${encodeURIComponent(matchId)}`,
+      { method: "DELETE" }
+    );
+    setBusy(null);
+    if (res.ok) {
+      router.refresh();
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "Could not unassign match");
+  }
+
   return (
     <div className="card space-y-4">
       <div>
@@ -173,13 +196,24 @@ export function CourtTracker({
                   {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
                   {bracketLabel(match.bracket)} · Round {match.round}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setScoring(match)}
-                  className="btn-primary text-xs py-1.5 px-3 w-full sm:w-auto"
-                >
-                  Enter Score
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScoring(match)}
+                    className="btn-primary text-xs py-1.5 px-3 flex-1 sm:flex-none"
+                  >
+                    Enter Score
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => unassign(match.id)}
+                    disabled={busy === `unassign:${match.id}`}
+                    className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
+                    title="Send this match back to the queue (injury, no-show, etc.)"
+                  >
+                    {busy === `unassign:${match.id}` ? "…" : "Bump"}
+                  </button>
+                </div>
               </div>
             ) : (
               <p className="mt-2 text-xs text-surface-muted">

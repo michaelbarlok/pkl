@@ -13,6 +13,7 @@ import { EndTournamentButton } from "./end-tournament-button";
 import {
   AskToPartnerButton,
   RespondToRequestButtons,
+  CancelRequestButton,
 } from "./partner-request-buttons";
 import { DeleteTournamentButton } from "@/components/delete-tournament-button";
 import { CoOrganizerManager } from "@/components/co-organizer-manager";
@@ -703,6 +704,8 @@ export default async function TournamentDetailPage({
                   </div>
                   {isIncoming ? (
                     <RespondToRequestButtons tournamentId={id} requestId={rq.id} />
+                  ) : isOutgoing ? (
+                    <CancelRequestButton tournamentId={id} requestId={rq.id} />
                   ) : (
                     <span className="text-xs text-surface-muted">Waiting on reply</span>
                   )}

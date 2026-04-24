@@ -33,6 +33,26 @@ export async function POST(
     return NextResponse.json({ error: "Registration is not open" }, { status: 400 });
   }
 
+  // Hidden tournaments are invite-only. Refuse registrations from
+  // anyone but the organizer team — the URL might be in circulation
+  // if someone pasted it into a group chat, and we don't want
+  // strangers to sneak onto a private bracket.
+  if (tournament.is_hidden) {
+    const [{ data: org }, isCreator] = await Promise.all([
+      auth.supabase
+        .from("tournament_organizers")
+        .select("profile_id")
+        .eq("tournament_id", tournamentId)
+        .eq("profile_id", auth.profile.id)
+        .maybeSingle(),
+      Promise.resolve(tournament.created_by === auth.profile.id),
+    ]);
+    const isAdmin = auth.profile.role === "admin";
+    if (!isCreator && !isAdmin && !org) {
+      return NextResponse.json({ error: "Registration is not open" }, { status: 400 });
+    }
+  }
+
   // Honor the registration window timestamps. Status is the primary
   // gate but these columns exist for a reason — respect them so
   // organizers don't have to be awake at 8am to flip the status.

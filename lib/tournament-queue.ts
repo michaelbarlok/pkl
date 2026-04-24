@@ -283,7 +283,7 @@ export async function promoteMatchToCourt(
   return { ok: true };
 }
 
-async function runAssignmentPass(tournamentId: string): Promise<void> {
+export async function runAssignmentPass(tournamentId: string): Promise<void> {
   const service = await createServiceClient();
 
   const { data: tournamentRaw } = await service
