@@ -299,9 +299,11 @@ export default async function TournamentDetailPage({
   // Falls back to 2-col (then 1-col) when only one or neither exists.
   const has3Cols = !!(courtTrackerBlock && divisionBracketsBlock);
   // Widen the container when we're in 3-col mode so each lane has
-  // enough room for player names + action buttons to breathe.
+  // enough room for player names + action buttons to breathe. In
+  // 3-col mode we fill up to the layout's new 120rem cap; in 2-col
+  // mode we stay narrower so the content doesn't feel sparse.
   const containerMaxW = has3Cols
-    ? "max-w-3xl lg:max-w-[96rem]"
+    ? "max-w-3xl lg:max-w-none"
     : "max-w-3xl lg:max-w-7xl";
   const gridClasses = has3Cols
     ? "lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
