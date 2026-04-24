@@ -1,6 +1,7 @@
 "use client";
 
 import { useSupabase } from "@/components/providers/supabase-provider";
+import { useConfirm } from "@/components/confirm-modal";
 import { getDivisionLabel } from "@/lib/divisions";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -50,6 +51,7 @@ export function CourtTracker({
 }: Props) {
   const router = useRouter();
   const { supabase } = useSupabase();
+  const confirm = useConfirm();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [scoring, setScoring] = useState<CourtTrackerMatch | null>(null);
@@ -114,13 +116,21 @@ export function CourtTracker({
   }
 
   /**
-   * Pull a match off its court and back to the end of the queue.
-   * Used when a team can't play (injury, no-show) but the organizer
-   * doesn't want to record a forfeit yet. Confirms first so a stray
-   * tap doesn't disrupt an active game.
+   * Pull a match off its court and back into the queue at position 2
+   * (one match ahead of them before they play again). Useful when a
+   * team isn't ready and needs a few extra minutes. Confirms first
+   * so a stray tap doesn't disrupt an active game.
    */
   async function unassign(matchId: string) {
-    if (!confirm("Bump this match back to the end of the queue and free the court?")) return;
+    const ok = await confirm({
+      title: "Bump this match?",
+      description:
+        "The match goes back to the queue at position 2 — one match will play before them, giving them a couple more minutes.",
+      confirmLabel: "Bump",
+      cancelLabel: "Never mind",
+      variant: "warning",
+    });
+    if (!ok) return;
     setBusy(`unassign:${matchId}`);
     setError("");
     const res = await fetch(
@@ -209,7 +219,7 @@ export function CourtTracker({
                     onClick={() => unassign(match.id)}
                     disabled={busy === `unassign:${match.id}`}
                     className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
-                    title="Send this match back to the queue (injury, no-show, etc.)"
+                    title="Team not ready — send them back to the queue for a few more minutes"
                   >
                     {busy === `unassign:${match.id}` ? "…" : "Bump"}
                   </button>

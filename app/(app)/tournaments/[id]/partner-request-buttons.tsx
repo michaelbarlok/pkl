@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -18,13 +19,20 @@ export function AskToPartnerButton({
   targetName: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
   async function ask() {
     if (busy || sent) return;
-    if (!confirm(`Send ${targetName} a partner request?`)) return;
+    const ok = await confirm({
+      title: `Ask ${targetName} to partner?`,
+      description: "They'll get a push and email with Confirm / Decline buttons.",
+      confirmLabel: "Send request",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
     setBusy(true);
     setError("");
     const res = await fetch(
@@ -135,12 +143,20 @@ export function CancelRequestButton({
   requestId: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function cancel() {
     if (busy) return;
-    if (!confirm("Cancel this partner request?")) return;
+    const ok = await confirm({
+      title: "Cancel this partner request?",
+      description: "You can send a new request to anyone else later.",
+      confirmLabel: "Cancel request",
+      cancelLabel: "Keep it",
+      variant: "warning",
+    });
+    if (!ok) return;
     setBusy(true);
     setError("");
     const res = await fetch(

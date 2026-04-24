@@ -1,6 +1,7 @@
 "use client";
 
 import { FormError } from "@/components/form-error";
+import { useConfirm } from "@/components/confirm-modal";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { getDivisionLabel } from "@/lib/divisions";
 import type { TournamentRegistration } from "@/types/database";
@@ -30,6 +31,7 @@ export function TournamentRegistrationButton({
 }: Props) {
   const { supabase } = useSupabase();
   const router = useRouter();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedDivision, setSelectedDivision] = useState(
@@ -102,7 +104,15 @@ export function TournamentRegistrationButton({
   }
 
   async function handleWithdraw() {
-    if (!confirm("Are you sure you want to withdraw?")) return;
+    const ok = await confirm({
+      title: "Withdraw from this tournament?",
+      description:
+        "You'll lose your spot. If registration is still open you can rejoin, but your seed may change.",
+      confirmLabel: "Withdraw",
+      cancelLabel: "Stay in",
+      variant: "danger",
+    });
+    if (!ok) return;
     setLoading(true);
     setError("");
 
