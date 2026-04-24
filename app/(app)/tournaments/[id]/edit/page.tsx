@@ -113,9 +113,13 @@ export default function EditTournamentPage() {
       return;
     }
 
-    const { error: updateError } = await supabase
-      .from("tournaments")
-      .update({
+    // Route through the server API so organizer auth + validation
+    // (type flip, division removal) run before the write. Previously
+    // we wrote direct via supabase-js which only had RLS to rely on.
+    const res = await fetch(`/api/tournaments/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         title: title.trim(),
         description: description.trim() || null,
         format,
@@ -139,11 +143,12 @@ export default function EditTournamentPage() {
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
         num_courts: numCourts ? parseInt(numCourts) || null : null,
-      })
-      .eq("id", id);
+      }),
+    });
 
-    if (updateError) {
-      setError(updateError.message);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Couldn't save changes");
       setSubmitting(false);
       return;
     }

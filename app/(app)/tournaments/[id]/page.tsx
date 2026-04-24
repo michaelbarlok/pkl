@@ -13,6 +13,7 @@ import { EndTournamentButton } from "./end-tournament-button";
 import {
   AskToPartnerButton,
   RespondToRequestButtons,
+  CancelRequestButton,
 } from "./partner-request-buttons";
 import { DeleteTournamentButton } from "@/components/delete-tournament-button";
 import { CoOrganizerManager } from "@/components/co-organizer-manager";
@@ -25,6 +26,7 @@ import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import { PaidToggle } from "@/components/paid-toggle";
 import { PaymentReminderButton } from "@/components/payment-reminder-button";
 import { ShareBracketButton } from "@/components/share-bracket-button";
+import { ShareTournamentButton } from "@/components/share-tournament-button";
 import { HideTournamentToggle } from "@/app/(app)/admin/tournaments/hide-toggle";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -376,6 +378,13 @@ export default async function TournamentDetailPage({
 
               {/* Hero action row */}
               <div className="mt-4 flex flex-wrap items-center gap-2">
+                {!(tournament as any).is_hidden && (
+                  <ShareTournamentButton
+                    tournamentId={id}
+                    title={tournament.title}
+                    summary={`${tournament.title} — ${formatDate(tournament.start_date + "T00:00:00")} at ${tournament.location}`}
+                  />
+                )}
                 {matches.length > 0 && !(tournament as any).is_hidden && (
                   <ShareBracketButton tournamentId={id} />
                 )}
@@ -695,6 +704,8 @@ export default async function TournamentDetailPage({
                   </div>
                   {isIncoming ? (
                     <RespondToRequestButtons tournamentId={id} requestId={rq.id} />
+                  ) : isOutgoing ? (
+                    <CancelRequestButton tournamentId={id} requestId={rq.id} />
                   ) : (
                     <span className="text-xs text-surface-muted">Waiting on reply</span>
                   )}

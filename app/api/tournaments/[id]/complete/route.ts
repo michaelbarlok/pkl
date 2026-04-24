@@ -39,6 +39,12 @@ export async function POST(
   if (tournament.status === "completed") {
     return NextResponse.json({ ok: true, already_completed: true });
   }
+  if (tournament.status === "cancelled") {
+    return NextResponse.json(
+      { error: "This tournament was cancelled — there's nothing to complete." },
+      { status: 409 }
+    );
+  }
 
   // Gate: every match must be completed or a BYE. Anything pending
   // means scores are still outstanding — block until they're entered.

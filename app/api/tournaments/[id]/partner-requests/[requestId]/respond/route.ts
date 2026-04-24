@@ -153,19 +153,37 @@ export async function POST(
       `requester_id.eq.${req.requester_id},target_id.eq.${req.requester_id},requester_id.eq.${req.target_id},target_id.eq.${req.target_id}`
     );
 
-  await notify({
-    profileId: req.requester_id,
-    type: "tournament_partner_accepted",
-    title: `${targetName} is your partner`,
-    body: `You're locked in for ${tournament.title}.`,
-    link: `/tournaments/${tournamentId}`,
-    emailTemplate: "TournamentPartnerAccepted",
-    emailData: {
-      tournamentId,
-      tournamentTitle: tournament.title,
-      targetName,
-    },
-  });
+  // Notify BOTH sides — requester gets "your partner accepted" and
+  // the target (who just tapped Accept) gets a confirmation too so
+  // the UI doesn't go silent after their action.
+  await Promise.all([
+    notify({
+      profileId: req.requester_id,
+      type: "tournament_partner_accepted",
+      title: `${targetName} is your partner`,
+      body: `You're locked in for ${tournament.title}.`,
+      link: `/tournaments/${tournamentId}`,
+      emailTemplate: "TournamentPartnerAccepted",
+      emailData: {
+        tournamentId,
+        tournamentTitle: tournament.title,
+        targetName,
+      },
+    }),
+    notify({
+      profileId: req.target_id,
+      type: "tournament_partner_accepted",
+      title: `${requesterName} is your partner`,
+      body: `You're locked in for ${tournament.title}.`,
+      link: `/tournaments/${tournamentId}`,
+      emailTemplate: "TournamentPartnerAccepted",
+      emailData: {
+        tournamentId,
+        tournamentTitle: tournament.title,
+        targetName: requesterName,
+      },
+    }),
+  ]);
 
   return NextResponse.json({ ok: true, status: "confirmed" });
 }

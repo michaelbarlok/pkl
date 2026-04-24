@@ -146,15 +146,43 @@ export async function PUT(
     return NextResponse.json({ error: "match_id and winner_id required" }, { status: 400 });
   }
 
+  // Score sanity. Scores are arrays (one entry per game, supports
+  // best-of-3). Minimum standard: both arrays same length, at least
+  // one game recorded, non-negative, not a 0-0 draw, and the
+  // declared winner must actually have won the majority of games.
+  const s1 = Array.isArray(score1) ? score1.map(Number) : [];
+  const s2 = Array.isArray(score2) ? score2.map(Number) : [];
+  if (s1.length !== s2.length) {
+    return NextResponse.json({ error: "score1 and score2 must have the same number of games" }, { status: 400 });
+  }
+  if (s1.length === 0) {
+    return NextResponse.json({ error: "Record at least one game score" }, { status: 400 });
+  }
+  if (s1.some((n) => !Number.isFinite(n) || n < 0) || s2.some((n) => !Number.isFinite(n) || n < 0)) {
+    return NextResponse.json({ error: "Scores must be non-negative numbers" }, { status: 400 });
+  }
+  if (s1.every((n, i) => n === 0 && s2[i] === 0)) {
+    return NextResponse.json({ error: "Scores cannot all be 0-0" }, { status: 400 });
+  }
+
   // Fetch tournament format
   const { data: tournament } = await supabase
     .from("tournaments")
-    .select("format")
+    .select("format, status")
     .eq("id", tournamentId)
     .single();
 
   if (!tournament) {
     return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+  }
+
+  // Cancelled tournaments are frozen — no more scoring. The Danger
+  // Zone button sets this status and we treat it as terminal.
+  if (tournament.status === "cancelled") {
+    return NextResponse.json(
+      { error: "This tournament has been cancelled — scores can't be recorded." },
+      { status: 409 }
+    );
   }
 
   // Fetch existing match state to detect edits (winner change)
@@ -168,6 +196,27 @@ export async function PUT(
     return NextResponse.json({ error: "Match not found" }, { status: 404 });
   }
 
+  // Winner must be one of the two players on the match.
+  if (winner_id !== existingMatch.player1_id && winner_id !== existingMatch.player2_id) {
+    return NextResponse.json({ error: "winner_id must match player1_id or player2_id" }, { status: 400 });
+  }
+
+  // Winner's per-game wins must be the majority. Ties (same score)
+  // count toward neither team, so they must be broken in the data.
+  let p1Wins = 0;
+  let p2Wins = 0;
+  for (let i = 0; i < s1.length; i++) {
+    if (s1[i] > s2[i]) p1Wins++;
+    else if (s2[i] > s1[i]) p2Wins++;
+  }
+  if (p1Wins === p2Wins) {
+    return NextResponse.json({ error: "Scores don't clearly determine a winner — check for tied games" }, { status: 400 });
+  }
+  const inferredWinner = p1Wins > p2Wins ? existingMatch.player1_id : existingMatch.player2_id;
+  if (inferredWinner !== winner_id) {
+    return NextResponse.json({ error: "winner_id doesn't match the scores" }, { status: 400 });
+  }
+
   const previousWinner = existingMatch.status === "completed" ? existingMatch.winner_id : null;
   const previousLoser = previousWinner
     ? (existingMatch.player1_id === previousWinner ? existingMatch.player2_id : existingMatch.player1_id)
@@ -179,23 +228,32 @@ export async function PUT(
   // engine can hand it to the next queued match, and null out
   // queue_entered_at so an in-queue match scored directly from the
   // bracket view (skipping the court) gets cleanly removed from
-  // the queue.
+  // the queue. Optimistic lock on `updated_at`: if another organizer
+  // wrote the same match between our fetch and our write, the row
+  // returned will be empty and we return 409 so the caller can refetch.
   const { data: match, error: updateError } = await supabase
     .from("tournament_matches")
     .update({
-      score1: score1 ?? [],
-      score2: score2 ?? [],
+      score1: s1,
+      score2: s2,
       winner_id,
       status: "completed",
       court_number: null,
       queue_entered_at: null,
     })
     .eq("id", match_id)
+    .eq("updated_at", existingMatch.updated_at)
     .select()
     .single();
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+  if (!match) {
+    return NextResponse.json(
+      { error: "Match was updated by someone else. Reload and try again." },
+      { status: 409 }
+    );
   }
 
   // Auto-advance winner to next match in bracket (scoped to same division)

@@ -46,9 +46,11 @@ export async function POST(
     );
   }
 
+  // partner_id included so doubles partners get the "division is live"
+  // push — not just the team anchor.
   const { data: regRows } = await service
     .from("tournament_registrations")
-    .select("division, player_id")
+    .select("division, player_id, partner_id")
     .eq("tournament_id", tournamentId)
     .neq("status", "withdrawn");
 
@@ -86,11 +88,17 @@ export async function POST(
     }
   }
 
-  // Notify registrants of each newly-activated division.
+  // Notify registrants of each newly-activated division. Include
+  // both player_id (anchor) and partner_id (other half of the team)
+  // so doubles partners are notified too.
   for (const division of newlyActivated) {
-    const playerIds = (regRows ?? [])
-      .filter((r: any) => r.division === division)
-      .map((r: any) => r.player_id);
+    const ids = new Set<string>();
+    for (const r of (regRows ?? []) as { division: string; player_id: string; partner_id: string | null }[]) {
+      if (r.division !== division) continue;
+      if (r.player_id) ids.add(r.player_id);
+      if (r.partner_id) ids.add(r.partner_id);
+    }
+    const playerIds = Array.from(ids);
     if (playerIds.length === 0) continue;
 
     await notifyMany(playerIds, {

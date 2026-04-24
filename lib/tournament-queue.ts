@@ -53,6 +53,35 @@ interface Tournament {
 }
 
 /**
+ * In doubles tournaments each `tournament_matches` row stores one
+ * player per team — the registration's `player_id` (team anchor).
+ * The second half of each team lives in `tournament_registrations.partner_id`.
+ * Live-play notifications ("Head to Court N", "You're up next",
+ * "Your division is live") need to reach BOTH halves of a team, so
+ * we expand anchor IDs to full teams via this helper. Singles
+ * tournaments have no partner rows, so the return value equals the
+ * input. Returns a de-duplicated list.
+ */
+export async function expandTeamsForNotify(
+  tournamentId: string,
+  anchorPlayerIds: string[]
+): Promise<string[]> {
+  if (anchorPlayerIds.length === 0) return [];
+  const service = await createServiceClient();
+  const { data } = await service
+    .from("tournament_registrations")
+    .select("player_id, partner_id")
+    .eq("tournament_id", tournamentId)
+    .in("player_id", anchorPlayerIds)
+    .neq("status", "withdrawn");
+  const full = new Set<string>(anchorPlayerIds);
+  for (const row of (data ?? []) as { player_id: string; partner_id: string | null }[]) {
+    if (row.partner_id) full.add(row.partner_id);
+  }
+  return Array.from(full);
+}
+
+/**
  * Interleave a queue of matches across divisions. Within each
  * division the pool-play order (round asc, match_number asc) is
  * preserved — this matters so BYEs rotate correctly — but when
@@ -226,9 +255,10 @@ export async function promoteMatchToCourt(
     .update({ court_number: courtNumber })
     .eq("id", matchId);
 
-  const playerIds = [match.player1_id, match.player2_id].filter(
+  const anchorIds = [match.player1_id, match.player2_id].filter(
     (x): x is string => !!x
   );
+  const playerIds = await expandTeamsForNotify(tournamentId, anchorIds);
   if (playerIds.length > 0) {
     const divLabel = match.division ? getDivisionLabel(match.division) : "";
     const courtTitle = `Head to Court ${courtNumber}`;
@@ -253,7 +283,7 @@ export async function promoteMatchToCourt(
   return { ok: true };
 }
 
-async function runAssignmentPass(tournamentId: string): Promise<void> {
+export async function runAssignmentPass(tournamentId: string): Promise<void> {
   const service = await createServiceClient();
 
   const { data: tournamentRaw } = await service
@@ -381,9 +411,10 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
 
   // ── Step 4: "Head to Court N" pushes.
   for (const { match, court } of assignments) {
-    const playerIds = [match.player1_id, match.player2_id].filter(
+    const anchorIds = [match.player1_id, match.player2_id].filter(
       (x): x is string => !!x
     );
+    const playerIds = await expandTeamsForNotify(tournamentId, anchorIds);
     if (playerIds.length === 0) continue;
     const divLabel = match.division ? getDivisionLabel(match.division) : "";
     const courtTitle = `Head to Court ${court}`;
@@ -447,9 +478,10 @@ async function runAssignmentPass(tournamentId: string): Promise<void> {
   for (const t of positionTargets) {
     if (!t.match) continue;
     if (t.match[t.column]) continue;
-    const playerIds = [t.match.player1_id, t.match.player2_id].filter(
+    const anchorIds = [t.match.player1_id, t.match.player2_id].filter(
       (x): x is string => !!x
     );
+    const playerIds = await expandTeamsForNotify(tournamentId, anchorIds);
     if (playerIds.length === 0) continue;
     const divLabel = t.match.division ? getDivisionLabel(t.match.division) : "";
     const bodyText = t.body(divLabel);

@@ -121,3 +121,53 @@ export function RespondToRequestButtons({
     </div>
   );
 }
+
+/**
+ * Small "Cancel" link the requester sees next to their outgoing
+ * pending request. Lets them back out before the target responds
+ * (previously there was no way to undo).
+ */
+export function CancelRequestButton({
+  tournamentId,
+  requestId,
+}: {
+  tournamentId: string;
+  requestId: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function cancel() {
+    if (busy) return;
+    if (!confirm("Cancel this partner request?")) return;
+    setBusy(true);
+    setError("");
+    const res = await fetch(
+      `/api/tournaments/${tournamentId}/partner-requests/${requestId}`,
+      { method: "DELETE" }
+    );
+    setBusy(false);
+    if (res.ok) {
+      router.refresh();
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "Could not cancel");
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-surface-muted">Waiting on reply</span>
+      <button
+        type="button"
+        onClick={cancel}
+        disabled={busy}
+        className="text-xs text-surface-muted hover:text-dark-100 underline disabled:opacity-50"
+      >
+        {busy ? "…" : "Cancel"}
+      </button>
+      {error && <span className="text-xs text-red-400">{error}</span>}
+    </div>
+  );
+}

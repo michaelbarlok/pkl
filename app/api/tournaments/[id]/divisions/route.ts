@@ -367,7 +367,26 @@ export async function POST(
       .eq("id", tournamentId);
   }
 
-  // Delete existing matches
+  // Refuse regeneration if any pool / playoff match has been scored —
+  // regenerating would silently wipe completed results. Organizers
+  // who really want to redo brackets from scratch should delete the
+  // tournament or withdraw all registrations first.
+  const { count: completedCount } = await supabase
+    .from("tournament_matches")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId)
+    .eq("status", "completed");
+  if ((completedCount ?? 0) > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `Can't regenerate brackets — ${completedCount} match${(completedCount ?? 0) === 1 ? " has" : "es have"} already been scored. Delete the tournament if you need to start over.`,
+      },
+      { status: 409 }
+    );
+  }
+
+  // Delete existing (all pending) matches.
   await supabase
     .from("tournament_matches")
     .delete()
