@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/create-scheduled-sheets",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/tournament-registration-windows",
+      "schedule": "* * * * *"
     }
   ]
 }
