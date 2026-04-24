@@ -3,6 +3,7 @@
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
+import { localDateTimeToIso } from "@/lib/datetime-local";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
@@ -124,8 +125,8 @@ export default function CreateTournamentPage() {
           : null,
         payment_link: paymentLink.trim() || null,
         payment_directions: paymentDirections.trim() || null,
-        registration_opens_at: registrationOpensAt || null,
-        registration_closes_at: registrationClosesAt || null,
+        registration_opens_at: localDateTimeToIso(registrationOpensAt),
+        registration_closes_at: localDateTimeToIso(registrationClosesAt),
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,

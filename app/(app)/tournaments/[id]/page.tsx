@@ -494,6 +494,13 @@ export default async function TournamentDetailPage({
               <span className="text-sm text-dark-100">{tournament.entry_fee}</span>
             </DetailRow>
           )}
+          {(tournament as any).registration_opens_at && tournament.status === "draft" && (
+            <DetailRow label="Registration Opens">
+              <span className="text-sm text-dark-100">
+                {formatDateTime((tournament as any).registration_opens_at)}
+              </span>
+            </DetailRow>
+          )}
           {tournament.registration_closes_at && (
             <DetailRow label="Registration Closes">
               <span className="text-sm text-dark-100">

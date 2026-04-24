@@ -4,6 +4,7 @@ import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
 import { TournamentLogoUpload } from "@/components/tournament-logo-upload";
+import { localDateTimeToIso, isoToLocalDateTimeInput } from "@/lib/datetime-local";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -71,8 +72,8 @@ export default function EditTournamentPage() {
         }
         setPaymentLink((data as any).payment_link ?? "");
         setPaymentDirections((data as any).payment_directions ?? "");
-        setRegistrationOpensAt(data.registration_opens_at?.slice(0, 16) ?? "");
-        setRegistrationClosesAt(data.registration_closes_at?.slice(0, 16) ?? "");
+        setRegistrationOpensAt(isoToLocalDateTimeInput(data.registration_opens_at));
+        setRegistrationClosesAt(isoToLocalDateTimeInput(data.registration_closes_at));
         setScoreToWinPool(data.score_to_win_pool?.toString() ?? "11");
         setScoreToWinPlayoff(data.score_to_win_playoff?.toString() ?? "11");
         setFinalsBestOf3(data.finals_best_of_3 ?? false);
@@ -140,8 +141,8 @@ export default function EditTournamentPage() {
           : null,
         payment_link: paymentLink.trim() || null,
         payment_directions: paymentDirections.trim() || null,
-        registration_opens_at: registrationOpensAt || null,
-        registration_closes_at: registrationClosesAt || null,
+        registration_opens_at: localDateTimeToIso(registrationOpensAt),
+        registration_closes_at: localDateTimeToIso(registrationClosesAt),
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
