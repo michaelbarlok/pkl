@@ -327,9 +327,18 @@ export default async function TournamentDetailPage({
                       </span>
                     )}
                   </div>
-                  <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-dark-100 break-words">
-                    {tournament.title}
-                  </h1>
+                  <div className="mt-2 flex items-start gap-3 min-w-0">
+                    {(tournament as any).logo_url && (
+                      <img
+                        src={(tournament as any).logo_url}
+                        alt=""
+                        className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg object-cover ring-1 ring-surface-border"
+                      />
+                    )}
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-dark-100 break-words min-w-0">
+                      {tournament.title}
+                    </h1>
+                  </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-surface-muted">
                     <span className="inline-flex items-center gap-1.5">
                       <svg className="h-4 w-4 text-surface-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>

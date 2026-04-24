@@ -403,6 +403,7 @@ export interface Tournament {
   score_to_win_playoff?: number | null;
   finals_best_of_3?: boolean | null;
   division_settings?: Record<string, { games_per_team?: number }> | null;
+  logo_url?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

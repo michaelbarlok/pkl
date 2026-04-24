@@ -42,6 +42,12 @@ export type TournamentMatchWithPlayers = TournamentMatch & {
 export async function listTournaments(filters?: {
   status?: string;
   format?: string;
+  type?: string;
+  /** City / state substring. Case-insensitive ILIKE on tournaments.location. */
+  location?: string;
+  /** Gender prefix ("mens" | "womens" | "mixed"). Applied post-fetch
+   *  because it matches against the divisions text[] column. */
+  gender?: string;
 }): Promise<TournamentWithCounts[]> {
   const supabase = await createClient();
 
@@ -73,14 +79,36 @@ export async function listTournaments(filters?: {
   if (filters?.format) {
     query = query.eq("format", filters.format);
   }
+  if (filters?.type && (filters.type === "singles" || filters.type === "doubles")) {
+    query = query.eq("type", filters.type);
+  }
+  if (filters?.location && filters.location.trim() !== "") {
+    // ILIKE substring so "Austin" finds "Austin, TX", "West Austin", etc.
+    query = query.ilike("location", `%${filters.location.trim()}%`);
+  }
 
   const { data, error } = await query;
   if (error || !data) return [];
 
-  return (data as unknown as (TournamentWithCounts & { registrations: { count: number }[] })[]).map((t) => ({
+  let rows = (data as unknown as (TournamentWithCounts & {
+    registrations: { count: number }[];
+  })[]).map((t) => ({
     ...t,
     registration_count: t.registrations?.[0]?.count ?? 0,
   }));
+
+  // Gender filter — matches if ANY of the tournament's divisions
+  // starts with "<gender>_". Done in JS because divisions is a
+  // text[] column and a leading-prefix match against array elements
+  // is clunky in PostgREST syntax.
+  if (filters?.gender && ["mens", "womens", "mixed"].includes(filters.gender)) {
+    const prefix = `${filters.gender}_`;
+    rows = rows.filter((t) =>
+      (t.divisions ?? []).some((d: string) => d.startsWith(prefix))
+    );
+  }
+
+  return rows;
 }
 
 /**

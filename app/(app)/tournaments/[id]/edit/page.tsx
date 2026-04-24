@@ -3,6 +3,7 @@
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
+import { TournamentLogoUpload } from "@/components/tournament-logo-upload";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -32,6 +33,7 @@ export default function EditTournamentPage() {
   const [scoreToWinPlayoff, setScoreToWinPlayoff] = useState("11");
   const [finalsBestOf3, setFinalsBestOf3] = useState(false);
   const [numCourts, setNumCourts] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   const [savedLocations, setSavedLocations] = useState<{ name: string; cityState: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +77,7 @@ export default function EditTournamentPage() {
         setScoreToWinPlayoff(data.score_to_win_playoff?.toString() ?? "11");
         setFinalsBestOf3(data.finals_best_of_3 ?? false);
         setNumCourts((data as any).num_courts?.toString() ?? "");
+        setLogoUrl((data as any).logo_url ?? null);
       }
 
       // Build location dropdown options
@@ -143,6 +146,7 @@ export default function EditTournamentPage() {
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
         num_courts: numCourts ? parseInt(numCourts) || null : null,
+        logo_url: logoUrl,
       }),
     });
 
@@ -163,6 +167,12 @@ export default function EditTournamentPage() {
       <h1 className="text-2xl font-bold text-dark-100">Edit Tournament</h1>
 
       <form onSubmit={handleSubmit} className="card space-y-4">
+        <TournamentLogoUpload
+          tournamentId={id}
+          currentUrl={logoUrl}
+          onUploaded={setLogoUrl}
+        />
+
         <div>
           <label className="block text-sm font-medium text-dark-200 mb-1">Tournament Name *</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="input" maxLength={120} required />
