@@ -4,7 +4,7 @@ import { FormError } from "@/components/form-error";
 import { getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
-import { useState, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 
 // Map from player_id → partner display name (for doubles)
 export type PartnerMap = Map<string, string>;
@@ -453,34 +453,82 @@ function PoolSection({
   scoreToWin?: number;
   partnerMap?: PartnerMap;
 }) {
+  // Collapsible by default-open. Multi-pool divisions (Winners/
+  // Losers, or 3+ pools) would otherwise push a lot of stacked
+  // standings + matches into one long scroll; the user can fold
+  // pools they aren't watching to keep the page manageable.
+  const [poolOpen, setPoolOpen] = useState(true);
   const rounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b);
 
-  // Default the round pill to the first round that still has matches
-  // to play — keeps the viewer on the "current" round instead of
-  // always landing on Round 1 after refresh. Falls back to the
-  // earliest round when everything is complete.
-  const initialRound = (() => {
+  // First round that still has something to play — this is the
+  // "current live round" the viewer likely cares about. Recomputes
+  // on every render so realtime match updates move it forward
+  // automatically.
+  const firstIncompleteRound = useMemo(() => {
     for (const r of rounds) {
       const any = matches.some(
         (m) => m.round === r && m.status !== "completed" && m.status !== "bye"
       );
       if (any) return r;
     }
-    return rounds[0];
-  })();
+    return null;
+  }, [rounds, matches]);
+
+  // Default the round pill to the current live round on mount.
   const [selectedRound, setSelectedRound] = useState<number | null>(
-    initialRound ?? null
+    firstIncompleteRound ?? rounds[0] ?? null
   );
+
+  // Auto-advance: when the round the viewer is currently on finishes,
+  // jump to the next round with pending matches. Only triggers if
+  // the viewer is actually following the live round — if they
+  // manually navigated to a past round we leave them alone. We track
+  // the previous "live round" in a ref so a round transition (live 3
+  // → live 4) only advances viewers who were on the previous live
+  // round.
+  const prevActiveRef = useRef<number | null>(firstIncompleteRound);
+  useEffect(() => {
+    const prev = prevActiveRef.current;
+    prevActiveRef.current = firstIncompleteRound;
+    if (
+      firstIncompleteRound != null &&
+      prev != null &&
+      prev !== firstIncompleteRound &&
+      selectedRound === prev
+    ) {
+      setSelectedRound(firstIncompleteRound);
+    }
+  }, [firstIncompleteRound, selectedRound]);
 
   // Compute standings
   const standings = computeStandings(matches, partnerMap);
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider">{label}</h3>
+      <button
+        type="button"
+        onClick={() => setPoolOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left group"
+        aria-expanded={poolOpen}
+      >
+        <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider group-hover:text-dark-100">
+          {label}
+        </h3>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className={`h-4 w-4 text-surface-muted transition-transform ${poolOpen ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
 
       {/* Standings Table */}
-      {standings.length > 0 && (
+      {poolOpen && standings.length > 0 && (
         <div className="card overflow-x-auto p-0">
           <table className="min-w-full divide-y divide-surface-border">
             <thead className="bg-surface-overlay">
@@ -514,7 +562,7 @@ function PoolSection({
       {/* Round pill selector — tapping a round reveals just that
           round's matches so the pool isn't a long scroll when the
           schedule has a lot of rounds. */}
-      {rounds.length > 1 && (
+      {poolOpen && rounds.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
           {rounds.map((round) => {
             const isActive = selectedRound === round;
@@ -557,7 +605,7 @@ function PoolSection({
       )}
 
       {/* Matches for the selected round (or all rounds if only one). */}
-      {(selectedRound != null ? [selectedRound] : rounds).map((round) => {
+      {poolOpen && (selectedRound != null ? [selectedRound] : rounds).map((round) => {
         const roundMatches = matches
           .filter((m) => m.round === round)
           .sort((a, b) => a.match_number - b.match_number);
