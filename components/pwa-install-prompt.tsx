@@ -2,9 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { getExistingSubscription, isPushSupported } from "@/lib/push-client";
 
 const STORAGE_VISITS = "pwa-install-visit-count";
 const STORAGE_INSTALLED = "pwa-install-accepted";
+// Set once the post-install "go set up push" nudge has been shown
+// so we never fire it twice on the same device.
+const STORAGE_POST_INSTALL_SHOWN = "pwa-push-setup-prompted";
 
 /**
  * Prompts authenticated users to install the PWA. Cadence:
@@ -28,7 +32,7 @@ const STORAGE_INSTALLED = "pwa-install-accepted";
  * Mounted inside the authenticated AppLayout so unauthenticated
  * visitors never see it.
  */
-export function PWAInstallPrompt() {
+export function PWAInstallPrompt({ profileId }: { profileId: string }) {
   const [mounted, setMounted] = useState(false);
   const [show, setShow] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -37,21 +41,51 @@ export function PWAInstallPrompt() {
   // Typed loose because the BeforeInstallPromptEvent type isn't
   // in lib.dom and polyfilling for one property isn't worth it.
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  // Post-install nudge — shown once, points at the notification
+  // preferences on the profile page so installed users flip from
+  // email to push.
+  const [showPostInstall, setShowPostInstall] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  /**
+   * Fire the "now set up push notifications" modal — unless we've
+   * already shown it on this device, or the user already has a
+   * working push subscription (so no nudge needed).
+   */
+  async function maybeShowPostInstall() {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem(STORAGE_POST_INSTALL_SHOWN) === "true") return;
+    if (isPushSupported()) {
+      const existing = await getExistingSubscription().catch(() => null);
+      if (existing) {
+        // Already subscribed — no need to prompt.
+        localStorage.setItem(STORAGE_POST_INSTALL_SHOWN, "true");
+        return;
+      }
+    }
+    setShowPostInstall(true);
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     // If the app is already running in standalone/installed mode,
-    // mark the flag and bail so we never prompt again.
+    // mark the flag and bail the install prompt. First standalone
+    // launch (flag wasn't already true) is the iOS path into the
+    // post-install push-setup nudge.
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       window.matchMedia("(display-mode: minimal-ui)").matches ||
       window.matchMedia("(display-mode: fullscreen)").matches ||
       (navigator as any).standalone === true;
     if (standalone) {
+      const wasAlreadyInstalled =
+        localStorage.getItem(STORAGE_INSTALLED) === "true";
       localStorage.setItem(STORAGE_INSTALLED, "true");
+      if (!wasAlreadyInstalled) {
+        maybeShowPostInstall();
+      }
       return;
     }
 
@@ -90,6 +124,10 @@ export function PWAInstallPrompt() {
     const onInstalled = () => {
       localStorage.setItem(STORAGE_INSTALLED, "true");
       setShow(false);
+      // Chromium path — the browser will still be open after
+      // install. Fire the push-setup nudge here so users don't have
+      // to go hunt for notification preferences themselves.
+      maybeShowPostInstall();
     };
     window.addEventListener("beforeinstallprompt", onBip);
     window.addEventListener("appinstalled", onInstalled);
@@ -101,10 +139,12 @@ export function PWAInstallPrompt() {
 
   async function install() {
     if (!deferredPrompt) return;
+    let accepted = false;
     try {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") {
+        accepted = true;
         localStorage.setItem(STORAGE_INSTALLED, "true");
       }
     } catch {
@@ -113,15 +153,33 @@ export function PWAInstallPrompt() {
     }
     setDeferredPrompt(null);
     setShow(false);
+    // Some Chromium flavors don't fire `appinstalled` reliably after
+    // the userChoice promise resolves, so hand off to the nudge
+    // ourselves if the user accepted.
+    if (accepted) maybeShowPostInstall();
   }
 
   function dismiss() {
     setShow(false);
   }
 
-  if (!mounted || !show) return null;
+  function dismissPostInstall() {
+    localStorage.setItem(STORAGE_POST_INSTALL_SHOWN, "true");
+    setShowPostInstall(false);
+  }
 
-  const body = (
+  function openNotifSettings() {
+    localStorage.setItem(STORAGE_POST_INSTALL_SHOWN, "true");
+    setShowPostInstall(false);
+    // Hash targets the notifications section on the profile edit
+    // page so the user lands where they need to flip the switch.
+    window.location.href = `/players/${profileId}/edit#notifications`;
+  }
+
+  if (!mounted) return null;
+  if (!show && !showPostInstall) return null;
+
+  const installBanner = show ? (
     <div className="fixed inset-x-0 bottom-0 z-[150] p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:p-6 pointer-events-none">
       <div className="mx-auto max-w-md pointer-events-auto rounded-2xl bg-surface-raised shadow-2xl ring-1 ring-surface-border animate-scale-in">
         <div className="flex items-start gap-3 p-4">
@@ -170,7 +228,57 @@ export function PWAInstallPrompt() {
         )}
       </div>
     </div>
-  );
+  ) : null;
 
-  return createPortal(body, document.body);
+  // Post-install nudge — fires once after a fresh install (or the
+  // first standalone launch). Drives the user to their profile's
+  // notification preferences so we can flip them from email to push.
+  const postInstallModal = showPostInstall ? (
+    <div
+      className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pwa-post-install-title"
+      onClick={dismissPostInstall}
+    >
+      <div
+        className="relative w-full max-w-md rounded-2xl bg-surface-raised shadow-2xl ring-1 ring-surface-border animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-brand-vivid">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-5 w-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 id="pwa-post-install-title" className="text-base font-semibold text-dark-100">
+                You&rsquo;re in — turn on push notifications?
+              </h2>
+              <p className="mt-1 text-sm text-surface-muted leading-relaxed">
+                Now that the app lives on your home screen, flip to push in your profile and you&rsquo;ll get instant court assignments, up-next pings, and tournament alerts instead of email.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-surface-border px-6 py-4">
+          <button type="button" onClick={dismissPostInstall} className="btn-secondary text-sm">
+            Not now
+          </button>
+          <button type="button" onClick={openNotifSettings} className="btn-primary text-sm">
+            Open settings
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  return createPortal(
+    <>
+      {installBanner}
+      {postInstallModal}
+    </>,
+    document.body
+  );
 }

@@ -139,8 +139,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Prompts signed-in users to add the PWA to their home screen.
            Self-throttles: first login visit stays quiet, shows on visit
            #2, #4, #6, … and turns itself off permanently once the app
-           is installed on this device. */}
-      <PWAInstallPrompt />
+           is installed on this device. After a successful install (or
+           the first standalone launch on iOS) it also nudges the user
+           to flip their notification preferences to push. */}
+      <PWAInstallPrompt profileId={profile.id} />
     </div>
   );
 }
