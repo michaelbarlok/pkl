@@ -294,15 +294,29 @@ export default async function TournamentDetailPage({
   ) : null;
 
   const hasRightColumn = !!(courtTrackerBlock || divisionBracketsBlock);
+  // On wider screens we split the secondary content into two lanes:
+  // Court Tracker in the middle, DivisionBrackets on the right.
+  // Falls back to 2-col (then 1-col) when only one or neither exists.
+  const has3Cols = !!(courtTrackerBlock && divisionBracketsBlock);
+  // Widen the container when we're in 3-col mode so each lane has
+  // enough room for player names + action buttons to breathe.
+  const containerMaxW = has3Cols
+    ? "max-w-3xl lg:max-w-[96rem]"
+    : "max-w-3xl lg:max-w-7xl";
+  const gridClasses = has3Cols
+    ? "lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
+    : hasRightColumn
+    ? "lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
+    : "space-y-6";
 
   return (
-    <div className="max-w-3xl lg:max-w-7xl mx-auto space-y-6">
+    <div className={`${containerMaxW} mx-auto space-y-6`}>
       {/* Real-time bracket updates */}
       {isInProgress && <TournamentRealtimeSubscription tournamentId={id} />}
 
       <Breadcrumb items={[{ label: "Tournaments", href: "/tournaments" }, { label: tournament.title }]} />
 
-      <div className={hasRightColumn ? "lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start space-y-6 lg:space-y-0" : "space-y-6"}>
+      <div className={gridClasses}>
         <div className="space-y-6 min-w-0">
 
       {/* Hero */}
@@ -950,9 +964,20 @@ export default async function TournamentDetailPage({
       )}
         </div>
 
-        {hasRightColumn && (
+        {/* Middle column on lg+ when we have a Court Tracker. On
+             narrower 2-col layouts (brackets exist but no tracker)
+             this slot is empty and the right column slides in. */}
+        {courtTrackerBlock && (
           <div className="hidden lg:block space-y-6 min-w-0">
             {courtTrackerBlock}
+          </div>
+        )}
+
+        {/* Right column on lg+ when we have bracket pills. Lives
+             here whether we're 3-col (middle has tracker) or 2-col
+             (middle empty). */}
+        {divisionBracketsBlock && (
+          <div className="hidden lg:block space-y-6 min-w-0">
             {divisionBracketsBlock}
           </div>
         )}
