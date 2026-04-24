@@ -329,11 +329,17 @@ export default async function TournamentDetailPage({
                   </div>
                   <div className="mt-2 flex items-start gap-3 min-w-0">
                     {(tournament as any).logo_url && (
-                      <img
-                        src={(tournament as any).logo_url}
-                        alt=""
-                        className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg object-cover ring-1 ring-surface-border"
-                      />
+                      // object-contain + tinted frame so wide / tall /
+                      // transparent logos render fully at a consistent
+                      // 56-64px box — no cropping.
+                      <div className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg bg-surface-overlay ring-1 ring-surface-border flex items-center justify-center overflow-hidden">
+                        <img
+                          src={(tournament as any).logo_url}
+                          alt=""
+                          className="h-full w-full object-contain p-1"
+                          loading="eager"
+                        />
+                      </div>
                     )}
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-dark-100 break-words min-w-0">
                       {tournament.title}

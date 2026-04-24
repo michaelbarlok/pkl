@@ -34,11 +34,17 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithCount
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex items-start gap-3 min-w-0 flex-1">
             {logoUrl && (
-              <img
-                src={logoUrl}
-                alt=""
-                className="h-12 w-12 shrink-0 rounded-md object-cover ring-1 ring-surface-border"
-              />
+              // object-contain + surface-overlay background so wide /
+              // tall / transparent org logos render fully without
+              // getting cropped. p-1 keeps them off the frame edge.
+              <div className="h-12 w-12 shrink-0 rounded-md bg-surface-overlay ring-1 ring-surface-border flex items-center justify-center overflow-hidden">
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="h-full w-full object-contain p-1"
+                  loading="lazy"
+                />
+              </div>
             )}
             <h3 className="text-base font-semibold text-dark-100 line-clamp-2 min-w-0">
               {t.title}
