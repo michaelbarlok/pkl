@@ -608,8 +608,14 @@ export default async function TournamentDetailPage({
             </CollapsibleCard>
           )}
 
-          {/* Court Tracker moved to the right-hand column on desktop
-              (declared as courtTrackerBlock above). */}
+          {/* Court Tracker renders inline on mobile; on lg+ it shifts
+              to the right-hand column (see the hidden/lg:block block
+              below). Rendering it in both places keeps the source
+              order unchanged on mobile so mid-page content like
+              Registered/End Tournament still sits below play state. */}
+          {courtTrackerBlock && (
+            <div className="lg:hidden">{courtTrackerBlock}</div>
+          )}
 
           {/* Simple status controls for non-bracket transitions */}
           <OrganizerControls
@@ -622,8 +628,12 @@ export default async function TournamentDetailPage({
       {/* (Co-Organizer management moved inside the Tournament
           Details card above — redundant panel removed.) */}
 
-      {/* Brackets by Division moved to the right-hand column on desktop
-          (declared as divisionBracketsBlock above). */}
+      {/* DivisionBrackets — same split-rendering trick as Court
+          Tracker: mobile keeps it here in source order, lg+ hides
+          this copy and renders the right-column version instead. */}
+      {divisionBracketsBlock && (
+        <div className="lg:hidden">{divisionBracketsBlock}</div>
+      )}
 
       {/* Regular registered players get a pointer to the Play tab once
           the tournament is live. They don't see other divisions' brackets
@@ -925,7 +935,7 @@ export default async function TournamentDetailPage({
         </div>
 
         {hasRightColumn && (
-          <div className="space-y-6 min-w-0">
+          <div className="hidden lg:block space-y-6 min-w-0">
             {courtTrackerBlock}
             {divisionBracketsBlock}
           </div>
