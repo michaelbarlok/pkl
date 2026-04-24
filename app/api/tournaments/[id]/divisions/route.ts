@@ -10,6 +10,7 @@ import {
 import { getDivision, getDivisionLabel, SKILLS } from "@/lib/divisions";
 import { getTournamentManager } from "@/lib/tournament-auth";
 import { notifyMany } from "@/lib/notify";
+import { activateDivisionQueue } from "@/lib/tournament-queue";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /**
@@ -267,6 +268,12 @@ export async function PUT(
           .eq("bracket", bye.bracket);
       }
     }
+
+    // Kick the Court Tracker queue so freshly-inserted R1 playoff
+    // matches get stamped queue_entered_at and start filling open
+    // courts. Without this the Court Tracker was empty the moment
+    // playoffs began — pool play ended, nothing queued.
+    await activateDivisionQueue(tournamentId);
 
     // Notify everyone who played pool play in this division that
     // the playoff bracket is live. Source is tournament_registrations
