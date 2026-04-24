@@ -345,16 +345,16 @@ export default async function TournamentDetailPage({
                       {tournament.title}
                     </h1>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-surface-muted">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-dark-200">
                     <span className="inline-flex items-center gap-1.5">
-                      <svg className="h-4 w-4 text-surface-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <svg className="h-4 w-4 text-dark-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0zM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                       </svg>
                       {tournament.location}
                     </span>
                     {tournament.start_time && (
                       <span className="inline-flex items-center gap-1.5">
-                        <svg className="h-4 w-4 text-surface-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <svg className="h-4 w-4 text-dark-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
                         </svg>
                         {formatTime(tournament.start_time)}
@@ -378,13 +378,13 @@ export default async function TournamentDetailPage({
 
                 {/* Date chip */}
                 <div className="shrink-0 text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-muted leading-none">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-dark-200 leading-none">
                     {chip.month}
                   </p>
                   <p className="text-4xl sm:text-5xl font-bold leading-none mt-1 text-dark-100">
                     {chip.day}
                     {chip.endDay && (
-                      <span className="text-xl font-semibold text-surface-muted align-top ml-0.5">
+                      <span className="text-xl font-semibold text-dark-200 align-top ml-0.5">
                         {chip.endDay}
                       </span>
                     )}
