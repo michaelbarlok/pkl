@@ -56,10 +56,13 @@ export async function POST(
   // Honor the registration window timestamps. Status is the primary
   // gate but these columns exist for a reason — respect them so
   // organizers don't have to be awake at 8am to flip the status.
+  // Don't toLocaleString server-side: this route runs on Vercel
+  // (UTC) and would print UTC clock times in the error message,
+  // confusing players who set the window in their local zone.
   const now = new Date();
   if (tournament.registration_opens_at && new Date(tournament.registration_opens_at) > now) {
     return NextResponse.json(
-      { error: `Registration opens on ${new Date(tournament.registration_opens_at).toLocaleString()}` },
+      { error: "Registration hasn't opened yet — check back soon." },
       { status: 400 }
     );
   }

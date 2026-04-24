@@ -29,6 +29,7 @@ import { ShareBracketButton } from "@/components/share-bracket-button";
 import { ShareTournamentButton } from "@/components/share-tournament-button";
 import { HideTournamentToggle } from "@/app/(app)/admin/tournaments/hide-toggle";
 import { TournamentWinnersCard } from "@/components/tournament-winners-card";
+import { LocalDateTime } from "@/components/local-date-time";
 import { tournamentHeroGradient } from "@/lib/tournament-hero";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -497,14 +498,14 @@ export default async function TournamentDetailPage({
           {(tournament as any).registration_opens_at && tournament.status === "draft" && (
             <DetailRow label="Registration Opens">
               <span className="text-sm text-dark-100">
-                {formatDateTime((tournament as any).registration_opens_at)}
+                <LocalDateTime iso={(tournament as any).registration_opens_at} />
               </span>
             </DetailRow>
           )}
           {tournament.registration_closes_at && (
             <DetailRow label="Registration Closes">
               <span className="text-sm text-dark-100">
-                {formatDateTime(tournament.registration_closes_at)}
+                <LocalDateTime iso={tournament.registration_closes_at} />
               </span>
             </DetailRow>
           )}
