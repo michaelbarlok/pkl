@@ -190,11 +190,18 @@ export default async function TournamentDetailPage({
   // Lifted out so the desktop layout can move them into a right-hand
   // column next to the hero + details + registered cards, putting the
   // wide unused space on lg+ screens to work during live play.
+  //
+  // Stays visible for the entire in_progress lifecycle — pool play,
+  // playoffs, even after every division's winner has been decided —
+  // until the organizer taps End Tournament (which flips status to
+  // completed and clears tournament_active_divisions). Empty courts
+  // and an empty queue are fine states to show; they give the
+  // organizer a stable dashboard and avoid the "where'd it go?"
+  // confusion when a division briefly has no eligible matches.
   const hasCourtTracker =
     canManage &&
     tournament.status === "in_progress" &&
-    ((tournament as any).num_courts ?? 0) > 0 &&
-    activeDivisions.length > 0;
+    ((tournament as any).num_courts ?? 0) > 0;
 
   const courtTrackerBlock = hasCourtTracker
     ? (() => {
