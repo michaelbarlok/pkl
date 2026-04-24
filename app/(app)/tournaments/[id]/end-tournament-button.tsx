@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/confirm-modal";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,18 +12,21 @@ import { useState } from "react";
  */
 export function EndTournamentButton({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function end() {
     if (busy) return;
-    if (
-      !confirm(
-        "End the tournament and send final recap notifications to every player and organizer?"
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "End the tournament?",
+      description:
+        "Final standings lock and recap notifications go out to every player and organizer. This can't be undone.",
+      confirmLabel: "End tournament",
+      cancelLabel: "Cancel",
+      variant: "warning",
+    });
+    if (!ok) return;
     setBusy(true);
     setError("");
     const res = await fetch(`/api/tournaments/${tournamentId}/complete`, {

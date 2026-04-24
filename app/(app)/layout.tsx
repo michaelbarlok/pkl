@@ -8,6 +8,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { ThemeListener } from "@/components/theme-listener";
 import { ActiveSessionAlert } from "@/components/active-session-alert";
 import { TournamentCourtAlert } from "@/components/tournament-court-alert";
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
 
@@ -134,6 +135,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
            and deep-link to the Play tab. Ack is per-match-id so a
            second court assignment for the same team re-triggers. */}
       <TournamentCourtAlert profileId={profile.id} />
+
+      {/* Prompts signed-in users to add the PWA to their home screen.
+           Self-throttles: first login visit stays quiet, shows on visit
+           #2, #4, #6, … and turns itself off permanently once the app
+           is installed on this device. After a successful install (or
+           the first standalone launch on iOS) it also nudges the user
+           to flip their notification preferences to push. */}
+      <PWAInstallPrompt profileId={profile.id} />
     </div>
   );
 }

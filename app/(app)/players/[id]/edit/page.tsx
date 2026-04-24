@@ -484,7 +484,7 @@ export default function EditProfilePage() {
           </div>
 
           {/* Notification Preferences */}
-          <div className="border-t border-surface-border pt-4 mt-4 space-y-4">
+          <div id="notifications" className="border-t border-surface-border pt-4 mt-4 space-y-4 scroll-mt-24">
             <div>
               <h3 className="text-sm font-semibold text-dark-100 mb-0.5">Notification Preferences</h3>
               <p className="text-xs text-surface-muted">

@@ -34,12 +34,14 @@ export async function POST(
 /**
  * DELETE /api/tournaments/[id]/queue/promote?match_id=<uuid>
  *
- * Pull an on-court match back into the queue — e.g. injury, wrong
- * team showed up, or the organizer reconsidered. The match's
- * court_number is cleared and queue_entered_at is refreshed so the
- * match re-enters the FIFO line at the back. The freed court is
- * then fed by the normal assignment pass. Score / participants are
- * untouched — this is a re-queue, not a cancel.
+ * Pull an on-court match back into the queue — used when a team
+ * isn't ready (injury, wrong pair, warmup needed). Organizer-only.
+ *
+ * The match re-enters the queue at POSITION 2 rather than the back:
+ * we set its queue_entered_at to just after the current front-of-line
+ * match, giving the bumped team roughly one more match's worth of
+ * warmup time before they have to step on the court again. Score /
+ * participants are untouched — this is a re-queue, not a cancel.
  */
 export async function DELETE(
   request: NextRequest,
@@ -69,13 +71,38 @@ export async function DELETE(
     );
   }
 
-  // Re-queue at the back of the line (fresh queue_entered_at) so
-  // this match doesn't jump ahead of others already waiting. The
-  // assignment pass will fill the freed court from the front of
-  // the line.
+  // Find the current front-of-line queued match. If none, there's
+  // nothing ahead anyway — stamping "now" puts this match first,
+  // which is fine (no other match to buy time against).
+  const { data: frontOfLine } = await service
+    .from("tournament_matches")
+    .select("queue_entered_at")
+    .eq("tournament_id", tournamentId)
+    .eq("status", "pending")
+    .is("court_number", null)
+    .not("queue_entered_at", "is", null)
+    .neq("id", matchId)
+    .order("queue_entered_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  // New timestamp = 1ms after the current front match so the bumped
+  // match sits at position 2. If the queue is empty, "now" is fine.
+  // Also clear up_next / in_3rd ack columns since the match's
+  // notification context changed.
+  const frontTs = frontOfLine?.queue_entered_at
+    ? new Date(frontOfLine.queue_entered_at).getTime() + 1
+    : Date.now();
+  const newStamp = new Date(frontTs).toISOString();
+
   await service
     .from("tournament_matches")
-    .update({ court_number: null, queue_entered_at: new Date().toISOString() })
+    .update({
+      court_number: null,
+      queue_entered_at: newStamp,
+      up_next_notified_at: null,
+      in_3rd_notified_at: null,
+    })
     .eq("id", matchId);
 
   await runAssignmentPass(tournamentId);
