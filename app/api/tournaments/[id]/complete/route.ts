@@ -78,18 +78,22 @@ export async function POST(
   const recap = await computeTournamentRecap(tournamentId);
   if (!recap) return NextResponse.json({ ok: true, recap: null });
 
-  // Collect recipient lists.
+  // Collect recipient lists. Pull partner_id too — doubles
+  // registrations store one player per slot, so the recap needs to
+  // fan out to BOTH teammates. Without this, partner-side players
+  // never got their division recap.
   const { data: regs } = await service
     .from("tournament_registrations")
-    .select("player_id, division, status")
+    .select("player_id, partner_id, division, status")
     .eq("tournament_id", tournamentId)
     .neq("status", "withdrawn");
-  const playerIdsByDivision = new Map<string, string[]>();
+  const playerIdsByDivision = new Map<string, Set<string>>();
   for (const r of (regs ?? []) as any[]) {
-    if (!r.player_id || !r.division) continue;
-    const arr = playerIdsByDivision.get(r.division) ?? [];
-    arr.push(r.player_id);
-    playerIdsByDivision.set(r.division, arr);
+    if (!r.division) continue;
+    const set = playerIdsByDivision.get(r.division) ?? new Set<string>();
+    if (r.player_id) set.add(r.player_id);
+    if (r.partner_id) set.add(r.partner_id);
+    playerIdsByDivision.set(r.division, set);
   }
 
   const { data: organizerRows } = await service
@@ -103,8 +107,8 @@ export async function POST(
 
   // Per-division player fan-out. Excludes anyone also in the
   // organizer list — they'll get the fuller organizer email instead.
-  for (const [division, playerIds] of playerIdsByDivision) {
-    const targets = playerIds.filter((pid) => !organizerIds.has(pid));
+  for (const [division, playerIdSet] of playerIdsByDivision) {
+    const targets = Array.from(playerIdSet).filter((pid) => !organizerIds.has(pid));
     if (targets.length === 0) continue;
     await notifyMany(targets, {
       type: "tournament_recap",

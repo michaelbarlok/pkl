@@ -28,6 +28,7 @@ import { PaymentReminderButton } from "@/components/payment-reminder-button";
 import { ShareBracketButton } from "@/components/share-bracket-button";
 import { ShareTournamentButton } from "@/components/share-tournament-button";
 import { HideTournamentToggle } from "@/app/(app)/admin/tournaments/hide-toggle";
+import { TournamentWinnersCard } from "@/components/tournament-winners-card";
 import { tournamentHeroGradient } from "@/lib/tournament-hero";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -302,6 +303,18 @@ export default async function TournamentDetailPage({
       {isInProgress && <TournamentRealtimeSubscription tournamentId={id} />}
 
       <Breadcrumb items={[{ label: "Tournaments", href: "/tournaments" }, { label: tournament.title }]} />
+
+      {/* Winners podium — only renders on completed tournaments.
+          Pinned above the grid so every division's champions are
+          the first thing a visitor sees on a finished event. */}
+      {tournament.status === "completed" && (
+        <TournamentWinnersCard
+          tournamentId={id}
+          divisions={(tournament.divisions ?? []) as string[]}
+          matches={matches as any}
+          partnerMap={partnerMap}
+        />
+      )}
 
       <div className={gridClasses}>
         <div className="space-y-6 min-w-0">
