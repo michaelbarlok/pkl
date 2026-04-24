@@ -166,30 +166,12 @@ export default function HowItWorksPage() {
         <header>
           <h2 className="text-xl font-semibold text-dark-100">Tournaments</h2>
           <p className="mt-1 text-sm text-surface-muted">
-            Tri-Star supports three tournament formats. Each can run multiple divisions in parallel
-            (for example Men&apos;s 3.5 and Mixed 4.0).
+            Tri-Star tournaments run Round Robin with playoffs. Each event can run multiple divisions
+            in parallel (for example Men&apos;s 3.5 and Mixed 4.0).
           </p>
         </header>
 
         <div className="space-y-6 text-sm text-dark-200 leading-relaxed">
-          <div className="space-y-2">
-            <h3 className="text-base font-semibold text-dark-100">Single Elimination</h3>
-            <p>
-              A straight bracket: lose once and you&apos;re out. If the team count isn&apos;t a power of two,
-              the top seeds get byes through the first round so every subsequent round has a full matchup.
-              Seeds come from registration order, or explicit seed numbers if the organizer sets them.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="text-base font-semibold text-dark-100">Double Elimination</h3>
-            <p>
-              Two brackets run side by side. Losing a match in the winners bracket drops you into the
-              losers bracket, and you can still win the whole thing by running through losers. The winners
-              finalist and the losers finalist meet in the grand final to determine the champion.
-            </p>
-          </div>
-
           <div className="space-y-2">
             <h3 className="text-base font-semibold text-dark-100">Round Robin with Playoffs</h3>
             <p>

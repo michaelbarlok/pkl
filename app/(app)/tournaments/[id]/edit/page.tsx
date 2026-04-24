@@ -15,7 +15,7 @@ export default function EditTournamentPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [format, setFormat] = useState("single_elimination");
+  const [format, setFormat] = useState("round_robin");
   const [type, setType] = useState("doubles");
   const [divisions, setDivisions] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
@@ -200,12 +200,21 @@ export default function EditTournamentPage() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">Format *</label>
-            <select value={format} onChange={(e) => setFormat(e.target.value)} className="input">
-              <option value="single_elimination">Single Elimination</option>
-              <option value="double_elimination">Double Elimination</option>
-              <option value="round_robin">Round Robin</option>
-            </select>
+            <label className="block text-sm font-medium text-dark-200 mb-1">Format</label>
+            {/* Format is currently locked to whatever was set at
+                 creation. Round Robin is the only user-facing option
+                 right now; Single / Double Elimination stay visible
+                 as read-only labels so editing a legacy tournament
+                 doesn't silently flip its format. */}
+            <p className="input !bg-surface-overlay text-sm text-dark-200 cursor-not-allowed">
+              {format === "round_robin"
+                ? "Round Robin"
+                : format === "single_elimination"
+                  ? "Single Elimination"
+                  : format === "double_elimination"
+                    ? "Double Elimination"
+                    : format}
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Type *</label>

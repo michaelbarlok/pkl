@@ -13,7 +13,10 @@ export default function CreateTournamentPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [format, setFormat] = useState("round_robin");
+  // Format is Round Robin for all new tournaments right now.
+  // Re-enable the select + wire setFormat if/when Single/Double
+  // Elimination come back.
+  const format = "round_robin";
   const [type, setType] = useState("doubles");
   const [divisions, setDivisions] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
@@ -204,35 +207,19 @@ export default function CreateTournamentPage() {
           />
         </div>
 
-        {/* Format & Type */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Format *
-            </label>
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              className="input"
-            >
-              <option value="round_robin">Round Robin</option>
-              <option value="single_elimination">Single Elimination</option>
-              <option value="double_elimination">Double Elimination</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Type *
-            </label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="input"
-            >
-              <option value="doubles">Doubles</option>
-              <option value="singles">Singles</option>
-            </select>
-          </div>
+        {/* Type (format is currently always Round Robin). */}
+        <div>
+          <label className="block text-sm font-medium text-dark-200 mb-1">
+            Type *
+          </label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="input"
+          >
+            <option value="doubles">Doubles</option>
+            <option value="singles">Singles</option>
+          </select>
         </div>
 
         {/* Live-play logistics */}
