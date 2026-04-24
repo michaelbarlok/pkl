@@ -105,6 +105,29 @@ export default function CreateTournamentPage() {
       return;
     }
 
+    // Cross-field date sanity. Bail loudly on nonsense ordering so
+    // the cron doesn't end up opening registration after the
+    // tournament has already started etc.
+    const opensIso = localDateTimeToIso(registrationOpensAt);
+    const closesIso = localDateTimeToIso(registrationClosesAt);
+    if (opensIso && closesIso && new Date(opensIso) >= new Date(closesIso)) {
+      setError("Registration closes before it opens — check the dates.");
+      setSubmitting(false);
+      return;
+    }
+    if (startDate && closesIso && new Date(closesIso) > new Date(`${startDate}T23:59`)) {
+      setError("Registration must close on or before the tournament start date.");
+      setSubmitting(false);
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (startDate && new Date(`${startDate}T00:00`) < today) {
+      setError("Tournament start date is in the past.");
+      setSubmitting(false);
+      return;
+    }
+
     const { data, error: insertError } = await supabase
       .from("tournaments")
       .insert({
@@ -125,8 +148,8 @@ export default function CreateTournamentPage() {
           : null,
         payment_link: paymentLink.trim() || null,
         payment_directions: paymentDirections.trim() || null,
-        registration_opens_at: localDateTimeToIso(registrationOpensAt),
-        registration_closes_at: localDateTimeToIso(registrationClosesAt),
+        registration_opens_at: opensIso,
+        registration_closes_at: closesIso,
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
