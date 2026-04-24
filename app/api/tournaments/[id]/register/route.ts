@@ -106,99 +106,28 @@ export async function POST(
     }
   }
 
-  // Determine if the division is full
-  let isFull = false;
-
-  // Check per-division cap
-  if (tournament.max_teams_per_division && division) {
-    const { count: divisionConfirmed } = await auth.supabase
-      .from("tournament_registrations")
-      .select("*", { count: "exact", head: true })
-      .eq("tournament_id", tournamentId)
-      .eq("division", division)
-      .eq("status", "confirmed");
-
-    if ((divisionConfirmed ?? 0) >= tournament.max_teams_per_division) {
-      isFull = true;
+  // Cap check + insert run atomically in an RPC that locks the
+  // tournament row FOR UPDATE. Without this, two simultaneous
+  // registrations could both read `count < cap` and both insert as
+  // confirmed, silently exceeding the cap. The RPC also handles
+  // withdrawn-row reuse and waitlist-position computation so the
+  // whole "slot me in" step is one atomic hop.
+  const { data: registration, error } = await auth.supabase.rpc(
+    "register_for_tournament_atomic",
+    {
+      p_tournament_id: tournamentId,
+      p_player_id: auth.profile.id,
+      p_partner_id: partner_id || null,
+      p_division: division || null,
     }
-  }
-
-  // Also check overall tournament cap
-  if (!isFull && tournament.player_cap) {
-    const { count: confirmedCount } = await auth.supabase
-      .from("tournament_registrations")
-      .select("*", { count: "exact", head: true })
-      .eq("tournament_id", tournamentId)
-      .eq("status", "confirmed");
-
-    if ((confirmedCount ?? 0) >= tournament.player_cap) {
-      isFull = true;
-    }
-  }
-
-  const status = isFull ? "waitlist" : "confirmed";
-
-  // Compute waitlist position (per-division if division exists)
-  let waitlistPosition = null;
-  if (status === "waitlist") {
-    let query = auth.supabase
-      .from("tournament_registrations")
-      .select("*", { count: "exact", head: true })
-      .eq("tournament_id", tournamentId)
-      .eq("status", "waitlist");
-
-    if (division) {
-      query = query.eq("division", division);
-    }
-
-    const { count: waitlistCount } = await query;
-    waitlistPosition = (waitlistCount ?? 0) + 1;
-  }
-
-  // Check for a previously withdrawn registration for this player — the UNIQUE
-  // constraint on (tournament_id, player_id) prevents a fresh INSERT in that case.
-  const { data: withdrawn } = await auth.supabase
-    .from("tournament_registrations")
-    .select("id")
-    .eq("tournament_id", tournamentId)
-    .eq("player_id", auth.profile.id)
-    .eq("status", "withdrawn")
-    .maybeSingle();
-
-  let registration, error;
-  if (withdrawn) {
-    // Reuse the existing withdrawn row to avoid the unique-constraint violation
-    ({ data: registration, error } = await auth.supabase
-      .from("tournament_registrations")
-      .update({
-        partner_id: partner_id || null,
-        division: division || null,
-        status,
-        waitlist_position: waitlistPosition,
-        seed: null,
-        registered_at: new Date().toISOString(),
-      })
-      .eq("id", withdrawn.id)
-      .select()
-      .single());
-  } else {
-    ({ data: registration, error } = await auth.supabase
-      .from("tournament_registrations")
-      .insert({
-        tournament_id: tournamentId,
-        player_id: auth.profile.id,
-        partner_id: partner_id || null,
-        division: division || null,
-        status,
-        waitlist_position: waitlistPosition,
-      })
-      .select()
-      .single());
-  }
+  ) as { data: any; error: any };
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  const status = (registration?.status as string) ?? "confirmed";
+  const waitlistPosition = (registration?.waitlist_position as number | null) ?? null;
 
   // Check tournament badges (non-blocking)
   checkAndAwardBadges(auth.profile.id, ["tournament"]).catch(() => {});

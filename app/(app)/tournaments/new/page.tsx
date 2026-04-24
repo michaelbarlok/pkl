@@ -3,6 +3,7 @@
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
+import { localDateTimeToIso } from "@/lib/datetime-local";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
@@ -12,7 +13,10 @@ export default function CreateTournamentPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [format, setFormat] = useState("round_robin");
+  // Format is Round Robin for all new tournaments right now.
+  // Re-enable the select + wire setFormat if/when Single/Double
+  // Elimination come back.
+  const format = "round_robin";
   const [type, setType] = useState("doubles");
   const [divisions, setDivisions] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
@@ -104,6 +108,29 @@ export default function CreateTournamentPage() {
       return;
     }
 
+    // Cross-field date sanity. Bail loudly on nonsense ordering so
+    // the cron doesn't end up opening registration after the
+    // tournament has already started etc.
+    const opensIso = localDateTimeToIso(registrationOpensAt);
+    const closesIso = localDateTimeToIso(registrationClosesAt);
+    if (opensIso && closesIso && new Date(opensIso) >= new Date(closesIso)) {
+      setError("Registration closes before it opens — check the dates.");
+      setSubmitting(false);
+      return;
+    }
+    if (startDate && closesIso && new Date(closesIso) > new Date(`${startDate}T23:59`)) {
+      setError("Registration must close on or before the tournament start date.");
+      setSubmitting(false);
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (startDate && new Date(`${startDate}T00:00`) < today) {
+      setError("Tournament start date is in the past.");
+      setSubmitting(false);
+      return;
+    }
+
     const { data, error: insertError } = await supabase
       .from("tournaments")
       .insert({
@@ -124,8 +151,8 @@ export default function CreateTournamentPage() {
           : null,
         payment_link: paymentLink.trim() || null,
         payment_directions: paymentDirections.trim() || null,
-        registration_opens_at: registrationOpensAt || null,
-        registration_closes_at: registrationClosesAt || null,
+        registration_opens_at: opensIso,
+        registration_closes_at: closesIso,
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
@@ -180,35 +207,19 @@ export default function CreateTournamentPage() {
           />
         </div>
 
-        {/* Format & Type */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Format *
-            </label>
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              className="input"
-            >
-              <option value="round_robin">Round Robin</option>
-              <option value="single_elimination">Single Elimination</option>
-              <option value="double_elimination">Double Elimination</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Type *
-            </label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="input"
-            >
-              <option value="doubles">Doubles</option>
-              <option value="singles">Singles</option>
-            </select>
-          </div>
+        {/* Type (format is currently always Round Robin). */}
+        <div>
+          <label className="block text-sm font-medium text-dark-200 mb-1">
+            Type *
+          </label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="input"
+          >
+            <option value="doubles">Doubles</option>
+            <option value="singles">Singles</option>
+          </select>
         </div>
 
         {/* Live-play logistics */}

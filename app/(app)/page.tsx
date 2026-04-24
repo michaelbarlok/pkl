@@ -296,14 +296,14 @@ export default async function HomePage() {
             <div className="divide-y divide-surface-border">
               <div className="flex items-center justify-between px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-dark-100">Spring Singles Championship</p>
-                  <p className="text-xs text-surface-muted">Apr 12 &middot; Single Elimination</p>
+                  <p className="text-sm font-medium text-dark-100">Spring Doubles Classic</p>
+                  <p className="text-xs text-surface-muted">Apr 12 &middot; Round Robin</p>
                 </div>
                 <span className="badge-green">Open</span>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-dark-100">Doubles Round Robin</p>
+                  <p className="text-sm font-medium text-dark-100">Mixed 4.0 Shootout</p>
                   <p className="text-xs text-surface-muted">Apr 19 &middot; Round Robin</p>
                 </div>
                 <span className="badge-blue">16/32</span>
@@ -311,7 +311,7 @@ export default async function HomePage() {
               <div className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-medium text-dark-100">Summer Classic</p>
-                  <p className="text-xs text-surface-muted">May 3 &middot; Double Elimination</p>
+                  <p className="text-xs text-surface-muted">May 3 &middot; Round Robin</p>
                 </div>
                 <span className="badge-yellow">Coming Soon</span>
               </div>
@@ -327,7 +327,7 @@ export default async function HomePage() {
               <h2 className="text-xl font-bold text-dark-100">Tournaments</h2>
             </div>
             <p className="text-dark-200">
-              Compete in organized tournaments with brackets, seeding, and multiple formats. From casual round robins to competitive single and double elimination — find the right tournament for your skill level.
+              Compete in organized tournaments with Round Robin pool play and seeded playoff brackets. Real-time court assignments, automatic push alerts when it&apos;s your turn, and a live view of every match.
             </p>
           </div>
         </div>
@@ -406,7 +406,7 @@ export default async function HomePage() {
             },
             {
               q: "What formats does Tri-Star Pickleball support?",
-              a: "Tri-Star Pickleball supports ladder leagues (shootouts with step-based rankings), free play sessions with automatic team rotation, and tournaments in single elimination, double elimination, and round robin formats.",
+              a: "Tri-Star Pickleball supports ladder leagues (shootouts with step-based rankings), free play sessions with automatic team rotation, and Round Robin tournaments with seeded playoff brackets.",
             },
             {
               q: "Can I run my own group?",

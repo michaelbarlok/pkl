@@ -4,6 +4,7 @@ import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
 import { TournamentLogoUpload } from "@/components/tournament-logo-upload";
+import { localDateTimeToIso, isoToLocalDateTimeInput } from "@/lib/datetime-local";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -14,7 +15,7 @@ export default function EditTournamentPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [format, setFormat] = useState("single_elimination");
+  const [format, setFormat] = useState("round_robin");
   const [type, setType] = useState("doubles");
   const [divisions, setDivisions] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
@@ -71,8 +72,8 @@ export default function EditTournamentPage() {
         }
         setPaymentLink((data as any).payment_link ?? "");
         setPaymentDirections((data as any).payment_directions ?? "");
-        setRegistrationOpensAt(data.registration_opens_at?.slice(0, 16) ?? "");
-        setRegistrationClosesAt(data.registration_closes_at?.slice(0, 16) ?? "");
+        setRegistrationOpensAt(isoToLocalDateTimeInput(data.registration_opens_at));
+        setRegistrationClosesAt(isoToLocalDateTimeInput(data.registration_closes_at));
         setScoreToWinPool(data.score_to_win_pool?.toString() ?? "11");
         setScoreToWinPlayoff(data.score_to_win_playoff?.toString() ?? "11");
         setFinalsBestOf3(data.finals_best_of_3 ?? false);
@@ -116,6 +117,20 @@ export default function EditTournamentPage() {
       return;
     }
 
+    // Cross-field date sanity — same rules as the create form.
+    const opensIso = localDateTimeToIso(registrationOpensAt);
+    const closesIso = localDateTimeToIso(registrationClosesAt);
+    if (opensIso && closesIso && new Date(opensIso) >= new Date(closesIso)) {
+      setError("Registration closes before it opens — check the dates.");
+      setSubmitting(false);
+      return;
+    }
+    if (startDate && closesIso && new Date(closesIso) > new Date(`${startDate}T23:59`)) {
+      setError("Registration must close on or before the tournament start date.");
+      setSubmitting(false);
+      return;
+    }
+
     // Route through the server API so organizer auth + validation
     // (type flip, division removal) run before the write. Previously
     // we wrote direct via supabase-js which only had RLS to rely on.
@@ -140,8 +155,8 @@ export default function EditTournamentPage() {
           : null,
         payment_link: paymentLink.trim() || null,
         payment_directions: paymentDirections.trim() || null,
-        registration_opens_at: registrationOpensAt || null,
-        registration_closes_at: registrationClosesAt || null,
+        registration_opens_at: opensIso,
+        registration_closes_at: closesIso,
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
@@ -185,12 +200,21 @@ export default function EditTournamentPage() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">Format *</label>
-            <select value={format} onChange={(e) => setFormat(e.target.value)} className="input">
-              <option value="single_elimination">Single Elimination</option>
-              <option value="double_elimination">Double Elimination</option>
-              <option value="round_robin">Round Robin</option>
-            </select>
+            <label className="block text-sm font-medium text-dark-200 mb-1">Format</label>
+            {/* Format is currently locked to whatever was set at
+                 creation. Round Robin is the only user-facing option
+                 right now; Single / Double Elimination stay visible
+                 as read-only labels so editing a legacy tournament
+                 doesn't silently flip its format. */}
+            <p className="input !bg-surface-overlay text-sm text-dark-200 cursor-not-allowed">
+              {format === "round_robin"
+                ? "Round Robin"
+                : format === "single_elimination"
+                  ? "Single Elimination"
+                  : format === "double_elimination"
+                    ? "Double Elimination"
+                    : format}
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Type *</label>
