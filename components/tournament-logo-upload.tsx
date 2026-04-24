@@ -12,6 +12,11 @@ interface Props {
 
 const MAX_DIMENSION = 512;
 const JPEG_QUALITY = 0.85;
+// Reject obviously-oversized raw uploads before we try to decode
+// them. createImageBitmap has to load the full file into memory
+// first, and phones will OOM on a 40MB HEIC / RAW / TIFF. Most real
+// logos are well under 5MB.
+const MAX_RAW_BYTES = 10 * 1024 * 1024;
 
 /**
  * Resize + convert to JPEG via canvas. Same pattern as AvatarUpload,
@@ -86,6 +91,12 @@ export function TournamentLogoUpload({ tournamentId, currentUrl, onUploaded }: P
         setError("Save the tournament first, then upload a logo.");
         return;
       }
+      if (file.size > MAX_RAW_BYTES) {
+        setError(
+          `That image is ${(file.size / 1024 / 1024).toFixed(1)}MB — too large. Try one under 10MB or resize it first.`
+        );
+        return;
+      }
       setError(null);
       const objectUrl = URL.createObjectURL(file);
       setPreview(objectUrl);
@@ -129,7 +140,7 @@ export function TournamentLogoUpload({ tournamentId, currentUrl, onUploaded }: P
         aria-label="Upload logo"
       >
         {preview ? (
-          <img src={preview} alt="Logo preview" className="h-full w-full object-cover" />
+          <img src={preview} alt="Logo preview" className="h-full w-full object-contain p-1" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-surface-muted">
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
