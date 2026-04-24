@@ -155,13 +155,23 @@ export function CourtTracker({
         </p>
       </div>
 
-      {/* Courts grid */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {/* Courts grid. At ≤10 courts, 2-column is generous and keeps
+          player names on a single line; at 11+ we drop to 3 cols
+          (and 4 cols on xl) so the section doesn't eat the page.
+          Padding also tightens at the denser breakpoint. */}
+      <div
+        className={
+          "grid grid-cols-1 gap-2 sm:grid-cols-2 " +
+          (numCourts > 10 ? "lg:grid-cols-3 xl:grid-cols-4" : "")
+        }
+      >
         {courtsList.map(({ court, match }) => (
           <div
             key={court}
             className={
-              "rounded-lg border shadow-sm px-4 py-3 " +
+              "rounded-lg border shadow-sm " +
+              (numCourts > 10 ? "px-3 py-2" : "px-4 py-3") +
+              " " +
               (match
                 ? "border-brand-500/40 bg-brand-500/10"
                 : "border-surface-border bg-surface-overlay")
