@@ -9,6 +9,7 @@ import { LiveTournamentRealtime } from "./live-realtime";
 import { MyCourtCard } from "./my-court-card";
 import { NextUpQueue } from "./next-up-queue";
 import { DivisionRulesCard } from "./division-rules-card";
+import { OtherPoolsViewer } from "./other-pools-viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -90,17 +91,44 @@ export default async function TournamentLivePage({
     redirect(`/tournaments/${tournamentId}`);
   }
 
-  // Bracket + partner info. We scope the bracket query to the
-  // viewer's division only — they shouldn't see other divisions.
-  const { data: matches } = await supabase
+  // Pull matches for every active division — the viewer's primary
+  // pool renders at the top, but the "Other pools" dropdown below
+  // lets them peek at any other live pool read-only (same spirit as
+  // the ladder session's "see other courts" view).
+  const activeDivisionList = Array.from(activeDivisionSet) as string[];
+  const { data: allActiveMatches } = await supabase
     .from("tournament_matches")
     .select(
       "*, player1:profiles!player1_id(id, display_name, avatar_url), player2:profiles!player2_id(id, display_name, avatar_url)"
     )
     .eq("tournament_id", tournamentId)
-    .eq("division", myDivision)
+    .in("division", activeDivisionList.length > 0 ? activeDivisionList : [myDivision])
     .order("round", { ascending: true })
     .order("match_number", { ascending: true });
+
+  // Player's pool = the bracket they appear in within their division.
+  // Use a pool-play match (not playoff) so a player who's already
+  // reached the playoff bracket still sees their pool on top.
+  const myPoolMatch = (allActiveMatches ?? []).find(
+    (m: any) =>
+      m.division === myDivision &&
+      m.bracket !== "playoff" &&
+      (m.player1_id === teamPrimaryId || m.player2_id === teamPrimaryId)
+  ) as any;
+  const myBracket: string | null = myPoolMatch?.bracket ?? null;
+
+  // Matches shown in the "your pool" region — same division + same
+  // bracket. Falls back to all-division matches if we couldn't pin
+  // down the bracket (e.g. the player is only in the playoff, which
+  // we still want to display in the TournamentBracketView).
+  const myDivisionMatches = (allActiveMatches ?? []).filter(
+    (m: any) => m.division === myDivision
+  );
+  const matches = myBracket
+    ? myDivisionMatches.filter(
+        (m: any) => m.bracket === myBracket || m.bracket === "playoff"
+      )
+    : myDivisionMatches;
 
   // Find the viewer's currently-assigned court (if any). Their team
   // is on court when a pending match has them as player1 or player2
@@ -114,14 +142,16 @@ export default async function TournamentLivePage({
       (m.player1_id === teamPrimaryId || m.player2_id === teamPrimaryId)
   ) as any;
 
-  // Partner map for doubles labels.
+  // Partner map for doubles labels — scoped to every active
+  // division so the "Other pools" viewer below can label those
+  // rows correctly too, not just the viewer's own pool.
   const partnerMap: PartnerMap = new Map();
-  if (tournament.type === "doubles") {
+  if (tournament.type === "doubles" && activeDivisionList.length > 0) {
     const { data: regs } = await supabase
       .from("tournament_registrations")
       .select("player_id, partner_id, partner:profiles!partner_id(display_name)")
       .eq("tournament_id", tournamentId)
-      .eq("division", myDivision)
+      .in("division", activeDivisionList)
       .neq("status", "withdrawn");
     for (const r of (regs ?? []) as any[]) {
       if (r.player_id && r.partner_id) {
@@ -279,6 +309,22 @@ export default async function TournamentLivePage({
         canManage={false}
         tournamentId={tournamentId}
         division={myDivision}
+        scoreToWinPool={tournament.score_to_win_pool ?? undefined}
+        scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
+        finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
+        partnerMap={partnerMap}
+      />
+
+      {/* Read-only view into other pools — same division's other
+          brackets + every other active division's pools. Players
+          use this to spot friends or follow other matches they
+          care about. */}
+      <OtherPoolsViewer
+        tournamentId={tournamentId}
+        allActiveMatches={(allActiveMatches ?? []) as any}
+        myDivision={myDivision}
+        myBracket={myBracket}
+        format={tournament.format}
         scoreToWinPool={tournament.score_to_win_pool ?? undefined}
         scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}

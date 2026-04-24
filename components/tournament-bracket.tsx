@@ -453,6 +453,11 @@ function PoolSection({
   scoreToWin?: number;
   partnerMap?: PartnerMap;
 }) {
+  // Collapsible by default-open. Multi-pool divisions (Winners/
+  // Losers, or 3+ pools) would otherwise push a lot of stacked
+  // standings + matches into one long scroll; the user can fold
+  // pools they aren't watching to keep the page manageable.
+  const [poolOpen, setPoolOpen] = useState(true);
   const rounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b);
 
   // First round that still has something to play — this is the
@@ -500,10 +505,30 @@ function PoolSection({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider">{label}</h3>
+      <button
+        type="button"
+        onClick={() => setPoolOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left group"
+        aria-expanded={poolOpen}
+      >
+        <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider group-hover:text-dark-100">
+          {label}
+        </h3>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className={`h-4 w-4 text-surface-muted transition-transform ${poolOpen ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
 
       {/* Standings Table */}
-      {standings.length > 0 && (
+      {poolOpen && standings.length > 0 && (
         <div className="card overflow-x-auto p-0">
           <table className="min-w-full divide-y divide-surface-border">
             <thead className="bg-surface-overlay">
@@ -537,7 +562,7 @@ function PoolSection({
       {/* Round pill selector — tapping a round reveals just that
           round's matches so the pool isn't a long scroll when the
           schedule has a lot of rounds. */}
-      {rounds.length > 1 && (
+      {poolOpen && rounds.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
           {rounds.map((round) => {
             const isActive = selectedRound === round;
@@ -580,7 +605,7 @@ function PoolSection({
       )}
 
       {/* Matches for the selected round (or all rounds if only one). */}
-      {(selectedRound != null ? [selectedRound] : rounds).map((round) => {
+      {poolOpen && (selectedRound != null ? [selectedRound] : rounds).map((round) => {
         const roundMatches = matches
           .filter((m) => m.round === round)
           .sort((a, b) => a.match_number - b.match_number);
