@@ -101,7 +101,7 @@ export function MyCourtCard({
           {bracketLabel(match.bracket)} · Round {match.round}
         </p>
         <p className="text-[11px] text-surface-muted">
-          Head to the court now. Your organizer will enter the score when the match wraps.
+          Head to the court now. When the match is over, a member of the winning team is responsible for reporting the score to organizers.
         </p>
       </div>
     </div>
