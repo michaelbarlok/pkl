@@ -13,6 +13,12 @@ const STORAGE_POST_INSTALL_SHOWN = "pwa-push-setup-prompted";
 // one "visit" — multiple refreshes, client-side navigations, and
 // React StrictMode double-mounts in dev don't all bump the counter.
 const SESSION_COUNTED = "pwa-install-session-counted";
+// iOS timestamp of the last time we showed the install banner.
+// Safari can't tell us whether the user actually tapped Share → Add
+// to Home Screen, so after showing the banner we assume they might
+// have and go quiet for a while.
+const STORAGE_IOS_SHOWN_AT = "pwa-install-ios-shown-at";
+const IOS_SNOOZE_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 /**
  * Prompts authenticated users to install the PWA. Cadence:
@@ -146,7 +152,16 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
     setIsIOS(ios);
 
     if (ios) {
-      // No event to wait for — just show the instructions.
+      // Safari has no way to confirm the PWA actually got installed,
+      // so we'd keep nagging forever. Stamp the time we show the
+      // banner and stay silent for IOS_SNOOZE_MS afterward — long
+      // enough for the user to actually install and come back
+      // through their home-screen icon (which flips STORAGE_INSTALLED
+      // and turns the prompt off for good).
+      const lastShownRaw = localStorage.getItem(STORAGE_IOS_SHOWN_AT);
+      const lastShown = lastShownRaw ? Number(lastShownRaw) : 0;
+      if (Date.now() - lastShown < IOS_SNOOZE_MS) return;
+      localStorage.setItem(STORAGE_IOS_SHOWN_AT, String(Date.now()));
       setShow(true);
       return;
     }
