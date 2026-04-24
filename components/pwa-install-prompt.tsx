@@ -91,7 +91,9 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
     //     the PWA is installed on this device even if the user is
     //     currently in a regular tab on the same origin.
     //   - localStorage flag — our own historical signal from a
-    //     previous appinstalled event or standalone detection.
+    //     previous appinstalled event or standalone detection. Stale
+    //     after an uninstall, so it's always checked alongside at
+    //     least one live signal before we trust it.
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       window.matchMedia("(display-mode: minimal-ui)").matches ||
@@ -107,13 +109,40 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
       return;
     }
 
-    if (localStorage.getItem(STORAGE_INSTALLED) === "true") return;
+    // Always register beforeinstallprompt FIRST — the browser only
+    // fires it when the app is installable (i.e. not installed). If
+    // the user uninstalled the PWA, localStorage still says
+    // "installed" from the previous appinstalled event, so the flag
+    // alone would keep the prompt suppressed forever. When the event
+    // fires we invalidate the stale flag and show the banner so the
+    // re-install path works.
+    const onBip = (e: Event) => {
+      e.preventDefault();
+      localStorage.removeItem(STORAGE_INSTALLED);
+      setDeferredPrompt(e);
+      setShow(true);
+    };
+    const onInstalled = () => {
+      localStorage.setItem(STORAGE_INSTALLED, "true");
+      setShow(false);
+      // Chromium path — the browser will still be open after
+      // install. Fire the push-setup nudge here so users don't have
+      // to go hunt for notification preferences themselves.
+      maybeShowPostInstall();
+    };
+    window.addEventListener("beforeinstallprompt", onBip);
+    window.addEventListener("appinstalled", onInstalled);
+    const cleanup = () => {
+      window.removeEventListener("beforeinstallprompt", onBip);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
 
     // Chrome exposes getInstalledRelatedApps when the site is
     // listed in the manifest's related_applications and / or the
     // PWA was installed via this browser. Non-blocking — if it
-    // reports the app installed, flip the flag and bail without
-    // prompting. Fails silently on browsers that don't implement it.
+    // reports the app installed, flip the flag (and retract any
+    // banner we showed). If it reports empty AND the flag was set,
+    // that's an uninstall signature — clear the stale flag.
     const nav = navigator as Navigator & {
       getInstalledRelatedApps?: () => Promise<{ platform: string; id?: string; url?: string }[]>;
     };
@@ -122,13 +151,24 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
         .then((apps) => {
           if (apps && apps.length > 0) {
             localStorage.setItem(STORAGE_INSTALLED, "true");
-            // If we'd already decided to show the banner this run,
-            // retract it — the async check just confirmed install.
             setShow(false);
+          } else if (localStorage.getItem(STORAGE_INSTALLED) === "true") {
+            // Flag said installed, browser says no — user uninstalled
+            // between sessions. Clear the flag so the cadence (and
+            // the beforeinstallprompt listener we registered above)
+            // can re-offer install.
+            localStorage.removeItem(STORAGE_INSTALLED);
           }
         })
         .catch(() => {});
     }
+
+    // If the flag says installed AND we haven't gotten a live signal
+    // to the contrary yet, stay quiet for now. The beforeinstallprompt
+    // listener stays armed — if the browser fires the event (the
+    // authoritative "not installed" signal on Chrome), it clears the
+    // flag and shows the banner then.
+    if (localStorage.getItem(STORAGE_INSTALLED) === "true") return cleanup;
 
     // One visit = one session. sessionStorage clears on tab close
     // but persists across refreshes and StrictMode double-mounts,
@@ -142,8 +182,9 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
       sessionStorage.setItem(SESSION_COUNTED, "true");
     }
     // Show on visits 2, 4, 6, … — every other visit starting with
-    // the second (login visit stays quiet).
-    if (count < 2 || count % 2 !== 0) return;
+    // the second (login visit stays quiet). Return cleanup so the
+    // beforeinstallprompt listener still gets torn down on unmount.
+    if (count < 2 || count % 2 !== 0) return cleanup;
 
     // iOS detection — userAgent because feature detection isn't
     // sufficient (iOS Safari doesn't fire beforeinstallprompt).
@@ -160,36 +201,18 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
       // and turns the prompt off for good).
       const lastShownRaw = localStorage.getItem(STORAGE_IOS_SHOWN_AT);
       const lastShown = lastShownRaw ? Number(lastShownRaw) : 0;
-      if (Date.now() - lastShown < IOS_SNOOZE_MS) return;
+      if (Date.now() - lastShown < IOS_SNOOZE_MS) return cleanup;
       localStorage.setItem(STORAGE_IOS_SHOWN_AT, String(Date.now()));
       setShow(true);
-      return;
+      return cleanup;
     }
 
-    // Chromium browsers: stash the install event when it fires,
-    // then reveal our banner. If the event never fires (browser
-    // doesn't support PWA install or the site doesn't meet the
-    // install criteria for this user yet), we stay silent rather
-    // than showing a button that goes nowhere.
-    const onBip = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShow(true);
-    };
-    const onInstalled = () => {
-      localStorage.setItem(STORAGE_INSTALLED, "true");
-      setShow(false);
-      // Chromium path — the browser will still be open after
-      // install. Fire the push-setup nudge here so users don't have
-      // to go hunt for notification preferences themselves.
-      maybeShowPostInstall();
-    };
-    window.addEventListener("beforeinstallprompt", onBip);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBip);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
+    // Chromium path: listener is already registered above — if the
+    // browser fires beforeinstallprompt during this session, the
+    // banner will appear then. If the site doesn't meet install
+    // criteria (or the user dismissed the browser-level install
+    // shelf recently), no event fires and we stay silent.
+    return cleanup;
   }, []);
 
   async function install() {
