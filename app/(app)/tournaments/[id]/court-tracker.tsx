@@ -155,14 +155,19 @@ export function CourtTracker({
         </p>
       </div>
 
-      {/* Courts grid. At ≤10 courts, 2-column is generous and keeps
-          player names on a single line; at 11+ we drop to 3 cols
-          (and 4 cols on xl) so the section doesn't eat the page.
-          Padding also tightens at the denser breakpoint. */}
+      {/* Courts grid. Always one column on narrow screens (mobile).
+          From sm+ we use auto-fit with a ~260px minimum per tile so
+          the grid packs 2 / 3 / 4 columns based on whatever width
+          the lane actually has — no hardcoded breakpoint math.
+          >10-court tournaments get a tighter tile (minimum 220px)
+          AND tighter padding so three columns fit comfortably in
+          the Court Tracker lane on standard laptops. */}
       <div
-        className={
-          "grid grid-cols-1 gap-2 sm:grid-cols-2 " +
-          (numCourts > 10 ? "lg:grid-cols-3 xl:grid-cols-4" : "")
+        className="grid grid-cols-1 gap-2 sm:[grid-template-columns:repeat(auto-fit,minmax(var(--court-min,260px),1fr))]"
+        style={
+          {
+            ["--court-min" as any]: numCourts > 10 ? "220px" : "260px",
+          } as React.CSSProperties
         }
       >
         {courtsList.map(({ court, match }) => (

@@ -297,11 +297,18 @@ export default async function TournamentDetailPage({
   //     at least 900px to render without horizontal scroll; forcing
   //     them into a sidebar lane was clipping half the bracket.
   const hasCourtTrackerLane = !!courtTrackerBlock;
+  // Tournaments with lots of courts want a wider Court Tracker lane
+  // so the internal courts-grid can fit 3 columns of tiles. Favor
+  // the right side when >10 courts; stay even otherwise so the hero
+  // + details block doesn't feel cramped.
+  const manyCourts = ((tournament as any).num_courts ?? 0) > 10;
   const containerMaxW = hasCourtTrackerLane || divisionBracketsBlock
     ? "max-w-3xl lg:max-w-none"
     : "max-w-3xl lg:max-w-7xl";
   const gridClasses = hasCourtTrackerLane
-    ? "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
+    ? manyCourts
+      ? "lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
+      : "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
     : "space-y-6";
 
   return (
