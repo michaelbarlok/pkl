@@ -420,17 +420,71 @@ function RoundRobinView({
         </div>
       )}
 
-      {/* Desktop two-column layout when playoffs exist; stacked otherwise */}
+      {/* Once playoffs exist, stack the bracket on top (that's the
+          live action now) and fold pool play into a collapsible
+          below — closed by default so the bracket has the page to
+          itself. The previous side-by-side sidebar layout was
+          designed for a full-width container and broke down when
+          DivisionBrackets now lives in a narrow right column of the
+          main tournament grid. Stacking vertically works at any
+          width. */}
       {hasPlayoffs ? (
-        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,480px)] lg:gap-8 lg:items-start">
-          {/* Pool play — below playoff on mobile, left column on desktop */}
-          <div className="order-2 lg:order-1 space-y-6 mt-6 lg:mt-0">{poolPlayoffContent}</div>
-          {/* Playoff bracket — above pool play on mobile, sticky right sidebar on desktop */}
-          <div className="order-1 lg:order-2 lg:sticky lg:top-6">{playoffBracketView}</div>
+        <div className="space-y-4">
+          {playoffBracketView}
+          <PoolPlayCollapsible defaultOpen={false}>
+            <div className="space-y-6">{poolPlayoffContent}</div>
+          </PoolPlayCollapsible>
         </div>
       ) : (
         <div className="space-y-6">{poolPlayoffContent}</div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Division-level "Pool play results" folder rendered once the
+ * playoff bracket exists. Closed by default so the bracket owns the
+ * page; the organizer expands when they need to double-check
+ * standings, game scores, or seeding rationale.
+ */
+function PoolPlayCollapsible({
+  defaultOpen,
+  children,
+}: {
+  defaultOpen: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left group"
+        aria-expanded={open}
+      >
+        <div>
+          <p className="text-sm font-semibold text-dark-100 group-hover:text-brand-vivid">
+            Pool play results
+          </p>
+          <p className="text-xs text-surface-muted mt-0.5">
+            Standings, round matches, and seeding notes.
+          </p>
+        </div>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className={`h-4 w-4 text-surface-muted transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && <div className="mt-4">{children}</div>}
     </div>
   );
 }
