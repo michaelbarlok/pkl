@@ -199,12 +199,109 @@ export default async function TournamentDetailPage({
     divisionMatches.set(key, val);
   }
 
+  // Lifted out so the desktop layout can move them into a right-hand
+  // column next to the hero + details + registered cards, putting the
+  // wide unused space on lg+ screens to work during live play.
+  const hasCourtTracker =
+    canManage &&
+    tournament.status === "in_progress" &&
+    ((tournament as any).num_courts ?? 0) > 0 &&
+    activeDivisions.length > 0;
+
+  const courtTrackerBlock = hasCourtTracker
+    ? (() => {
+        const numCourts = (tournament as any).num_courts as number;
+        const activeSet = new Set(activeDivisions);
+        const toTracker = (m: any): CourtTrackerMatch => ({
+          id: m.id,
+          division: m.division ?? null,
+          round: m.round,
+          match_number: m.match_number,
+          bracket: m.bracket,
+          player1_id: m.player1_id ?? null,
+          player2_id: m.player2_id ?? null,
+          player1_name: m.player1?.display_name ?? null,
+          partner1_name: m.player1_id ? partnerMap.get(m.player1_id) ?? null : null,
+          player2_name: m.player2?.display_name ?? null,
+          partner2_name: m.player2_id ? partnerMap.get(m.player2_id) ?? null : null,
+          court_number: m.court_number ?? null,
+          queue_entered_at: m.queue_entered_at ?? null,
+          status: m.status,
+        });
+
+        const onCourtMatches = matches
+          .filter(
+            (m: any) =>
+              m.status === "pending" &&
+              m.court_number != null &&
+              m.division &&
+              activeSet.has(m.division)
+          )
+          .map(toTracker);
+
+        // Strict FIFO — queue_entered_at is staggered at enqueue
+        // time (engine does the cross-division interleave there),
+        // so the read path is a pure timestamp sort.
+        const queuedMatches = (matches
+          .filter(
+            (m: any) =>
+              m.status === "pending" &&
+              m.court_number == null &&
+              m.queue_entered_at != null &&
+              m.player1_id &&
+              m.player2_id &&
+              m.division &&
+              activeSet.has(m.division)
+          )
+          .sort((a: any, b: any) =>
+            new Date(a.queue_entered_at).getTime() -
+            new Date(b.queue_entered_at).getTime()
+          ) as any[]).map(toTracker);
+
+        return (
+          <CourtTracker
+            tournamentId={id}
+            numCourts={numCourts}
+            onCourt={onCourtMatches}
+            queue={queuedMatches}
+          />
+        );
+      })()
+    : null;
+
+  const hasDivisionBrackets = matches.length > 0 && canManage;
+  const divisionBracketsBlock = hasDivisionBrackets ? (
+    <DivisionBrackets
+      divisionMatchesEntries={Array.from(divisionMatches.entries()).map(([div, divMatches]) => ({
+        division: div,
+        matches: divMatches,
+      }))}
+      tournament={{
+        format: tournament.format,
+        score_to_win_pool: tournament.score_to_win_pool ?? undefined,
+        score_to_win_playoff: tournament.score_to_win_playoff ?? undefined,
+        finals_best_of_3: tournament.finals_best_of_3 ?? undefined,
+      }}
+      canManage={canManage}
+      tournamentId={id}
+      myDivision={myDivision}
+      partnerMap={partnerMap}
+      isRoundRobin={tournament.format === "round_robin"}
+      activeDivisions={activeDivisions}
+    />
+  ) : null;
+
+  const hasRightColumn = !!(courtTrackerBlock || divisionBracketsBlock);
+
   return (
-    <div className="max-w-3xl lg:max-w-6xl mx-auto space-y-6">
+    <div className="max-w-3xl lg:max-w-7xl mx-auto space-y-6">
       {/* Real-time bracket updates */}
       {isInProgress && <TournamentRealtimeSubscription tournamentId={id} />}
 
       <Breadcrumb items={[{ label: "Tournaments", href: "/tournaments" }, { label: tournament.title }]} />
+
+      <div className={hasRightColumn ? "lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start space-y-6 lg:space-y-0" : "space-y-6"}>
+        <div className="space-y-6 min-w-0">
 
       {/* Hero */}
       {(() => {
@@ -511,71 +608,8 @@ export default async function TournamentDetailPage({
             </CollapsibleCard>
           )}
 
-          {/* Live court tracker (shown when we know num_courts and
-              at least one division is active). Organizers see every
-              court, the matches on them, and the queue of eligible
-              matches with Send-to-Court buttons. */}
-          {tournament.status === "in_progress" &&
-            ((tournament as any).num_courts ?? 0) > 0 &&
-            activeDivisions.length > 0 &&
-            (() => {
-              const numCourts = (tournament as any).num_courts as number;
-              const activeSet = new Set(activeDivisions);
-              const toTracker = (m: any): CourtTrackerMatch => ({
-                id: m.id,
-                division: m.division ?? null,
-                round: m.round,
-                match_number: m.match_number,
-                bracket: m.bracket,
-                player1_id: m.player1_id ?? null,
-                player2_id: m.player2_id ?? null,
-                player1_name: m.player1?.display_name ?? null,
-                partner1_name: m.player1_id ? partnerMap.get(m.player1_id) ?? null : null,
-                player2_name: m.player2?.display_name ?? null,
-                partner2_name: m.player2_id ? partnerMap.get(m.player2_id) ?? null : null,
-                court_number: m.court_number ?? null,
-                queue_entered_at: m.queue_entered_at ?? null,
-                status: m.status,
-              });
-
-              const onCourtMatches = matches
-                .filter(
-                  (m: any) =>
-                    m.status === "pending" &&
-                    m.court_number != null &&
-                    m.division &&
-                    activeSet.has(m.division)
-                )
-                .map(toTracker);
-
-              // Strict FIFO — queue_entered_at is staggered at enqueue
-              // time (engine does the cross-division interleave there),
-              // so the read path is a pure timestamp sort.
-              const queuedMatches = (matches
-                .filter(
-                  (m: any) =>
-                    m.status === "pending" &&
-                    m.court_number == null &&
-                    m.queue_entered_at != null &&
-                    m.player1_id &&
-                    m.player2_id &&
-                    m.division &&
-                    activeSet.has(m.division)
-                )
-                .sort((a: any, b: any) =>
-                  new Date(a.queue_entered_at).getTime() -
-                  new Date(b.queue_entered_at).getTime()
-                ) as any[]).map(toTracker);
-
-              return (
-                <CourtTracker
-                  tournamentId={id}
-                  numCourts={numCourts}
-                  onCourt={onCourtMatches}
-                  queue={queuedMatches}
-                />
-              );
-            })()}
+          {/* Court Tracker moved to the right-hand column on desktop
+              (declared as courtTrackerBlock above). */}
 
           {/* Simple status controls for non-bracket transitions */}
           <OrganizerControls
@@ -588,31 +622,8 @@ export default async function TournamentDetailPage({
       {/* (Co-Organizer management moved inside the Tournament
           Details card above — redundant panel removed.) */}
 
-      {/* Brackets by Division — tabbed UI when in_progress with multiple divisions.
-          Regular registered players don't need the full bracket grid from
-          the tournament page: once the event is underway they go to the
-          Play tab to see their own pool. Only organizers keep the
-          tab view here so they can enter scores for every division. */}
-      {matches.length > 0 && canManage && (
-        <DivisionBrackets
-          divisionMatchesEntries={Array.from(divisionMatches.entries()).map(([div, divMatches]) => ({
-            division: div,
-            matches: divMatches,
-          }))}
-          tournament={{
-            format: tournament.format,
-            score_to_win_pool: tournament.score_to_win_pool ?? undefined,
-            score_to_win_playoff: tournament.score_to_win_playoff ?? undefined,
-            finals_best_of_3: tournament.finals_best_of_3 ?? undefined,
-          }}
-          canManage={canManage}
-          tournamentId={id}
-          myDivision={myDivision}
-          partnerMap={partnerMap}
-          isRoundRobin={tournament.format === "round_robin"}
-          activeDivisions={activeDivisions}
-        />
-      )}
+      {/* Brackets by Division moved to the right-hand column on desktop
+          (declared as divisionBracketsBlock above). */}
 
       {/* Regular registered players get a pointer to the Play tab once
           the tournament is live. They don't see other divisions' brackets
@@ -911,6 +922,15 @@ export default async function TournamentDetailPage({
           </div>
         </div>
       )}
+        </div>
+
+        {hasRightColumn && (
+          <div className="space-y-6 min-w-0">
+            {courtTrackerBlock}
+            {divisionBracketsBlock}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
