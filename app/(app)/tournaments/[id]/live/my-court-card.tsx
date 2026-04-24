@@ -71,7 +71,11 @@ export function MyCourtCard({
       className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${heroTint} ring-1 ring-surface-border`}
     >
       <div className="p-5 sm:p-6 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-vivid">
+        {/* Label + all secondary text on the gradient use text-dark-200
+            (adaptive: light on dark mode, dark on light mode). The
+            previous text-brand-vivid / text-surface-muted both fell
+            below AA contrast against the colored tint in light mode. */}
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-dark-200">
           Your Court
         </p>
         <div className="flex items-baseline gap-3 flex-wrap">
@@ -79,28 +83,28 @@ export function MyCourtCard({
             Court {match.court_number}
           </p>
           {numCourts && (
-            <p className="text-xs text-surface-muted">of {numCourts}</p>
+            <p className="text-xs text-dark-200">of {numCourts}</p>
           )}
         </div>
         <div className="text-sm text-dark-200 space-y-0.5">
           {match.partner_name && (
             <p>
-              <span className="text-surface-muted">Partner:</span>{" "}
+              <span className="text-dark-200">Partner:</span>{" "}
               <span className="text-dark-100 font-medium">{match.partner_name}</span>
             </p>
           )}
           {match.opponent_team && (
             <p>
-              <span className="text-surface-muted">Opponent:</span>{" "}
+              <span className="text-dark-200">Opponent:</span>{" "}
               <span className="text-dark-100 font-medium">{match.opponent_team}</span>
             </p>
           )}
         </div>
-        <p className="text-xs text-surface-muted">
+        <p className="text-xs text-dark-200">
           {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
           {bracketLabel(match.bracket)} · Round {match.round}
         </p>
-        <p className="text-[11px] text-surface-muted">
+        <p className="text-[11px] text-dark-200">
           Head to the court now. When the match is over, a member of the winning team is responsible for reporting the score to organizers.
         </p>
       </div>
