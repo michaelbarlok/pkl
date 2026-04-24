@@ -4,7 +4,7 @@ import { FormError } from "@/components/form-error";
 import { getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
-import { useState, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 
 // Map from player_id → partner display name (for doubles)
 export type PartnerMap = Map<string, string>;
@@ -455,22 +455,45 @@ function PoolSection({
 }) {
   const rounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b);
 
-  // Default the round pill to the first round that still has matches
-  // to play — keeps the viewer on the "current" round instead of
-  // always landing on Round 1 after refresh. Falls back to the
-  // earliest round when everything is complete.
-  const initialRound = (() => {
+  // First round that still has something to play — this is the
+  // "current live round" the viewer likely cares about. Recomputes
+  // on every render so realtime match updates move it forward
+  // automatically.
+  const firstIncompleteRound = useMemo(() => {
     for (const r of rounds) {
       const any = matches.some(
         (m) => m.round === r && m.status !== "completed" && m.status !== "bye"
       );
       if (any) return r;
     }
-    return rounds[0];
-  })();
+    return null;
+  }, [rounds, matches]);
+
+  // Default the round pill to the current live round on mount.
   const [selectedRound, setSelectedRound] = useState<number | null>(
-    initialRound ?? null
+    firstIncompleteRound ?? rounds[0] ?? null
   );
+
+  // Auto-advance: when the round the viewer is currently on finishes,
+  // jump to the next round with pending matches. Only triggers if
+  // the viewer is actually following the live round — if they
+  // manually navigated to a past round we leave them alone. We track
+  // the previous "live round" in a ref so a round transition (live 3
+  // → live 4) only advances viewers who were on the previous live
+  // round.
+  const prevActiveRef = useRef<number | null>(firstIncompleteRound);
+  useEffect(() => {
+    const prev = prevActiveRef.current;
+    prevActiveRef.current = firstIncompleteRound;
+    if (
+      firstIncompleteRound != null &&
+      prev != null &&
+      prev !== firstIncompleteRound &&
+      selectedRound === prev
+    ) {
+      setSelectedRound(firstIncompleteRound);
+    }
+  }, [firstIncompleteRound, selectedRound]);
 
   // Compute standings
   const standings = computeStandings(matches, partnerMap);
