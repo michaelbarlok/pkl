@@ -26,11 +26,24 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithCount
     ? Math.min((t.registration_count / t.player_cap) * 100, 100)
     : null;
 
+  const logoUrl = (t as any).logo_url as string | null | undefined;
+
   return (
     <div className={`card hover:ring-1 hover:ring-brand-500/30 transition-all flex flex-col ${accent}`}>
       <Link href={`/tournaments/${t.id}`} className="flex-1">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="text-base font-semibold text-dark-100 line-clamp-2">{t.title}</h3>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            {logoUrl && (
+              <img
+                src={logoUrl}
+                alt=""
+                className="h-12 w-12 shrink-0 rounded-md object-cover ring-1 ring-surface-border"
+              />
+            )}
+            <h3 className="text-base font-semibold text-dark-100 line-clamp-2 min-w-0">
+              {t.title}
+            </h3>
+          </div>
           <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TOURNAMENT_STATUS_COLORS[t.status] ?? ""}`}>
             {TOURNAMENT_STATUS_LABELS[t.status] ?? t.status}
           </span>

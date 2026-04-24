@@ -1,17 +1,27 @@
 import { EmptyState } from "@/components/empty-state";
 import { listTournaments } from "@/lib/queries/tournament";
 import { TournamentCard } from "@/components/tournament-card";
+import { TournamentFilterBar } from "./filter-bar";
 import Link from "next/link";
 
 export default async function TournamentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; format?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    format?: string;
+    type?: string;
+    gender?: string;
+    location?: string;
+  }>;
 }) {
   const params = await searchParams;
   const tournaments = await listTournaments({
     status: params.status,
     format: params.format,
+    type: params.type,
+    gender: params.gender,
+    location: params.location,
   });
 
   // Separate active from past
@@ -31,13 +41,7 @@ export default async function TournamentsPage({
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <FilterPill label="All" href="/tournaments" active={!params.status && !params.format} />
-        <FilterPill label="Open Registration" href="/tournaments?status=registration_open" active={params.status === "registration_open"} />
-        <FilterPill label="In Progress" href="/tournaments?status=in_progress" active={params.status === "in_progress"} />
-        <FilterPill label="Completed" href="/tournaments?status=completed" active={params.status === "completed"} />
-      </div>
+      <TournamentFilterBar />
 
       {/* Active Tournaments */}
       {active.length > 0 && (
@@ -75,17 +79,3 @@ export default async function TournamentsPage({
   );
 }
 
-function FilterPill({ label, href, active }: { label: string; href: string; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-        active
-          ? "bg-brand-900/50 text-brand-300 ring-1 ring-brand-500"
-          : "bg-surface-overlay text-surface-muted hover:text-dark-200"
-      }`}
-    >
-      {label}
-    </Link>
-  );
-}

@@ -65,6 +65,7 @@ const EDITABLE_FIELDS = new Set([
   "score_to_win_playoff",
   "finals_best_of_3",
   "num_courts",
+  "logo_url",
 ]);
 
 export async function PUT(
