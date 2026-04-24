@@ -317,21 +317,34 @@ function RoundRobinView({
 
   const poolPlayoffContent = (
     <>
-      {/* Pool Standings + Matches */}
-      {poolBrackets.map((bracket) => {
-        const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
-        return (
-          <PoolSection
-            key={bracket}
-            label={getPoolLabel(bracket, poolBrackets.length)}
-            matches={bracketMatches}
-            canManage={canManage}
-            tournamentId={tournamentId}
-            scoreToWin={scoreToWinPool}
-            partnerMap={partnerMap}
-          />
-        );
-      })}
+      {/* Pool Standings + Matches. Multiple pools lay out in columns
+          via auto-fit so a wide division page shows Pool A / B / C
+          side by side instead of stacking vertically for ages.
+          Minimum ~380px keeps each pool's standings table + match
+          rows legible; tighter screens naturally collapse to fewer
+          columns and eventually stack. */}
+      <div
+        className={
+          poolBrackets.length > 1
+            ? "grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(380px,1fr))]"
+            : "space-y-6"
+        }
+      >
+        {poolBrackets.map((bracket) => {
+          const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
+          return (
+            <PoolSection
+              key={bracket}
+              label={getPoolLabel(bracket, poolBrackets.length)}
+              matches={bracketMatches}
+              canManage={canManage}
+              tournamentId={tournamentId}
+              scoreToWin={scoreToWinPool}
+              partnerMap={partnerMap}
+            />
+          );
+        })}
+      </div>
 
       {/* Advance to Playoffs — Review Step */}
       {canManage && poolComplete && !hasPlayoffs && division && !showReview && (

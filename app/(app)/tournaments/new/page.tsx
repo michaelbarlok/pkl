@@ -12,7 +12,7 @@ export default function CreateTournamentPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [format, setFormat] = useState("single_elimination");
+  const [format, setFormat] = useState("round_robin");
   const [type, setType] = useState("doubles");
   const [divisions, setDivisions] = useState<string[]>([]);
   const [startDate, setStartDate] = useState("");
@@ -191,9 +191,9 @@ export default function CreateTournamentPage() {
               onChange={(e) => setFormat(e.target.value)}
               className="input"
             >
+              <option value="round_robin">Round Robin</option>
               <option value="single_elimination">Single Elimination</option>
               <option value="double_elimination">Double Elimination</option>
-              <option value="round_robin">Round Robin</option>
             </select>
           </div>
           <div>
