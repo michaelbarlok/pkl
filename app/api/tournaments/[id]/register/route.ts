@@ -33,6 +33,31 @@ export async function POST(
     return NextResponse.json({ error: "Registration is not open" }, { status: 400 });
   }
 
+  // Honor the registration window timestamps. Status is the primary
+  // gate but these columns exist for a reason — respect them so
+  // organizers don't have to be awake at 8am to flip the status.
+  const now = new Date();
+  if (tournament.registration_opens_at && new Date(tournament.registration_opens_at) > now) {
+    return NextResponse.json(
+      { error: `Registration opens on ${new Date(tournament.registration_opens_at).toLocaleString()}` },
+      { status: 400 }
+    );
+  }
+  if (tournament.registration_closes_at && new Date(tournament.registration_closes_at) < now) {
+    return NextResponse.json(
+      { error: "Registration has closed" },
+      { status: 400 }
+    );
+  }
+
+  // Singles tournaments shouldn't accept a partner on the payload.
+  if (tournament.type === "singles" && partner_id) {
+    return NextResponse.json(
+      { error: "This is a singles tournament — partner_id is not allowed" },
+      { status: 400 }
+    );
+  }
+
   // Check if player already registered (as player or partner)
   const { data: existing } = await auth.supabase
     .from("tournament_registrations")
@@ -206,6 +231,29 @@ export async function DELETE(
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
+  // Once the tournament is live, self-service withdrawal gets messy —
+  // matches are already scheduled and the opponent will show up to
+  // play a ghost. Block it here; organizers can still mark a
+  // registration withdrawn server-side if they need to forfeit a
+  // team. Completed tournaments are also locked.
+  const { data: tournament } = await auth.supabase
+    .from("tournaments")
+    .select("status, title")
+    .eq("id", tournamentId)
+    .single();
+  if (!tournament) {
+    return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+  }
+  if (tournament.status === "in_progress" || tournament.status === "completed") {
+    return NextResponse.json(
+      {
+        error:
+          "This tournament is already underway. Contact an organizer to drop out — we can't remove a team mid-play without breaking the bracket.",
+      },
+      { status: 409 }
+    );
+  }
+
   // Find registration (include player/partner ids for notifications)
   const { data: reg } = await auth.supabase
     .from("tournament_registrations")
@@ -234,12 +282,6 @@ export async function DELETE(
   }
 
   // Send withdrawal notification — non-blocking, test users suppressed inside notify()
-  const { data: tournament } = await auth.supabase
-    .from("tournaments")
-    .select("title")
-    .eq("id", tournamentId)
-    .single();
-
   const tournamentTitle = tournament?.title ?? "the tournament";
   const withdrawalEmailData = { tournamentTitle, tournamentId };
 
