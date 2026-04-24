@@ -152,9 +152,17 @@ export async function onMatchCompleted(tournamentId: string): Promise<void> {
 
 /**
  * Called when the organizer activates one or more divisions.
+ *
+ * Passes `reinterleave: true` so the entire pending queue (across
+ * every currently-active division) is re-stamped via a fresh
+ * cross-division interleave. Without this, staggered activations
+ * — Div B activating two hours after Div A — would leave B's
+ * matches stamped newer than A's entire remaining queue, so B
+ * waits behind A instead of sharing courts 50/50. Matches already
+ * on a court are left alone; this only touches waiting matches.
  */
 export async function activateDivisionQueue(tournamentId: string): Promise<void> {
-  await runAssignmentPass(tournamentId);
+  await runAssignmentPass(tournamentId, { reinterleave: true });
 }
 
 /**
@@ -283,7 +291,10 @@ export async function promoteMatchToCourt(
   return { ok: true };
 }
 
-export async function runAssignmentPass(tournamentId: string): Promise<void> {
+export async function runAssignmentPass(
+  tournamentId: string,
+  opts: { reinterleave?: boolean } = {}
+): Promise<void> {
   const service = await createServiceClient();
 
   const { data: tournamentRaw } = await service
@@ -301,6 +312,23 @@ export async function runAssignmentPass(tournamentId: string): Promise<void> {
     .eq("tournament_id", tournamentId);
   const activeSet = new Set((activeDivs ?? []).map((r: any) => r.division));
   if (activeSet.size === 0) return;
+
+  // When a new division activates we re-interleave the ENTIRE waiting
+  // queue, not just freshly-eligible matches. Otherwise a late-
+  // activating division would get matches stamped newer than the
+  // already-queued division's remaining work and would be stuck
+  // waiting behind it. Matches already on a court are untouched —
+  // they're playing, not waiting. The subsequent fetch picks up the
+  // nulled state and Step 1 re-stamps everything interleaved.
+  if (opts.reinterleave) {
+    await service
+      .from("tournament_matches")
+      .update({ queue_entered_at: null })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "pending")
+      .is("court_number", null)
+      .not("queue_entered_at", "is", null);
+  }
 
   const { data: matchesRaw } = await service
     .from("tournament_matches")
