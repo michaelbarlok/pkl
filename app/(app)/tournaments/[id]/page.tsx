@@ -28,6 +28,7 @@ import { PaymentReminderButton } from "@/components/payment-reminder-button";
 import { ShareBracketButton } from "@/components/share-bracket-button";
 import { ShareTournamentButton } from "@/components/share-tournament-button";
 import { HideTournamentToggle } from "@/app/(app)/admin/tournaments/hide-toggle";
+import { tournamentHeroGradient } from "@/lib/tournament-hero";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -56,24 +57,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 /**
- * Tournament hero uses a deterministic gradient keyed on the tournament id
- * so each tournament wears a consistent "color" across the app (brackets,
- * detail, cards). Stays inside the brand palette.
+ * Split an ISO/date into month/day chip pieces for the hero.
  */
-function tournamentHeroGradient(seed: string): string {
-  const palette = [
-    "from-brand-700/50 via-brand-600/30 to-surface-raised",
-    "from-accent-700/40 via-brand-600/25 to-surface-raised",
-    "from-teal-700/40 via-brand-600/25 to-surface-raised",
-    "from-indigo-700/40 via-violet-600/25 to-surface-raised",
-    "from-rose-700/35 via-accent-600/25 to-surface-raised",
-  ];
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
-  return palette[Math.abs(h) % palette.length];
-}
-
-/** Split an ISO/date into month/day chip pieces for the hero. */
 function tournamentDateChip(startIso: string, endIso: string | null) {
   const d = new Date((startIso.length === 10 ? startIso : startIso.slice(0, 10)) + "T12:00:00");
   const month = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();

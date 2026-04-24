@@ -199,8 +199,9 @@ export default async function TournamentLivePage({
   const myQueueIdx = queueRows.findIndex(
     (m: any) => m.player1_id === teamPrimaryId || m.player2_id === teamPrimaryId
   );
-  const queueSubtitle =
-    myQueueIdx >= 0
+  const queueSubtitle = myOnCourtMatch
+    ? `You're live on Court ${myOnCourtMatch.court_number}`
+    : myQueueIdx >= 0
       ? `You're ${ordinal(myQueueIdx + 1)} in line of ${queueRows.length}`
       : queueRows.length > 0
         ? `${queueRows.length} waiting`
@@ -230,6 +231,8 @@ export default async function TournamentLivePage({
         match={myCourtCardData}
         tournamentId={tournamentId}
         numCourts={tournament.num_courts ?? null}
+        queuePosition={myQueueIdx >= 0 ? myQueueIdx + 1 : null}
+        queueSize={queueRows.length}
       />
 
       {/* Rules — collapsed by default during live play. The rulebook
@@ -252,19 +255,20 @@ export default async function TournamentLivePage({
         />
       </CollapsibleCard>
 
-      {/* Match queue — collapsed by default, but the card subtitle
-          shows queue position even collapsed so the player sees how
-          far away their match is at a glance. Expand for the full
-          FIFO list with highlighted self-row. */}
+      {/* Match queue — collapsed by default. When the viewer is on a
+          court the expanded content is just a "You're live!" banner;
+          otherwise it's the full read-only Court Tracker + queue so
+          players can spot friends and identify which court to watch. */}
       <CollapsibleCard
-        title="Match queue"
+        title={myCourtCardData ? "Court Tracker" : "Match queue"}
         subtitle={queueSubtitle}
         defaultOpen={false}
       >
         <NextUpQueue
           tournamentId={tournamentId}
           myTeamPrimaryId={teamPrimaryId}
-          myDivision={myDivision}
+          isOnCourt={!!myCourtCardData}
+          numCourts={tournament.num_courts ?? null}
           embedded
         />
       </CollapsibleCard>
