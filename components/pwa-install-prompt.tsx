@@ -9,6 +9,10 @@ const STORAGE_INSTALLED = "pwa-install-accepted";
 // Set once the post-install "go set up push" nudge has been shown
 // so we never fire it twice on the same device.
 const STORAGE_POST_INSTALL_SHOWN = "pwa-push-setup-prompted";
+// Session-scoped guard so a single browsing session only counts as
+// one "visit" — multiple refreshes, client-side navigations, and
+// React StrictMode double-mounts in dev don't all bump the counter.
+const SESSION_COUNTED = "pwa-install-session-counted";
 
 /**
  * Prompts authenticated users to install the PWA. Cadence:
@@ -52,17 +56,19 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
    * Fire the "now set up push notifications" modal — unless we've
    * already shown it on this device, or the user already has a
    * working push subscription (so no nudge needed).
+   *
+   * The flag gets set preemptively so concurrent triggers (e.g. the
+   * appinstalled event firing alongside our userChoice fallback, or
+   * a standalone mount racing a realtime reconnect) can never show
+   * this modal twice.
    */
   async function maybeShowPostInstall() {
     if (typeof window === "undefined") return;
     if (localStorage.getItem(STORAGE_POST_INSTALL_SHOWN) === "true") return;
+    localStorage.setItem(STORAGE_POST_INSTALL_SHOWN, "true");
     if (isPushSupported()) {
       const existing = await getExistingSubscription().catch(() => null);
-      if (existing) {
-        // Already subscribed — no need to prompt.
-        localStorage.setItem(STORAGE_POST_INSTALL_SHOWN, "true");
-        return;
-      }
+      if (existing) return; // already subscribed, no nudge needed
     }
     setShowPostInstall(true);
   }
@@ -70,10 +76,16 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // If the app is already running in standalone/installed mode,
-    // mark the flag and bail the install prompt. First standalone
-    // launch (flag wasn't already true) is the iOS path into the
-    // post-install push-setup nudge.
+    // Detect "already installed" through every signal available:
+    //   - display-mode: standalone / minimal-ui / fullscreen — we're
+    //     running inside the installed PWA shell right now.
+    //   - navigator.standalone — iOS-specific, true when launched
+    //     from the home screen.
+    //   - getInstalledRelatedApps() — Chrome-only API that reports
+    //     the PWA is installed on this device even if the user is
+    //     currently in a regular tab on the same origin.
+    //   - localStorage flag — our own historical signal from a
+    //     previous appinstalled event or standalone detection.
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       window.matchMedia("(display-mode: minimal-ui)").matches ||
@@ -91,12 +103,40 @@ export function PWAInstallPrompt({ profileId }: { profileId: string }) {
 
     if (localStorage.getItem(STORAGE_INSTALLED) === "true") return;
 
-    // Increment the visit counter on each fresh mount. Only show
-    // the prompt on visits 2, 4, 6, ... — every other visit
-    // starting with the second.
-    const prev = Number(localStorage.getItem(STORAGE_VISITS) ?? "0");
-    const count = prev + 1;
-    localStorage.setItem(STORAGE_VISITS, String(count));
+    // Chrome exposes getInstalledRelatedApps when the site is
+    // listed in the manifest's related_applications and / or the
+    // PWA was installed via this browser. Non-blocking — if it
+    // reports the app installed, flip the flag and bail without
+    // prompting. Fails silently on browsers that don't implement it.
+    const nav = navigator as Navigator & {
+      getInstalledRelatedApps?: () => Promise<{ platform: string; id?: string; url?: string }[]>;
+    };
+    if (typeof nav.getInstalledRelatedApps === "function") {
+      nav.getInstalledRelatedApps()
+        .then((apps) => {
+          if (apps && apps.length > 0) {
+            localStorage.setItem(STORAGE_INSTALLED, "true");
+            // If we'd already decided to show the banner this run,
+            // retract it — the async check just confirmed install.
+            setShow(false);
+          }
+        })
+        .catch(() => {});
+    }
+
+    // One visit = one session. sessionStorage clears on tab close
+    // but persists across refreshes and StrictMode double-mounts,
+    // so the counter only increments the first time we run in a
+    // given session. Read the counter either way (even if we don't
+    // increment) so the parity check below reflects the real count.
+    let count = Number(localStorage.getItem(STORAGE_VISITS) ?? "0");
+    if (sessionStorage.getItem(SESSION_COUNTED) !== "true") {
+      count += 1;
+      localStorage.setItem(STORAGE_VISITS, String(count));
+      sessionStorage.setItem(SESSION_COUNTED, "true");
+    }
+    // Show on visits 2, 4, 6, … — every other visit starting with
+    // the second (login visit stays quiet).
     if (count < 2 || count % 2 !== 0) return;
 
     // iOS detection — userAgent because feature detection isn't
