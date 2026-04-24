@@ -5,8 +5,106 @@ import { FeedbackButton } from "@/components/feedback-button";
 import type { Profile } from "@/types/database";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
+
+/**
+ * Returns true when the viewer has something live to play — an
+ * active shootout they're checked into, an active free-play session,
+ * or an in-progress tournament division they're registered in.
+ * Used by the bottom nav to pulse the Play tab as a subtle cue.
+ *
+ * Re-checks on route change + window focus so the cue dismisses
+ * without a hard refresh once the viewer taps Play. Cheap: three
+ * small PostgREST queries gated by profile id.
+ */
+function useHasActivePlay(profileId: string): boolean {
+  const { supabase } = useSupabase();
+  const pathname = usePathname();
+  const [hasActive, setHasActive] = useState(false);
+
+  const check = useCallback(async () => {
+    // Active shootout (ladder) session the viewer is checked into.
+    const { data: shootout } = await supabase
+      .from("session_participants")
+      .select("session:shootout_sessions(id, status)")
+      .eq("player_id", profileId)
+      .eq("checked_in", true)
+      .limit(10);
+    if (
+      (shootout ?? []).some((p: any) => {
+        const s = p.session?.status;
+        return s && !["session_complete", "created"].includes(s);
+      })
+    ) {
+      setHasActive(true);
+      return;
+    }
+
+    // Active free-play session the viewer is checked into.
+    const { data: freePlay } = await supabase
+      .from("free_play_session_players")
+      .select("session:free_play_sessions!inner(id, status)")
+      .eq("player_id", profileId)
+      .limit(10);
+    if (
+      (freePlay ?? []).some((r: any) => r.session?.status === "active")
+    ) {
+      setHasActive(true);
+      return;
+    }
+
+    // In-progress tournament with a division the viewer is in.
+    // Mirrors the Play-tab routing in /sessions/active/page.tsx.
+    const { data: regs } = await supabase
+      .from("tournament_registrations")
+      .select("tournament_id, division, status, tournament:tournaments(status)")
+      .or(`player_id.eq.${profileId},partner_id.eq.${profileId}`)
+      .neq("status", "withdrawn");
+    const candidate = (regs ?? []).find(
+      (r: any) => r.tournament?.status === "in_progress"
+    ) as any;
+    if (candidate) {
+      const { data: active } = await supabase
+        .from("tournament_active_divisions")
+        .select("division")
+        .eq("tournament_id", candidate.tournament_id)
+        .eq("division", candidate.division)
+        .maybeSingle();
+      if (active) {
+        setHasActive(true);
+        return;
+      }
+    }
+
+    setHasActive(false);
+  }, [supabase, profileId]);
+
+  // Re-check on route change — covers both fresh page loads and
+  // client-side navigations (the layout server component is
+  // cached so it won't recompute on its own).
+  useEffect(() => {
+    check();
+  }, [check, pathname]);
+
+  // Re-check when the tab gains focus — catches the "phone was
+  // backgrounded, session started in the meantime" case without
+  // needing a realtime subscription here.
+  useEffect(() => {
+    function onFocus() {
+      check();
+    }
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") check();
+    });
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [check]);
+
+  return hasActive;
+}
 
 const mainTabs = [
   {
@@ -151,6 +249,24 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
   const showAdminNav = isAdmin || isGroupAdmin;
   const [moreOpen, setMoreOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Pulse the Play tab when the viewer has something live to join,
+  // but stop pulsing once they're viewing it — mirrors the Sign Up
+  // button's pulse on the sheet detail page.
+  const hasActivePlay = useHasActivePlay(profile.id);
+  const viewingActivePlay = useMemo(() => {
+    // Any "I'm on my live session / tournament" route. Covers the
+    // Play-tab redirect hub itself plus every destination it
+    // bounces to (ladder session, free-play manager, tournament
+    // live view).
+    if (!pathname) return false;
+    if (pathname.startsWith("/sessions/active")) return true;
+    if (/^\/sessions\/[^/]+(?:\/|$)/.test(pathname)) return true;
+    if (/^\/tournaments\/[^/]+\/live(?:\/|$)/.test(pathname)) return true;
+    if (/^\/groups\/[^/]+\/session(?:\/|$)/.test(pathname)) return true;
+    return false;
+  }, [pathname]);
+  const playShouldPulse = hasActivePlay && !viewingActivePlay;
 
   // Focus trap when menu is open
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -345,22 +461,34 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
               tab.href === "/"
                 ? pathname === "/"
                 : pathname.startsWith(tab.href);
+            const pulse = tab.name === "Play" && playShouldPulse;
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
                 className={cn(
                   "flex flex-1 flex-col items-center pt-2 pb-1.5 text-xs font-medium transition-colors",
-                  active ? "text-brand-400" : "text-dark-300 active:text-dark-100"
+                  active || pulse ? "text-brand-400" : "text-dark-300 active:text-dark-100"
                 )}
               >
                 <span
                   className={cn(
-                    "mb-0.5 flex items-center justify-center rounded-2xl px-5 py-0.5 transition-colors",
-                    active && "bg-brand-500/15"
+                    "relative mb-0.5 flex items-center justify-center rounded-2xl px-5 py-0.5 transition-colors overflow-hidden",
+                    active && "bg-brand-500/15",
+                    pulse && !active && "bg-brand-500/15"
                   )}
                 >
-                  {tab.icon}
+                  {/* Pulse behind the icon — overflow-hidden on the
+                      parent clips animate-ping's outward scale to the
+                      pill's bounds, so the effect reads as a subtle
+                      fill-fade and never spills above the nav strip. */}
+                  {pulse && (
+                    <span
+                      className="pointer-events-none absolute inset-0 rounded-2xl bg-brand-400 opacity-40 animate-ping"
+                      aria-hidden
+                    />
+                  )}
+                  <span className="relative">{tab.icon}</span>
                 </span>
                 <span>{tab.name}</span>
               </Link>
