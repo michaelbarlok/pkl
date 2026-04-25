@@ -10,6 +10,8 @@ interface Props {
     games_per_team?: number;
     num_pools?: number;
     playoff_advancing?: number;
+    score_to_win_pool?: number;
+    score_to_win_playoff?: number;
   } | null;
   /** Render without the outer `.card` wrapper + heading — the
    *  caller is already providing a card frame (e.g. CollapsibleCard). */
@@ -34,6 +36,10 @@ export function DivisionRulesCard({
   const isRoundRobin = format === "round_robin";
   const playoffAdvancing = divisionSettings?.playoff_advancing;
   const gamesPerTeam = divisionSettings?.games_per_team;
+  // Per-division overrides take precedence over the tournament-level
+  // score-to-win values.
+  const effectivePoolScore = divisionSettings?.score_to_win_pool ?? scoreToWinPool;
+  const effectivePlayoffScore = divisionSettings?.score_to_win_playoff ?? scoreToWinPlayoff;
 
   return (
     <div className={embedded ? "space-y-3" : "card border border-brand-500/30 space-y-3"}>
@@ -54,10 +60,10 @@ export function DivisionRulesCard({
             </div>
             <div>
               <dt className="inline font-medium">Pool play games to:</dt>{" "}
-              <dd className="inline text-surface-muted">{scoreToWinPool ?? 11}</dd>
+              <dd className="inline text-surface-muted">{effectivePoolScore ?? 11}</dd>
               <span className="text-surface-border mx-1.5">·</span>
               <dt className="inline font-medium">Playoff games to:</dt>{" "}
-              <dd className="inline text-surface-muted">{scoreToWinPlayoff ?? 11}</dd>
+              <dd className="inline text-surface-muted">{effectivePlayoffScore ?? 11}</dd>
             </div>
             {gamesPerTeam && (
               <div>

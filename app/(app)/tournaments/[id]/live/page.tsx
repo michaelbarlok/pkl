@@ -309,8 +309,14 @@ export default async function TournamentLivePage({
         canManage={false}
         tournamentId={tournamentId}
         division={myDivision}
-        scoreToWinPool={tournament.score_to_win_pool ?? undefined}
-        scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
+        scoreToWinPool={
+          (tournament as any).division_settings?.[myDivision]?.score_to_win_pool ??
+          tournament.score_to_win_pool ?? undefined
+        }
+        scoreToWinPlayoff={
+          (tournament as any).division_settings?.[myDivision]?.score_to_win_playoff ??
+          tournament.score_to_win_playoff ?? undefined
+        }
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
         partnerMap={partnerMap}
       />
@@ -328,6 +334,7 @@ export default async function TournamentLivePage({
         scoreToWinPool={tournament.score_to_win_pool ?? undefined}
         scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
+        divisionSettings={(tournament as any).division_settings ?? null}
         partnerMap={partnerMap}
       />
 

@@ -48,6 +48,12 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
   const [gamesPerTeam, setGamesPerTeam] = useState<Record<string, string>>({});
   const [numPoolsOverride, setNumPoolsOverride] = useState<Record<string, string>>({});
   const [playoffAdvancing, setPlayoffAdvancing] = useState<Record<string, string>>({});
+  // Per-division score-to-win overrides. Pool and playoff are
+  // independent — organizers commonly want pool play to 11 (more
+  // games, shorter each) but playoffs to 15 (fewer matches, more
+  // weight). Empty string = fall back to tournament-level default.
+  const [scoreToWinPool, setScoreToWinPool] = useState<Record<string, string>>({});
+  const [scoreToWinPlayoff, setScoreToWinPlayoff] = useState<Record<string, string>>({});
 
   // Seeding state
   const [seedingOpen, setSeedingOpen] = useState<Record<string, boolean>>({});
@@ -179,17 +185,33 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
 
     const divisionSettings: Record<
       string,
-      { games_per_team?: number; num_pools?: number; playoff_advancing?: number }
+      {
+        games_per_team?: number;
+        num_pools?: number;
+        playoff_advancing?: number;
+        score_to_win_pool?: number;
+        score_to_win_playoff?: number;
+      }
     > = {};
     if (isRoundRobin) {
       for (const d of divisions) {
-        const settings: { games_per_team?: number; num_pools?: number; playoff_advancing?: number } = {};
+        const settings: {
+          games_per_team?: number;
+          num_pools?: number;
+          playoff_advancing?: number;
+          score_to_win_pool?: number;
+          score_to_win_playoff?: number;
+        } = {};
         const gpt = parseInt(gamesPerTeam[d.division] ?? "");
         if (gpt > 0) settings.games_per_team = gpt;
         const np = parseInt(numPoolsOverride[d.division] ?? "");
         if (np > 0) settings.num_pools = np;
         const pa = parseInt(playoffAdvancing[d.division] ?? "");
         if (pa > 0) settings.playoff_advancing = pa;
+        const stwPool = parseInt(scoreToWinPool[d.division] ?? "");
+        if (stwPool > 0) settings.score_to_win_pool = stwPool;
+        const stwPlayoff = parseInt(scoreToWinPlayoff[d.division] ?? "");
+        if (stwPlayoff > 0) settings.score_to_win_playoff = stwPlayoff;
         if (Object.keys(settings).length > 0) {
           divisionSettings[d.division] = settings;
         }
@@ -641,6 +663,62 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                       </div>
                     );
                   })()}
+
+                  {/* Pool score to win — independent of the playoff
+                      override below. Use case: a small pool of 4
+                      plays to 15 instead of 6 quick games to 11.
+                      Default falls back to the tournament-level
+                      setting. */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs font-medium text-dark-200">Pool score to win:</label>
+                    <select
+                      value={scoreToWinPool[d.division] ?? ""}
+                      onChange={(e) =>
+                        setScoreToWinPool((prev) => ({
+                          ...prev,
+                          [d.division]: e.target.value,
+                        }))
+                      }
+                      className="input w-auto py-1 text-center text-xs"
+                    >
+                      <option value="">default</option>
+                      <option value="11">11</option>
+                      <option value="15">15</option>
+                    </select>
+                    <span className="text-xs text-surface-muted">
+                      {scoreToWinPool[d.division]
+                        ? `pool games to ${scoreToWinPool[d.division]}`
+                        : "uses the tournament-level pool score"}
+                    </span>
+                  </div>
+
+                  {/* Playoff score to win — separate from pool so
+                      organizers can run quick pool games to 11 then
+                      crown the bracket with games to 15 (or vice
+                      versa). Default falls back to the
+                      tournament-level setting. */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs font-medium text-dark-200">Playoff score to win:</label>
+                    <select
+                      value={scoreToWinPlayoff[d.division] ?? ""}
+                      onChange={(e) =>
+                        setScoreToWinPlayoff((prev) => ({
+                          ...prev,
+                          [d.division]: e.target.value,
+                        }))
+                      }
+                      className="input w-auto py-1 text-center text-xs"
+                    >
+                      <option value="">default</option>
+                      <option value="11">11</option>
+                      <option value="15">15</option>
+                    </select>
+                    <span className="text-xs text-surface-muted">
+                      {scoreToWinPlayoff[d.division]
+                        ? `playoff games to ${scoreToWinPlayoff[d.division]}`
+                        : "uses the tournament-level playoff score"}
+                    </span>
+                  </div>
 
                   {/* Playoff teams advancing — defaults to the size-based
                       rule (4 / 3 / 2 depending on pool count). Organizer

@@ -28,6 +28,15 @@ interface Props {
   isRoundRobin: boolean;
   /** Divisions currently in tournament_active_divisions. */
   activeDivisions?: string[];
+  /** Per-division setting overrides (score_to_win, etc.). Resolved
+   *  at render time so each tab shows its own scores. */
+  divisionSettings?: Record<
+    string,
+    {
+      score_to_win_pool?: number;
+      score_to_win_playoff?: number;
+    } | null
+  > | null;
 }
 
 function divisionStatus(
@@ -52,7 +61,15 @@ export function DivisionBrackets({
   partnerMap,
   isRoundRobin,
   activeDivisions,
+  divisionSettings,
 }: Props) {
+  function resolvedScores(division: string) {
+    const override = divisionSettings?.[division];
+    return {
+      pool: override?.score_to_win_pool ?? tournament.score_to_win_pool,
+      playoff: override?.score_to_win_playoff ?? tournament.score_to_win_playoff,
+    };
+  }
   const activeSet = useMemo(
     () => new Set(activeDivisions ?? []),
     [activeDivisions]
@@ -86,6 +103,7 @@ export function DivisionBrackets({
   if (!hasMultipleDivisions) {
     const entry = orderedEntries[0];
     if (!entry) return null;
+    const scores = resolvedScores(entry.division);
     return (
       <div>
         <h2 className="text-lg font-semibold text-dark-100 mb-3">
@@ -94,8 +112,8 @@ export function DivisionBrackets({
         {isRoundRobin && (
           <DivisionRules
             division={entry.division}
-            scoreToWinPool={tournament.score_to_win_pool}
-            scoreToWinPlayoff={tournament.score_to_win_playoff}
+            scoreToWinPool={scores.pool}
+            scoreToWinPlayoff={scores.playoff}
             finalsBestOf3={tournament.finals_best_of_3}
           />
         )}
@@ -105,8 +123,8 @@ export function DivisionBrackets({
           canManage={canManage}
           tournamentId={tournamentId}
           division={entry.division === "__none__" ? undefined : entry.division}
-          scoreToWinPool={tournament.score_to_win_pool}
-          scoreToWinPlayoff={tournament.score_to_win_playoff}
+          scoreToWinPool={scores.pool}
+          scoreToWinPlayoff={scores.playoff}
           finalsBestOf3={tournament.finals_best_of_3}
           partnerMap={partnerMap}
         />
@@ -186,32 +204,35 @@ export function DivisionBrackets({
       </div>
 
       {/* Selected Division Content */}
-      {selectedEntry && (
-        <div>
-          {/* Division Rules */}
-          {isRoundRobin && (
-            <DivisionRules
-              division={selectedEntry.division}
-              scoreToWinPool={tournament.score_to_win_pool}
-              scoreToWinPlayoff={tournament.score_to_win_playoff}
-              finalsBestOf3={tournament.finals_best_of_3}
-            />
-          )}
+      {selectedEntry && (() => {
+        const scores = resolvedScores(selectedEntry.division);
+        return (
+          <div>
+            {/* Division Rules */}
+            {isRoundRobin && (
+              <DivisionRules
+                division={selectedEntry.division}
+                scoreToWinPool={scores.pool}
+                scoreToWinPlayoff={scores.playoff}
+                finalsBestOf3={tournament.finals_best_of_3}
+              />
+            )}
 
-          {/* Bracket */}
-          <TournamentBracketView
-            matches={selectedEntry.matches}
-            format={tournament.format}
-            canManage={canManage}
-            tournamentId={tournamentId}
-            division={selectedEntry.division === "__none__" ? undefined : selectedEntry.division}
-            scoreToWinPool={tournament.score_to_win_pool}
-            scoreToWinPlayoff={tournament.score_to_win_playoff}
-            finalsBestOf3={tournament.finals_best_of_3}
-            partnerMap={partnerMap}
-          />
-        </div>
-      )}
+            {/* Bracket */}
+            <TournamentBracketView
+              matches={selectedEntry.matches}
+              format={tournament.format}
+              canManage={canManage}
+              tournamentId={tournamentId}
+              division={selectedEntry.division === "__none__" ? undefined : selectedEntry.division}
+              scoreToWinPool={scores.pool}
+              scoreToWinPlayoff={scores.playoff}
+              finalsBestOf3={tournament.finals_best_of_3}
+              partnerMap={partnerMap}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }
