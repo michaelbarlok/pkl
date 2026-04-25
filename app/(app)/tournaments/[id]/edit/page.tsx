@@ -5,10 +5,12 @@ import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
 import { DivisionStartTimes } from "@/components/division-start-times";
 import { TournamentLogoUpload } from "@/components/tournament-logo-upload";
-import { localDateTimeToIso, isoToLocalDateTimeInput } from "@/lib/datetime-local";
+import { fifteenMinuteSlots, isoToLocalDateTimeInput, localDateTimeToIso, snapDateTimeLocalTo15 } from "@/lib/datetime-local";
 import { getDivisionGender } from "@/lib/divisions";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+const TIME_SLOTS = fifteenMinuteSlots();
 
 export default function EditTournamentPage() {
   const { id } = useParams<{ id: string }>();
@@ -360,7 +362,12 @@ export default function EditTournamentPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Start Time</label>
-            <input type="time" step="900" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="input" />
+            <select value={startTime} onChange={(e) => setStartTime(e.target.value)} className="input">
+              <option value="">—</option>
+              {TIME_SLOTS.map((slot) => (
+                <option key={slot.value} value={slot.value}>{slot.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Location *</label>
@@ -507,11 +514,25 @@ export default function EditTournamentPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Registration Opens</label>
-            <input type="datetime-local" step="900" value={registrationOpensAt} onChange={(e) => setRegistrationOpensAt(e.target.value)} className="input" />
+            <input
+              type="datetime-local"
+              step="900"
+              value={registrationOpensAt}
+              onChange={(e) => setRegistrationOpensAt(e.target.value)}
+              onBlur={(e) => setRegistrationOpensAt(snapDateTimeLocalTo15(e.target.value))}
+              className="input"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">Registration Closes</label>
-            <input type="datetime-local" step="900" value={registrationClosesAt} onChange={(e) => setRegistrationClosesAt(e.target.value)} className="input" />
+            <input
+              type="datetime-local"
+              step="900"
+              value={registrationClosesAt}
+              onChange={(e) => setRegistrationClosesAt(e.target.value)}
+              onBlur={(e) => setRegistrationClosesAt(snapDateTimeLocalTo15(e.target.value))}
+              className="input"
+            />
           </div>
         </div>
 

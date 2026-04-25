@@ -11,7 +11,10 @@ import type {
   Profile,
   ShootoutGroup,
 } from "@/types/database";
+import { fifteenMinuteSlots, snapDateTimeLocalTo15 } from "@/lib/datetime-local";
 import { PRIORITY_ORDER } from "@/lib/utils";
+
+const TIME_SLOTS = fifteenMinuteSlots();
 
 export default function AdminSheetDetailPage() {
   const { supabase } = useSupabase();
@@ -512,13 +515,16 @@ export default function AdminSheetDetailPage() {
             <label className="block text-sm font-medium text-dark-200 mb-1">
               Event Time
             </label>
-            <input
-              type="time"
-              step="900"
+            <select
               value={eventTime}
               onChange={(e) => setEventTime(e.target.value)}
               className="input"
-            />
+            >
+              <option value="">—</option>
+              {TIME_SLOTS.map((slot) => (
+                <option key={slot.value} value={slot.value}>{slot.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">
@@ -584,6 +590,7 @@ export default function AdminSheetDetailPage() {
               step="900"
               value={signupClosesAt}
               onChange={(e) => setSignupClosesAt(e.target.value)}
+              onBlur={(e) => setSignupClosesAt(snapDateTimeLocalTo15(e.target.value))}
               className="input"
             />
           </div>
@@ -596,6 +603,7 @@ export default function AdminSheetDetailPage() {
               step="900"
               value={withdrawClosesAt}
               onChange={(e) => setWithdrawClosesAt(e.target.value)}
+              onBlur={(e) => setWithdrawClosesAt(snapDateTimeLocalTo15(e.target.value))}
               className="input"
             />
           </div>
