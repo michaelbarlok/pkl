@@ -228,6 +228,31 @@ export async function DELETE(
     .update({ status: "withdrawn" })
     .eq("id", reg.id);
 
+  // Cancel any pending partner requests where the withdrawing
+  // player (or their partner) appears as requester or target.
+  // Without this, a request to a now-withdrawn player would sit
+  // forever and the requester would have no idea why their pending
+  // request never resolves. Both player_id and partner_id are
+  // checked because either side of a doubles team could "withdraw"
+  // by triggering this DELETE.
+  const involvedIds = [reg.player_id, reg.partner_id].filter(
+    (x): x is string => !!x
+  );
+  if (involvedIds.length > 0) {
+    const idList = involvedIds.join(",");
+    await auth.supabase
+      .from("tournament_partner_requests")
+      .update({
+        status: "cancelled",
+        responded_at: new Date().toISOString(),
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "pending")
+      .or(
+        `requester_id.in.(${idList}),target_id.in.(${idList})`
+      );
+  }
+
   // If was confirmed, promote the first waitlisted team from the same division
   if (wasConfirmed) {
     await promoteTournamentWaitlist(tournamentId, division);
