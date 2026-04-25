@@ -303,7 +303,7 @@ export function generateRoundRobin(
   for (let i = 0; i < structure.numPools; i++) {
     // Default: full round robin for this specific pool (each team plays every opponent once)
     const perPoolGames = gamesPerTeam ?? (pools[i].length - 1);
-    allMatches.push(...generatePoolMatches(pools[i], bracketNames[i], perPoolGames, rng));
+    allMatches.push(...generatePoolMatches(pools[i], bracketNames[i], perPoolGames));
   }
   // Defensive invariant check: no pool-play round should contain
   // duplicate pairings or place any team in more than one real
@@ -450,13 +450,11 @@ function snakeDistribute(playerIds: string[], poolSizes: number[]): string[][] {
  * @param playerIds  Pool participants, already distributed.
  * @param bracket    Label used on each match row (e.g. "winners").
  * @param gamesPerTeam  How many pool games each team should play.
- * @param rng        Optional RNG for tests; defaults to Math.random.
  */
 function generatePoolMatches(
   playerIds: string[],
   bracket: string,
-  gamesPerTeam: number,
-  rng: () => number = Math.random
+  gamesPerTeam: number
 ): BracketMatch[] {
   const n = playerIds.length;
   if (n < 2) return [];
@@ -497,13 +495,12 @@ function generatePoolMatches(
     for (let r = 0; r < roundsPerLap; r++) roundSequence.push(r);
   }
   if (extras > 0) {
-    const idxs = Array.from({ length: roundsPerLap }, (_, i) => i);
-    for (let i = idxs.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
-    }
-    const picked = idxs.slice(0, extras).sort((a, b) => a - b);
-    roundSequence.push(...picked);
+    // Even pools, partial-lap leftover: rematches always start from
+    // round 1 and proceed in order. Round N rematches round 1, round
+    // N+1 rematches round 2, etc. Deterministic — randomising would
+    // mean the same gamesPerTeam value can produce different
+    // schedules across regenerations, which surprises organizers.
+    for (let r = 0; r < extras; r++) roundSequence.push(r);
   }
 
   const matches: BracketMatch[] = [];

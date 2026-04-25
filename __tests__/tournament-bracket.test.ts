@@ -767,6 +767,35 @@ describe("generateRoundRobin — gamesPerTeam > opponents (over-full)", () => {
     for (const c of counts.values()) expect(c).toBe(8);
   });
 
+  test("4 teams @ 5 games — rounds 4 & 5 rematch rounds 1 & 2 in order", () => {
+    // Per the organizer spec: even pools repeat rounds in order when
+    // gamesPerTeam exceeds (n-1). So round 4 matches the round-1
+    // pairings exactly, round 5 matches round-2 pairings exactly.
+    const ids = makeIds(4);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 5, rng: seededRng(99) });
+
+    expect(Math.max(...m.map((x) => x.round))).toBe(5);
+
+    // Same-round pairings serialised so we can compare across rounds.
+    const pairsInRound = (round: number) =>
+      m
+        .filter((x) => x.round === round && x.player1_id && x.player2_id)
+        .map((x) => [x.player1_id!, x.player2_id!].sort().join("|"))
+        .sort()
+        .join(",");
+
+    expect(pairsInRound(4)).toBe(pairsInRound(1));
+    expect(pairsInRound(5)).toBe(pairsInRound(2));
+
+    // Every team still plays exactly 5 games.
+    const counts = new Map<string, number>();
+    for (const x of m) {
+      if (x.player1_id) counts.set(x.player1_id, (counts.get(x.player1_id) ?? 0) + 1);
+      if (x.player2_id) counts.set(x.player2_id, (counts.get(x.player2_id) ?? 0) + 1);
+    }
+    for (const c of counts.values()) expect(c).toBe(5);
+  });
+
   test("odd pool balance — 3@3 rounds up to 2 full laps (4 games each)", () => {
     const ids = makeIds(3);
     const m = generateRoundRobin(ids, { gamesPerTeam: 3, rng: seededRng(5) });
@@ -1102,11 +1131,16 @@ describe("computePoolStandings", () => {
       },
     ];
     const standings = computePoolStandings(matches);
-    // Only 1 completed match contributes
+    // Only the completed match contributes to W/L. Teams that have
+    // a pending match still appear in the standings at 0-0 so the
+    // table shows every player in the pool from round 1 onwards.
     expect(standings.find((s) => s.id === "p1")!.wins).toBe(1);
     expect(standings.find((s) => s.id === "p2")!.losses).toBe(1);
-    // p3 has no completed matches yet
-    expect(standings.find((s) => s.id === "p3")).toBeUndefined();
+    const p3 = standings.find((s) => s.id === "p3");
+    expect(p3).toBeDefined();
+    expect(p3!.wins).toBe(0);
+    expect(p3!.losses).toBe(0);
+    expect(p3!.pointDiff).toBe(0);
   });
 
   test("handles 4-team pool standings (full round robin)", () => {
