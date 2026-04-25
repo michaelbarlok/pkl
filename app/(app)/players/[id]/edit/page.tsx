@@ -568,11 +568,26 @@ export default function EditProfilePage() {
                 },
                 {
                   label: "Tournaments",
+                  // Tournament notifications cover the full lifecycle:
+                  // sign-up confirmations, partner-request flow, day-of
+                  // live-play pings, and the post-event recap. Players
+                  // can pick push or email for each (or both) — but at
+                  // least one channel is required so they don't miss a
+                  // court call or a partner request.
                   types: [
                     { type: "tournament_registration", label: "Tournament registration" },
                     { type: "tournament_reminder", label: "Tournament reminder" },
                     { type: "tournament_cancelled", label: "Tournament cancelled" },
                     { type: "tournament_withdrawal", label: "Withdrawal confirmed" },
+                    { type: "tournament_partner_request", label: "Partner request received" },
+                    { type: "tournament_partner_accepted", label: "Partner request accepted" },
+                    { type: "tournament_partner_declined", label: "Partner request declined" },
+                    { type: "tournament_division_started", label: "Division going live" },
+                    { type: "tournament_court_assigned", label: "Court assigned" },
+                    { type: "tournament_up_next", label: "You're up next" },
+                    { type: "tournament_in_3rd", label: "3rd in the queue" },
+                    { type: "tournament_playoffs_starting", label: "Playoffs starting" },
+                    { type: "tournament_recap", label: "Tournament recap" },
                   ],
                 },
                 {
@@ -598,12 +613,30 @@ export default function EditProfilePage() {
                 return fallback;
               };
 
+              // Tournament notifications must keep at least one channel
+              // on — players who silence a court-assignment ping could
+              // hold the entire schedule hostage when they don't show up.
+              // Build the set from the rendered groups so this stays in
+              // sync with whatever the Tournaments group lists above.
+              const TOURNAMENT_TYPES = new Set<string>(
+                notifGroups.find((g) => g.label === "Tournaments")?.types.map((t) => t.type) ?? []
+              );
+
               const toggleChannel = (t: string, ch: Channel) =>
                 setNotificationPrefs((prev) => {
                   const current = prev[t] ?? getChannels(t);
                   const next = current.includes(ch)
                     ? current.filter((c) => c !== ch)
                     : [...current, ch];
+                  // Tournament types: if removing the last channel would
+                  // leave the type silent, auto-flip the OTHER channel
+                  // on instead. Net effect — clicking off your only
+                  // active channel switches you to the other one rather
+                  // than silencing the type entirely.
+                  if (TOURNAMENT_TYPES.has(t) && next.length === 0) {
+                    const other: Channel = ch === "email" ? "push" : "email";
+                    return { ...prev, [t]: [other] };
+                  }
                   return { ...prev, [t]: next };
                 });
 

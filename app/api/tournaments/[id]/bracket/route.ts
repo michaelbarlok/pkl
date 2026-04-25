@@ -300,7 +300,7 @@ export async function PUT(
     // Get all playoff matches for this division to determine max round
     let playoffQuery = supabase
       .from("tournament_matches")
-      .select("round, match_number, id")
+      .select("round, match_number, id, series_game, status, winner_id, player1_id, player2_id")
       .eq("tournament_id", tournamentId)
       .eq("bracket", "playoff");
 
@@ -315,16 +315,65 @@ export async function PUT(
       const isSemifinalRound = match.round === maxRound - 1;
       const isFinalRound = match.round >= maxRound;
 
+      // Best-of-3 series game just scored: spawn the next game if
+      // the series isn't decided yet. Game 1 always begets Game 2.
+      // Game 2 only begets Game 3 if the series is tied 1-1. Game 3
+      // is always terminal.
+      if (match.series_game != null) {
+        const seriesGames = allPlayoff.filter(
+          (p: any) =>
+            p.round === match.round &&
+            p.match_number === match.match_number &&
+            p.series_game != null
+        );
+        // Roll up game wins per team, treating the just-saved match's
+        // winner as part of the tally (the row's status flipped to
+        // completed earlier; allPlayoff fetched its updated state).
+        const wins = new Map<string, number>();
+        for (const g of seriesGames) {
+          if (g.status === "completed" && g.winner_id) {
+            wins.set(g.winner_id, (wins.get(g.winner_id) ?? 0) + 1);
+          }
+        }
+        const decided = Array.from(wins.values()).some((w) => w >= 2);
+        const nextGameNumber = (match.series_game as number) + 1;
+        const alreadySpawned = seriesGames.some(
+          (g: any) => g.series_game === nextGameNumber
+        );
+        // Game 2 always spawns after Game 1 (1 win can't decide).
+        // Game 3 only when tied 1-1. Game 3 never spawns Game 4.
+        if (!decided && nextGameNumber <= 3 && !alreadySpawned) {
+          await supabase.from("tournament_matches").insert({
+            tournament_id: tournamentId,
+            division: match.division ?? null,
+            round: match.round,
+            match_number: match.match_number,
+            bracket: "playoff",
+            player1_id: match.player1_id,
+            player2_id: match.player2_id,
+            status: "pending",
+            series_game: nextGameNumber,
+            score1: [],
+            score2: [],
+          });
+        }
+      }
+
       // Determine loser
       const loserId = match.player1_id === winner_id ? match.player2_id : match.player1_id;
 
       if (!isFinalRound) {
         // Winner advancement
         if (isSemifinalRound) {
-          // SF winners → final (match 1 in max round)
+          // SF winners → final (match 1 in max round). For best-of-3
+          // we always target Game 1 (the only series row that exists
+          // at SF time; Games 2/3 spawn later).
           const winnerSlot = match.match_number % 2 === 1 ? "player1_id" : "player2_id";
           const finalMatch = allPlayoff.find(
-            (m: any) => m.round === maxRound && m.match_number === 1
+            (m: any) =>
+              m.round === maxRound &&
+              m.match_number === 1 &&
+              (m.series_game == null || m.series_game === 1)
           );
           if (finalMatch) {
             await supabase

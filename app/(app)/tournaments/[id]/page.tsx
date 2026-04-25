@@ -19,6 +19,7 @@ import { DeleteTournamentButton } from "@/components/delete-tournament-button";
 import { CoOrganizerManager } from "@/components/co-organizer-manager";
 import { CollapsibleCard } from "./collapsible-card";
 import { getDivisionLabel } from "@/lib/divisions";
+import { matchPositionLabel } from "@/lib/tournament-bracket";
 import { DivisionBrackets } from "./division-brackets";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { Breadcrumb } from "@/components/breadcrumb";
@@ -210,6 +211,17 @@ export default async function TournamentDetailPage({
     ? (() => {
         const numCourts = (tournament as any).num_courts as number;
         const activeSet = new Set(activeDivisions);
+        // Per-division max playoff round, so playoff cards can label
+        // themselves "Semifinal" / "Final" / "3rd Place" instead of a
+        // generic "Round N". 4-team playoffs go to round 2 (R1=semis,
+        // R2=final+3rd), 6-team to round 3, 8+ deeper.
+        const maxPlayoffRoundByDivision = new Map<string, number>();
+        for (const m of matches as any[]) {
+          if (m.bracket !== "playoff" || !m.division) continue;
+          const cur = maxPlayoffRoundByDivision.get(m.division) ?? 0;
+          if (m.round > cur) maxPlayoffRoundByDivision.set(m.division, m.round);
+        }
+        const finalsBestOf3 = (tournament.finals_best_of_3 ?? false) as boolean;
         const toTracker = (m: any): CourtTrackerMatch => ({
           id: m.id,
           division: m.division ?? null,
@@ -225,6 +237,11 @@ export default async function TournamentDetailPage({
           court_number: m.court_number ?? null,
           queue_entered_at: m.queue_entered_at ?? null,
           status: m.status,
+          position_label: matchPositionLabel(
+            m,
+            m.division ? maxPlayoffRoundByDivision.get(m.division) ?? null : null,
+            finalsBestOf3
+          ),
         });
 
         const onCourtMatches = matches

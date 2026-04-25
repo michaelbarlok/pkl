@@ -469,6 +469,12 @@ export interface TournamentMatch {
   winner_id?: string | null;
   status: TournamentMatchStatus;
   scheduled_time?: string | null;
+  /** Best-of-3 finals only: 1, 2, or 3 marking which game of the
+   *  series this row is. NULL for every other match — pool play,
+   *  single-game playoff, 3rd place. Game 1 generates up front;
+   *  Game 2 spawns on Game 1's score entry; Game 3 only if the
+   *  series is tied 1-1 after Game 2. */
+  series_game?: number | null;
   created_at: string;
   updated_at: string;
   // Relations
