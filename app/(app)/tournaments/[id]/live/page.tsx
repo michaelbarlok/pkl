@@ -48,7 +48,7 @@ export default async function TournamentLivePage({
     .single();
   if (!profile) notFound();
 
-  const [{ data: tournament }, { data: registration }, { data: activeDivs }] =
+  const [{ data: tournament }, { data: regRows }, { data: activeDivs }] =
     await Promise.all([
       supabase
         .from("tournaments")
@@ -59,14 +59,16 @@ export default async function TournamentLivePage({
         .single(),
       // `.or` so we find the registration whether the viewer is the
       // team's primary (player_id) or the partner that got added via
-      // the Ask-to-Partner flow (partner_id).
+      // the Ask-to-Partner flow (partner_id). With multi-division
+      // support a player may have multiple rows here (Men's + Mixed)
+      // so we fetch all and pick the active-division one below —
+      // .maybeSingle() would error on >1 row.
       supabase
         .from("tournament_registrations")
         .select("division, player_id, partner_id")
         .eq("tournament_id", tournamentId)
         .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
-        .neq("status", "withdrawn")
-        .maybeSingle(),
+        .neq("status", "withdrawn"),
       supabase
         .from("tournament_active_divisions")
         .select("division")
@@ -74,16 +76,28 @@ export default async function TournamentLivePage({
     ]);
 
   if (!tournament) notFound();
-  if (!registration) notFound();
+  const allMyRegs = (regRows ?? []) as {
+    division: string;
+    player_id: string;
+    partner_id: string | null;
+  }[];
+  if (allMyRegs.length === 0) notFound();
 
-  const myDivision = registration.division as string;
-  // The team's "primary" — what tournament_matches.player1_id /
-  // player2_id reference. Whether the viewer is the registration's
-  // player_id or the partner_id, the primary is the row's player_id.
-  const teamPrimaryId = registration.player_id as string;
   const activeDivisionSet = new Set(
     (activeDivs ?? []).map((r: any) => r.division as string)
   );
+
+  // Prefer the registration whose division is currently live. Falling
+  // back to the first row matters when no division is active yet —
+  // the redirect below sends the viewer back to the detail page in
+  // that case anyway, so picking any row is fine.
+  const liveReg =
+    allMyRegs.find((r) => activeDivisionSet.has(r.division)) ?? allMyRegs[0];
+  const myDivision = liveReg.division;
+  // The team's "primary" — what tournament_matches.player1_id /
+  // player2_id reference. Whether the viewer is the registration's
+  // player_id or the partner_id, the primary is the row's player_id.
+  const teamPrimaryId = liveReg.player_id;
 
   // If the viewer's division isn't active, bounce them back to the
   // tournament detail page where they can at least see the bracket.
