@@ -73,45 +73,62 @@ export async function DELETE(
     );
   }
 
-  // Pull the top of the queue. We want the bumped match to land at
-  // position 2 of the POST-promotion queue: after the front-of-line
-  // match gets sent to the now-empty court, queue[0] (was second)
-  // stays at position 1 and the bumped match should sit immediately
-  // behind it. So we anchor the new timestamp to the SECOND queued
-  // match's stamp +1ms. Edge cases:
-  //   - 0 queued: nothing to land behind, stamp = now (bumped will
-  //     refill the just-vacated court anyway).
-  //   - 1 queued: only one match ahead; bumped sits after it (stamp
-  //     = front+1ms), ending at position 1 of the post-promotion
-  //     queue (queue is just the bumped match; nothing else to put
-  //     it behind).
-  const { data: topQueued } = await service
+  // Treat the queue like an explicit ordered array: read every
+  // queued match (excluding the bumped one), splice the bumped match
+  // in at the position-2 slot of the post-promotion queue, then
+  // re-stamp the whole list with fresh, strictly-increasing 1ms
+  // ticks. This is the definitive ordering — no leaning on existing
+  // stamps that might collide, no microsecond hacks. Cross-division
+  // because queue_entered_at is the merged FIFO ordering across
+  // every active division (Court Tracker reads it that way).
+  const { data: queuedRaw } = await service
     .from("tournament_matches")
-    .select("queue_entered_at")
+    .select("id")
     .eq("tournament_id", tournamentId)
     .eq("status", "pending")
     .is("court_number", null)
     .not("queue_entered_at", "is", null)
     .neq("id", matchId)
-    .order("queue_entered_at", { ascending: true })
-    .limit(2);
+    .order("queue_entered_at", { ascending: true });
+  const queued = (queuedRaw ?? []) as { id: string }[];
 
-  const top = (topQueued ?? []) as { queue_entered_at: string }[];
-  const anchorStamp = top[1]?.queue_entered_at ?? top[0]?.queue_entered_at;
-  const anchorMs = anchorStamp
-    ? new Date(anchorStamp).getTime() + 1
-    : Date.now();
-  const newStamp = new Date(anchorMs).toISOString();
+  // Pre-promotion order should be [Q1, Q2, BUMPED, Q3, Q4, …] so
+  // that after runAssignmentPass promotes Q1 to the just-vacated
+  // court, the bumped match sits at position 2 of the remaining
+  // queue. Insert at index 2 (after Q1 and Q2). If the queue has
+  // fewer than 2 entries, insert at the end — bumped is the only
+  // remaining queued match anyway.
+  const insertAt = Math.min(2, queued.length);
+  const newOrder = [
+    ...queued.slice(0, insertAt).map((q) => q.id),
+    matchId,
+    ...queued.slice(insertAt).map((q) => q.id),
+  ];
 
-  await service
-    .from("tournament_matches")
-    .update({
-      court_number: null,
-      queue_entered_at: newStamp,
-      up_next_notified_at: null,
-      in_3rd_notified_at: null,
+  // Re-stamp every queued match at consecutive 1ms ticks. The
+  // bumped match also gets its court_number cleared and its
+  // notification ack columns reset since its position context
+  // changed. Updates run in parallel — each touches a single row.
+  const baseMs = Date.now();
+  await Promise.all(
+    newOrder.map((id, i) => {
+      const stamp = new Date(baseMs + i).toISOString();
+      const isBumped = id === matchId;
+      return service
+        .from("tournament_matches")
+        .update(
+          isBumped
+            ? {
+                queue_entered_at: stamp,
+                court_number: null,
+                up_next_notified_at: null,
+                in_3rd_notified_at: null,
+              }
+            : { queue_entered_at: stamp }
+        )
+        .eq("id", id);
     })
-    .eq("id", matchId);
+  );
 
   await runAssignmentPass(tournamentId);
   return NextResponse.json({ ok: true });
