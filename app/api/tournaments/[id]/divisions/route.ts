@@ -363,7 +363,13 @@ export async function POST(
   const body = await request.json().catch(() => ({}));
   const divisionSettings: Record<
     string,
-    { games_per_team?: number; num_pools?: number; playoff_advancing?: number }
+    {
+      games_per_team?: number;
+      num_pools?: number;
+      playoff_advancing?: number;
+      score_to_win_pool?: number;
+      score_to_win_playoff?: number;
+    }
   > = body.division_settings ?? {};
 
   // Save division_settings to tournament

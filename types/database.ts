@@ -410,6 +410,14 @@ export interface Tournament {
      *  organizers stagger gendered vs mixed divisions on the same
      *  day. Falls back to the tournament-level start_time. */
     start_time?: string;
+    /** Per-division score-to-win overrides. The DivisionReview UI
+     *  exposes a single "Score to win" toggle that writes the SAME
+     *  value to both fields — organizers picking 15 typically want
+     *  both pool and playoff games to 15 — but they're stored
+     *  separately so future UIs can split them. Falls back to the
+     *  tournament-level score_to_win_pool / _playoff. */
+    score_to_win_pool?: number;
+    score_to_win_playoff?: number;
   }> | null;
   logo_url?: string | null;
   created_by: string;

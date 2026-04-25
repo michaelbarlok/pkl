@@ -20,6 +20,12 @@ interface Props {
   scoreToWinPool?: number;
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
+  /** Per-division setting overrides — used to resolve the right
+   *  score-to-win for whichever pool the viewer picks. */
+  divisionSettings?: Record<
+    string,
+    { score_to_win_pool?: number; score_to_win_playoff?: number } | null
+  > | null;
   partnerMap?: PartnerMap;
 }
 
@@ -46,6 +52,7 @@ export function OtherPoolsViewer({
   scoreToWinPool,
   scoreToWinPlayoff,
   finalsBestOf3,
+  divisionSettings,
   partnerMap,
 }: Props) {
   // Enumerate every unique (division, bracket) pair in pool play.
@@ -127,19 +134,22 @@ export function OtherPoolsViewer({
         </select>
       </div>
 
-      {selected && selectedMatches.length > 0 && (
-        <TournamentBracketView
-          matches={selectedMatches as any}
-          format={format}
-          canManage={false}
-          tournamentId={tournamentId}
-          division={selectedDivision}
-          scoreToWinPool={scoreToWinPool}
-          scoreToWinPlayoff={scoreToWinPlayoff}
-          finalsBestOf3={finalsBestOf3}
-          partnerMap={partnerMap}
-        />
-      )}
+      {selected && selectedMatches.length > 0 && (() => {
+        const override = divisionSettings?.[selectedDivision];
+        return (
+          <TournamentBracketView
+            matches={selectedMatches as any}
+            format={format}
+            canManage={false}
+            tournamentId={tournamentId}
+            division={selectedDivision}
+            scoreToWinPool={override?.score_to_win_pool ?? scoreToWinPool}
+            scoreToWinPlayoff={override?.score_to_win_playoff ?? scoreToWinPlayoff}
+            finalsBestOf3={finalsBestOf3}
+            partnerMap={partnerMap}
+          />
+        );
+      })()}
     </div>
   );
 }

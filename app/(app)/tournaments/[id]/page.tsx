@@ -286,6 +286,7 @@ export default async function TournamentDetailPage({
       partnerMap={partnerMap}
       isRoundRobin={tournament.format === "round_robin"}
       activeDivisions={activeDivisions}
+      divisionSettings={(tournament as any).division_settings ?? null}
     />
   ) : null;
 

@@ -48,6 +48,11 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
   const [gamesPerTeam, setGamesPerTeam] = useState<Record<string, string>>({});
   const [numPoolsOverride, setNumPoolsOverride] = useState<Record<string, string>>({});
   const [playoffAdvancing, setPlayoffAdvancing] = useState<Record<string, string>>({});
+  // Per-division "Score to win" override (11 or 15). Empty string =
+  // use tournament-level default. Applied to BOTH pool and playoff
+  // games for the division — short-format events typically want a
+  // single longer-game value across the whole bracket.
+  const [scoreToWin, setScoreToWin] = useState<Record<string, string>>({});
 
   // Seeding state
   const [seedingOpen, setSeedingOpen] = useState<Record<string, boolean>>({});
@@ -179,17 +184,36 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
 
     const divisionSettings: Record<
       string,
-      { games_per_team?: number; num_pools?: number; playoff_advancing?: number }
+      {
+        games_per_team?: number;
+        num_pools?: number;
+        playoff_advancing?: number;
+        score_to_win_pool?: number;
+        score_to_win_playoff?: number;
+      }
     > = {};
     if (isRoundRobin) {
       for (const d of divisions) {
-        const settings: { games_per_team?: number; num_pools?: number; playoff_advancing?: number } = {};
+        const settings: {
+          games_per_team?: number;
+          num_pools?: number;
+          playoff_advancing?: number;
+          score_to_win_pool?: number;
+          score_to_win_playoff?: number;
+        } = {};
         const gpt = parseInt(gamesPerTeam[d.division] ?? "");
         if (gpt > 0) settings.games_per_team = gpt;
         const np = parseInt(numPoolsOverride[d.division] ?? "");
         if (np > 0) settings.num_pools = np;
         const pa = parseInt(playoffAdvancing[d.division] ?? "");
         if (pa > 0) settings.playoff_advancing = pa;
+        const stw = parseInt(scoreToWin[d.division] ?? "");
+        if (stw > 0) {
+          // Single user-facing toggle writes both columns. If we ever
+          // want pool ≠ playoff, split the control here.
+          settings.score_to_win_pool = stw;
+          settings.score_to_win_playoff = stw;
+        }
         if (Object.keys(settings).length > 0) {
           divisionSettings[d.division] = settings;
         }
@@ -641,6 +665,34 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                       </div>
                     );
                   })()}
+
+                  {/* Score to win — single override that drives BOTH
+                      pool and playoff game scores for this division.
+                      Use case: a small pool of 4 plays to 15 instead
+                      of 6 quick games to 11. Default leaves it at the
+                      tournament-level setting. */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs font-medium text-dark-200">Score to win:</label>
+                    <select
+                      value={scoreToWin[d.division] ?? ""}
+                      onChange={(e) =>
+                        setScoreToWin((prev) => ({
+                          ...prev,
+                          [d.division]: e.target.value,
+                        }))
+                      }
+                      className="input w-auto py-1 text-center text-xs"
+                    >
+                      <option value="">default</option>
+                      <option value="11">11</option>
+                      <option value="15">15</option>
+                    </select>
+                    <span className="text-xs text-surface-muted">
+                      {scoreToWin[d.division]
+                        ? `pool & playoff games to ${scoreToWin[d.division]}`
+                        : "uses the tournament-level scores"}
+                    </span>
+                  </div>
 
                   {/* Playoff teams advancing — defaults to the size-based
                       rule (4 / 3 / 2 depending on pool count). Organizer
