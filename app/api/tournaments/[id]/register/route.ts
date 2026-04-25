@@ -56,10 +56,13 @@ export async function POST(
   // Honor the registration window timestamps. Status is the primary
   // gate but these columns exist for a reason — respect them so
   // organizers don't have to be awake at 8am to flip the status.
+  // Don't toLocaleString server-side: this route runs on Vercel
+  // (UTC) and would print UTC clock times in the error message,
+  // confusing players who set the window in their local zone.
   const now = new Date();
   if (tournament.registration_opens_at && new Date(tournament.registration_opens_at) > now) {
     return NextResponse.json(
-      { error: `Registration opens on ${new Date(tournament.registration_opens_at).toLocaleString()}` },
+      { error: "Registration hasn't opened yet — check back soon." },
       { status: 400 }
     );
   }
@@ -224,6 +227,31 @@ export async function DELETE(
     .from("tournament_registrations")
     .update({ status: "withdrawn" })
     .eq("id", reg.id);
+
+  // Cancel any pending partner requests where the withdrawing
+  // player (or their partner) appears as requester or target.
+  // Without this, a request to a now-withdrawn player would sit
+  // forever and the requester would have no idea why their pending
+  // request never resolves. Both player_id and partner_id are
+  // checked because either side of a doubles team could "withdraw"
+  // by triggering this DELETE.
+  const involvedIds = [reg.player_id, reg.partner_id].filter(
+    (x): x is string => !!x
+  );
+  if (involvedIds.length > 0) {
+    const idList = involvedIds.join(",");
+    await auth.supabase
+      .from("tournament_partner_requests")
+      .update({
+        status: "cancelled",
+        responded_at: new Date().toISOString(),
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "pending")
+      .or(
+        `requester_id.in.(${idList}),target_id.in.(${idList})`
+      );
+  }
 
   // If was confirmed, promote the first waitlisted team from the same division
   if (wasConfirmed) {

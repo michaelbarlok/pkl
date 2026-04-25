@@ -29,6 +29,7 @@ import { ShareBracketButton } from "@/components/share-bracket-button";
 import { ShareTournamentButton } from "@/components/share-tournament-button";
 import { HideTournamentToggle } from "@/app/(app)/admin/tournaments/hide-toggle";
 import { TournamentWinnersCard } from "@/components/tournament-winners-card";
+import { LocalDateTime } from "@/components/local-date-time";
 import { tournamentHeroGradient } from "@/lib/tournament-hero";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -497,14 +498,14 @@ export default async function TournamentDetailPage({
           {(tournament as any).registration_opens_at && tournament.status === "draft" && (
             <DetailRow label="Registration Opens">
               <span className="text-sm text-dark-100">
-                {formatDateTime((tournament as any).registration_opens_at)}
+                <LocalDateTime iso={(tournament as any).registration_opens_at} />
               </span>
             </DetailRow>
           )}
           {tournament.registration_closes_at && (
             <DetailRow label="Registration Closes">
               <span className="text-sm text-dark-100">
-                {formatDateTime(tournament.registration_closes_at)}
+                <LocalDateTime iso={tournament.registration_closes_at} />
               </span>
             </DetailRow>
           )}
@@ -821,12 +822,22 @@ export default async function TournamentDetailPage({
                   const needsPartner =
                     tournament.type === "doubles" &&
                     !(reg as any).partner_id;
+                  // The viewer can ask if they themselves are still
+                  // partner-less — that includes the "I haven't
+                  // registered" case AND the "I registered solo
+                  // looking for a partner" case. Previously the
+                  // second case was blocked, so two need-partner
+                  // players couldn't pair up without one withdrawing
+                  // and re-registering.
+                  const viewerIsPartnerless =
+                    !myRegistration ||
+                    !(myRegistration as any).partner_id;
                   const viewerCanAsk =
                     needsPartner &&
                     profile &&
                     playerId &&
                     profile.id !== playerId &&
-                    !myRegistration;
+                    viewerIsPartnerless;
                   return (
                   <tr key={reg.id}>
                     <td className="px-2 sm:px-4 py-2 text-sm text-surface-muted">{i + 1}</td>
@@ -1083,10 +1094,20 @@ function StatusAdvanceButton({
   async function advance() {
     "use server";
     const supabase = await createClient();
-    await supabase
-      .from("tournaments")
-      .update({ status: nextStatus })
-      .eq("id", tournamentId);
+    // When the organizer manually opens or reopens registration we
+    // also clear the scheduled window timestamps. Without this, the
+    // tournament-registration-windows cron would immediately re-flip
+    // the status: a stale registration_closes_at in the past keeps
+    // forcing the row back to registration_closed every minute,
+    // making the Reopen button effectively useless. The organizer's
+    // manual click trumps the schedule — they can re-set close
+    // times via Edit if they want a future auto-close.
+    const updates: Record<string, unknown> = { status: nextStatus };
+    if (nextStatus === "registration_open") {
+      updates.registration_closes_at = null;
+      updates.registration_opens_at = null;
+    }
+    await supabase.from("tournaments").update(updates).eq("id", tournamentId);
     const { revalidatePath } = await import("next/cache");
     revalidatePath(`/tournaments/${tournamentId}`);
   }

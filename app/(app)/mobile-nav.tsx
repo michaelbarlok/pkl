@@ -329,12 +329,18 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
     router.push("/login");
   }
 
+  // The More button lights up for any of its menu items' routes —
+  // EXCEPT when the viewer is on an active-play page. Tournament
+  // live pages live under /tournaments/<id>/live, which would
+  // otherwise satisfy both this check and Play's, lighting up two
+  // tabs at once. Defer to Play in that case.
   const isMoreActive =
-    pathname.startsWith("/badges") ||
-    pathname.startsWith("/forum") ||
-    pathname.startsWith("/notifications") ||
-    pathname.startsWith("/tournaments") ||
-    pathname.startsWith("/admin");
+    !viewingActivePlay &&
+    (pathname.startsWith("/badges") ||
+      pathname.startsWith("/forum") ||
+      pathname.startsWith("/notifications") ||
+      pathname.startsWith("/tournaments") ||
+      pathname.startsWith("/admin"));
 
   return (
     <>
@@ -457,11 +463,21 @@ export function MobileNav({ profile, isGroupAdmin = false }: { profile: Profile;
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-surface-border bg-surface md:hidden">
         <div className="flex items-center justify-around">
           {mainTabs.map((tab) => {
-            const active =
+            const isPlayTab = tab.name === "Play";
+            // While on any active-play page (the live ladder /
+            // free-play / tournament view), the Play tab is the
+            // canonical "you are here" — even though the URL has
+            // already redirected to e.g. /tournaments/<id>/live.
+            // Suppress every other tab's active state on those
+            // routes so two tabs never light up at once.
+            const baseActive =
               tab.href === "/"
                 ? pathname === "/"
                 : pathname.startsWith(tab.href);
-            const pulse = tab.name === "Play" && playShouldPulse;
+            const active = viewingActivePlay
+              ? isPlayTab
+              : baseActive;
+            const pulse = isPlayTab && playShouldPulse;
             return (
               <Link
                 key={tab.href}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
-import { notify } from "@/lib/notify";
+import { notify, notifyMany } from "@/lib/notify";
 
 /**
  * POST /api/tournaments/[id]/partner-requests/[requestId]/respond
@@ -144,14 +144,55 @@ export async function POST(
     .update({ status: "confirmed", responded_at: nowIso })
     .eq("id", requestId);
 
-  await service
+  // Find every other pending request that involves either side of
+  // this newly-confirmed pairing. Fetch BEFORE the cascade-cancel
+  // update so we still have the row IDs + requester/target ids to
+  // notify the people whose requests just got invalidated.
+  const { data: othersToCancel } = await service
     .from("tournament_partner_requests")
-    .update({ status: "cancelled", responded_at: nowIso })
+    .select("id, requester_id, target_id")
     .eq("tournament_id", tournamentId)
     .eq("status", "pending")
+    .neq("id", requestId)
     .or(
       `requester_id.eq.${req.requester_id},target_id.eq.${req.requester_id},requester_id.eq.${req.target_id},target_id.eq.${req.target_id}`
     );
+
+  if ((othersToCancel ?? []).length > 0) {
+    await service
+      .from("tournament_partner_requests")
+      .update({ status: "cancelled", responded_at: nowIso })
+      .in(
+        "id",
+        (othersToCancel ?? []).map((r: any) => r.id)
+      );
+
+    // Notify each affected requester their request was invalidated.
+    // Skip notifying the people who just got paired — they already
+    // got a "you're locked in" push above. Targets of cancelled
+    // requests don't get a notification (they never acted, no UI
+    // surprise to dismiss).
+    const pairedIds = new Set([req.requester_id, req.target_id]);
+    const requestersToNotify = new Set<string>();
+    for (const row of othersToCancel ?? []) {
+      const r = row as any;
+      if (!pairedIds.has(r.requester_id)) requestersToNotify.add(r.requester_id);
+    }
+    if (requestersToNotify.size > 0) {
+      await notifyMany(Array.from(requestersToNotify), {
+        type: "tournament_partner_declined",
+        title: "Partner request closed",
+        body: `Your partner request for ${tournament.title} was cancelled — they paired up with someone else. Try another player.`,
+        link: `/tournaments/${tournamentId}`,
+        emailTemplate: "TournamentPartnerDeclined",
+        emailData: {
+          tournamentId,
+          tournamentTitle: tournament.title,
+          targetName: "your prospective partner",
+        },
+      });
+    }
+  }
 
   // Notify BOTH sides — requester gets "your partner accepted" and
   // the target (who just tapped Accept) gets a confirmation too so
