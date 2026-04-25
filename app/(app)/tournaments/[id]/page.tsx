@@ -1084,10 +1084,20 @@ function StatusAdvanceButton({
   async function advance() {
     "use server";
     const supabase = await createClient();
-    await supabase
-      .from("tournaments")
-      .update({ status: nextStatus })
-      .eq("id", tournamentId);
+    // When the organizer manually opens or reopens registration we
+    // also clear the scheduled window timestamps. Without this, the
+    // tournament-registration-windows cron would immediately re-flip
+    // the status: a stale registration_closes_at in the past keeps
+    // forcing the row back to registration_closed every minute,
+    // making the Reopen button effectively useless. The organizer's
+    // manual click trumps the schedule — they can re-set close
+    // times via Edit if they want a future auto-close.
+    const updates: Record<string, unknown> = { status: nextStatus };
+    if (nextStatus === "registration_open") {
+      updates.registration_closes_at = null;
+      updates.registration_opens_at = null;
+    }
+    await supabase.from("tournaments").update(updates).eq("id", tournamentId);
     const { revalidatePath } = await import("next/cache");
     revalidatePath(`/tournaments/${tournamentId}`);
   }
