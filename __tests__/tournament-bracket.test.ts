@@ -767,6 +767,35 @@ describe("generateRoundRobin — gamesPerTeam > opponents (over-full)", () => {
     for (const c of counts.values()) expect(c).toBe(8);
   });
 
+  test("4 teams @ 5 games — rounds 4 & 5 rematch rounds 1 & 2 in order", () => {
+    // Per the organizer spec: even pools repeat rounds in order when
+    // gamesPerTeam exceeds (n-1). So round 4 matches the round-1
+    // pairings exactly, round 5 matches round-2 pairings exactly.
+    const ids = makeIds(4);
+    const m = generateRoundRobin(ids, { gamesPerTeam: 5, rng: seededRng(99) });
+
+    expect(Math.max(...m.map((x) => x.round))).toBe(5);
+
+    // Same-round pairings serialised so we can compare across rounds.
+    const pairsInRound = (round: number) =>
+      m
+        .filter((x) => x.round === round && x.player1_id && x.player2_id)
+        .map((x) => [x.player1_id!, x.player2_id!].sort().join("|"))
+        .sort()
+        .join(",");
+
+    expect(pairsInRound(4)).toBe(pairsInRound(1));
+    expect(pairsInRound(5)).toBe(pairsInRound(2));
+
+    // Every team still plays exactly 5 games.
+    const counts = new Map<string, number>();
+    for (const x of m) {
+      if (x.player1_id) counts.set(x.player1_id, (counts.get(x.player1_id) ?? 0) + 1);
+      if (x.player2_id) counts.set(x.player2_id, (counts.get(x.player2_id) ?? 0) + 1);
+    }
+    for (const c of counts.values()) expect(c).toBe(5);
+  });
+
   test("odd pool balance — 3@3 rounds up to 2 full laps (4 games each)", () => {
     const ids = makeIds(3);
     const m = generateRoundRobin(ids, { gamesPerTeam: 3, rng: seededRng(5) });
@@ -783,7 +812,318 @@ describe("generateRoundRobin — gamesPerTeam > opponents (over-full)", () => {
   });
 });
 
-// ─── generateRoundRobin ───────────────────────────────────────────────────────
+// ─── generateRoundRobin — comprehensive matrix ──────────────────────────────
+//
+// Per the organizer spec the round-robin generator must satisfy these
+// invariants for every pool size 3-10 and every supported gamesPerTeam:
+//   1. No self-play (player1 != player2).
+//   2. Each round contains a UNIQUE set of players — no team appears
+//      in two matches of the same round (bye counts as one slot).
+//   3. Each round has UNIQUE pairings — no pair plays itself twice
+//      in the same round.
+//   4. Every team plays exactly `gamesPerTeam` real (non-bye) matches.
+//   5. Odd pools: every team gets EQUAL byes (= laps); even pools: no byes.
+//   6. Full-lap schedules (gamesPerTeam = laps × (n-1)): every distinct
+//      pair plays exactly `laps` times. No partial coverage.
+//   7. Even-pool extras (gamesPerTeam > n-1, not a whole lap multiple):
+//      rounds that exceed (n-1) replay the schedule from round 1 in
+//      ORDER. Round (n-1)+k matches round k for k = 1..extras.
+//
+// `assertValidSchedule` runs all invariants in one place so each test
+// case is one-liner. Helper functions live below the test blocks.
+
+interface ScheduleCase {
+  poolSize: number;
+  gamesPerTeam: number;
+  /** Optional `numPools` override (for splitting 7-10 across 2 pools). */
+  numPools?: number;
+}
+
+describe("generateRoundRobin — full schedule integrity (pool sizes 3-10)", () => {
+  const singlePoolCases: ScheduleCase[] = [
+    // 3 teams (odd) — only valid: 1 lap (2 games) or 2 laps (4 games)
+    { poolSize: 3, gamesPerTeam: 2 },
+    { poolSize: 3, gamesPerTeam: 4 },
+    // 4 teams (even) — partial, full RR, with-extras, double RR, with-extras-on-double
+    { poolSize: 4, gamesPerTeam: 1 },
+    { poolSize: 4, gamesPerTeam: 3 },
+    { poolSize: 4, gamesPerTeam: 5 },
+    { poolSize: 4, gamesPerTeam: 6 },
+    { poolSize: 4, gamesPerTeam: 7 },
+    // 5 teams (odd) — only valid: 4 (1 lap) or 8 (2 laps)
+    { poolSize: 5, gamesPerTeam: 4 },
+    { poolSize: 5, gamesPerTeam: 8 },
+    // 6 teams (even)
+    { poolSize: 6, gamesPerTeam: 4 },
+    { poolSize: 6, gamesPerTeam: 5 },
+    { poolSize: 6, gamesPerTeam: 7 },
+    { poolSize: 6, gamesPerTeam: 10 },
+    // 7 teams (odd) — single pool exception (we keep 7 in one pool by default)
+    { poolSize: 7, gamesPerTeam: 6 },
+    { poolSize: 7, gamesPerTeam: 12 },
+    // 8 teams — by default split into 2 pools, but force 1 pool here
+    { poolSize: 8, gamesPerTeam: 5, numPools: 1 },
+    { poolSize: 8, gamesPerTeam: 7, numPools: 1 },
+    { poolSize: 8, gamesPerTeam: 10, numPools: 1 },
+    // 9 teams (odd, single pool with override)
+    { poolSize: 9, gamesPerTeam: 8, numPools: 1 },
+    { poolSize: 9, gamesPerTeam: 16, numPools: 1 },
+    // 10 teams (even, single pool with override)
+    { poolSize: 10, gamesPerTeam: 6, numPools: 1 },
+    { poolSize: 10, gamesPerTeam: 9, numPools: 1 },
+    { poolSize: 10, gamesPerTeam: 12, numPools: 1 },
+  ];
+
+  test.each(singlePoolCases)(
+    "single pool: $poolSize teams @ $gamesPerTeam games (numPools=$numPools)",
+    ({ poolSize, gamesPerTeam, numPools }) => {
+      const ids = makeIds(poolSize);
+      const matches = generateRoundRobin(ids, {
+        gamesPerTeam,
+        numPools,
+        rng: seededRng(poolSize * 100 + gamesPerTeam),
+      });
+      assertValidSchedule(matches, ids, gamesPerTeam);
+    }
+  );
+
+  // 2-pool splits for 7-10 teams. With max-6-per-pool the default
+  // splits already produce 2 pools at 8+; 7 stays in 1 unless we
+  // override. Forcing numPools=2 covers the explicit-split path
+  // organizers can opt into.
+  const twoPoolCases: { poolSize: number; gamesPerTeam: number }[] = [
+    // 7 teams → 4+3
+    { poolSize: 7, gamesPerTeam: 3 }, // largest pool (4) plays 3 = full RR; smaller pool (3) round up to 1 lap = 2 games
+    { poolSize: 7, gamesPerTeam: 4 }, // 4-team pool: 1 lap + 1 extra; 3-team pool: 1 lap (2 games)
+    // 8 teams → 4+4
+    { poolSize: 8, gamesPerTeam: 3 },
+    { poolSize: 8, gamesPerTeam: 5 },
+    // 9 teams → 5+4
+    { poolSize: 9, gamesPerTeam: 4 },
+    // 10 teams → 5+5
+    { poolSize: 10, gamesPerTeam: 4 },
+    { poolSize: 10, gamesPerTeam: 8 },
+  ];
+
+  test.each(twoPoolCases)(
+    "two pools: $poolSize teams @ $gamesPerTeam games per team",
+    ({ poolSize, gamesPerTeam }) => {
+      const ids = makeIds(poolSize);
+      const matches = generateRoundRobin(ids, {
+        gamesPerTeam,
+        numPools: 2,
+        rng: seededRng(poolSize * 1000 + gamesPerTeam),
+      });
+
+      // Two pool labels — "winners" + "losers" for the 2-pool layout.
+      const brackets = Array.from(new Set(matches.map((m) => m.bracket)));
+      expect(brackets.sort()).toEqual(["losers", "winners"]);
+
+      // Pool sizes from getPoolStructure should be (ceil, floor).
+      const structure = getPoolStructure(poolSize, { numPools: 2 });
+      expect(structure.numPools).toBe(2);
+
+      // Each team appears in EXACTLY ONE bracket — no cross-pool play.
+      const bracketByPlayer = new Map<string, string>();
+      for (const m of matches) {
+        for (const pid of [m.player1_id, m.player2_id]) {
+          if (!pid) continue;
+          const existing = bracketByPlayer.get(pid);
+          if (existing && existing !== m.bracket) {
+            throw new Error(
+              `Player ${pid} appears in both ${existing} and ${m.bracket}`
+            );
+          }
+          bracketByPlayer.set(pid, m.bracket);
+        }
+      }
+
+      // Each pool individually must satisfy the full schedule
+      // invariants. Run the assertion per bracket. Pool size for each
+      // bracket = number of distinct players that appear in it.
+      for (const bracket of brackets) {
+        const poolMatches = matches.filter((m) => m.bracket === bracket);
+        const playersInPool = new Set<string>();
+        for (const m of poolMatches) {
+          if (m.player1_id) playersInPool.add(m.player1_id);
+          if (m.player2_id) playersInPool.add(m.player2_id);
+        }
+        const poolIds = Array.from(playersInPool);
+        // gamesPerTeam may differ between pools when the larger pool
+        // exactly schedules `gamesPerTeam` and the smaller pool rounds
+        // up. We assert the per-pool game count by reading what the
+        // generator actually produced rather than the requested
+        // gamesPerTeam value — see assertValidSchedule's mode arg.
+        assertValidSchedule(poolMatches, poolIds, /*gamesPerTeam*/ null);
+      }
+    }
+  );
+});
+
+/**
+ * Run every round-robin schedule invariant against `matches` for the
+ * given `playerIds`. When `gamesPerTeamRequested` is null we infer the
+ * count from the schedule (used in the multi-pool case where smaller
+ * odd pools round up to a higher game count than the larger pool).
+ */
+function assertValidSchedule(
+  matches: ReturnType<typeof generateRoundRobin>,
+  playerIds: string[],
+  gamesPerTeamRequested: number | null
+) {
+  const n = playerIds.length;
+  const isOdd = n % 2 === 1;
+  const opponents = n - 1;
+
+  // (1) No self-play.
+  for (const m of matches) {
+    if (m.player1_id && m.player2_id) {
+      expect(m.player1_id).not.toBe(m.player2_id);
+    }
+  }
+
+  // (2) & (3) Per-round invariants: a player appears at most once per
+  // round; each pairing is unique within a round.
+  const byRound = new Map<number, typeof matches>();
+  for (const m of matches) {
+    if (!byRound.has(m.round)) byRound.set(m.round, []);
+    byRound.get(m.round)!.push(m);
+  }
+  for (const [round, bucket] of byRound) {
+    const seenPlayers = new Set<string>();
+    const seenPairs = new Set<string>();
+    for (const m of bucket) {
+      // BYE row: a single team gets the slot — count it as one player.
+      const byePlayer =
+        m.status === "bye" ? m.player1_id ?? m.player2_id : null;
+      if (byePlayer) {
+        if (seenPlayers.has(byePlayer)) {
+          throw new Error(
+            `Round ${round}: player ${byePlayer} appears twice (bye + real)`
+          );
+        }
+        seenPlayers.add(byePlayer);
+        continue;
+      }
+      if (m.player1_id) {
+        if (seenPlayers.has(m.player1_id)) {
+          throw new Error(
+            `Round ${round}: player ${m.player1_id} in two matches`
+          );
+        }
+        seenPlayers.add(m.player1_id);
+      }
+      if (m.player2_id) {
+        if (seenPlayers.has(m.player2_id)) {
+          throw new Error(
+            `Round ${round}: player ${m.player2_id} in two matches`
+          );
+        }
+        seenPlayers.add(m.player2_id);
+      }
+      if (m.player1_id && m.player2_id) {
+        const pair = [m.player1_id, m.player2_id].sort().join("|");
+        if (seenPairs.has(pair)) {
+          throw new Error(`Round ${round}: pairing ${pair} appears twice`);
+        }
+        seenPairs.add(pair);
+      }
+    }
+  }
+
+  // (4) Every team plays EXACTLY the same number of real games.
+  const realGames = new Map<string, number>();
+  const byes = new Map<string, number>();
+  for (const id of playerIds) {
+    realGames.set(id, 0);
+    byes.set(id, 0);
+  }
+  for (const m of matches) {
+    if (m.status === "bye") {
+      const id = m.player1_id ?? m.player2_id;
+      if (id) byes.set(id, (byes.get(id) ?? 0) + 1);
+      continue;
+    }
+    if (m.player1_id)
+      realGames.set(m.player1_id, (realGames.get(m.player1_id) ?? 0) + 1);
+    if (m.player2_id)
+      realGames.set(m.player2_id, (realGames.get(m.player2_id) ?? 0) + 1);
+  }
+  const gameCounts = Array.from(realGames.values());
+  // Every team has the same game count.
+  expect(new Set(gameCounts).size).toBe(1);
+  const actualGames = gameCounts[0];
+  if (gamesPerTeamRequested != null) {
+    if (isOdd) {
+      // Odd pools round up to whole laps when an invalid count is
+      // requested. The actual count is the next multiple of opponents.
+      const laps = Math.ceil(gamesPerTeamRequested / opponents);
+      expect(actualGames).toBe(laps * opponents);
+    } else {
+      expect(actualGames).toBe(gamesPerTeamRequested);
+    }
+  }
+
+  // (5) BYE distribution.
+  const byeCounts = Array.from(byes.values());
+  if (isOdd) {
+    // Every team has the same number of byes — exactly `laps`.
+    expect(new Set(byeCounts).size).toBe(1);
+    const laps = actualGames / opponents;
+    expect(byeCounts[0]).toBe(laps);
+  } else {
+    // Even pools have no byes at all.
+    for (const b of byeCounts) expect(b).toBe(0);
+  }
+
+  // (6) Pair coverage. For any whole-lap multiple, every distinct pair
+  // plays exactly `laps` times.
+  const laps = actualGames / opponents;
+  const isWholeLap = Number.isInteger(laps);
+  if (isWholeLap) {
+    const pairCounts = new Map<string, number>();
+    for (const m of matches) {
+      if (m.status === "bye") continue;
+      if (!m.player1_id || !m.player2_id) continue;
+      const k = [m.player1_id, m.player2_id].sort().join("|");
+      pairCounts.set(k, (pairCounts.get(k) ?? 0) + 1);
+    }
+    for (let i = 0; i < playerIds.length; i++) {
+      for (let j = i + 1; j < playerIds.length; j++) {
+        const k = [playerIds[i], playerIds[j]].sort().join("|");
+        expect(pairCounts.get(k) ?? 0).toBe(laps);
+      }
+    }
+  }
+
+  // (7) Even-pool extras — rounds beyond the first lap replay rounds
+  // 1..extras in order.
+  if (!isOdd) {
+    const roundsPerLap = opponents; // for even pools
+    const totalRounds = Math.max(...matches.map((m) => m.round));
+    // Compare round k > roundsPerLap × fullLaps to round (k mod roundsPerLap).
+    const fullLaps = Math.floor(totalRounds / roundsPerLap);
+    const extraRoundsStart = fullLaps * roundsPerLap + 1;
+    if (totalRounds >= extraRoundsStart) {
+      const pairsInRound = (round: number) =>
+        matches
+          .filter(
+            (m) =>
+              m.round === round &&
+              m.player1_id &&
+              m.player2_id &&
+              m.status !== "bye"
+          )
+          .map((m) => [m.player1_id!, m.player2_id!].sort().join("|"))
+          .sort()
+          .join(",");
+      for (let r = extraRoundsStart; r <= totalRounds; r++) {
+        const lapRound = ((r - 1) % roundsPerLap) + 1;
+        expect(pairsInRound(r)).toBe(pairsInRound(lapRound));
+      }
+    }
+  }
+}
 
 describe("generateRoundRobin — small divisions (3-6 teams → single pool)", () => {
   // 7+ teams require 2+ pools due to max 6/pool rule
@@ -1102,11 +1442,16 @@ describe("computePoolStandings", () => {
       },
     ];
     const standings = computePoolStandings(matches);
-    // Only 1 completed match contributes
+    // Only the completed match contributes to W/L. Teams that have
+    // a pending match still appear in the standings at 0-0 so the
+    // table shows every player in the pool from round 1 onwards.
     expect(standings.find((s) => s.id === "p1")!.wins).toBe(1);
     expect(standings.find((s) => s.id === "p2")!.losses).toBe(1);
-    // p3 has no completed matches yet
-    expect(standings.find((s) => s.id === "p3")).toBeUndefined();
+    const p3 = standings.find((s) => s.id === "p3");
+    expect(p3).toBeDefined();
+    expect(p3!.wins).toBe(0);
+    expect(p3!.losses).toBe(0);
+    expect(p3!.pointDiff).toBe(0);
   });
 
   test("handles 4-team pool standings (full round robin)", () => {
