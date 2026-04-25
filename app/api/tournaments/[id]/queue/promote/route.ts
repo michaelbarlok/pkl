@@ -73,76 +73,63 @@ export async function DELETE(
     );
   }
 
-  // Pull the top of the queue (we need three so we can slot the
-  // bumped match BETWEEN the post-promotion-position-1 and -2
-  // matches). Cross-division because queue_entered_at is the merged
-  // FIFO ordering across every active division — that's what the
-  // Court Tracker / Match Queue display reads from.
-  const { data: topQueued } = await service
+  // Treat the queue like an explicit ordered array: read every
+  // queued match (excluding the bumped one), splice the bumped match
+  // in at the position-2 slot of the post-promotion queue, then
+  // re-stamp the whole list with fresh, strictly-increasing 1ms
+  // ticks. This is the definitive ordering — no leaning on existing
+  // stamps that might collide, no microsecond hacks. Cross-division
+  // because queue_entered_at is the merged FIFO ordering across
+  // every active division (Court Tracker reads it that way).
+  const { data: queuedRaw } = await service
     .from("tournament_matches")
-    .select("queue_entered_at")
+    .select("id")
     .eq("tournament_id", tournamentId)
     .eq("status", "pending")
     .is("court_number", null)
     .not("queue_entered_at", "is", null)
     .neq("id", matchId)
-    .order("queue_entered_at", { ascending: true })
-    .limit(3);
+    .order("queue_entered_at", { ascending: true });
+  const queued = (queuedRaw ?? []) as { id: string }[];
 
-  const top = (topQueued ?? []) as { queue_entered_at: string }[];
-  // Pick the new stamp:
-  //  - 3+ queued: midpoint between top[1] (becomes post-promotion
-  //    position 1) and top[2] (becomes position 2). Midpoint
-  //    guarantees we land strictly between them; the previous
-  //    "top[1]+1ms" collided with top[2] when stamps were 1ms apart
-  //    (which is the default — runAssignmentPass writes consecutive
-  //    1ms ticks), and the unstable sort then put the bumped match
-  //    at position 3 or further instead of 2.
-  //  - 2 queued: just past top[1] — bumped will be alone behind it
-  //    after the promotion.
-  //  - 1 queued: just past top[0].
-  //  - 0 queued: anchor on now (bumped refills its own court).
-  let newStampMs: number;
-  if (top.length >= 3) {
-    const t2 = new Date(top[1].queue_entered_at).getTime();
-    const t3 = new Date(top[2].queue_entered_at).getTime();
-    newStampMs = (t2 + t3) / 2;
-  } else if (top.length === 2) {
-    newStampMs = new Date(top[1].queue_entered_at).getTime() + 1;
-  } else if (top.length === 1) {
-    newStampMs = new Date(top[0].queue_entered_at).getTime() + 1;
-  } else {
-    newStampMs = Date.now();
-  }
-  const newStamp = isoWithMicros(newStampMs);
+  // Pre-promotion order should be [Q1, Q2, BUMPED, Q3, Q4, …] so
+  // that after runAssignmentPass promotes Q1 to the just-vacated
+  // court, the bumped match sits at position 2 of the remaining
+  // queue. Insert at index 2 (after Q1 and Q2). If the queue has
+  // fewer than 2 entries, insert at the end — bumped is the only
+  // remaining queued match anyway.
+  const insertAt = Math.min(2, queued.length);
+  const newOrder = [
+    ...queued.slice(0, insertAt).map((q) => q.id),
+    matchId,
+    ...queued.slice(insertAt).map((q) => q.id),
+  ];
 
-  await service
-    .from("tournament_matches")
-    .update({
-      court_number: null,
-      queue_entered_at: newStamp,
-      up_next_notified_at: null,
-      in_3rd_notified_at: null,
+  // Re-stamp every queued match at consecutive 1ms ticks. The
+  // bumped match also gets its court_number cleared and its
+  // notification ack columns reset since its position context
+  // changed. Updates run in parallel — each touches a single row.
+  const baseMs = Date.now();
+  await Promise.all(
+    newOrder.map((id, i) => {
+      const stamp = new Date(baseMs + i).toISOString();
+      const isBumped = id === matchId;
+      return service
+        .from("tournament_matches")
+        .update(
+          isBumped
+            ? {
+                queue_entered_at: stamp,
+                court_number: null,
+                up_next_notified_at: null,
+                in_3rd_notified_at: null,
+              }
+            : { queue_entered_at: stamp }
+        )
+        .eq("id", id);
     })
-    .eq("id", matchId);
+  );
 
   await runAssignmentPass(tournamentId);
   return NextResponse.json({ ok: true });
-}
-
-/**
- * ISO-8601 with microsecond precision. Date.toISOString() truncates
- * to milliseconds; PostgreSQL timestamptz stores microseconds, so
- * we need to inject the extra 3 digits ourselves to express a value
- * like "halfway between two 1ms-apart stamps". Accepts a fractional
- * ms input (e.g. 1234567890101.5 → "...T...:01.101500Z").
- */
-function isoWithMicros(ms: number): string {
-  const intMs = Math.floor(ms);
-  const microsFrac = Math.round((ms - intMs) * 1000); // 0..999
-  const base = new Date(intMs).toISOString(); // "...T...:01.234Z"
-  return base.replace(
-    "Z",
-    String(microsFrac).padStart(3, "0") + "Z"
-  );
 }
