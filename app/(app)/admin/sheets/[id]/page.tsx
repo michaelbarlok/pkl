@@ -11,7 +11,8 @@ import type {
   Profile,
   ShootoutGroup,
 } from "@/types/database";
-import { fifteenMinuteSlots, snapDateTimeLocalTo15 } from "@/lib/datetime-local";
+import { fifteenMinuteSlots } from "@/lib/datetime-local";
+import { DateTimeFifteenMin } from "@/components/date-time-15";
 import { PRIORITY_ORDER } from "@/lib/utils";
 
 const TIME_SLOTS = fifteenMinuteSlots();
@@ -585,26 +586,18 @@ export default function AdminSheetDetailPage() {
             <label className="block text-sm font-medium text-dark-200 mb-1">
               Sign-Up Closes At
             </label>
-            <input
-              type="datetime-local"
-              step="900"
+            <DateTimeFifteenMin
               value={signupClosesAt}
-              onChange={(e) => setSignupClosesAt(e.target.value)}
-              onBlur={(e) => setSignupClosesAt(snapDateTimeLocalTo15(e.target.value))}
-              className="input"
+              onChange={setSignupClosesAt}
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">
               Withdraw Closes At
             </label>
-            <input
-              type="datetime-local"
-              step="900"
+            <DateTimeFifteenMin
               value={withdrawClosesAt}
-              onChange={(e) => setWithdrawClosesAt(e.target.value)}
-              onBlur={(e) => setWithdrawClosesAt(snapDateTimeLocalTo15(e.target.value))}
-              className="input"
+              onChange={setWithdrawClosesAt}
             />
           </div>
         </div>
