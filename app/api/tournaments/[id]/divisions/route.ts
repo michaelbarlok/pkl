@@ -5,6 +5,7 @@ import {
   generateRoundRobin,
   generatePlayoffBracket,
   computePoolStandings,
+  computeCrossPoolSeeding,
   getPoolBrackets,
 } from "@/lib/tournament-bracket";
 import { getDivision, getDivisionLabel, SKILLS } from "@/lib/divisions";
@@ -208,18 +209,22 @@ export async function PUT(
       const perPoolBase = Math.floor(totalAdvancing / Math.max(1, numPools));
       const remainder = totalAdvancing % Math.max(1, numPools);
 
-      // Collect per-pool standings and pick the top K from each, where
-      // K = base + (1 for the first `remainder` pools — largest pools
-      // first, which matches the ladder-layout convention).
-      const allQualifiers: { id: string; wins: number; losses: number; pointDiff: number }[] = [];
-      poolBrackets.forEach((bracket, idx) => {
+      // Pull per-pool standings (with H2H already applied within each
+      // pool) and feed them to computeCrossPoolSeeding, which handles
+      // the cross-pool merge: wins → PD → H2H (only same-pool) →
+      // stable hash for cross-pool ties. Mirrors what the Review
+      // Advancement UI proposes so an organizer who skipped the panel
+      // still gets the same order the UI would have shown them.
+      const perPool = poolBrackets.map((bracket, idx) => {
         const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
-        const standings = computePoolStandings(bracketMatches);
-        const take = perPoolBase + (idx < remainder ? 1 : 0);
-        allQualifiers.push(...standings.slice(0, Math.min(take, standings.length)));
+        return {
+          bracket,
+          standings: computePoolStandings(bracketMatches),
+          takeCount: perPoolBase + (idx < remainder ? 1 : 0),
+        };
       });
-      allQualifiers.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
-      seededPlayerIds = allQualifiers.map((s) => s.id);
+      const seeded = computeCrossPoolSeeding(perPool);
+      seededPlayerIds = seeded.map((s) => s.id);
     }
 
     if (seededPlayerIds.length < 2) {
@@ -257,6 +262,19 @@ export async function PUT(
 
     if (insertError) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    // Persist playoff seed numbers on each advancing team's
+    // registration row. Index 0 in seededPlayerIds is the #1 seed.
+    // Stored so the playoff bracket UI can render "(1)" / "(2)" /…
+    // beside team names without recomputing the seed order.
+    for (let i = 0; i < seededPlayerIds.length; i++) {
+      await supabase
+        .from("tournament_registrations")
+        .update({ seed: i + 1 })
+        .eq("tournament_id", tournamentId)
+        .eq("division", division)
+        .eq("player_id", seededPlayerIds[i]);
     }
 
     // Auto-advance byes in the playoff bracket

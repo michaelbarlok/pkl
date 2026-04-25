@@ -70,7 +70,7 @@ export default async function ActiveSessionPage() {
   const { data: tRegs } = await supabase
     .from("tournament_registrations")
     .select(
-      "tournament_id, division, status, tournament:tournaments(id, status)"
+      "tournament_id, division, player_id, status, tournament:tournaments(id, status)"
     )
     .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
     .neq("status", "withdrawn");
@@ -80,20 +80,65 @@ export default async function ActiveSessionPage() {
   // just the first — the one that's active might be the second row.
   const candidates = (tRegs ?? []).filter(
     (r: any) => r.tournament?.status === "in_progress"
-  ) as { tournament_id: string; division: string }[];
+  ) as { tournament_id: string; division: string; player_id: string }[];
 
   if (candidates.length > 0) {
     const tournamentIds = Array.from(new Set(candidates.map((c) => c.tournament_id)));
-    const { data: activeRows } = await supabase
-      .from("tournament_active_divisions")
-      .select("tournament_id, division")
-      .in("tournament_id", tournamentIds);
+    const teamPrimaries = new Set(candidates.map((c) => c.player_id));
+
+    // Active divisions + the player's team's pending matches in
+    // those tournaments. We prefer divisions where the player's
+    // team has at least one pending match — that's the one they
+    // actually need to be looking at. Without this, an organizer
+    // who leaves a finished gendered division in
+    // tournament_active_divisions while activating Mixed would
+    // route the player to the stale, all-completed gendered
+    // bracket instead of Mixed.
+    const [{ data: activeRows }, { data: pendingMatches }] =
+      await Promise.all([
+        supabase
+          .from("tournament_active_divisions")
+          .select("tournament_id, division")
+          .in("tournament_id", tournamentIds),
+        supabase
+          .from("tournament_matches")
+          .select("tournament_id, division, player1_id, player2_id")
+          .in("tournament_id", tournamentIds)
+          .eq("status", "pending"),
+      ]);
+
     const activeSet = new Set(
       (activeRows ?? []).map((r: any) => `${r.tournament_id}:${r.division}`)
     );
-    const liveCandidate = candidates.find((c) =>
-      activeSet.has(`${c.tournament_id}:${c.division}`)
-    );
+    // (tournament_id, division) keys where the player's team has a
+    // pending match. tournament_matches.player{1,2}_id always points
+    // at the team primary (registration.player_id), never the partner.
+    const playerHasPending = new Set<string>();
+    for (const m of (pendingMatches ?? []) as {
+      tournament_id: string;
+      division: string | null;
+      player1_id: string | null;
+      player2_id: string | null;
+    }[]) {
+      if (!m.division) continue;
+      const involved =
+        (m.player1_id && teamPrimaries.has(m.player1_id)) ||
+        (m.player2_id && teamPrimaries.has(m.player2_id));
+      if (involved) {
+        playerHasPending.add(`${m.tournament_id}:${m.division}`);
+      }
+    }
+
+    // Two-tier preference: real work first, anything-active second.
+    const liveCandidate =
+      candidates.find((c) => {
+        const k = `${c.tournament_id}:${c.division}`;
+        return activeSet.has(k) && playerHasPending.has(k);
+      }) ??
+      candidates.find((c) =>
+        activeSet.has(`${c.tournament_id}:${c.division}`)
+      );
+
     if (liveCandidate) {
       redirect(`/tournaments/${liveCandidate.tournament_id}/live`);
     }

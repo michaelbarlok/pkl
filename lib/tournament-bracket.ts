@@ -940,6 +940,115 @@ export function computePoolStandings(
 }
 
 /**
+ * Cross-pool playoff seeding for divisions split into multiple pools.
+ *
+ * Inputs: per-pool standings (already H2H-resolved within each pool
+ * by computePoolStandings) plus how many teams to take from each
+ * pool. Returns the merged seeded list ranked using:
+ *   1. Wins (desc)
+ *   2. Point differential (desc)
+ *   3. Head-to-head — ONLY when the two teams played in the same
+ *      pool. Cross-pool teams never met, so this step is skipped
+ *      for them.
+ *   4. Stable hash of player_id for cross-pool ties — deterministic
+ *      so the same standings always produce the same seed order on
+ *      reload, but visually random across teams. Surfaced to the
+ *      organizer as "Random selection (cross-pool tie)" so they
+ *      know the algorithm couldn't separate the teams on stats.
+ *
+ * tiebreakerReason annotates the row that ranked above the row
+ * directly below when wins+PD couldn't split them. Same-pool ties
+ * inherit whichever H2H reason computePoolStandings already
+ * recorded; cross-pool ties get the random-selection note.
+ */
+export interface SeededPlayoffTeam {
+  id: string;
+  pool: string;
+  wins: number;
+  losses: number;
+  pointDiff: number;
+  /** Position in the source pool (1-indexed). Useful for display
+   *  when explaining "Pool A's #2 seed" etc. */
+  poolFinish: number;
+  tiebreakerReason: string | null;
+}
+
+export function computeCrossPoolSeeding(
+  perPool: {
+    bracket: string;
+    standings: PoolStandingRow[];
+    takeCount: number;
+  }[]
+): SeededPlayoffTeam[] {
+  // Snapshot the top-K from each pool, remembering which pool the
+  // team came from + its 1-indexed finish there. Same-pool order in
+  // standings is already final (H2H done by computePoolStandings).
+  type Decorated = SeededPlayoffTeam & { _hash: number };
+  const teams: Decorated[] = [];
+  for (const p of perPool) {
+    const take = p.standings.slice(0, p.takeCount);
+    for (let i = 0; i < take.length; i++) {
+      const r = take[i];
+      teams.push({
+        id: r.id,
+        pool: p.bracket,
+        wins: r.wins,
+        losses: r.losses,
+        pointDiff: r.pointDiff,
+        poolFinish: i + 1,
+        tiebreakerReason: null,
+        _hash: stableIdHash(r.id),
+      });
+    }
+  }
+
+  // Same-pool order must be preserved (the pool's standings already
+  // ran H2H to settle ties). When two teams in the same pool tie on
+  // (wins, pointDiff) here too, we defer to the original pool order
+  // — the team that finished higher in the pool stays higher in the
+  // merged list.
+  const poolOrderById = new Map<string, number>();
+  for (let i = 0; i < teams.length; i++) {
+    poolOrderById.set(teams[i].id, teams[i].poolFinish);
+  }
+
+  teams.sort((a, b) => {
+    if (a.wins !== b.wins) return b.wins - a.wins;
+    if (a.pointDiff !== b.pointDiff) return b.pointDiff - a.pointDiff;
+    if (a.pool === b.pool) {
+      // Same pool — fall through to the underlying pool standings
+      // order (which has H2H already applied).
+      return (poolOrderById.get(a.id) ?? 0) - (poolOrderById.get(b.id) ?? 0);
+    }
+    // Different pools, fully tied on stats — stable hash decides.
+    return a._hash - b._hash;
+  });
+
+  // Annotate the tiebreaker that decided each adjacent pair. Skip
+  // PD ties since the +/- column already shows that.
+  for (let k = 0; k < teams.length - 1; k++) {
+    const a = teams[k];
+    const b = teams[k + 1];
+    if (a.wins !== b.wins) continue;
+    if (a.pointDiff !== b.pointDiff) continue;
+    if (a.pool === b.pool) {
+      // Same-pool tie — pull through whatever H2H reason the pool
+      // standings already recorded for this row. The
+      // computePoolStandings caller upstream provides this; we don't
+      // have it here, so default to a generic same-pool note.
+      a.tiebreakerReason = "Higher head-to-head finish (same pool)";
+    } else {
+      a.tiebreakerReason = "Random (cross-pool tie)";
+    }
+  }
+
+  return teams.map(({ _hash: _omit, ...rest }) => {
+    void _omit;
+    return rest;
+  });
+}
+
+/**
  * Human label for a tournament match's bracket/round position.
  *
  * Pool play: "Pool A · Round 3" / "Pool 2 · Round 1"

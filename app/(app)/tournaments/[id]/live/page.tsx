@@ -87,12 +87,40 @@ export default async function TournamentLivePage({
     (activeDivs ?? []).map((r: any) => r.division as string)
   );
 
-  // Prefer the registration whose division is currently live. Falling
-  // back to the first row matters when no division is active yet —
-  // the redirect below sends the viewer back to the detail page in
-  // that case anyway, so picking any row is fine.
+  // When the viewer has multiple registrations in the same tournament
+  // (Men's + Mixed) and more than one of those divisions is in the
+  // active set, picking the first match by row order can land them on
+  // the wrong bracket — e.g. Men's wraps up but the organizer leaves
+  // it in tournament_active_divisions while activating Mixed. To stay
+  // on the bracket the player can actually act on, prefer the one
+  // where their team has at least one PENDING match. Falls back to
+  // any active reg, then to the first reg overall.
+  const teamPrimaries = Array.from(new Set(allMyRegs.map((r) => r.player_id)));
+  const { data: myPending } =
+    teamPrimaries.length > 0
+      ? await supabase
+          .from("tournament_matches")
+          .select("division, player1_id, player2_id")
+          .eq("tournament_id", tournamentId)
+          .eq("status", "pending")
+          .or(
+            teamPrimaries
+              .flatMap((id) => [`player1_id.eq.${id}`, `player2_id.eq.${id}`])
+              .join(",")
+          )
+      : { data: [] as { division: string | null; player1_id: string | null; player2_id: string | null }[] };
+  const divisionsWithMyPending = new Set(
+    (myPending ?? [])
+      .map((m: any) => m.division as string | null)
+      .filter((d): d is string => !!d)
+  );
+
   const liveReg =
-    allMyRegs.find((r) => activeDivisionSet.has(r.division)) ?? allMyRegs[0];
+    allMyRegs.find(
+      (r) => activeDivisionSet.has(r.division) && divisionsWithMyPending.has(r.division)
+    ) ??
+    allMyRegs.find((r) => activeDivisionSet.has(r.division)) ??
+    allMyRegs[0];
   const myDivision = liveReg.division;
   // The team's "primary" — what tournament_matches.player1_id /
   // player2_id reference. Whether the viewer is the registration's
@@ -158,18 +186,24 @@ export default async function TournamentLivePage({
 
   // Partner map for doubles labels — scoped to every active
   // division so the "Other pools" viewer below can label those
-  // rows correctly too, not just the viewer's own pool.
+  // rows correctly too, not just the viewer's own pool. We pull
+  // seed numbers from the same query so the playoff bracket
+  // renderer can show "(N)" beside team names.
   const partnerMap: PartnerMap = new Map();
-  if (tournament.type === "doubles" && activeDivisionList.length > 0) {
+  const seedByPlayerId = new Map<string, number>();
+  if (activeDivisionList.length > 0) {
     const { data: regs } = await supabase
       .from("tournament_registrations")
-      .select("player_id, partner_id, partner:profiles!partner_id(display_name)")
+      .select("player_id, partner_id, seed, partner:profiles!partner_id(display_name)")
       .eq("tournament_id", tournamentId)
       .in("division", activeDivisionList)
       .neq("status", "withdrawn");
     for (const r of (regs ?? []) as any[]) {
       if (r.player_id && r.partner_id) {
         partnerMap.set(r.player_id, r.partner?.display_name ?? "Partner");
+      }
+      if (r.player_id && typeof r.seed === "number") {
+        seedByPlayerId.set(r.player_id, r.seed);
       }
     }
   }
@@ -333,6 +367,7 @@ export default async function TournamentLivePage({
         }
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
         partnerMap={partnerMap}
+        seedByPlayerId={seedByPlayerId}
       />
 
       {/* Read-only view into other pools — same division's other
@@ -350,6 +385,7 @@ export default async function TournamentLivePage({
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
         divisionSettings={(tournament as any).division_settings ?? null}
         partnerMap={partnerMap}
+        seedByPlayerId={seedByPlayerId}
       />
 
       <LiveTournamentRealtime tournamentId={tournamentId} />

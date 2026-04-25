@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { fifteenMinuteSlots } from "@/lib/datetime-local";
 
 interface Props {
@@ -7,9 +8,6 @@ interface Props {
    *  <input type="datetime-local"> produces) or "" for unset. */
   value: string;
   onChange: (next: string) => void;
-  /** Disables the time select when the date is empty — picking a
-   *  time before a date would silently drop the time. */
-  required?: boolean;
   /** Optional min/max for the date side, formatted as YYYY-MM-DD. */
   minDate?: string;
   maxDate?: string;
@@ -24,11 +22,13 @@ const TIME_SLOTS = fifteenMinuteSlots();
  * `YYYY-MM-DDTHH:MM` value back to the parent so caller code can keep
  * using the same `localDateTimeToIso` round-trip helpers as before.
  *
- * Replaces `<input type="datetime-local" step="900">` everywhere we
- * surface registration / sign-up / withdraw windows. The native
- * datetime-local picker only constrained the spinner; a user could
- * still type "8:07" and store an off-grid value. With this composite
- * the time is literally unselectable off the 15-minute grid.
+ * Both halves are kept in LOCAL state and persist across re-renders.
+ * The composite only emits a real value upward once both date and
+ * time are set; while the user is mid-input we emit "" to the
+ * parent but DO NOT echo "" back into our own inputs. Without this,
+ * typing the date would emit "" → parent re-renders with value="" →
+ * the date input would clear what the user just typed (the bug
+ * users hit on the registration window fields).
  */
 export function DateTimeFifteenMin({
   value,
@@ -37,27 +37,35 @@ export function DateTimeFifteenMin({
   maxDate,
   className,
 }: Props) {
-  // Split the incoming value. We tolerate both "YYYY-MM-DDTHH:MM"
-  // and "YYYY-MM-DDTHH:MM:SS" so a value loaded from the DB with
-  // seconds doesn't blow up.
-  let date = "";
-  let time = "";
-  if (value) {
-    const [d, t] = value.split("T");
-    date = d ?? "";
-    time = (t ?? "").slice(0, 5); // HH:MM, drop seconds
-  }
+  const split = (v: string): { d: string; t: string } => {
+    if (!v) return { d: "", t: "" };
+    const [d, t] = v.split("T");
+    return { d: d ?? "", t: (t ?? "").slice(0, 5) };
+  };
 
-  function emit(nextDate: string, nextTime: string) {
-    if (!nextDate || !nextTime) {
-      // Both halves are required for a real value. If either is
-      // missing we send "" so callers consistently treat the field
-      // as unset (the existing localDateTimeToIso null-checks
-      // expect that).
+  const initial = split(value);
+  const [date, setDate] = useState(initial.d);
+  const [time, setTime] = useState(initial.t);
+
+  // Sync from props when the parent provides a real value (e.g. an
+  // edit form loading existing data). We deliberately ignore
+  // value === "" so the half-typed state isn't wiped when our own
+  // partial-value emit clears the parent.
+  useEffect(() => {
+    if (!value) return;
+    const { d, t } = split(value);
+    setDate((prev) => (prev === d ? prev : d));
+    setTime((prev) => (prev === t ? prev : t));
+  }, [value]);
+
+  function update(nextDate: string, nextTime: string) {
+    setDate(nextDate);
+    setTime(nextTime);
+    if (nextDate && nextTime) {
+      onChange(`${nextDate}T${nextTime}`);
+    } else {
       onChange("");
-      return;
     }
-    onChange(`${nextDate}T${nextTime}`);
   }
 
   return (
@@ -67,12 +75,12 @@ export function DateTimeFifteenMin({
         value={date}
         min={minDate}
         max={maxDate}
-        onChange={(e) => emit(e.target.value, time)}
+        onChange={(e) => update(e.target.value, time)}
         className="input"
       />
       <select
         value={time}
-        onChange={(e) => emit(date, e.target.value)}
+        onChange={(e) => update(date, e.target.value)}
         className="input"
       >
         <option value="">—</option>

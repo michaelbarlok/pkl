@@ -27,6 +27,10 @@ interface Props {
     { score_to_win_pool?: number; score_to_win_playoff?: number } | null
   > | null;
   partnerMap?: PartnerMap;
+  /** team-primary player_id → playoff seed. Same shape used by the
+   *  main TournamentBracketView call so playoff team names show
+   *  "(N)" beside their name. */
+  seedByPlayerId?: Map<string, number>;
 }
 
 /**
@@ -54,6 +58,7 @@ export function OtherPoolsViewer({
   finalsBestOf3,
   divisionSettings,
   partnerMap,
+  seedByPlayerId,
 }: Props) {
   // Enumerate every unique (division, bracket) pair in pool play.
   // Playoff brackets are excluded from the selector because each
@@ -147,6 +152,7 @@ export function OtherPoolsViewer({
             scoreToWinPlayoff={override?.score_to_win_playoff ?? scoreToWinPlayoff}
             finalsBestOf3={finalsBestOf3}
             partnerMap={partnerMap}
+            seedByPlayerId={seedByPlayerId}
           />
         );
       })()}
