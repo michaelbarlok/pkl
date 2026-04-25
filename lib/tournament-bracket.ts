@@ -896,7 +896,11 @@ export function computePoolStandings(
     const b = sorted[k + 1];
     if (a.wins !== b.wins) continue; // not a tie at all
     if (a.pointDiff !== b.pointDiff) {
-      output[k].tiebreakerReason = "Higher point differential";
+      // Point differential is already visible in the +/- column —
+      // surfacing "Higher point differential" again is noise. Leave
+      // tiebreakerReason null so the UI stays quiet for this case
+      // and only annotates the genuinely non-obvious tiebreakers
+      // below.
       continue;
     }
     if (a._h2hW !== b._h2hW) {
