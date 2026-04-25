@@ -11,7 +11,7 @@ interface DivisionEntry {
   matches: TournamentMatch[];
 }
 
-type DivisionStatus = "live" | "upcoming" | "complete";
+type DivisionStatus = "live" | "ready" | "upcoming" | "complete";
 
 interface Props {
   divisionMatchesEntries: DivisionEntry[];
@@ -48,6 +48,15 @@ function divisionStatus(
     (m) => m.status === "completed" || m.status === "bye"
   );
   if (allDone) return "complete";
+  // "Ready" = pool play wrapped, but the playoff bracket hasn't been
+  // generated yet. This is the moment an organizer should hit Review
+  // Advancement, so we surface it loudly in the tabs and the banner.
+  const poolMatches = entry.matches.filter((m) => m.bracket !== "playoff");
+  const poolDone =
+    poolMatches.length > 0 &&
+    poolMatches.every((m) => m.status === "completed" || m.status === "bye");
+  const hasPlayoff = entry.matches.some((m) => m.bracket === "playoff");
+  if (poolDone && !hasPlayoff) return "ready";
   if (activeSet.has(entry.division)) return "live";
   return "upcoming";
 }
@@ -79,10 +88,13 @@ export function DivisionBrackets({
   // the input order stable within each bucket. A stable sort is
   // guaranteed in ES2019+, which is what Next targets.
   const orderedEntries = useMemo(() => {
+    // Ready-to-advance jumps to the very front so organizers see it
+    // before the live (still-playing) divisions when they open the tab.
     const rank: Record<DivisionStatus, number> = {
-      live: 0,
-      upcoming: 1,
-      complete: 2,
+      ready: 0,
+      live: 1,
+      upcoming: 2,
+      complete: 3,
     };
     return [...divisionMatchesEntries].sort(
       (a, b) => rank[divisionStatus(a, activeSet)] - rank[divisionStatus(b, activeSet)]
@@ -135,11 +147,44 @@ export function DivisionBrackets({
   // Multiple divisions — pill/tab navigation
   const selectedEntry = orderedEntries.find((e) => e.division === selectedDivision);
 
+  // Divisions whose pool play just wrapped, awaiting the Review
+  // Advancement step. Surfaced as a banner so an organizer juggling
+  // multiple divisions doesn't have to click into each tab to find
+  // the one that needs attention.
+  const readyDivisions = orderedEntries.filter(
+    (e) => divisionStatus(e, activeSet) === "ready"
+  );
+
   return (
     <div>
-      {/* Division Tabs — live divisions float to the front so the
-          organizer can hop between whichever pools are currently
-          playing; completed divisions sink to the end with a ✓.  */}
+      {/* Pool-play-complete banner — only for organizers, only when at
+          least one division is sitting at the "ready to advance" gate. */}
+      {canManage && readyDivisions.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2.5 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-300 uppercase tracking-wide">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-300 animate-pulse" />
+            Ready to advance
+          </span>
+          <span className="text-xs text-dark-200">
+            Pool play is complete in {readyDivisions.length === 1 ? "this division" : `${readyDivisions.length} divisions`} — review the seeding to generate the playoff bracket.
+          </span>
+          <div className="flex flex-wrap gap-1.5 w-full sm:w-auto sm:ml-auto">
+            {readyDivisions.map((entry) => (
+              <button
+                key={entry.division}
+                onClick={() => setSelectedDivision(entry.division)}
+                className="text-xs font-medium px-2 py-1 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 ring-1 ring-amber-500/40"
+              >
+                {getDivisionLabel(entry.division)} →
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Division Tabs — ready-to-advance divisions float to the very
+          front (amber pulse), then live divisions, then upcoming, then
+          completed (✓, deprioritised). */}
       <div className="flex flex-wrap gap-2 mb-4">
         {orderedEntries.map((entry) => {
           const { division } = entry;
@@ -151,6 +196,11 @@ export function DivisionBrackets({
           let style: string;
           if (isSelected) {
             style = "bg-brand-500 text-white ring-1 ring-brand-400";
+          } else if (status === "ready") {
+            // Loud amber pulse — this is the one the organizer needs
+            // to act on. Stands out from "live" (brand) and "complete"
+            // (muted).
+            style = "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/50 hover:bg-amber-500/25";
           } else if (status === "live") {
             style = "bg-brand-500/15 text-brand-vivid ring-1 ring-brand-500/40 hover:bg-brand-500/25";
           } else if (status === "complete") {
@@ -170,6 +220,15 @@ export function DivisionBrackets({
               className={`${base} ${style}`}
               aria-current={isSelected ? "true" : undefined}
             >
+              {status === "ready" && (
+                <span
+                  className={
+                    "h-1.5 w-1.5 rounded-full animate-pulse " +
+                    (isSelected ? "bg-white" : "bg-amber-300")
+                  }
+                  aria-label="Ready to advance"
+                />
+              )}
               {status === "live" && (
                 <span
                   className={
@@ -195,7 +254,10 @@ export function DivisionBrackets({
               <span>
                 {division === "__none__" ? "All" : getDivisionLabel(division)}
               </span>
-              {isMyDiv && !isSelected && (
+              {status === "ready" && !isSelected && (
+                <span className="text-[10px] opacity-90 font-semibold">Ready</span>
+              )}
+              {isMyDiv && !isSelected && status !== "ready" && (
                 <span className="text-[10px] opacity-80">(You)</span>
               )}
             </button>

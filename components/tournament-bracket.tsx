@@ -1,7 +1,7 @@
 "use client";
 
 import { FormError } from "@/components/form-error";
-import { getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
+import { computePoolStandings, getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
@@ -221,7 +221,7 @@ function RoundRobinView({
   const [advancing, setAdvancing] = useState(false);
   const [advanceError, setAdvanceError] = useState("");
   const [showReview, setShowReview] = useState(false);
-  const [editableSeeds, setEditableSeeds] = useState<{ id: string; name: string; wins: number; losses: number; pointDiff: number }[]>([]);
+  const [editableSeeds, setEditableSeeds] = useState<{ id: string; name: string; wins: number; losses: number; pointDiff: number; tiebreakerReason: string | null }[]>([]);
 
   // Separate pool play from playoff matches
   const playoffMatches = matches.filter((m) => m.bracket === "playoff");
@@ -243,11 +243,11 @@ function RoundRobinView({
 
   function handleReviewAdvancement() {
     // Compute the proposed seeding from pool standings
-    let proposed: { id: string; name: string; wins: number; losses: number; pointDiff: number }[];
+    let proposed: typeof editableSeeds;
 
     if (isMultiPool) {
       // 15+ teams: top 2 from each pool, ranked across all pools
-      const allQualifiers: { id: string; name: string; wins: number; losses: number; pointDiff: number }[] = [];
+      const allQualifiers: typeof editableSeeds = [];
       for (const bracket of poolBrackets) {
         const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
         const standings = computeStandings(bracketMatches, partnerMap);
@@ -368,16 +368,27 @@ function RoundRobinView({
           </p>
           <div className="space-y-1 mb-4">
             {editableSeeds.map((team, i) => (
-              <div key={team.id} className="flex items-center gap-2 rounded-lg bg-surface-overlay px-3 py-2">
-                <span className="text-xs font-bold text-brand-vivid w-5">#{i + 1}</span>
-                <span className="text-sm font-medium text-dark-100 flex-1">{team.name}</span>
-                <span className="text-xs text-surface-muted">
-                  {team.wins}W-{team.losses}L ({team.pointDiff > 0 ? "+" : ""}{team.pointDiff})
-                </span>
-                <div className="flex gap-1">
-                  <button onClick={() => moveSeed(i, -1)} disabled={i === 0} className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-surface-muted hover:text-dark-200 disabled:opacity-30">&uarr;</button>
-                  <button onClick={() => moveSeed(i, 1)} disabled={i === editableSeeds.length - 1} className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-surface-muted hover:text-dark-200 disabled:opacity-30">&darr;</button>
+              <div key={team.id} className="rounded-lg bg-surface-overlay px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-brand-vivid w-5">#{i + 1}</span>
+                  <span className="text-sm font-medium text-dark-100 flex-1">{team.name}</span>
+                  <span className="text-xs text-surface-muted">
+                    {team.wins}W-{team.losses}L ({team.pointDiff > 0 ? "+" : ""}{team.pointDiff})
+                  </span>
+                  <div className="flex gap-1">
+                    <button onClick={() => moveSeed(i, -1)} disabled={i === 0} className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-surface-muted hover:text-dark-200 disabled:opacity-30">&uarr;</button>
+                    <button onClick={() => moveSeed(i, 1)} disabled={i === editableSeeds.length - 1} className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-surface-muted hover:text-dark-200 disabled:opacity-30">&darr;</button>
+                  </div>
                 </div>
+                {/* Tiebreaker call-out — explains the reason this seed
+                    edged the next one. Only present when wins + PD
+                    were equal so the row below it required a
+                    tiebreaker. */}
+                {team.tiebreakerReason && (
+                  <p className="mt-1 ml-7 text-[11px] text-accent-300">
+                    Tiebreaker over #{i + 2}: {team.tiebreakerReason}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -569,6 +580,12 @@ function PoolSection({
 
   // Compute standings
   const standings = computeStandings(matches, partnerMap);
+  // Tiebreaker reasons only show once the whole pool is finished —
+  // mid-play "Higher point differential" while half the matches are
+  // still pending would be misleading (the spread can still flip).
+  const poolComplete =
+    matches.length > 0 &&
+    matches.every((m) => m.status === "completed" || m.status === "bye");
 
   return (
     <div className="space-y-4">
@@ -610,11 +627,21 @@ function PoolSection({
             <tbody className="divide-y divide-surface-border bg-surface-raised">
               {standings.map((s, i) => (
                 <tr key={s.id}>
-                  <td className="px-2 sm:px-4 py-2 text-sm text-surface-muted">{i + 1}</td>
-                  <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">{s.name}</td>
-                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-teal-vivid">{s.wins}</td>
-                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-adaptive-red">{s.losses}</td>
-                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold">
+                  <td className="px-2 sm:px-4 py-2 text-sm text-surface-muted align-top">{i + 1}</td>
+                  <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">
+                    <div>{s.name}</div>
+                    {/* Tiebreaker note — only after pool play is done
+                        and only on rows where wins+PD couldn't separate
+                        this row from the one below. */}
+                    {poolComplete && s.tiebreakerReason && (
+                      <div className="text-[11px] text-accent-300 mt-0.5">
+                        Tiebreaker over #{i + 2}: {s.tiebreakerReason}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-teal-vivid align-top">{s.wins}</td>
+                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold text-adaptive-red align-top">{s.losses}</td>
+                  <td className="px-2 sm:px-4 py-2 text-center text-sm font-semibold align-top">
                     <span className={s.pointDiff > 0 ? "text-teal-vivid" : s.pointDiff < 0 ? "text-adaptive-red" : "text-surface-muted"}>
                       {s.pointDiff > 0 ? "+" : ""}{s.pointDiff}
                     </span>
@@ -825,52 +852,30 @@ function getDivisionResults(playoffMatches: TournamentMatch[], partnerMap?: Part
 }
 
 /**
- * Compute standings from a set of matches.
+ * Compute standings + tiebreaker reasons from a set of matches.
+ *
+ * Delegates the actual sort and tiebreaker stack to
+ * lib/tournament-bracket.computePoolStandings so the live UI matches
+ * what the server writes when seeding the playoff bracket. This
+ * thin wrapper just resolves the team name (player1 / partner) for
+ * each row.
  */
 function computeStandings(matches: TournamentMatch[], partnerMap?: PartnerMap) {
-  const standings = new Map<string, { name: string; wins: number; losses: number; pointDiff: number }>();
-
+  const nameById = new Map<string, string>();
   for (const m of matches) {
-    if (m.player1_id && !standings.has(m.player1_id)) {
+    if (m.player1_id && !nameById.has(m.player1_id)) {
       const baseName = (m as any).player1?.display_name ?? m.player1_id.slice(0, 8);
-      standings.set(m.player1_id, {
-        name: teamLabel(m.player1_id, baseName, partnerMap),
-        wins: 0,
-        losses: 0,
-        pointDiff: 0,
-      });
+      nameById.set(m.player1_id, teamLabel(m.player1_id, baseName, partnerMap));
     }
-    if (m.player2_id && !standings.has(m.player2_id)) {
+    if (m.player2_id && !nameById.has(m.player2_id)) {
       const baseName = (m as any).player2?.display_name ?? m.player2_id.slice(0, 8);
-      standings.set(m.player2_id, {
-        name: teamLabel(m.player2_id, baseName, partnerMap),
-        wins: 0,
-        losses: 0,
-        pointDiff: 0,
-      });
-    }
-    if (m.status === "completed" && m.winner_id) {
-      const s1sum = m.score1.reduce((a, b) => a + b, 0);
-      const s2sum = m.score2.reduce((a, b) => a + b, 0);
-
-      if (m.player1_id) {
-        const s = standings.get(m.player1_id)!;
-        if (m.winner_id === m.player1_id) s.wins++;
-        else s.losses++;
-        s.pointDiff += s1sum - s2sum;
-      }
-      if (m.player2_id) {
-        const s = standings.get(m.player2_id)!;
-        if (m.winner_id === m.player2_id) s.wins++;
-        else s.losses++;
-        s.pointDiff += s2sum - s1sum;
-      }
+      nameById.set(m.player2_id, teamLabel(m.player2_id, baseName, partnerMap));
     }
   }
-
-  return Array.from(standings.entries())
-    .map(([id, s]) => ({ id, ...s }))
-    .sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
+  return computePoolStandings(matches as any).map((row) => ({
+    ...row,
+    name: nameById.get(row.id) ?? row.id.slice(0, 8),
+  }));
 }
 
 // ============================================================

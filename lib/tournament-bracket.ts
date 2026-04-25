@@ -754,12 +754,30 @@ function generateSixTeamPlayoff(players: string[]): BracketMatch[] {
  *   5. Stable hash of player_id ("coin flip") — deterministic per
  *      player so reloads don't reshuffle positions.
  *
+ * Each row carries a `tiebreakerReason` describing WHY it ranked
+ * above the row immediately below it when overall record alone
+ * couldn't separate them. Null when the row in question wasn't tied
+ * with anyone (or was tied but no metric distinguished — extremely
+ * rare). UIs render this as a small note under the team name once
+ * pool play is complete.
+ *
  * BYE matches and unfinished matches are skipped (status !== "completed"
  * or no winner_id).
  */
+export interface PoolStandingRow {
+  id: string;
+  wins: number;
+  losses: number;
+  pointDiff: number;
+  /** Short, user-facing note describing why this row beat the row
+   *  ranked directly below it in a tie. Null when no tiebreaker
+   *  applied. */
+  tiebreakerReason: string | null;
+}
+
 export function computePoolStandings(
   matches: { player1_id: string | null; player2_id: string | null; winner_id: string | null; score1: number[]; score2: number[]; status: string }[]
-): { id: string; wins: number; losses: number; pointDiff: number }[] {
+): PoolStandingRow[] {
   const stats = new Map<string, { wins: number; losses: number; pointDiff: number }>();
   // h2hWins[a][b] = 1 if a beat b, summed across any repeat matchups.
   const h2hWins = new Map<string, Map<string, number>>();
@@ -772,12 +790,16 @@ export function computePoolStandings(
     if (!h2hPointDiff.has(id)) h2hPointDiff.set(id, new Map());
   }
 
+  // First pass: register every player who appears in any match (even
+  // BYE-only entries) so a team that's still 0-0 shows up in the
+  // standings table.
+  for (const m of matches) {
+    if (m.player1_id) ensurePlayer(m.player1_id);
+    if (m.player2_id) ensurePlayer(m.player2_id);
+  }
+
   for (const m of matches) {
     if (m.status !== "completed" || !m.winner_id) continue;
-
-    for (const pid of [m.player1_id, m.player2_id]) {
-      if (pid) ensurePlayer(pid);
-    }
 
     const s1sum = m.score1.reduce((a, b) => a + b, 0);
     const s2sum = m.score2.reduce((a, b) => a + b, 0);
@@ -818,7 +840,8 @@ export function computePoolStandings(
   entries.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
 
   // Resolve ties inside each cluster (same wins AND same pointDiff).
-  const output: { id: string; wins: number; losses: number; pointDiff: number }[] = [];
+  type Decorated = { id: string; wins: number; losses: number; pointDiff: number; _h2hW: number; _h2hP: number; _hash: number };
+  const sorted: Decorated[] = [];
   let i = 0;
   while (i < entries.length) {
     let j = i + 1;
@@ -830,17 +853,11 @@ export function computePoolStandings(
       j++;
     }
 
-    if (j - i === 1) {
-      output.push(entries[i]);
-      i = j;
-      continue;
-    }
-
     const cluster = entries.slice(i, j);
     const clusterIds = new Set(cluster.map((e) => e.id));
 
     // H2H wins / H2H pd — count only matches between cluster members.
-    const decorated = cluster.map((e) => {
+    const decorated: Decorated[] = cluster.map((e) => {
       const w = h2hWins.get(e.id) ?? new Map();
       const p = h2hPointDiff.get(e.id) ?? new Map();
       let h2hW = 0;
@@ -860,14 +877,39 @@ export function computePoolStandings(
         a._hash - b._hash
     );
 
-    for (const d of decorated) {
-      const { _h2hW, _h2hP, _hash, ...rest } = d;
-      void _h2hW;
-      void _h2hP;
-      void _hash;
-      output.push(rest);
-    }
+    sorted.push(...decorated);
     i = j;
+  }
+
+  // Annotate each row with the reason it ranked above the row
+  // immediately below it. Walk adjacent pairs; the first metric that
+  // differs is the tiebreaker that decided the order.
+  const output: PoolStandingRow[] = sorted.map((d) => ({
+    id: d.id,
+    wins: d.wins,
+    losses: d.losses,
+    pointDiff: d.pointDiff,
+    tiebreakerReason: null,
+  }));
+  for (let k = 0; k < sorted.length - 1; k++) {
+    const a = sorted[k];
+    const b = sorted[k + 1];
+    if (a.wins !== b.wins) continue; // not a tie at all
+    if (a.pointDiff !== b.pointDiff) {
+      output[k].tiebreakerReason = "Higher point differential";
+      continue;
+    }
+    if (a._h2hW !== b._h2hW) {
+      output[k].tiebreakerReason = "Won head-to-head";
+      continue;
+    }
+    if (a._h2hP !== b._h2hP) {
+      output[k].tiebreakerReason = "Higher head-to-head point differential";
+      continue;
+    }
+    // Truly identical on every metric — the stable-hash fallback
+    // settled it. Players accept this with a fair-coin framing.
+    output[k].tiebreakerReason = "Coin flip (set at bracket creation)";
   }
 
   return output;
