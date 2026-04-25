@@ -194,7 +194,7 @@ export default async function TournamentLivePage({
   if (activeDivisionList.length > 0) {
     const { data: regs } = await supabase
       .from("tournament_registrations")
-      .select("player_id, partner_id, seed, partner:profiles!partner_id(display_name)")
+      .select("player_id, partner_id, seed, division, partner:profiles!partner_id(display_name)")
       .eq("tournament_id", tournamentId)
       .in("division", activeDivisionList)
       .neq("status", "withdrawn");
@@ -202,8 +202,10 @@ export default async function TournamentLivePage({
       if (r.player_id && r.partner_id) {
         partnerMap.set(r.player_id, r.partner?.display_name ?? "Partner");
       }
-      if (r.player_id && typeof r.seed === "number") {
-        seedByPlayerId.set(r.player_id, r.seed);
+      // Compound key keeps multi-division registrants (Men's + Mixed)
+      // distinct so each bracket shows the seed for that division.
+      if (r.player_id && r.division && typeof r.seed === "number") {
+        seedByPlayerId.set(`${r.division}|${r.player_id}`, r.seed);
       }
     }
   }
