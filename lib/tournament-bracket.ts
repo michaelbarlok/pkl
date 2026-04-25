@@ -919,6 +919,56 @@ export function computePoolStandings(
   return output;
 }
 
+/**
+ * Human label for a tournament match's bracket/round position.
+ *
+ * Pool play: "Pool A · Round 3" / "Pool 2 · Round 1"
+ * Playoff (depth measured from the final round):
+ *   - max round, match_number 1 → "Final"
+ *   - max round, match_number 2 → "3rd Place"
+ *   - max round − 1            → "Semifinal"
+ *   - max round − 2            → "Quarterfinal"
+ *   - deeper                   → "Round of N" where N doubles each step
+ *
+ * `maxPlayoffRound` must be the largest round number among playoff
+ * matches in this match's division — a single match alone can't tell
+ * us how many rounds of playoffs exist (4 teams = 2 rounds, 6 teams =
+ * 3 rounds). Caller computes once per division.
+ *
+ * @param finalsBestOf3 — when true and the row IS the final, append
+ *  "(Best of 3)" so players know it's a series.
+ */
+export function matchPositionLabel(
+  match: { round: number; match_number: number; bracket: string },
+  maxPlayoffRound: number | null,
+  finalsBestOf3: boolean = false
+): string {
+  if (match.bracket !== "playoff") {
+    const pool = poolNameFromBracket(match.bracket);
+    return `${pool} · Round ${match.round}`;
+  }
+
+  if (maxPlayoffRound == null) {
+    return `Playoff · Round ${match.round}`;
+  }
+
+  if (match.round === maxPlayoffRound) {
+    if (match.match_number === 2) return "3rd Place";
+    return finalsBestOf3 ? "Final (Best of 3)" : "Final";
+  }
+  const depth = maxPlayoffRound - match.round;
+  if (depth === 1) return "Semifinal";
+  if (depth === 2) return "Quarterfinal";
+  // Round of 16, Round of 32, …
+  return `Round of ${Math.pow(2, depth + 1)}`;
+}
+
+function poolNameFromBracket(bracket: string): string {
+  if (bracket === "winners") return "Pool A";
+  if (bracket === "losers") return "Pool B";
+  if (bracket.startsWith("pool_")) return `Pool ${bracket.slice(5)}`;
+  return bracket;
+}
 /** Deterministic hash used as the final "coin flip" tiebreaker. */
 function stableIdHash(id: string): number {
   let h = 0;

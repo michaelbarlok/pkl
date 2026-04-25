@@ -22,6 +22,10 @@ export interface CourtTrackerMatch {
   court_number: number | null;
   queue_entered_at: string | null;
   status: string;
+  /** Pre-computed bracket-aware label, e.g. "Pool A · Round 3",
+   *  "Semifinal", "Final", "3rd Place". Parent calculates because
+   *  it has access to the per-division max playoff round. */
+  position_label: string;
 }
 
 interface Props {
@@ -218,8 +222,7 @@ export function CourtTracker({
                   </p>
                 </div>
                 <p className="text-xs text-surface-muted">
-                  {match.division ? getDivisionLabel(match.division) : ""} ·{" "}
-                  {bracketLabel(match.bracket)} · Round {match.round}
+                  {match.division ? getDivisionLabel(match.division) : ""} · {match.position_label}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
@@ -284,8 +287,7 @@ export function CourtTracker({
                     </p>
                   </div>
                   <p className="text-surface-muted mt-1">
-                    {m.division ? getDivisionLabel(m.division) : ""} ·{" "}
-                    {bracketLabel(m.bracket)} · Round {m.round}
+                    {m.division ? getDivisionLabel(m.division) : ""} · {m.position_label}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 shrink-0">
@@ -548,10 +550,3 @@ function formatTeam(p1: string | null, p2: string | null): string {
   return p1 ?? p2 ?? "TBD";
 }
 
-function bracketLabel(bracket: string): string {
-  if (bracket === "playoff") return "Playoff";
-  if (bracket === "winners") return "Pool A";
-  if (bracket === "losers") return "Pool B";
-  if (bracket.startsWith("pool_")) return `Pool ${bracket.slice(5)}`;
-  return bracket;
-}

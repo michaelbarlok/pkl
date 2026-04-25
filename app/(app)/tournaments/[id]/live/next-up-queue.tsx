@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getDivisionLabel } from "@/lib/divisions";
+import { matchPositionLabel } from "@/lib/tournament-bracket";
 
 interface Props {
   tournamentId: string;
@@ -96,6 +97,28 @@ export async function NextUpQueue({
   const queue = (matchesRaw ?? []).filter(
     (m: any) => m.division && activeSet.has(m.division)
   );
+
+  // Per-division max playoff round so playoff cards can label
+  // themselves "Semifinal" / "Final" / "3rd Place". Cheap separate
+  // pull because the on-court / queue lists above are filtered to
+  // pending only and we need every playoff round to know depth.
+  const { data: playoffRoundsRaw } = await supabase
+    .from("tournament_matches")
+    .select("division, round")
+    .eq("tournament_id", tournamentId)
+    .eq("bracket", "playoff");
+  const maxPlayoffRoundByDivision = new Map<string, number>();
+  for (const r of (playoffRoundsRaw ?? []) as { division: string | null; round: number }[]) {
+    if (!r.division) continue;
+    const cur = maxPlayoffRoundByDivision.get(r.division) ?? 0;
+    if (r.round > cur) maxPlayoffRoundByDivision.set(r.division, r.round);
+  }
+  function labelFor(m: { division: string | null; round: number; match_number: number; bracket: string }) {
+    return matchPositionLabel(
+      m,
+      m.division ? maxPlayoffRoundByDivision.get(m.division) ?? null : null
+    );
+  }
 
   // Partner names for doubles labels, scoped to all active divisions.
   const { data: partnerRows } = activeDivArr.length
@@ -224,7 +247,7 @@ export async function NextUpQueue({
                         {teamLabel(match.player2_id, match.player2?.display_name)}
                       </p>
                       <p className="text-xs text-surface-muted">
-                        {getDivisionLabel(match.division)} · Round {match.round}
+                        {getDivisionLabel(match.division)} · {labelFor(match)}
                       </p>
                     </div>
                   ) : (
@@ -287,7 +310,7 @@ export async function NextUpQueue({
                         </p>
                       </div>
                       <p className="text-surface-muted mt-1">
-                        {getDivisionLabel(m.division)} · Round {m.round}
+                        {getDivisionLabel(m.division)} · {labelFor(m)}
                       </p>
                     </div>
                   </div>
