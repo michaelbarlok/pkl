@@ -75,19 +75,27 @@ export default async function ActiveSessionPage() {
     .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
     .neq("status", "withdrawn");
 
-  const candidate = (tRegs ?? []).find(
+  // Multi-division registration means a player can have several rows
+  // per tournament (e.g. Men's + Mixed). Look at every candidate, not
+  // just the first — the one that's active might be the second row.
+  const candidates = (tRegs ?? []).filter(
     (r: any) => r.tournament?.status === "in_progress"
-  ) as any;
+  ) as { tournament_id: string; division: string }[];
 
-  if (candidate) {
-    const { data: active } = await supabase
+  if (candidates.length > 0) {
+    const tournamentIds = Array.from(new Set(candidates.map((c) => c.tournament_id)));
+    const { data: activeRows } = await supabase
       .from("tournament_active_divisions")
-      .select("division")
-      .eq("tournament_id", candidate.tournament_id)
-      .eq("division", candidate.division)
-      .maybeSingle();
-    if (active) {
-      redirect(`/tournaments/${candidate.tournament_id}/live`);
+      .select("tournament_id, division")
+      .in("tournament_id", tournamentIds);
+    const activeSet = new Set(
+      (activeRows ?? []).map((r: any) => `${r.tournament_id}:${r.division}`)
+    );
+    const liveCandidate = candidates.find((c) =>
+      activeSet.has(`${c.tournament_id}:${c.division}`)
+    );
+    if (liveCandidate) {
+      redirect(`/tournaments/${liveCandidate.tournament_id}/live`);
     }
   }
 
