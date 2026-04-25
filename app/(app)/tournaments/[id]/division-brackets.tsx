@@ -37,6 +37,9 @@ interface Props {
       score_to_win_playoff?: number;
     } | null
   > | null;
+  /** team-primary player_id → playoff seed. Threaded down so each
+   *  division tab's playoff bracket can render "(N)" next to names. */
+  seedByPlayerId?: Map<string, number>;
 }
 
 function divisionStatus(
@@ -71,6 +74,7 @@ export function DivisionBrackets({
   isRoundRobin,
   activeDivisions,
   divisionSettings,
+  seedByPlayerId,
 }: Props) {
   function resolvedScores(division: string) {
     const override = divisionSettings?.[division];
@@ -139,6 +143,7 @@ export function DivisionBrackets({
           scoreToWinPlayoff={scores.playoff}
           finalsBestOf3={tournament.finals_best_of_3}
           partnerMap={partnerMap}
+          seedByPlayerId={seedByPlayerId}
         />
       </div>
     );
@@ -291,6 +296,7 @@ export function DivisionBrackets({
               scoreToWinPlayoff={scores.playoff}
               finalsBestOf3={tournament.finals_best_of_3}
               partnerMap={partnerMap}
+              seedByPlayerId={seedByPlayerId}
             />
           </div>
         );

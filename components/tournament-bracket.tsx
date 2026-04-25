@@ -1,7 +1,7 @@
 "use client";
 
 import { FormError } from "@/components/form-error";
-import { computePoolStandings, getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
+import { computeCrossPoolSeeding, computePoolStandings, getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
@@ -19,9 +19,12 @@ interface Props {
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
   partnerMap?: PartnerMap;
+  /** Map of team-primary player id → playoff seed number (1-N).
+   *  Drives the "(N)" suffix on team names in the playoff bracket. */
+  seedByPlayerId?: Map<string, number>;
 }
 
-export function TournamentBracketView({ matches, format, canManage, tournamentId, division, scoreToWinPool, scoreToWinPlayoff, finalsBestOf3, partnerMap }: Props) {
+export function TournamentBracketView({ matches, format, canManage, tournamentId, division, scoreToWinPool, scoreToWinPlayoff, finalsBestOf3, partnerMap, seedByPlayerId }: Props) {
   if (format === "round_robin") {
     return (
       <RoundRobinView
@@ -33,6 +36,7 @@ export function TournamentBracketView({ matches, format, canManage, tournamentId
         scoreToWinPlayoff={scoreToWinPlayoff}
         finalsBestOf3={finalsBestOf3}
         partnerMap={partnerMap}
+        seedByPlayerId={seedByPlayerId}
       />
     );
   }
@@ -207,6 +211,7 @@ function RoundRobinView({
   scoreToWinPlayoff,
   finalsBestOf3,
   partnerMap,
+  seedByPlayerId,
 }: {
   matches: TournamentMatch[];
   canManage: boolean;
@@ -216,6 +221,7 @@ function RoundRobinView({
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
   partnerMap?: PartnerMap;
+  seedByPlayerId?: Map<string, number>;
 }) {
   const router = useRouter();
   const [advancing, setAdvancing] = useState(false);
@@ -245,30 +251,58 @@ function RoundRobinView({
     // Compute the proposed seeding from pool standings
     let proposed: typeof editableSeeds;
 
-    if (isMultiPool) {
-      // 15+ teams: top 2 from each pool, ranked across all pools
-      const allQualifiers: typeof editableSeeds = [];
-      for (const bracket of poolBrackets) {
+    if (isMultiPool || poolBrackets.length === 2) {
+      // Multi-pool (≥3 pools, top 2 each) and the 8-14 team layout
+      // (2 pools, top 3 each) both go through the cross-pool merger
+      // so they share H2H-when-same-pool / random-when-cross-pool
+      // tiebreaker semantics. Take counts come from the same
+      // base+remainder distribution the divisions API uses.
+      const totalAdvancing = isMultiPool ? poolBrackets.length * 2 : 6;
+      const numPools = poolBrackets.length;
+      const perPoolBase = Math.floor(totalAdvancing / numPools);
+      const remainder = totalAdvancing % numPools;
+
+      // Per-pool standings (with H2H already settled inside each pool
+      // by computePoolStandings via computeStandings).
+      const poolStandings = poolBrackets.map((bracket) => {
         const bracketMatches = poolMatches.filter((m) => m.bracket === bracket);
-        const standings = computeStandings(bracketMatches, partnerMap);
-        allQualifiers.push(...standings.slice(0, 2));
-      }
-      proposed = allQualifiers.sort(
-        (a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff
+        return computeStandings(bracketMatches, partnerMap);
+      });
+      // Build the input shape computeCrossPoolSeeding expects (no
+      // names — those are layered on below from the per-pool list).
+      const seeded = computeCrossPoolSeeding(
+        poolBrackets.map((bracket, idx) => ({
+          bracket,
+          standings: poolStandings[idx].map((s) => ({
+            id: s.id,
+            wins: s.wins,
+            losses: s.losses,
+            pointDiff: s.pointDiff,
+            tiebreakerReason: s.tiebreakerReason,
+          })),
+          takeCount: perPoolBase + (idx < remainder ? 1 : 0),
+        }))
       );
-    } else if (poolBrackets.length === 2) {
-      // 8-14 teams: top 3 from each pool
-      const poolAMatches = poolMatches.filter((m) => m.bracket === poolBrackets[0]);
-      const poolBMatches = poolMatches.filter((m) => m.bracket === poolBrackets[1]);
-      const poolAStandings = computeStandings(poolAMatches, partnerMap);
-      const poolBStandings = computeStandings(poolBMatches, partnerMap);
-      const poolATop3 = poolAStandings.slice(0, 3);
-      const poolBTop3 = poolBStandings.slice(0, 3);
-      proposed = [...poolATop3, ...poolBTop3].sort(
-        (a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff
-      );
+      // Map the seeded ids back to the rendered rows (with names).
+      const byId = new Map<string, typeof poolStandings[number][number]>();
+      for (const ps of poolStandings) for (const r of ps) byId.set(r.id, r);
+      proposed = seeded.map((s) => {
+        const row = byId.get(s.id);
+        return {
+          id: s.id,
+          name: row?.name ?? s.id.slice(0, 8),
+          wins: s.wins,
+          losses: s.losses,
+          pointDiff: s.pointDiff,
+          // Cross-pool seeding's reason is the truth here — it knows
+          // when "Random (cross-pool tie)" applies, which the per-pool
+          // standings can't see.
+          tiebreakerReason: s.tiebreakerReason,
+        };
+      });
     } else {
-      // Single pool: top 4
+      // Single pool: top 4 — pool standings already contain the
+      // tiebreakerReason annotations from computePoolStandings.
       const standings = computeStandings(poolMatches, partnerMap);
       proposed = standings.slice(0, Math.min(4, standings.length));
     }
@@ -412,6 +446,7 @@ function RoundRobinView({
       scoreToWin={scoreToWinPlayoff}
       finalsBestOf3={finalsBestOf3}
       partnerMap={partnerMap}
+      seedByPlayerId={seedByPlayerId}
     />
   ) : null;
 
@@ -739,6 +774,7 @@ function PlayoffBracketView({
   scoreToWin,
   finalsBestOf3,
   partnerMap,
+  seedByPlayerId,
 }: {
   matches: TournamentMatch[];
   canManage: boolean;
@@ -746,6 +782,7 @@ function PlayoffBracketView({
   scoreToWin?: number;
   finalsBestOf3?: boolean;
   partnerMap?: PartnerMap;
+  seedByPlayerId?: Map<string, number>;
 }) {
   const maxRound = Math.max(...matches.map((m) => m.round), 0);
   const rounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b);
@@ -812,6 +849,7 @@ function PlayoffBracketView({
                       gameInfo={gameInfoText ?? (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
                       partnerMap={partnerMap}
                       bestOf3={isLegacyBestOf3Row}
+                      seedByPlayerId={seedByPlayerId}
                     />
                   </div>
                 );
@@ -940,6 +978,7 @@ function MatchCard({
   gameInfo,
   partnerMap,
   bestOf3,
+  seedByPlayerId,
 }: {
   match: TournamentMatch;
   canManage: boolean;
@@ -947,6 +986,7 @@ function MatchCard({
   gameInfo?: string;
   partnerMap?: PartnerMap;
   bestOf3?: boolean;
+  seedByPlayerId?: Map<string, number>;
 }) {
   const router = useRouter();
   const [scoring, setScoring] = useState(false);
@@ -957,8 +997,15 @@ function MatchCard({
 
   const p1BaseName = (match as any).player1?.display_name ?? (match.player1_id ? "TBD" : "\u2014");
   const p2BaseName = (match as any).player2?.display_name ?? (match.player2_id ? "TBD" : "\u2014");
-  const p1Name = match.player1_id && p1BaseName !== "TBD" ? teamLabel(match.player1_id, p1BaseName, partnerMap) : p1BaseName;
-  const p2Name = match.player2_id && p2BaseName !== "TBD" ? teamLabel(match.player2_id, p2BaseName, partnerMap) : p2BaseName;
+  const p1NameRaw = match.player1_id && p1BaseName !== "TBD" ? teamLabel(match.player1_id, p1BaseName, partnerMap) : p1BaseName;
+  const p2NameRaw = match.player2_id && p2BaseName !== "TBD" ? teamLabel(match.player2_id, p2BaseName, partnerMap) : p2BaseName;
+  // Append the playoff seed in parentheses when known. Caller only
+  // passes seedByPlayerId for playoff matches, so pool-play cards
+  // stay visually clean.
+  const p1Seed = match.player1_id ? seedByPlayerId?.get(match.player1_id) : undefined;
+  const p2Seed = match.player2_id ? seedByPlayerId?.get(match.player2_id) : undefined;
+  const p1Name = p1Seed != null ? `${p1NameRaw} (${p1Seed})` : p1NameRaw;
+  const p2Name = p2Seed != null ? `${p2NameRaw} (${p2Seed})` : p2NameRaw;
 
   const isCompleted = match.status === "completed";
   const isBye = match.status === "bye";

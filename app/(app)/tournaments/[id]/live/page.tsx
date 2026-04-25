@@ -186,18 +186,24 @@ export default async function TournamentLivePage({
 
   // Partner map for doubles labels — scoped to every active
   // division so the "Other pools" viewer below can label those
-  // rows correctly too, not just the viewer's own pool.
+  // rows correctly too, not just the viewer's own pool. We pull
+  // seed numbers from the same query so the playoff bracket
+  // renderer can show "(N)" beside team names.
   const partnerMap: PartnerMap = new Map();
-  if (tournament.type === "doubles" && activeDivisionList.length > 0) {
+  const seedByPlayerId = new Map<string, number>();
+  if (activeDivisionList.length > 0) {
     const { data: regs } = await supabase
       .from("tournament_registrations")
-      .select("player_id, partner_id, partner:profiles!partner_id(display_name)")
+      .select("player_id, partner_id, seed, partner:profiles!partner_id(display_name)")
       .eq("tournament_id", tournamentId)
       .in("division", activeDivisionList)
       .neq("status", "withdrawn");
     for (const r of (regs ?? []) as any[]) {
       if (r.player_id && r.partner_id) {
         partnerMap.set(r.player_id, r.partner?.display_name ?? "Partner");
+      }
+      if (r.player_id && typeof r.seed === "number") {
+        seedByPlayerId.set(r.player_id, r.seed);
       }
     }
   }
@@ -361,6 +367,7 @@ export default async function TournamentLivePage({
         }
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
         partnerMap={partnerMap}
+        seedByPlayerId={seedByPlayerId}
       />
 
       {/* Read-only view into other pools — same division's other
@@ -378,6 +385,7 @@ export default async function TournamentLivePage({
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
         divisionSettings={(tournament as any).division_settings ?? null}
         partnerMap={partnerMap}
+        seedByPlayerId={seedByPlayerId}
       />
 
       <LiveTournamentRealtime tournamentId={tournamentId} />

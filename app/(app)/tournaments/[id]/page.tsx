@@ -165,6 +165,17 @@ export default async function TournamentDetailPage({
     }
   }
 
+  // Playoff seed lookup. Persisted on tournament_registrations.seed
+  // when the playoff bracket is generated; the playoff bracket UI
+  // renders "(N)" beside each team name from this map.
+  const seedByPlayerId = new Map<string, number>();
+  for (const reg of registrations) {
+    const r = reg as any;
+    if (r.player_id && typeof r.seed === "number") {
+      seedByPlayerId.set(r.player_id, r.seed);
+    }
+  }
+
   // Only organizers see the bracket grid on the tournament page —
   // regular registered players are pointed to the Play tab for their
   // own pool. The group-by-division build below only feeds
@@ -301,6 +312,7 @@ export default async function TournamentDetailPage({
       tournamentId={id}
       myDivision={myDivision}
       partnerMap={partnerMap}
+      seedByPlayerId={seedByPlayerId}
       isRoundRobin={tournament.format === "round_robin"}
       activeDivisions={activeDivisions}
       divisionSettings={(tournament as any).division_settings ?? null}
