@@ -4,7 +4,8 @@ import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
 import { DivisionStartTimes } from "@/components/division-start-times";
-import { fifteenMinuteSlots, localDateTimeToIso, snapDateTimeLocalTo15 } from "@/lib/datetime-local";
+import { fifteenMinuteSlots, localDateTimeToIso } from "@/lib/datetime-local";
+import { DateTimeFifteenMin } from "@/components/date-time-15";
 import { getDivisionGender } from "@/lib/divisions";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -580,26 +581,18 @@ export default function CreateTournamentPage() {
             <label className="block text-sm font-medium text-dark-200 mb-1">
               Registration Opens
             </label>
-            <input
-              type="datetime-local"
-              step="900"
+            <DateTimeFifteenMin
               value={registrationOpensAt}
-              onChange={(e) => setRegistrationOpensAt(e.target.value)}
-              onBlur={(e) => setRegistrationOpensAt(snapDateTimeLocalTo15(e.target.value))}
-              className="input"
+              onChange={setRegistrationOpensAt}
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">
               Registration Closes
             </label>
-            <input
-              type="datetime-local"
-              step="900"
+            <DateTimeFifteenMin
               value={registrationClosesAt}
-              onChange={(e) => setRegistrationClosesAt(e.target.value)}
-              onBlur={(e) => setRegistrationClosesAt(snapDateTimeLocalTo15(e.target.value))}
-              className="input"
+              onChange={setRegistrationClosesAt}
             />
           </div>
         </div>
