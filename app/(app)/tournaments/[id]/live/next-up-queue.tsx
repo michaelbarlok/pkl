@@ -70,7 +70,7 @@ export async function NextUpQueue({
   const { data: onCourtRaw } = await supabase
     .from("tournament_matches")
     .select(
-      "id, division, round, match_number, bracket, court_number, player1_id, player2_id, player1:profiles!player1_id(display_name), player2:profiles!player2_id(display_name)"
+      "id, division, round, match_number, bracket, series_game, court_number, player1_id, player2_id, player1:profiles!player1_id(display_name), player2:profiles!player2_id(display_name)"
     )
     .eq("tournament_id", tournamentId)
     .not("court_number", "is", null)
@@ -85,7 +85,7 @@ export async function NextUpQueue({
   const { data: matchesRaw } = await supabase
     .from("tournament_matches")
     .select(
-      "id, division, round, match_number, bracket, court_number, queue_entered_at, player1_id, player2_id, player1:profiles!player1_id(display_name), player2:profiles!player2_id(display_name)"
+      "id, division, round, match_number, bracket, series_game, court_number, queue_entered_at, player1_id, player2_id, player1:profiles!player1_id(display_name), player2:profiles!player2_id(display_name)"
     )
     .eq("tournament_id", tournamentId)
     .is("court_number", null)

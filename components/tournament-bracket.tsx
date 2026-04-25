@@ -761,9 +761,16 @@ function PlayoffBracketView({
       <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider">Playoffs</h3>
       <div className="flex flex-col gap-4">
         {rounds.map((round) => {
+          // Best-of-3 finals share match_number=1 across game rows;
+          // secondary sort on series_game keeps Game 1 above Game 2
+          // above Game 3 in the bracket render.
           const roundMatches = matches
             .filter((m) => m.round === round)
-            .sort((a, b) => a.match_number - b.match_number);
+            .sort(
+              (a, b) =>
+                a.match_number - b.match_number ||
+                ((a as any).series_game ?? 0) - ((b as any).series_game ?? 0)
+            );
 
           return (
             <div key={round} className="flex flex-col gap-3">
@@ -773,10 +780,19 @@ function PlayoffBracketView({
               {roundMatches.map((match) => {
                 const isThirdPlace = round === maxRound && match.match_number === 2;
                 const isChampionship = round === maxRound && match.match_number === 1;
-                const isBestOf3 = isChampionship && !!finalsBestOf3;
+                const seriesGame = (match as any).series_game as number | undefined;
+                // Best-of-3 finals are now split into individual
+                // game rows (series_game = 1, 2, 3). Each game row
+                // is a single-game match — the multi-game MatchCard
+                // UI is reserved for legacy single-row best-of-3
+                // finals (no series_game).
+                const isLegacyBestOf3Row =
+                  isChampionship && !!finalsBestOf3 && !seriesGame;
                 const gameInfoText = scoreToWin
-                  ? `Game to ${scoreToWin}${isBestOf3 ? " (Best 2 of 3)" : ""}`
-                  : (isBestOf3 ? "Best 2 of 3" : undefined);
+                  ? `Game to ${scoreToWin}${isLegacyBestOf3Row ? " (Best 2 of 3)" : ""}`
+                  : isLegacyBestOf3Row
+                    ? "Best 2 of 3"
+                    : undefined;
                 return (
                   <div key={match.id}>
                     {isThirdPlace && (
@@ -784,7 +800,9 @@ function PlayoffBracketView({
                     )}
                     {isChampionship && (
                       <p className="text-xs text-surface-muted mb-1 text-center">
-                        Championship{isBestOf3 ? " (Best 2 of 3)" : ""}
+                        {seriesGame
+                          ? `Championship · Game ${seriesGame}`
+                          : `Championship${isLegacyBestOf3Row ? " (Best 2 of 3)" : ""}`}
                       </p>
                     )}
                     <MatchCard
@@ -793,7 +811,7 @@ function PlayoffBracketView({
                       tournamentId={tournamentId}
                       gameInfo={gameInfoText ?? (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
                       partnerMap={partnerMap}
-                      bestOf3={isBestOf3}
+                      bestOf3={isLegacyBestOf3Row}
                     />
                   </div>
                 );
@@ -816,14 +834,47 @@ function getDivisionResults(playoffMatches: TournamentMatch[], partnerMap?: Part
   const maxRound = Math.max(...playoffMatches.map((m) => m.round));
   const finalRoundMatches = playoffMatches.filter((m) => m.round === maxRound);
 
-  // Championship is match 1 in final round, 3rd place is match 2
-  const championship = finalRoundMatches.find((m) => m.match_number === 1);
+  // Championship is match_number 1 in the final round (one row for
+  // single-game finals; up to three rows for best-of-3, one per
+  // game). 3rd place is match 2.
+  const championshipRows = finalRoundMatches.filter((m) => m.match_number === 1);
   const thirdPlace = finalRoundMatches.find((m) => m.match_number === 2);
 
-  if (!championship || championship.status !== "completed" || !championship.winner_id) return null;
-
-  const firstId = championship.winner_id;
-  const secondId = championship.player1_id === firstId ? championship.player2_id : championship.player1_id;
+  // Series resolver: single-row final = standard winner_id. Multi-
+  // row best-of-3 = first team to 2 game wins.
+  let firstId: string | null = null;
+  let secondId: string | null = null;
+  let sampleMatch: TournamentMatch | null = null;
+  if (championshipRows.length === 1) {
+    const c = championshipRows[0];
+    if (c.status !== "completed" || !c.winner_id) return null;
+    firstId = c.winner_id;
+    secondId = c.player1_id === firstId ? c.player2_id ?? null : c.player1_id ?? null;
+    sampleMatch = c;
+  } else if (championshipRows.length > 1) {
+    const wins = new Map<string, number>();
+    for (const r of championshipRows) {
+      if (r.status === "completed" && r.winner_id) {
+        wins.set(r.winner_id, (wins.get(r.winner_id) ?? 0) + 1);
+      }
+    }
+    for (const [id, w] of wins) {
+      if (w >= 2) {
+        firstId = id;
+        const sample = championshipRows[0];
+        secondId =
+          sample.player1_id === id
+            ? sample.player2_id ?? null
+            : sample.player1_id ?? null;
+        sampleMatch = sample;
+        break;
+      }
+    }
+    if (!firstId || !sampleMatch) return null;
+  } else {
+    return null;
+  }
+  const championship = sampleMatch;
 
   const getName = (id: string | null | undefined, match: TournamentMatch): string => {
     if (!id) return "Unknown";

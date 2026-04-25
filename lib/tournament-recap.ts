@@ -156,30 +156,56 @@ export async function computeTournamentRecap(
     const placements: RecapPlayoffPlacement[] = [];
     if (playoffMatches.length > 0) {
       const maxRound = Math.max(...playoffMatches.map((m: any) => m.round));
-      const finalMatch = playoffMatches.find(
+      // Best-of-3 finals split the championship into multiple game
+      // rows (all match_number=1 in maxRound). Aggregate game wins
+      // to find the series winner; first-to-2 wins the series.
+      const finalRows = playoffMatches.filter(
         (m: any) => m.round === maxRound && m.match_number === 1
       );
       const thirdPlaceMatch = playoffMatches.find(
         (m: any) => m.round === maxRound && m.match_number === 2
       );
 
-      if (finalMatch?.winner_id) {
+      let seriesWinnerId: string | null = null;
+      let seriesRunnerUpId: string | null = null;
+      if (finalRows.length === 1) {
+        const f = finalRows[0] as any;
+        if (f.winner_id) {
+          seriesWinnerId = f.winner_id;
+          seriesRunnerUpId =
+            f.player1_id === f.winner_id ? f.player2_id : f.player1_id;
+        }
+      } else if (finalRows.length > 1) {
+        const wins = new Map<string, number>();
+        for (const r of finalRows as any[]) {
+          if (r.winner_id) {
+            wins.set(r.winner_id, (wins.get(r.winner_id) ?? 0) + 1);
+          }
+        }
+        for (const [id, w] of wins) {
+          if (w >= 2) {
+            seriesWinnerId = id;
+            const sample = finalRows[0] as any;
+            seriesRunnerUpId =
+              sample.player1_id === id ? sample.player2_id : sample.player1_id;
+            break;
+          }
+        }
+      }
+
+      if (seriesWinnerId) {
         placements.push({
           place: 1,
-          playerId: finalMatch.winner_id,
-          displayName: nameFor(finalMatch.winner_id),
-          partnerName: partnerFor(finalMatch.winner_id),
+          playerId: seriesWinnerId,
+          displayName: nameFor(seriesWinnerId),
+          partnerName: partnerFor(seriesWinnerId),
         });
-        const runnerUp =
-          finalMatch.winner_id === finalMatch.player1_id
-            ? finalMatch.player2_id
-            : finalMatch.player1_id;
-        if (runnerUp) {
+        if (seriesRunnerUpId) {
           placements.push({
             place: 2,
-            playerId: runnerUp,
-            displayName: nameFor(runnerUp),
-            partnerName: partnerFor(runnerUp),
+            playerId: seriesRunnerUpId,
+            displayName: nameFor(seriesRunnerUpId),
+            partnerName: partnerFor(seriesRunnerUpId),
           });
         }
       }

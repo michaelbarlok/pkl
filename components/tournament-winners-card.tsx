@@ -69,20 +69,22 @@ export function TournamentWinnersCard({
 
       if (playoff.length > 0) {
         const maxRound = Math.max(...playoff.map((m: any) => m.round));
-        const finalMatch = playoff.find(
+        // Final = every match_number 1 row in the max round.
+        // Best-of-3 finals can have up to 3 rows (one per game);
+        // single-game finals have exactly 1.
+        const finalRows = playoff.filter(
           (m: any) => m.round === maxRound && m.match_number === 1
-        ) as any;
+        );
         const thirdMatch = playoff.find(
           (m: any) => m.round === maxRound && m.match_number === 2
         ) as any;
 
-        if (finalMatch?.status === "completed" && finalMatch.winner_id) {
-          first = { name: nameFor(finalMatch.winner_id) };
-          const runnerUp =
-            finalMatch.player1_id === finalMatch.winner_id
-              ? finalMatch.player2_id
-              : finalMatch.player1_id;
-          if (runnerUp) second = { name: nameFor(runnerUp) };
+        const seriesResult = resolveSeriesWinner(finalRows);
+        if (seriesResult) {
+          first = { name: nameFor(seriesResult.winnerId) };
+          if (seriesResult.runnerUpId) {
+            second = { name: nameFor(seriesResult.runnerUpId) };
+          }
         }
         if (thirdMatch?.status === "completed" && thirdMatch.winner_id) {
           third = { name: nameFor(thirdMatch.winner_id) };
@@ -94,6 +96,45 @@ export function TournamentWinnersCard({
     .filter((r) => r.first !== null);
 
   if (results.length === 0) return null;
+
+  // -- inline because winners-card is server-only and we don't have
+  // a shared utils file for tournament playoff helpers right now.
+  function resolveSeriesWinner(
+    finalRows: any[]
+  ): { winnerId: string; runnerUpId: string | null } | null {
+    if (finalRows.length === 0) return null;
+    // Single-game final: just look at the single completed row.
+    if (finalRows.length === 1) {
+      const f = finalRows[0];
+      if (f.status !== "completed" || !f.winner_id) return null;
+      const runnerUp =
+        f.player1_id === f.winner_id ? f.player2_id : f.player1_id;
+      return { winnerId: f.winner_id, runnerUpId: runnerUp ?? null };
+    }
+    // Best-of-3: tally game wins per team. Series winner = first to 2.
+    const wins = new Map<string, number>();
+    for (const r of finalRows) {
+      if (r.status === "completed" && r.winner_id) {
+        wins.set(r.winner_id, (wins.get(r.winner_id) ?? 0) + 1);
+      }
+    }
+    let seriesWinner: string | null = null;
+    for (const [id, w] of wins) {
+      if (w >= 2) {
+        seriesWinner = id;
+        break;
+      }
+    }
+    if (!seriesWinner) return null;
+    // Runner-up is the OTHER team in the series — pulled from any
+    // game row's two players (they're stable across games).
+    const sample = finalRows[0];
+    const runnerUp =
+      sample.player1_id === seriesWinner
+        ? sample.player2_id
+        : sample.player1_id;
+    return { winnerId: seriesWinner, runnerUpId: runnerUp ?? null };
+  }
 
   const heroTint = tournamentHeroGradient(tournamentId);
 

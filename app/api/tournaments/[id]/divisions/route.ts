@@ -184,12 +184,13 @@ export async function PUT(
     // spots going to the largest "best remaining" sweep).
     const { data: tournamentForSettings } = await supabase
       .from("tournaments")
-      .select("division_settings")
+      .select("division_settings, finals_best_of_3")
       .eq("id", tournamentId)
       .single();
     const overrideAdvancing = (tournamentForSettings as any)?.division_settings?.[division]?.playoff_advancing as
       | number
       | undefined;
+    const finalsBestOf3 = (tournamentForSettings as any)?.finals_best_of_3 === true;
 
     // Defaults if the organizer didn't pick: 4 / 6 / 2-per-pool.
     const defaultAdvancing =
@@ -228,8 +229,12 @@ export async function PUT(
       );
     }
 
-    // Generate playoff bracket
-    const playoffMatches = generatePlayoffBracket(seededPlayerIds);
+    // Generate playoff bracket. Best-of-3 finals only spawn Game 1
+    // up front — Games 2 and 3 are inserted by the score-entry
+    // endpoint as the series progresses.
+    const playoffMatches = generatePlayoffBracket(seededPlayerIds, {
+      finalsBestOf3,
+    });
 
     // Insert playoff matches
     const matchInserts = playoffMatches.map((m) => ({
@@ -241,6 +246,7 @@ export async function PUT(
       player1_id: m.player1_id,
       player2_id: m.player2_id,
       status: m.status,
+      series_game: m.series_game ?? null,
       score1: [] as number[],
       score2: [] as number[],
     }));

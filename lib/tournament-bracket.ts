@@ -28,6 +28,9 @@ interface BracketMatch {
   player1_id: string | null;
   player2_id: string | null;
   status: "pending" | "bye";
+  /** Best-of-3 finals: 1 for the first game (only one generated up
+   *  front; Game 2/3 spawn dynamically as scores come in). */
+  series_game?: number | null;
 }
 
 // ============================================================
@@ -558,18 +561,38 @@ function generatePoolMatches(
  * All matches use bracket="playoff".
  * @param seededPlayerIds - Players ordered by seed (index 0 = #1 seed)
  */
-export function generatePlayoffBracket(seededPlayerIds: string[]): BracketMatch[] {
+export function generatePlayoffBracket(
+  seededPlayerIds: string[],
+  options?: { finalsBestOf3?: boolean }
+): BracketMatch[] {
   const n = seededPlayerIds.length;
+  const bestOf3 = options?.finalsBestOf3 ?? false;
 
+  let matches: BracketMatch[];
   if (n === 4) {
-    return generateFourTeamPlayoff(seededPlayerIds);
-  }
-  if (n === 6) {
-    return generateSixTeamPlayoff(seededPlayerIds);
+    matches = generateFourTeamPlayoff(seededPlayerIds);
+  } else if (n === 6) {
+    matches = generateSixTeamPlayoff(seededPlayerIds);
+  } else {
+    // For any other size (including 8+ from multi-pool): single elim + 3rd place game
+    matches = generateSingleElimWithThirdPlace(seededPlayerIds);
   }
 
-  // For any other size (including 8+ from multi-pool): single elim + 3rd place game
-  return generateSingleElimWithThirdPlace(seededPlayerIds);
+  if (bestOf3 && matches.length > 0) {
+    // Mark the championship row as Game 1 of a best-of-3 series.
+    // Subsequent games (2 and 3) get spawned by the score-entry
+    // endpoint as Game 1 / Game 2 complete — Game 3 only when the
+    // series is tied 1-1, never up front. The 3rd place game stays
+    // as a single-game match (match_number 2 in the final round).
+    const maxRound = Math.max(...matches.map((m) => m.round));
+    for (const m of matches) {
+      if (m.round === maxRound && m.match_number === 1) {
+        m.series_game = 1;
+      }
+    }
+  }
+
+  return matches;
 }
 
 /**
@@ -939,7 +962,12 @@ export function computePoolStandings(
  *  "(Best of 3)" so players know it's a series.
  */
 export function matchPositionLabel(
-  match: { round: number; match_number: number; bracket: string },
+  match: {
+    round: number;
+    match_number: number;
+    bracket: string;
+    series_game?: number | null;
+  },
   maxPlayoffRound: number | null,
   finalsBestOf3: boolean = false
 ): string {
@@ -954,6 +982,13 @@ export function matchPositionLabel(
 
   if (match.round === maxPlayoffRound) {
     if (match.match_number === 2) return "3rd Place";
+    // Best-of-3 finals split into individual game rows. The label
+    // names the specific game so the queue and court tracker show
+    // "Final · Game 1" / "Final · Game 2" / "Final · Game 3"
+    // instead of three identical "Final" cards.
+    if (match.series_game) {
+      return `Final · Game ${match.series_game}`;
+    }
     return finalsBestOf3 ? "Final (Best of 3)" : "Final";
   }
   const depth = maxPlayoffRound - match.round;
