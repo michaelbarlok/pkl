@@ -256,8 +256,18 @@ export async function PUT(
     );
   }
 
-  // Auto-advance winner to next match in bracket (scoped to same division)
-  if (match.bracket === "winners" || match.bracket === "grand_final") {
+  // Auto-advance winner to next match in bracket (scoped to same division).
+  // Only fires for single-elim winner / double-elim grand_final brackets —
+  // round_robin reuses the "winners" bracket label for its single-pool
+  // schedule, where matches don't feed into a downstream tree, so this
+  // advancement would silently overwrite later-round pool play slots and
+  // schedule the same team twice. Pool play uses a flat circle-method
+  // schedule — there's nothing to advance into.
+  const isRoundRobin = tournament.format === "round_robin";
+  if (
+    !isRoundRobin &&
+    (match.bracket === "winners" || match.bracket === "grand_final")
+  ) {
     const nextRound = match.round + 1;
     const nextMatchNumber = Math.ceil(match.match_number / 2);
     const slot = match.match_number % 2 === 1 ? "player1_id" : "player2_id";
@@ -378,8 +388,14 @@ export async function PUT(
   }
 
   // If editing a completed match and the winner changed, fix downstream slots
-  // Replace old winner/loser references in later rounds with new winner/loser
-  if (winnerChanged && (match.bracket === "winners" || match.bracket === "playoff" || match.bracket === "grand_final")) {
+  // Replace old winner/loser references in later rounds with new winner/loser.
+  // Skipped for round_robin pool play (same "winners" label reuse problem
+  // as above — round-robin matches have no downstream tree to repair).
+  if (
+    winnerChanged &&
+    !isRoundRobin &&
+    (match.bracket === "winners" || match.bracket === "playoff" || match.bracket === "grand_final")
+  ) {
     const newLoser = match.player1_id === winner_id ? match.player2_id : match.player1_id;
 
     // Find all matches in later rounds of the same bracket/division
