@@ -1,5 +1,6 @@
 "use client";
 
+import { fifteenMinuteSlots } from "@/lib/datetime-local";
 import { getDivisionLabel, getDivisionGender } from "@/lib/divisions";
 
 interface Props {
@@ -11,6 +12,9 @@ interface Props {
   /** Tournament-level start_time so we can hint "fallback" copy. */
   defaultTime?: string;
 }
+
+// Pre-built 15-min options used by every per-division select.
+const TIME_SLOTS = fifteenMinuteSlots();
 
 /**
  * Per-division start-time inputs. Renders one row per selected
@@ -50,14 +54,21 @@ export function DivisionStartTimes({
                   </p>
                 )}
               </div>
-              <input
-                type="time"
-                step="900"
+              <select
                 value={values[code] ?? ""}
                 onChange={(e) => onChange({ ...values, [code]: e.target.value })}
-                placeholder={defaultTime}
                 className="input text-sm py-1.5 px-2 w-32"
-              />
+                aria-label={`${getDivisionLabel(code)} start time`}
+              >
+                <option value="">
+                  {defaultTime ? "default" : "—"}
+                </option>
+                {TIME_SLOTS.map((slot) => (
+                  <option key={slot.value} value={slot.value}>
+                    {slot.label}
+                  </option>
+                ))}
+              </select>
             </div>
           );
         })}

@@ -4,10 +4,15 @@ import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
 import { DivisionStartTimes } from "@/components/division-start-times";
-import { localDateTimeToIso } from "@/lib/datetime-local";
+import { fifteenMinuteSlots, localDateTimeToIso, snapDateTimeLocalTo15 } from "@/lib/datetime-local";
 import { getDivisionGender } from "@/lib/divisions";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+
+// Pre-built once — all date/time entry fields are 15-min only across
+// the entire app, so a single shared list of slots keeps the rendered
+// HTML small and consistent.
+const TIME_SLOTS = fifteenMinuteSlots();
 
 export default function CreateTournamentPage() {
   const { supabase } = useSupabase();
@@ -384,13 +389,18 @@ export default function CreateTournamentPage() {
             <label className="block text-sm font-medium text-dark-200 mb-1">
               Start Time
             </label>
-            <input
-              type="time"
-              step="900"
+            <select
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
               className="input"
-            />
+            >
+              <option value="">—</option>
+              {TIME_SLOTS.map((slot) => (
+                <option key={slot.value} value={slot.value}>
+                  {slot.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">
@@ -575,6 +585,7 @@ export default function CreateTournamentPage() {
               step="900"
               value={registrationOpensAt}
               onChange={(e) => setRegistrationOpensAt(e.target.value)}
+              onBlur={(e) => setRegistrationOpensAt(snapDateTimeLocalTo15(e.target.value))}
               className="input"
             />
           </div>
@@ -587,6 +598,7 @@ export default function CreateTournamentPage() {
               step="900"
               value={registrationClosesAt}
               onChange={(e) => setRegistrationClosesAt(e.target.value)}
+              onBlur={(e) => setRegistrationClosesAt(snapDateTimeLocalTo15(e.target.value))}
               className="input"
             />
           </div>
