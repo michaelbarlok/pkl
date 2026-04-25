@@ -19,8 +19,12 @@ interface Props {
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
   partnerMap?: PartnerMap;
-  /** Map of team-primary player id → playoff seed number (1-N).
-   *  Drives the "(N)" suffix on team names in the playoff bracket. */
+  /** Map of "<division>|<team-primary-player_id>" → playoff seed
+   *  number. Compound key is required because the same player can
+   *  legitimately hold different seeds in different divisions
+   *  (Men's + Mixed multi-division registration). A flat
+   *  player-only key collapsed across divisions and double-printed
+   *  the same seed onto unrelated teams in the playoff bracket. */
   seedByPlayerId?: Map<string, number>;
 }
 
@@ -1001,9 +1005,15 @@ function MatchCard({
   const p2NameRaw = match.player2_id && p2BaseName !== "TBD" ? teamLabel(match.player2_id, p2BaseName, partnerMap) : p2BaseName;
   // Append the playoff seed in parentheses when known. Caller only
   // passes seedByPlayerId for playoff matches, so pool-play cards
-  // stay visually clean.
-  const p1Seed = match.player1_id ? seedByPlayerId?.get(match.player1_id) : undefined;
-  const p2Seed = match.player2_id ? seedByPlayerId?.get(match.player2_id) : undefined;
+  // stay visually clean. Map key is "<division>|<player_id>" so a
+  // player who's in multiple divisions (Men's + Mixed) gets the
+  // right seed displayed in each bracket.
+  const seedKey = (pid: string | null | undefined) =>
+    pid && match.division ? `${match.division}|${pid}` : null;
+  const k1 = seedKey(match.player1_id);
+  const k2 = seedKey(match.player2_id);
+  const p1Seed = k1 ? seedByPlayerId?.get(k1) : undefined;
+  const p2Seed = k2 ? seedByPlayerId?.get(k2) : undefined;
   const p1Name = p1Seed != null ? `${p1NameRaw} (${p1Seed})` : p1NameRaw;
   const p2Name = p2Seed != null ? `${p2NameRaw} (${p2Seed})` : p2NameRaw;
 

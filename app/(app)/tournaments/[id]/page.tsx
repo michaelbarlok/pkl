@@ -167,12 +167,16 @@ export default async function TournamentDetailPage({
 
   // Playoff seed lookup. Persisted on tournament_registrations.seed
   // when the playoff bracket is generated; the playoff bracket UI
-  // renders "(N)" beside each team name from this map.
+  // renders "(N)" beside each team name from this map. Key is
+  // "<division>|<player_id>" because the same player can legitimately
+  // hold different seeds in different divisions (Men's + Mixed
+  // multi-division registration). A flat player-only key would
+  // collapse across divisions and double-print the same seed.
   const seedByPlayerId = new Map<string, number>();
   for (const reg of registrations) {
     const r = reg as any;
-    if (r.player_id && typeof r.seed === "number") {
-      seedByPlayerId.set(r.player_id, r.seed);
+    if (r.player_id && r.division && typeof r.seed === "number") {
+      seedByPlayerId.set(`${r.division}|${r.player_id}`, r.seed);
     }
   }
 
