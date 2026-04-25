@@ -2,7 +2,7 @@ import { requireAuth } from "@/lib/auth";
 import { checkAndAwardBadges } from "@/lib/badges";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
-import { getDivisionLabel } from "@/lib/divisions";
+import { getDivisionLabel, getDivisionGender } from "@/lib/divisions";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -81,32 +81,60 @@ export async function POST(
     );
   }
 
-  // Check if player already registered (as player or partner)
+  // Pull every existing non-withdrawn registration involving the
+  // player or the partner. Multi-division registration is allowed
+  // ("Men's + Mixed" / "Women's + Mixed"), so we can't just bail
+  // on any prior row — we have to check the GENDER buckets and
+  // the requested division.
+  const ids = partner_id
+    ? `${auth.profile.id},${partner_id}`
+    : auth.profile.id;
   const { data: existing } = await auth.supabase
     .from("tournament_registrations")
-    .select("id")
+    .select("id, player_id, partner_id, division")
     .eq("tournament_id", tournamentId)
-    .or(`player_id.eq.${auth.profile.id},partner_id.eq.${auth.profile.id}`)
-    .neq("status", "withdrawn")
-    .limit(1);
+    .or(`player_id.in.(${ids}),partner_id.in.(${ids})`)
+    .neq("status", "withdrawn");
 
-  if (existing && existing.length > 0) {
-    return NextResponse.json({ error: "You are already registered for this tournament" }, { status: 409 });
+  const newGender = division ? getDivisionGender(division) : null;
+  function checkConflicts(personId: string, label: string): NextResponse | null {
+    const myRows = (existing ?? []).filter(
+      (r: any) => r.player_id === personId || r.partner_id === personId
+    );
+    if (myRows.some((r: any) => r.division === division)) {
+      return NextResponse.json(
+        { error: `${label} already registered for this division` },
+        { status: 409 }
+      );
+    }
+    if (!newGender) return null;
+    const existingGenders = new Set(
+      myRows.map((r: any) => r.division && getDivisionGender(r.division))
+    );
+    if (newGender === "mens" || newGender === "womens") {
+      if (existingGenders.has("mens") || existingGenders.has("womens")) {
+        return NextResponse.json(
+          {
+            error: `${label} already in a Men's or Women's division — you can only add Mixed alongside it.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+    if (newGender === "mixed" && existingGenders.has("mixed")) {
+      return NextResponse.json(
+        { error: `${label} already in a Mixed division.` },
+        { status: 409 }
+      );
+    }
+    return null;
   }
 
-  // If doubles, check partner isn't already registered
+  const playerConflict = checkConflicts(auth.profile.id, "You're");
+  if (playerConflict) return playerConflict;
   if (partner_id) {
-    const { data: partnerExisting } = await auth.supabase
-      .from("tournament_registrations")
-      .select("id")
-      .eq("tournament_id", tournamentId)
-      .or(`player_id.eq.${partner_id},partner_id.eq.${partner_id}`)
-      .neq("status", "withdrawn")
-      .limit(1);
-
-    if (partnerExisting && partnerExisting.length > 0) {
-      return NextResponse.json({ error: "Your partner is already registered" }, { status: 409 });
-    }
+    const partnerConflict = checkConflicts(partner_id, "Your partner is");
+    if (partnerConflict) return partnerConflict;
   }
 
   // Cap check + insert run atomically in an RPC that locks the
@@ -206,18 +234,36 @@ export async function DELETE(
     );
   }
 
-  // Find registration (include player/partner ids for notifications)
-  const { data: reg } = await auth.supabase
+  // Optional ?division=… so multi-division registrants can withdraw
+  // from one bucket without dropping the others. If absent, we only
+  // succeed when the player has exactly one registration; otherwise
+  // we ask them to disambiguate.
+  const divisionFilter = request.nextUrl.searchParams.get("division");
+
+  let regQuery = auth.supabase
     .from("tournament_registrations")
     .select("id, status, division, player_id, partner_id")
     .eq("tournament_id", tournamentId)
     .or(`player_id.eq.${auth.profile.id},partner_id.eq.${auth.profile.id}`)
-    .neq("status", "withdrawn")
-    .single();
+    .neq("status", "withdrawn");
+  if (divisionFilter) {
+    regQuery = regQuery.eq("division", divisionFilter);
+  }
 
-  if (!reg) {
+  const { data: regs } = await regQuery;
+  if (!regs || regs.length === 0) {
     return NextResponse.json({ error: "Registration not found" }, { status: 404 });
   }
+  if (regs.length > 1 && !divisionFilter) {
+    return NextResponse.json(
+      {
+        error:
+          "You're registered in multiple divisions for this tournament. Pick which one to withdraw from.",
+      },
+      { status: 400 }
+    );
+  }
+  const reg = regs[0];
 
   const wasConfirmed = reg.status === "confirmed";
   const division = reg.division;

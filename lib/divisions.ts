@@ -52,6 +52,24 @@ export function getDivision(code: string): Division | undefined {
 }
 
 /**
+ * Pull the gender bucket out of a division code. Used by the
+ * registration route to enforce "one gendered division max +
+ * optional mixed" — a player can sign up for Men's + Mixed or
+ * Women's + Mixed, but never Men's + Women's.
+ */
+export function getDivisionGender(
+  code: string
+): "mens" | "womens" | "mixed" | null {
+  const div = getDivision(code);
+  if (div) return div.gender as "mens" | "womens" | "mixed";
+  // Legacy code path — older codes may not match ALL_DIVISIONS but
+  // still encode the gender as the first underscore-delimited token.
+  const first = code.split("_")[0];
+  if (first === "mens" || first === "womens" || first === "mixed") return first;
+  return null;
+}
+
+/**
  * Return a friendly label for a division code. Falls back to a
  * generic parser for legacy codes (e.g. `mixed_all_ages_4.0` from
  * before Mixed was flattened) so older registrations still render.

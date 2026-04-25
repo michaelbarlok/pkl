@@ -1,5 +1,5 @@
 import { EmptyState } from "@/components/empty-state";
-import { getTournament, getTournamentRegistrations, getTournamentMatches, getMyRegistration } from "@/lib/queries/tournament";
+import { getTournament, getTournamentRegistrations, getTournamentMatches, getMyRegistration, getMyRegistrations } from "@/lib/queries/tournament";
 import { createClient } from "@/lib/supabase/server";
 import { TournamentRegistrationButton } from "@/components/tournament-registration";
 import { TournamentBracketView } from "@/components/tournament-bracket";
@@ -91,6 +91,7 @@ export default async function TournamentDetailPage({
     registrations,
     matches,
     myRegistration,
+    myRegistrations,
     organizersResult,
     activeDivisionsResult,
     pendingPartnerRequestsResult,
@@ -100,6 +101,7 @@ export default async function TournamentDetailPage({
       getTournamentRegistrations(id),
       getTournamentMatches(id),
       getMyRegistration(id),
+      getMyRegistrations(id),
       supabase
         .from("tournament_organizers")
         .select("profile_id, added_at, profile:profiles!profile_id(id, display_name)")
@@ -586,19 +588,53 @@ export default async function TournamentDetailPage({
           </div>
         )}
 
-        {/* Divisions */}
-        {tournament.divisions && tournament.divisions.length > 0 && (
-          <div className="pt-3 border-t border-surface-border">
-            <p className="text-xs text-surface-muted uppercase font-medium mb-2">Divisions</p>
-            <div className="flex flex-wrap gap-1.5">
-              {tournament.divisions.map((code: string) => (
-                <span key={code} className="badge-blue text-xs">
-                  {getDivisionLabel(code)}
-                </span>
-              ))}
+        {/* Divisions — render per-division start times alongside each
+            badge when the organizer has set a per-division override.
+            Falls through to the tournament-level start_time chip in
+            the hero when no override is present. */}
+        {tournament.divisions && tournament.divisions.length > 0 && (() => {
+          const settings = ((tournament as any).division_settings ?? {}) as Record<
+            string,
+            { start_time?: string } | null
+          >;
+          const hasAnyOverride = Object.values(settings).some(
+            (v) => v && typeof v.start_time === "string" && v.start_time
+          );
+          return (
+            <div className="pt-3 border-t border-surface-border">
+              <p className="text-xs text-surface-muted uppercase font-medium mb-2">Divisions</p>
+              {hasAnyOverride ? (
+                <ul className="space-y-1">
+                  {tournament.divisions.map((code: string) => {
+                    const t = settings[code]?.start_time;
+                    return (
+                      <li key={code} className="flex items-center gap-2 text-sm">
+                        <span className="badge-blue text-xs">
+                          {getDivisionLabel(code)}
+                        </span>
+                        <span className="text-dark-200">
+                          {t
+                            ? formatTime(t)
+                            : tournament.start_time
+                              ? `${formatTime(tournament.start_time)} (default)`
+                              : ""}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {tournament.divisions.map((code: string) => (
+                    <span key={code} className="badge-blue text-xs">
+                      {getDivisionLabel(code)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Co-Organizer management — folded into the details card so
             the same organizer data isn't duplicated in a separate
@@ -623,6 +659,7 @@ export default async function TournamentDetailPage({
           tournamentType={tournament.type}
           divisions={tournament.divisions ?? []}
           myRegistration={myRegistration}
+          myRegistrations={myRegistrations}
           playerCap={tournament.player_cap}
           maxTeamsPerDivision={tournament.max_teams_per_division}
           confirmedCount={confirmedRegistrations.length}

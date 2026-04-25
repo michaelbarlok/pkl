@@ -167,15 +167,31 @@ export async function getTournamentMatches(
 }
 
 /**
- * Get the current user's registration for a tournament.
+ * Get the current user's registration for a tournament. With
+ * multi-division registration enabled, a player may have more
+ * than one row (Men's + Mixed, Women's + Mixed). Returns the
+ * "primary" — first by registered_at — for backward compatibility
+ * with callers that only handle one. Use getMyRegistrations for
+ * the full list.
  */
 export async function getMyRegistration(
   tournamentId: string
 ): Promise<TournamentRegistration | null> {
+  const all = await getMyRegistrations(tournamentId);
+  return all[0] ?? null;
+}
+
+/**
+ * All non-withdrawn registrations the current user has for this
+ * tournament — could be 0, 1, or 2 (one gendered + one mixed).
+ */
+export async function getMyRegistrations(
+  tournamentId: string
+): Promise<TournamentRegistration[]> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return [];
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -183,17 +199,15 @@ export async function getMyRegistration(
     .eq("user_id", user.id)
     .single();
 
-  if (!profile) return null;
+  if (!profile) return [];
 
-  // Check as player or partner — maybeSingle() treats zero rows as null (not an error)
   const { data } = await supabase
     .from("tournament_registrations")
     .select("*")
     .eq("tournament_id", tournamentId)
     .or(`player_id.eq.${profile.id},partner_id.eq.${profile.id}`)
     .neq("status", "withdrawn")
-    .limit(1)
-    .maybeSingle();
+    .order("registered_at", { ascending: true });
 
-  return data as unknown as TournamentRegistration | null;
+  return (data ?? []) as unknown as TournamentRegistration[];
 }
