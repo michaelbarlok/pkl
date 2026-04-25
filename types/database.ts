@@ -402,7 +402,15 @@ export interface Tournament {
   score_to_win_pool?: number | null;
   score_to_win_playoff?: number | null;
   finals_best_of_3?: boolean | null;
-  division_settings?: Record<string, { games_per_team?: number }> | null;
+  division_settings?: Record<string, {
+    games_per_team?: number;
+    num_pools?: number;
+    playoff_advancing?: number;
+    /** Per-division start time (HH:MM, local to the venue). Lets
+     *  organizers stagger gendered vs mixed divisions on the same
+     *  day. Falls back to the tournament-level start_time. */
+    start_time?: string;
+  }> | null;
   logo_url?: string | null;
   created_by: string;
   created_at: string;

@@ -3,7 +3,7 @@
 import { FormError } from "@/components/form-error";
 import { useConfirm } from "@/components/confirm-modal";
 import { useSupabase } from "@/components/providers/supabase-provider";
-import { getDivisionLabel } from "@/lib/divisions";
+import { getDivisionLabel, getDivisionGender } from "@/lib/divisions";
 import type { TournamentRegistration } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -12,7 +12,11 @@ interface Props {
   tournamentId: string;
   tournamentType: string;
   divisions: string[];
+  /** Backwards-compat alias for myRegistrations[0]. */
   myRegistration: TournamentRegistration | null;
+  /** Every non-withdrawn registration the viewer has — could be 0,
+   *  1, or 2 (one gendered + one mixed). */
+  myRegistrations?: TournamentRegistration[];
   playerCap: number | null | undefined;
   maxTeamsPerDivision: number | null | undefined;
   confirmedCount: number;
@@ -24,6 +28,7 @@ export function TournamentRegistrationButton({
   tournamentType,
   divisions,
   myRegistration,
+  myRegistrations,
   playerCap,
   maxTeamsPerDivision,
   confirmedCount,
@@ -32,10 +37,34 @@ export function TournamentRegistrationButton({
   const { supabase } = useSupabase();
   const router = useRouter();
   const confirm = useConfirm();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  // Multi-division support: a player can sign up for at most one
+  // gendered division (Men's OR Women's) AND optionally one Mixed
+  // alongside it. Compute which divisions are still eligible based
+  // on what the viewer is already in.
+  const allMine = myRegistrations ?? (myRegistration ? [myRegistration] : []);
+  const myGenders = new Set(
+    allMine
+      .map((r) => r.division && getDivisionGender(r.division))
+      .filter(Boolean) as ("mens" | "womens" | "mixed")[]
+  );
+  const myDivisions = new Set(allMine.map((r) => r.division));
+  const eligibleDivisions = divisions.filter((d) => {
+    if (myDivisions.has(d)) return false;
+    const g = getDivisionGender(d);
+    if (!g) return true;
+    if (g === "mens" || g === "womens") {
+      // Already in a gendered division? Can't add another gendered.
+      if (myGenders.has("mens") || myGenders.has("womens")) return false;
+    }
+    if (g === "mixed" && myGenders.has("mixed")) return false;
+    return true;
+  });
+
   const [selectedDivision, setSelectedDivision] = useState(
-    divisions.length === 1 ? divisions[0] : ""
+    eligibleDivisions.length === 1 ? eligibleDivisions[0] : ""
   );
   const [partnerSearch, setPartnerSearch] = useState("");
   const [searchResults, setSearchResults] = useState<{ id: string; display_name: string }[]>([]);
@@ -61,18 +90,18 @@ export function TournamentRegistrationButton({
   }
 
   async function handleRegister() {
-    setLoading(true);
+    setLoading("register");
     setError("");
 
     if (tournamentType === "doubles" && !selectedPartner && !needPartner) {
       setError("Please select a partner or check \"I need a partner\"");
-      setLoading(false);
+      setLoading(null);
       return;
     }
 
-    if (divisions.length > 1 && !selectedDivision) {
+    if (eligibleDivisions.length > 1 && !selectedDivision) {
       setError("Please select a division");
-      setLoading(false);
+      setLoading(null);
       return;
     }
 
@@ -81,82 +110,97 @@ export function TournamentRegistrationButton({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         partner_id: needPartner ? null : selectedPartner?.id || null,
-        division: selectedDivision || divisions[0] || null,
+        division: selectedDivision || eligibleDivisions[0] || null,
       }),
     });
 
     const data = await res.json();
     if (!res.ok) {
       setError(data.error ?? "Registration failed");
-      setLoading(false);
+      setLoading(null);
       return;
     }
 
-    // Flip the spinner off as soon as the server ack comes back. The
-    // tournament page still runs router.refresh() in the background,
-    // and once the fresh `myRegistration` prop lands this component
-    // swaps to the "You're registered!" branch on its own. Without
-    // this, the button reads "Registering…" for as long as the full
-    // server render takes, which can be several seconds on big
-    // tournaments with lots of joins.
-    setLoading(false);
+    // Reset form state so the next registration (if eligible) starts
+    // clean instead of carrying over the prior partner / division.
+    setSelectedPartner(null);
+    setNeedPartner(false);
+    setSelectedDivision("");
+    setLoading(null);
     router.refresh();
   }
 
-  async function handleWithdraw() {
+  async function handleWithdraw(divisionCode: string | null | undefined) {
+    const divLabel = divisionCode ? getDivisionLabel(divisionCode) : "this tournament";
     const ok = await confirm({
-      title: "Withdraw from this tournament?",
+      title: `Withdraw from ${divLabel}?`,
       description:
-        "You'll lose your spot. If registration is still open you can rejoin, but your seed may change.",
+        "You'll lose your spot in this division. If registration is still open you can rejoin, but your seed may change.",
       confirmLabel: "Withdraw",
       cancelLabel: "Stay in",
       variant: "danger",
     });
     if (!ok) return;
-    setLoading(true);
+    setLoading(`withdraw:${divisionCode ?? ""}`);
     setError("");
 
-    const res = await fetch(`/api/tournaments/${tournamentId}/register`, {
-      method: "DELETE",
-    });
+    const url = divisionCode
+      ? `/api/tournaments/${tournamentId}/register?division=${encodeURIComponent(divisionCode)}`
+      : `/api/tournaments/${tournamentId}/register`;
+    const res = await fetch(url, { method: "DELETE" });
 
     if (!res.ok) {
       const data = await res.json();
       setError(data.error ?? "Withdrawal failed");
-      setLoading(false);
+      setLoading(null);
       return;
     }
 
+    setLoading(null);
     router.refresh();
   }
 
-  // Already registered
-  if (myRegistration) {
-    return (
-      <div className="card">
-        <div className="flex items-center justify-between">
-          <div>
+  // Render existing registrations as their own row(s) above the
+  // form. With multi-division support a player may have one or two
+  // active rows; each gets its own withdraw button.
+  const registeredRows = allMine.length > 0 && (
+    <div className="card space-y-2">
+      {allMine.map((reg) => (
+        <div key={reg.id} className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-sm font-medium text-teal-vivid">
-              {myRegistration.status === "confirmed" ? "You're registered!" : "You're on the waitlist"}
+              {reg.status === "confirmed" ? "You're registered!" : "You're on the waitlist"}
             </p>
-            {myRegistration.division && (
-              <p className="text-xs text-surface-muted">Division: {getDivisionLabel(myRegistration.division)}</p>
+            {reg.division && (
+              <p className="text-xs text-surface-muted">
+                Division: {getDivisionLabel(reg.division)}
+              </p>
             )}
-            {myRegistration.waitlist_position && (
-              <p className="text-xs text-surface-muted">Waitlist position #{myRegistration.waitlist_position}</p>
+            {reg.waitlist_position && (
+              <p className="text-xs text-surface-muted">Waitlist position #{reg.waitlist_position}</p>
             )}
           </div>
-          <button onClick={handleWithdraw} disabled={loading} className="btn-secondary text-xs !border-red-500/50 !text-red-400">
-            {loading ? "..." : "Withdraw"}
+          <button
+            onClick={() => handleWithdraw(reg.division)}
+            disabled={loading !== null}
+            className="btn-secondary text-xs !border-red-500/50 !text-red-400 shrink-0"
+          >
+            {loading === `withdraw:${reg.division ?? ""}` ? "..." : "Withdraw"}
           </button>
         </div>
-        <FormError message={error} />
-      </div>
-    );
+      ))}
+      <FormError message={error} />
+    </div>
+  );
+
+  // No more eligible divisions to add — show only the existing
+  // registrations card and exit.
+  if (allMine.length > 0 && eligibleDivisions.length === 0) {
+    return registeredRows || null;
   }
 
   // Determine if the selected division (or overall tournament) is full
-  const activeDivision = selectedDivision || (divisions.length === 1 ? divisions[0] : "");
+  const activeDivision = selectedDivision || (eligibleDivisions.length === 1 ? eligibleDivisions[0] : "");
   const divisionFull = maxTeamsPerDivision != null && activeDivision
     ? (divisionConfirmedCounts[activeDivision] ?? 0) >= maxTeamsPerDivision
     : false;
@@ -164,9 +208,16 @@ export function TournamentRegistrationButton({
   const willWaitlist = divisionFull || overallFull;
 
   return (
-    <div className="card space-y-3">
+    <>
+      {registeredRows}
+      <div className="card space-y-3">
+        {allMine.length > 0 && (
+          <p className="text-sm font-semibold text-dark-200">
+            Add another division
+          </p>
+        )}
       {/* Division selector */}
-      {divisions.length > 1 && (
+      {eligibleDivisions.length > 1 && (
         <div>
           <label className="block text-sm font-medium text-dark-200 mb-1">Division *</label>
           <select
@@ -176,7 +227,7 @@ export function TournamentRegistrationButton({
             required
           >
             <option value="">Select a division...</option>
-            {divisions.map((code) => {
+            {eligibleDivisions.map((code) => {
               const count = divisionConfirmedCounts[code] ?? 0;
               const full = maxTeamsPerDivision != null && count >= maxTeamsPerDivision;
               return (
@@ -271,11 +322,12 @@ export function TournamentRegistrationButton({
 
       <button
         onClick={handleRegister}
-        disabled={loading}
+        disabled={loading !== null}
         className="btn-primary w-full"
       >
-        {loading ? "Registering..." : willWaitlist ? "Join Waitlist" : "Register"}
+        {loading === "register" ? "Registering..." : willWaitlist ? "Join Waitlist" : "Register"}
       </button>
-    </div>
+      </div>
+    </>
   );
 }

@@ -3,7 +3,9 @@
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
+import { DivisionStartTimes } from "@/components/division-start-times";
 import { localDateTimeToIso } from "@/lib/datetime-local";
+import { getDivisionGender } from "@/lib/divisions";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
@@ -19,6 +21,10 @@ export default function CreateTournamentPage() {
   const format = "round_robin";
   const [type, setType] = useState("doubles");
   const [divisions, setDivisions] = useState<string[]>([]);
+  // Per-division start time — overrides the tournament-level
+  // start_time for that division. Lets organizers stagger Men's at
+  // 8am, Women's at 10:30, Mixed at 2 etc. on the same day.
+  const [divisionStartTimes, setDivisionStartTimes] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -131,6 +137,38 @@ export default function CreateTournamentPage() {
       return;
     }
 
+    // Mixed must run at a different time than gendered divisions
+    // because a player can register for both Men's/Women's AND
+    // Mixed and can't physically play in two places at once.
+    const genderedTimes = new Set<string>();
+    for (const d of divisions) {
+      const g = getDivisionGender(d);
+      const t = divisionStartTimes[d]?.trim();
+      if (!t) continue;
+      if (g === "mens" || g === "womens") genderedTimes.add(t);
+    }
+    for (const d of divisions) {
+      const g = getDivisionGender(d);
+      const t = divisionStartTimes[d]?.trim();
+      if (!t) continue;
+      if (g === "mixed" && genderedTimes.has(t)) {
+        setError(
+          `Mixed divisions can't start at the same time as a Men's or Women's division (${t}). Stagger the start times.`
+        );
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // Build division_settings JSONB with start_time per division.
+    // Other settings (games_per_team etc.) are filled in later via
+    // the bracket-generation review panel.
+    const divisionSettings: Record<string, { start_time?: string }> = {};
+    for (const d of divisions) {
+      const t = divisionStartTimes[d]?.trim();
+      if (t) divisionSettings[d] = { start_time: t };
+    }
+
     const { data, error: insertError } = await supabase
       .from("tournaments")
       .insert({
@@ -157,6 +195,7 @@ export default function CreateTournamentPage() {
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
         num_courts: numCourts ? parseInt(numCourts) || null : null,
+        division_settings: Object.keys(divisionSettings).length > 0 ? divisionSettings : null,
         status: "draft",
         created_by: profile.id,
       })
@@ -297,9 +336,15 @@ export default function CreateTournamentPage() {
           <p className="text-xs text-surface-muted mb-3">
             Select which gender, age, and skill level divisions this tournament will offer.
           </p>
-          <div className="rounded-lg border border-surface-border p-4">
+          <div className="rounded-lg border border-surface-border p-4 mb-3">
             <DivisionCheckboxes selected={divisions} onChange={setDivisions} />
           </div>
+          <DivisionStartTimes
+            selectedDivisions={divisions}
+            values={divisionStartTimes}
+            onChange={setDivisionStartTimes}
+            defaultTime={startTime}
+          />
         </div>
 
         {/* Dates */}

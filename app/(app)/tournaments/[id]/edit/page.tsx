@@ -3,8 +3,10 @@
 import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { DivisionCheckboxes } from "@/components/division-checkboxes";
+import { DivisionStartTimes } from "@/components/division-start-times";
 import { TournamentLogoUpload } from "@/components/tournament-logo-upload";
 import { localDateTimeToIso, isoToLocalDateTimeInput } from "@/lib/datetime-local";
+import { getDivisionGender } from "@/lib/divisions";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -18,6 +20,8 @@ export default function EditTournamentPage() {
   const [format, setFormat] = useState("round_robin");
   const [type, setType] = useState("doubles");
   const [divisions, setDivisions] = useState<string[]>([]);
+  // Per-division start time overrides loaded from division_settings.
+  const [divisionStartTimes, setDivisionStartTimes] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -56,6 +60,14 @@ export default function EditTournamentPage() {
         setFormat(data.format);
         setType(data.type);
         setDivisions(data.divisions ?? []);
+        // Hydrate per-division start times from the JSONB column.
+        const settings = (data as any).division_settings ?? {};
+        const times: Record<string, string> = {};
+        for (const [code, val] of Object.entries(settings)) {
+          const t = (val as { start_time?: string } | null)?.start_time;
+          if (t) times[code] = t;
+        }
+        setDivisionStartTimes(times);
         setStartDate(data.start_date);
         setEndDate(data.end_date);
         setStartTime(data.start_time ?? "");
@@ -131,6 +143,38 @@ export default function EditTournamentPage() {
       return;
     }
 
+    // Mixed must run at a different time than gendered divisions —
+    // a player can register Men's/Women's AND Mixed and can't be on
+    // two courts at once. Same rule the create form enforces.
+    const genderedTimes = new Set<string>();
+    for (const d of divisions) {
+      const g = getDivisionGender(d);
+      const t = divisionStartTimes[d]?.trim();
+      if (!t) continue;
+      if (g === "mens" || g === "womens") genderedTimes.add(t);
+    }
+    for (const d of divisions) {
+      const g = getDivisionGender(d);
+      const t = divisionStartTimes[d]?.trim();
+      if (!t) continue;
+      if (g === "mixed" && genderedTimes.has(t)) {
+        setError(
+          `Mixed divisions can't start at the same time as a Men's or Women's division (${t}). Stagger the start times.`
+        );
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // Build division_settings JSONB. Preserve any non-start_time
+    // settings (games_per_team etc.) that may have been added later
+    // by the bracket-generation flow — only overwrite start_time.
+    const divisionSettings: Record<string, { start_time?: string }> = {};
+    for (const d of divisions) {
+      const t = divisionStartTimes[d]?.trim();
+      if (t) divisionSettings[d] = { start_time: t };
+    }
+
     // Route through the server API so organizer auth + validation
     // (type flip, division removal) run before the write. Previously
     // we wrote direct via supabase-js which only had RLS to rely on.
@@ -161,6 +205,7 @@ export default function EditTournamentPage() {
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
         num_courts: numCourts ? parseInt(numCourts) || null : null,
+        division_settings: Object.keys(divisionSettings).length > 0 ? divisionSettings : null,
         logo_url: logoUrl,
       }),
     });
@@ -290,9 +335,15 @@ export default function EditTournamentPage() {
 
         <div>
           <label className="block text-sm font-medium text-dark-200 mb-2">Divisions *</label>
-          <div className="rounded-lg border border-surface-border p-4">
+          <div className="rounded-lg border border-surface-border p-4 mb-3">
             <DivisionCheckboxes selected={divisions} onChange={setDivisions} />
           </div>
+          <DivisionStartTimes
+            selectedDivisions={divisions}
+            values={divisionStartTimes}
+            onChange={setDivisionStartTimes}
+            defaultTime={startTime}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
