@@ -168,7 +168,7 @@ export async function PUT(
   // Fetch tournament format
   const { data: tournament } = await supabase
     .from("tournaments")
-    .select("format, status")
+    .select("format, status, finals_best_of_3")
     .eq("id", tournamentId)
     .single();
 
@@ -314,6 +314,39 @@ export async function PUT(
       const maxRound = Math.max(...allPlayoff.map((m: any) => m.round));
       const isSemifinalRound = match.round === maxRound - 1;
       const isFinalRound = match.round >= maxRound;
+
+      // Legacy / pre-feature data: tournament has finals_best_of_3
+      // enabled but the championship row was generated before
+      // series_game existed, so it's NULL. Treat the just-scored
+      // championship as Game 1 of the series — backfill series_game
+      // = 1 on the row so subsequent reads see it correctly, and
+      // fall through to the spawn-next-game block below.
+      if (
+        tournament.finals_best_of_3 === true &&
+        match.match_number === 1 &&
+        match.round === maxRound &&
+        match.series_game == null
+      ) {
+        const otherGames = allPlayoff.filter(
+          (p: any) =>
+            p.round === match.round &&
+            p.match_number === 1 &&
+            p.id !== match.id
+        );
+        // Only retro-mark when the championship is a single row.
+        // If multiple rows already exist there's a series in flight.
+        if (otherGames.length === 0) {
+          await supabase
+            .from("tournament_matches")
+            .update({ series_game: 1 })
+            .eq("id", match.id);
+          match.series_game = 1;
+          // Reflect the marker on the cached row too so the
+          // seriesGames filter below picks it up.
+          const cached = allPlayoff.find((p: any) => p.id === match.id);
+          if (cached) cached.series_game = 1;
+        }
+      }
 
       // Best-of-3 series game just scored: spawn the next game if
       // the series isn't decided yet. Game 1 always begets Game 2.
