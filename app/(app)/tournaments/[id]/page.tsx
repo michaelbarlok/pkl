@@ -822,12 +822,22 @@ export default async function TournamentDetailPage({
                   const needsPartner =
                     tournament.type === "doubles" &&
                     !(reg as any).partner_id;
+                  // The viewer can ask if they themselves are still
+                  // partner-less — that includes the "I haven't
+                  // registered" case AND the "I registered solo
+                  // looking for a partner" case. Previously the
+                  // second case was blocked, so two need-partner
+                  // players couldn't pair up without one withdrawing
+                  // and re-registering.
+                  const viewerIsPartnerless =
+                    !myRegistration ||
+                    !(myRegistration as any).partner_id;
                   const viewerCanAsk =
                     needsPartner &&
                     profile &&
                     playerId &&
                     profile.id !== playerId &&
-                    !myRegistration;
+                    viewerIsPartnerless;
                   return (
                   <tr key={reg.id}>
                     <td className="px-2 sm:px-4 py-2 text-sm text-surface-muted">{i + 1}</td>
