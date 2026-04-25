@@ -56,22 +56,32 @@ function useHasActivePlay(profileId: string): boolean {
 
     // In-progress tournament with a division the viewer is in.
     // Mirrors the Play-tab routing in /sessions/active/page.tsx.
+    // Multi-division registrations mean a player can have several
+    // rows per tournament — we have to look at ALL of them, not just
+    // the first, otherwise the pulse misses when row[0]'s division
+    // is inactive but row[1]'s is live.
     const { data: regs } = await supabase
       .from("tournament_registrations")
       .select("tournament_id, division, status, tournament:tournaments(status)")
       .or(`player_id.eq.${profileId},partner_id.eq.${profileId}`)
       .neq("status", "withdrawn");
-    const candidate = (regs ?? []).find(
+    const candidates = (regs ?? []).filter(
       (r: any) => r.tournament?.status === "in_progress"
-    ) as any;
-    if (candidate) {
-      const { data: active } = await supabase
+    ) as { tournament_id: string; division: string }[];
+    if (candidates.length > 0) {
+      const tournamentIds = Array.from(
+        new Set(candidates.map((c) => c.tournament_id))
+      );
+      const { data: activeRows } = await supabase
         .from("tournament_active_divisions")
-        .select("division")
-        .eq("tournament_id", candidate.tournament_id)
-        .eq("division", candidate.division)
-        .maybeSingle();
-      if (active) {
+        .select("tournament_id, division")
+        .in("tournament_id", tournamentIds);
+      const activeSet = new Set(
+        (activeRows ?? []).map((r: any) => `${r.tournament_id}:${r.division}`)
+      );
+      if (
+        candidates.some((c) => activeSet.has(`${c.tournament_id}:${c.division}`))
+      ) {
         setHasActive(true);
         return;
       }
