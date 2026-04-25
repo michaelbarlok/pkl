@@ -222,21 +222,25 @@ export default function CreateTournamentPage() {
       <h1 className="text-2xl font-bold text-dark-100">Create Tournament</h1>
 
       {/* Mobile keeps the legacy single-card vertical layout via the
-           outer card-style classes on the form; on lg+ those styles
-           drop and the form becomes a 2-column grid of section
-           cards (each section div gains its own ring + bg + padding
-           via lg: variants). Same content / same state — only the
-           wrapper styling switches. */}
+           outer card-style classes on the form. On lg+ those styles
+           drop and the form switches to CSS multi-columns: each
+           section card flows into the next column when one fills up,
+           so heights stay balanced and there's no big gap under the
+           shorter cards (which is what you get with a regular grid
+           when one row's tallest card is much bigger). DOM order is
+           preserved so keyboard focus reads top-to-bottom in column
+           1 then top-to-bottom in column 2. The action row uses
+           column-span:all so it sits full-width under both columns. */}
       <form
         onSubmit={handleSubmit}
         className="
           rounded-xl bg-surface-raised p-3.5 sm:p-4 ring-1 ring-surface-border space-y-4
-          lg:bg-transparent lg:ring-0 lg:p-0 lg:space-y-0
-          lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start
+          lg:bg-transparent lg:ring-0 lg:p-0
+          lg:space-y-0 lg:columns-2 lg:gap-6
         "
       >
         {/* ── Basics ── */}
-        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+        <section className="space-y-4 lg:mb-6 lg:break-inside-avoid lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
           <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
             Basics
           </h2>
@@ -287,7 +291,7 @@ export default function CreateTournamentPage() {
         </section>
 
         {/* ── Format & Logistics ── */}
-        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+        <section className="space-y-4 lg:mb-6 lg:break-inside-avoid lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
           <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
             Format & Logistics
           </h2>
@@ -360,7 +364,7 @@ export default function CreateTournamentPage() {
         </section>
 
         {/* ── Schedule ── */}
-        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+        <section className="space-y-4 lg:mb-6 lg:break-inside-avoid lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
           <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
             Schedule
           </h2>
@@ -464,7 +468,7 @@ export default function CreateTournamentPage() {
         </section>
 
         {/* ── Divisions ── */}
-        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+        <section className="space-y-4 lg:mb-6 lg:break-inside-avoid lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
           <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
             Divisions
           </h2>
@@ -488,7 +492,7 @@ export default function CreateTournamentPage() {
         </section>
 
         {/* ── Capacity ── */}
-        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+        <section className="space-y-4 lg:mb-6 lg:break-inside-avoid lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
           <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
             Capacity
           </h2>
@@ -525,7 +529,7 @@ export default function CreateTournamentPage() {
         </section>
 
         {/* ── Entry Fee & Payment ── */}
-        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+        <section className="space-y-4 lg:mb-6 lg:break-inside-avoid lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
           <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
             Entry Fee & Payment
           </h2>
@@ -623,7 +627,7 @@ export default function CreateTournamentPage() {
         </section>
 
         {/* ── Registration Window ── */}
-        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+        <section className="space-y-4 lg:mb-6 lg:break-inside-avoid lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
           <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
             Registration Window
           </h2>
@@ -649,8 +653,8 @@ export default function CreateTournamentPage() {
           </div>
         </section>
 
-        {/* ── Action row — full width on lg+ ── */}
-        <div className="space-y-3 lg:col-span-2">
+        {/* ── Action row — full width below both columns on lg+ ── */}
+        <div className="space-y-3 lg:[column-span:all]">
           <FormError message={error} />
           <button type="submit" className="btn-primary w-full lg:w-auto" disabled={submitting}>
             {submitting ? "Creating..." : "Create Tournament"}
