@@ -218,390 +218,444 @@ export default function CreateTournamentPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl lg:max-w-6xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-dark-100">Create Tournament</h1>
 
-      <form onSubmit={handleSubmit} className="card space-y-4">
-        {/* Title */}
-        <div>
-          <label className="block text-sm font-medium text-dark-200 mb-1">
-            Tournament Name *
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="input"
-            maxLength={120}
-            required
-            placeholder="e.g. Spring Doubles Classic"
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium text-dark-200 mb-1">
-            Description
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="input min-h-[80px]"
-            maxLength={5000}
-            placeholder="Tournament details, rules, prizes..."
-          />
-        </div>
-
-        {/* Type (format is currently always Round Robin). */}
-        <div>
-          <label className="block text-sm font-medium text-dark-200 mb-1">
-            Type *
-          </label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="input"
-          >
-            <option value="doubles">Doubles</option>
-            <option value="singles">Singles</option>
-          </select>
-        </div>
-
-        {/* Live-play logistics */}
-        <div>
-          <label className="block text-sm font-medium text-dark-200 mb-1">
-            Number of courts available
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={numCourts}
-            onChange={(e) => setNumCourts(e.target.value)}
-            className="input"
-            placeholder="e.g. 4"
-          />
-          <p className="text-xs text-surface-muted mt-1">
-            Used when divisions go live to auto-assign matches to courts. Leave blank if unknown.
-          </p>
-        </div>
-
-        {/* Round Robin Settings */}
-        {format === "round_robin" && (
-          <div className="rounded-lg border border-surface-border p-4 space-y-4">
-            <p className="text-sm font-medium text-dark-200">Round Robin Settings</p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-dark-200 mb-1">
-                  Round Robin Score to Win
-                </label>
-                <input
-                  type="number"
-                  value={scoreToWinPool}
-                  onChange={(e) => setScoreToWinPool(e.target.value)}
-                  className="input"
-                  min={1}
-                  placeholder="11"
-                />
-                <p className="text-xs text-surface-muted mt-1">Points needed to win a pool play game</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-dark-200 mb-1">
-                  Playoff Score to Win
-                </label>
-                <input
-                  type="number"
-                  value={scoreToWinPlayoff}
-                  onChange={(e) => setScoreToWinPlayoff(e.target.value)}
-                  className="input"
-                  min={1}
-                  placeholder="11"
-                />
-                <p className="text-xs text-surface-muted mt-1">Points needed to win a playoff game</p>
-              </div>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={finalsBestOf3}
-                onChange={(e) => setFinalsBestOf3(e.target.checked)}
-                className="rounded border-surface-border text-brand-300 focus:ring-brand-300"
-              />
-              <span className="text-sm text-dark-200">Finals &mdash; Best 2 out of 3</span>
-            </label>
-            <p className="text-xs text-surface-muted -mt-2">
-              Championship match will be best 2 out of 3 games (each played to the playoff score above)
-            </p>
-          </div>
-        )}
-
-        {/* Divisions */}
-        <div>
-          <label className="block text-sm font-medium text-dark-200 mb-2">
-            Divisions *
-          </label>
-          <p className="text-xs text-surface-muted mb-3">
-            Select which gender, age, and skill level divisions this tournament will offer.
-          </p>
-          <div className="rounded-lg border border-surface-border p-4 mb-3">
-            <DivisionCheckboxes selected={divisions} onChange={setDivisions} />
-          </div>
-          <DivisionStartTimes
-            selectedDivisions={divisions}
-            values={divisionStartTimes}
-            onChange={setDivisionStartTimes}
-            defaultTime={startTime}
-          />
-        </div>
-
-        {/* Dates */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* Mobile keeps the legacy single-card vertical layout via the
+           outer card-style classes on the form; on lg+ those styles
+           drop and the form becomes a 2-column grid of section
+           cards (each section div gains its own ring + bg + padding
+           via lg: variants). Same content / same state — only the
+           wrapper styling switches. */}
+      <form
+        onSubmit={handleSubmit}
+        className="
+          rounded-xl bg-surface-raised p-3.5 sm:p-4 ring-1 ring-surface-border space-y-4
+          lg:bg-transparent lg:ring-0 lg:p-0 lg:space-y-0
+          lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start
+        "
+      >
+        {/* ── Basics ── */}
+        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+          <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
+            Basics
+          </h2>
+          {/* Title */}
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">
-              Start Date *
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                if (!endDate) setEndDate(e.target.value);
-              }}
-              className="input"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="input"
-              min={startDate}
-            />
-          </div>
-        </div>
-
-        {/* Time & Location */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Start Time
-            </label>
-            <select
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="input"
-            >
-              <option value="">—</option>
-              {TIME_SLOTS.map((slot) => (
-                <option key={slot.value} value={slot.value}>
-                  {slot.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Location *
-            </label>
-            {savedLocations.length > 0 ? (
-              <div className="space-y-2">
-                <select
-                  value={savedLocations.some((l) => l.name === location) ? location : "__custom__"}
-                  onChange={(e) => {
-                    if (e.target.value === "__custom__") {
-                      setLocation("");
-                    } else {
-                      setLocation(e.target.value);
-                    }
-                  }}
-                  className="input"
-                >
-                  {savedLocations.map((loc) => (
-                    <option key={loc.name} value={loc.name}>
-                      {loc.name}{loc.cityState ? ` — ${loc.cityState}` : ""}
-                    </option>
-                  ))}
-                  <option value="__custom__">+ Add new location</option>
-                </select>
-                {!savedLocations.some((l) => l.name === location) && (
-                  <input
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="input"
-                    placeholder="Enter new location name"
-                    required
-                  />
-                )}
-              </div>
-            ) : (
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="input"
-                required
-                placeholder="e.g. Athens Community Center"
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Player Cap, Max Per Division & Entry Fee */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Player/Team Cap
-            </label>
-            <input
-              type="number"
-              value={playerCap}
-              onChange={(e) => setPlayerCap(e.target.value)}
-              className="input"
-              min={2}
-              placeholder="Leave blank for unlimited"
-            />
-            <p className="text-xs text-surface-muted mt-1">Overall tournament cap</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Max Teams per Division
-            </label>
-            <input
-              type="number"
-              value={maxTeamsPerDivision}
-              onChange={(e) => setMaxTeamsPerDivision(e.target.value)}
-              className="input"
-              min={2}
-              placeholder="Leave blank for unlimited"
-            />
-            <p className="text-xs text-surface-muted mt-1">Extra teams go on a waitlist</p>
-          </div>
-        </div>
-        {/* Entry Fee & Payment Options */}
-        <div className="rounded-lg border border-surface-border p-4 space-y-4">
-          <p className="text-sm font-medium text-dark-200">Entry Fee &amp; Payment</p>
-          <div>
-            <label className="block text-xs font-medium text-dark-200 mb-1">
-              Entry Fee
+              Tournament Name *
             </label>
             <input
               type="text"
-              value={entryFee}
-              onChange={(e) => setEntryFee(e.target.value)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               className="input"
-              placeholder='e.g. "$20 per person"'
+              maxLength={120}
+              required
+              placeholder="e.g. Spring Doubles Classic"
             />
           </div>
+
+          {/* Description */}
           <div>
-            <p className="text-xs font-medium text-dark-200 mb-2">Payment Methods</p>
-            <p className="text-xs text-surface-muted mb-3">
-              Select how players can pay their entry fee.
+            <label className="block text-sm font-medium text-dark-200 mb-1">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="input min-h-[80px]"
+              maxLength={5000}
+              placeholder="Tournament details, rules, prizes..."
+            />
+          </div>
+
+          {/* Type (format is currently always Round Robin). */}
+          <div>
+            <label className="block text-sm font-medium text-dark-200 mb-1">
+              Type *
+            </label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="input"
+            >
+              <option value="doubles">Doubles</option>
+              <option value="singles">Singles</option>
+            </select>
+          </div>
+        </section>
+
+        {/* ── Format & Logistics ── */}
+        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+          <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
+            Format & Logistics
+          </h2>
+          {/* Live-play logistics */}
+          <div>
+            <label className="block text-sm font-medium text-dark-200 mb-1">
+              Number of courts available
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={numCourts}
+              onChange={(e) => setNumCourts(e.target.value)}
+              className="input"
+              placeholder="e.g. 4"
+            />
+            <p className="text-xs text-surface-muted mt-1">
+              Used when divisions go live to auto-assign matches to courts. Leave blank if unknown.
             </p>
-            <div className="space-y-3">
-              {[
-                { key: "venmo",  label: "Venmo",  placeholder: "@username" },
-                { key: "paypal", label: "PayPal", placeholder: "email or paypal.me/username" },
-                { key: "zelle",  label: "Zelle",  placeholder: "phone number or email" },
-                { key: "cash",   label: "Cash",   placeholder: null },
-                { key: "check",  label: "Check",  placeholder: "payable to..." },
-                { key: "other",  label: "Other",  placeholder: "URL or description" },
-              ].map(({ key, label, placeholder }) => (
-                <div key={key}>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={key in paymentOptions}
-                      onChange={(e) => {
-                        setPaymentOptions((prev) => {
-                          const next = { ...prev };
-                          if (e.target.checked) {
-                            next[key] = "";
-                          } else {
-                            delete next[key];
-                          }
-                          return next;
-                        });
-                      }}
-                      className="rounded border-surface-border text-brand-300 focus:ring-brand-300"
-                    />
-                    <span className="text-sm text-dark-200">{label}</span>
+          </div>
+
+          {/* Round Robin Settings */}
+          {format === "round_robin" && (
+            <div className="rounded-lg border border-surface-border p-4 space-y-4">
+              <p className="text-sm font-medium text-dark-200">Round Robin Settings</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-dark-200 mb-1">
+                    Round Robin Score to Win
                   </label>
-                  {key in paymentOptions && placeholder !== null && (
+                  <input
+                    type="number"
+                    value={scoreToWinPool}
+                    onChange={(e) => setScoreToWinPool(e.target.value)}
+                    className="input"
+                    min={1}
+                    placeholder="11"
+                  />
+                  <p className="text-xs text-surface-muted mt-1">Points needed to win a pool play game</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-dark-200 mb-1">
+                    Playoff Score to Win
+                  </label>
+                  <input
+                    type="number"
+                    value={scoreToWinPlayoff}
+                    onChange={(e) => setScoreToWinPlayoff(e.target.value)}
+                    className="input"
+                    min={1}
+                    placeholder="11"
+                  />
+                  <p className="text-xs text-surface-muted mt-1">Points needed to win a playoff game</p>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={finalsBestOf3}
+                  onChange={(e) => setFinalsBestOf3(e.target.checked)}
+                  className="rounded border-surface-border text-brand-300 focus:ring-brand-300"
+                />
+                <span className="text-sm text-dark-200">Finals &mdash; Best 2 out of 3</span>
+              </label>
+              <p className="text-xs text-surface-muted -mt-2">
+                Championship match will be best 2 out of 3 games (each played to the playoff score above)
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* ── Schedule ── */}
+        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+          <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
+            Schedule
+          </h2>
+          {/* Dates */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">
+                Start Date *
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  if (!endDate) setEndDate(e.target.value);
+                }}
+                className="input"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="input"
+                min={startDate}
+              />
+            </div>
+          </div>
+
+          {/* Time & Location */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">
+                Start Time
+              </label>
+              <select
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="input"
+              >
+                <option value="">—</option>
+                {TIME_SLOTS.map((slot) => (
+                  <option key={slot.value} value={slot.value}>
+                    {slot.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">
+                Location *
+              </label>
+              {savedLocations.length > 0 ? (
+                <div className="space-y-2">
+                  <select
+                    value={savedLocations.some((l) => l.name === location) ? location : "__custom__"}
+                    onChange={(e) => {
+                      if (e.target.value === "__custom__") {
+                        setLocation("");
+                      } else {
+                        setLocation(e.target.value);
+                      }
+                    }}
+                    className="input"
+                  >
+                    {savedLocations.map((loc) => (
+                      <option key={loc.name} value={loc.name}>
+                        {loc.name}{loc.cityState ? ` — ${loc.cityState}` : ""}
+                      </option>
+                    ))}
+                    <option value="__custom__">+ Add new location</option>
+                  </select>
+                  {!savedLocations.some((l) => l.name === location) && (
                     <input
                       type="text"
-                      value={paymentOptions[key]}
-                      onChange={(e) =>
-                        setPaymentOptions((prev) => ({ ...prev, [key]: e.target.value }))
-                      }
-                      className="input mt-2 ml-6"
-                      placeholder={placeholder}
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="input"
+                      placeholder="Enter new location name"
+                      required
                     />
                   )}
                 </div>
-              ))}
+              ) : (
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="input"
+                  required
+                  placeholder="e.g. Athens Community Center"
+                />
+              )}
             </div>
           </div>
+        </section>
+
+        {/* ── Divisions ── */}
+        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+          <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
+            Divisions
+          </h2>
           <div>
-            <label className="block text-xs font-medium text-dark-200 mb-1">
-              Payment Link
+            <label className="block text-sm font-medium text-dark-200 mb-2">
+              Divisions *
             </label>
-            <input
-              type="url"
-              value={paymentLink}
-              onChange={(e) => setPaymentLink(e.target.value)}
-              className="input"
-              placeholder="e.g. https://donate.example.org/pay"
-            />
-            <p className="text-xs text-surface-muted mt-1">
-              Optional external link (donation page, payment portal, etc.)
+            <p className="text-xs text-surface-muted mb-3">
+              Select which gender, age, and skill level divisions this tournament will offer.
             </p>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-dark-200 mb-1">
-              Payment Directions
-            </label>
-            <textarea
-              value={paymentDirections}
-              onChange={(e) => setPaymentDirections(e.target.value)}
-              className="input min-h-[72px]"
-              maxLength={1000}
-              placeholder="Any additional instructions for paying the entry fee..."
+            <div className="rounded-lg border border-surface-border p-4 mb-3">
+              <DivisionCheckboxes selected={divisions} onChange={setDivisions} />
+            </div>
+            <DivisionStartTimes
+              selectedDivisions={divisions}
+              values={divisionStartTimes}
+              onChange={setDivisionStartTimes}
+              defaultTime={startTime}
             />
           </div>
+        </section>
+
+        {/* ── Capacity ── */}
+        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+          <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
+            Capacity
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">
+                Player/Team Cap
+              </label>
+              <input
+                type="number"
+                value={playerCap}
+                onChange={(e) => setPlayerCap(e.target.value)}
+                className="input"
+                min={2}
+                placeholder="Leave blank for unlimited"
+              />
+              <p className="text-xs text-surface-muted mt-1">Overall tournament cap</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">
+                Max Teams per Division
+              </label>
+              <input
+                type="number"
+                value={maxTeamsPerDivision}
+                onChange={(e) => setMaxTeamsPerDivision(e.target.value)}
+                className="input"
+                min={2}
+                placeholder="Leave blank for unlimited"
+              />
+              <p className="text-xs text-surface-muted mt-1">Extra teams go on a waitlist</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Entry Fee & Payment ── */}
+        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+          <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
+            Entry Fee & Payment
+          </h2>
+          <div className="rounded-lg border border-surface-border p-4 space-y-4 lg:rounded-none lg:border-0 lg:p-0">
+            <p className="text-sm font-medium text-dark-200 lg:hidden">Entry Fee &amp; Payment</p>
+            <div>
+              <label className="block text-xs font-medium text-dark-200 mb-1">
+                Entry Fee
+              </label>
+              <input
+                type="text"
+                value={entryFee}
+                onChange={(e) => setEntryFee(e.target.value)}
+                className="input"
+                placeholder='e.g. "$20 per person"'
+              />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-dark-200 mb-2">Payment Methods</p>
+              <p className="text-xs text-surface-muted mb-3">
+                Select how players can pay their entry fee.
+              </p>
+              <div className="space-y-3">
+                {[
+                  { key: "venmo",  label: "Venmo",  placeholder: "@username" },
+                  { key: "paypal", label: "PayPal", placeholder: "email or paypal.me/username" },
+                  { key: "zelle",  label: "Zelle",  placeholder: "phone number or email" },
+                  { key: "cash",   label: "Cash",   placeholder: null },
+                  { key: "check",  label: "Check",  placeholder: "payable to..." },
+                  { key: "other",  label: "Other",  placeholder: "URL or description" },
+                ].map(({ key, label, placeholder }) => (
+                  <div key={key}>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={key in paymentOptions}
+                        onChange={(e) => {
+                          setPaymentOptions((prev) => {
+                            const next = { ...prev };
+                            if (e.target.checked) {
+                              next[key] = "";
+                            } else {
+                              delete next[key];
+                            }
+                            return next;
+                          });
+                        }}
+                        className="rounded border-surface-border text-brand-300 focus:ring-brand-300"
+                      />
+                      <span className="text-sm text-dark-200">{label}</span>
+                    </label>
+                    {key in paymentOptions && placeholder !== null && (
+                      <input
+                        type="text"
+                        value={paymentOptions[key]}
+                        onChange={(e) =>
+                          setPaymentOptions((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        className="input mt-2 ml-6"
+                        placeholder={placeholder}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-dark-200 mb-1">
+                Payment Link
+              </label>
+              <input
+                type="url"
+                value={paymentLink}
+                onChange={(e) => setPaymentLink(e.target.value)}
+                className="input"
+                placeholder="e.g. https://donate.example.org/pay"
+              />
+              <p className="text-xs text-surface-muted mt-1">
+                Optional external link (donation page, payment portal, etc.)
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-dark-200 mb-1">
+                Payment Directions
+              </label>
+              <textarea
+                value={paymentDirections}
+                onChange={(e) => setPaymentDirections(e.target.value)}
+                className="input min-h-[72px]"
+                maxLength={1000}
+                placeholder="Any additional instructions for paying the entry fee..."
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Registration Window ── */}
+        <section className="space-y-4 lg:rounded-xl lg:bg-surface-raised lg:p-4 lg:ring-1 lg:ring-surface-border">
+          <h2 className="hidden lg:block text-sm font-semibold text-dark-200 uppercase tracking-wide">
+            Registration Window
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">
+                Registration Opens
+              </label>
+              <DateTimeFifteenMin
+                value={registrationOpensAt}
+                onChange={setRegistrationOpensAt}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-200 mb-1">
+                Registration Closes
+              </label>
+              <DateTimeFifteenMin
+                value={registrationClosesAt}
+                onChange={setRegistrationClosesAt}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Action row — full width on lg+ ── */}
+        <div className="space-y-3 lg:col-span-2">
+          <FormError message={error} />
+          <button type="submit" className="btn-primary w-full lg:w-auto" disabled={submitting}>
+            {submitting ? "Creating..." : "Create Tournament"}
+          </button>
         </div>
-
-        {/* Registration Windows */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Registration Opens
-            </label>
-            <DateTimeFifteenMin
-              value={registrationOpensAt}
-              onChange={setRegistrationOpensAt}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-200 mb-1">
-              Registration Closes
-            </label>
-            <DateTimeFifteenMin
-              value={registrationClosesAt}
-              onChange={setRegistrationClosesAt}
-            />
-          </div>
-        </div>
-
-        <FormError message={error} />
-
-        <button type="submit" className="btn-primary w-full" disabled={submitting}>
-          {submitting ? "Creating..." : "Create Tournament"}
-        </button>
       </form>
     </div>
   );
