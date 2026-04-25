@@ -73,18 +73,11 @@ export async function DELETE(
     );
   }
 
-  // Pull the top of the queue. We want the bumped match to land at
-  // position 2 of the POST-promotion queue: after the front-of-line
-  // match gets sent to the now-empty court, queue[0] (was second)
-  // stays at position 1 and the bumped match should sit immediately
-  // behind it. So we anchor the new timestamp to the SECOND queued
-  // match's stamp +1ms. Edge cases:
-  //   - 0 queued: nothing to land behind, stamp = now (bumped will
-  //     refill the just-vacated court anyway).
-  //   - 1 queued: only one match ahead; bumped sits after it (stamp
-  //     = front+1ms), ending at position 1 of the post-promotion
-  //     queue (queue is just the bumped match; nothing else to put
-  //     it behind).
+  // Pull the top of the queue (we need three so we can slot the
+  // bumped match BETWEEN the post-promotion-position-1 and -2
+  // matches). Cross-division because queue_entered_at is the merged
+  // FIFO ordering across every active division — that's what the
+  // Court Tracker / Match Queue display reads from.
   const { data: topQueued } = await service
     .from("tournament_matches")
     .select("queue_entered_at")
@@ -94,14 +87,34 @@ export async function DELETE(
     .not("queue_entered_at", "is", null)
     .neq("id", matchId)
     .order("queue_entered_at", { ascending: true })
-    .limit(2);
+    .limit(3);
 
   const top = (topQueued ?? []) as { queue_entered_at: string }[];
-  const anchorStamp = top[1]?.queue_entered_at ?? top[0]?.queue_entered_at;
-  const anchorMs = anchorStamp
-    ? new Date(anchorStamp).getTime() + 1
-    : Date.now();
-  const newStamp = new Date(anchorMs).toISOString();
+  // Pick the new stamp:
+  //  - 3+ queued: midpoint between top[1] (becomes post-promotion
+  //    position 1) and top[2] (becomes position 2). Midpoint
+  //    guarantees we land strictly between them; the previous
+  //    "top[1]+1ms" collided with top[2] when stamps were 1ms apart
+  //    (which is the default — runAssignmentPass writes consecutive
+  //    1ms ticks), and the unstable sort then put the bumped match
+  //    at position 3 or further instead of 2.
+  //  - 2 queued: just past top[1] — bumped will be alone behind it
+  //    after the promotion.
+  //  - 1 queued: just past top[0].
+  //  - 0 queued: anchor on now (bumped refills its own court).
+  let newStampMs: number;
+  if (top.length >= 3) {
+    const t2 = new Date(top[1].queue_entered_at).getTime();
+    const t3 = new Date(top[2].queue_entered_at).getTime();
+    newStampMs = (t2 + t3) / 2;
+  } else if (top.length === 2) {
+    newStampMs = new Date(top[1].queue_entered_at).getTime() + 1;
+  } else if (top.length === 1) {
+    newStampMs = new Date(top[0].queue_entered_at).getTime() + 1;
+  } else {
+    newStampMs = Date.now();
+  }
+  const newStamp = isoWithMicros(newStampMs);
 
   await service
     .from("tournament_matches")
@@ -115,4 +128,21 @@ export async function DELETE(
 
   await runAssignmentPass(tournamentId);
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * ISO-8601 with microsecond precision. Date.toISOString() truncates
+ * to milliseconds; PostgreSQL timestamptz stores microseconds, so
+ * we need to inject the extra 3 digits ourselves to express a value
+ * like "halfway between two 1ms-apart stamps". Accepts a fractional
+ * ms input (e.g. 1234567890101.5 → "...T...:01.101500Z").
+ */
+function isoWithMicros(ms: number): string {
+  const intMs = Math.floor(ms);
+  const microsFrac = Math.round((ms - intMs) * 1000); // 0..999
+  const base = new Date(intMs).toISOString(); // "...T...:01.234Z"
+  return base.replace(
+    "Z",
+    String(microsFrac).padStart(3, "0") + "Z"
+  );
 }
