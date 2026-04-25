@@ -38,9 +38,11 @@ export async function POST(
  * isn't ready (injury, wrong pair, warmup needed). Organizer-only.
  *
  * The match re-enters the queue at POSITION 2 rather than the back:
- * we set its queue_entered_at to just after the current front-of-line
- * match, giving the bumped team roughly one more match's worth of
- * warmup time before they have to step on the court again. Score /
+ * the front-of-line match will get promoted to the now-empty court
+ * by the assignment pass below, so to land at queue position 2
+ * after that promotion we slot the bumped match between the SECOND
+ * and THIRD queued matches (front+1ms would put it at position 1
+ * once the front is promoted, which defeats the purpose). Score /
  * participants are untouched — this is a re-queue, not a cancel.
  */
 export async function DELETE(
@@ -71,10 +73,19 @@ export async function DELETE(
     );
   }
 
-  // Find the current front-of-line queued match. If none, there's
-  // nothing ahead anyway — stamping "now" puts this match first,
-  // which is fine (no other match to buy time against).
-  const { data: frontOfLine } = await service
+  // Pull the top of the queue. We want the bumped match to land at
+  // position 2 of the POST-promotion queue: after the front-of-line
+  // match gets sent to the now-empty court, queue[0] (was second)
+  // stays at position 1 and the bumped match should sit immediately
+  // behind it. So we anchor the new timestamp to the SECOND queued
+  // match's stamp +1ms. Edge cases:
+  //   - 0 queued: nothing to land behind, stamp = now (bumped will
+  //     refill the just-vacated court anyway).
+  //   - 1 queued: only one match ahead; bumped sits after it (stamp
+  //     = front+1ms), ending at position 1 of the post-promotion
+  //     queue (queue is just the bumped match; nothing else to put
+  //     it behind).
+  const { data: topQueued } = await service
     .from("tournament_matches")
     .select("queue_entered_at")
     .eq("tournament_id", tournamentId)
@@ -83,17 +94,14 @@ export async function DELETE(
     .not("queue_entered_at", "is", null)
     .neq("id", matchId)
     .order("queue_entered_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .limit(2);
 
-  // New timestamp = 1ms after the current front match so the bumped
-  // match sits at position 2. If the queue is empty, "now" is fine.
-  // Also clear up_next / in_3rd ack columns since the match's
-  // notification context changed.
-  const frontTs = frontOfLine?.queue_entered_at
-    ? new Date(frontOfLine.queue_entered_at).getTime() + 1
+  const top = (topQueued ?? []) as { queue_entered_at: string }[];
+  const anchorStamp = top[1]?.queue_entered_at ?? top[0]?.queue_entered_at;
+  const anchorMs = anchorStamp
+    ? new Date(anchorStamp).getTime() + 1
     : Date.now();
-  const newStamp = new Date(frontTs).toISOString();
+  const newStamp = new Date(anchorMs).toISOString();
 
   await service
     .from("tournament_matches")
