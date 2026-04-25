@@ -324,6 +324,7 @@ function assertValidRoundRobinSchedule(matches: BracketMatch[]): void {
     if (!byRoundBracket.has(key)) byRoundBracket.set(key, []);
     byRoundBracket.get(key)!.push(m);
   }
+  // Per-round invariants: no player in two matches, no pair twice.
   for (const [key, bucket] of byRoundBracket) {
     const seenPlayers = new Set<string>();
     const seenPairs = new Set<string>();
@@ -350,6 +351,36 @@ function assertValidRoundRobinSchedule(matches: BracketMatch[]): void {
         }
         seenPairs.add(pair);
       }
+    }
+  }
+
+  // Per-pool invariant: every team in the same bracket plays the
+  // SAME number of real (non-BYE) games. The previous per-round
+  // checks caught duplicate pairings but not "team A plays 5 games,
+  // team B plays 4." This guarantees within-pool fairness — what
+  // organizers actually mean by "round robin."
+  const gamesPerPlayerByBracket = new Map<string, Map<string, number>>();
+  for (const m of matches) {
+    if (m.status === "bye") continue;
+    if (!m.player1_id || !m.player2_id) continue;
+    const counts = gamesPerPlayerByBracket.get(m.bracket) ?? new Map<string, number>();
+    counts.set(m.player1_id, (counts.get(m.player1_id) ?? 0) + 1);
+    counts.set(m.player2_id, (counts.get(m.player2_id) ?? 0) + 1);
+    gamesPerPlayerByBracket.set(m.bracket, counts);
+  }
+  for (const [bracket, counts] of gamesPerPlayerByBracket) {
+    const values = Array.from(counts.values());
+    if (values.length === 0) continue;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (max !== min) {
+      const offenders = Array.from(counts.entries())
+        .filter(([, n]) => n !== min)
+        .map(([id, n]) => `${id}:${n}`)
+        .join(", ");
+      throw new Error(
+        `Round-robin generator produced an unbalanced schedule for bracket ${bracket} — game counts range ${min}-${max}. Offenders (vs base ${min}): ${offenders}`
+      );
     }
   }
 }
