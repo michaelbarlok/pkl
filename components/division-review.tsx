@@ -376,7 +376,12 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
           const poolStructure = isRoundRobin
             ? getPoolStructure(d.count, { numPools: poolCountOverride ?? undefined })
             : null;
-          const maxPoolCount = Math.max(1, Math.floor(d.count / 2));
+          // Hard min of 3 teams per pool — a pool of 2 is just a
+          // single head-to-head, not a round robin worth playing
+          // out. getPoolStructure enforces the same clamp so even a
+          // typed-in value above this gets pulled back down before
+          // generation.
+          const maxPoolCount = Math.max(1, Math.floor(d.count / 3));
 
           return (
             <div key={d.division} className="space-y-0">

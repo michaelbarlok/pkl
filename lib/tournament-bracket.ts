@@ -175,9 +175,13 @@ export function getPoolStructure(
   maxGamesPerTeam: number;
 } {
   // Organizer override. Clamp into a sane range: at least 1 pool, and
-  // at most floor(teamCount/2) so every pool still has ≥2 teams.
+  // at most floor(teamCount/3) so every pool still has ≥3 teams. A
+  // pool of 2 is just a single best-of-1 head-to-head — no real round
+  // robin to play out — so we refuse to split that small even when
+  // explicitly asked. (Tiny divisions with <3 teams fall back to 1
+  // pool because the max(1, …) floor still pins a minimum.)
   const override = options?.numPools;
-  const maxReasonable = Math.max(1, Math.floor(teamCount / 2));
+  const maxReasonable = Math.max(1, Math.floor(teamCount / 3));
   const numPools = override && override >= 1
     ? Math.min(override, maxReasonable)
     // 7 teams is a special case: we'd rather run one pool of 7 (full
