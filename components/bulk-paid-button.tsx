@@ -89,7 +89,7 @@ export function BulkPaidButton({ unpaid }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs font-medium px-2 py-1 rounded bg-green-500/15 text-green-300 hover:bg-green-500/25 ring-1 ring-green-500/40"
+        className="btn-secondary text-xs"
       >
         Bulk mark paid
       </button>
