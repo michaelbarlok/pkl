@@ -116,7 +116,27 @@ export async function POST(
     );
   }
 
-  const division = req.division || targetReg.division;
+  // Refuse to silently move the target across divisions. The request
+  // carries its own `division` field which the previous code happily
+  // wrote back onto the target's registration row, so a request
+  // pointing at a different division would teleport the target into
+  // it on accept — and, since a different division means a different
+  // capacity bucket, could push that division over `max_teams_per_
+  // division` without ever counting the move. Forcing the request
+  // and the target's own registration to agree means: (a) no silent
+  // cross-division team movement, and (b) accept never changes the
+  // count in any division (it just attaches a partner_id), which is
+  // why a separate capacity check isn't needed here.
+  if (req.division && req.division !== targetReg.division) {
+    return NextResponse.json(
+      {
+        error:
+          "This request was made for a different division than you're registered in. Ask them to send a new request matching your division.",
+      },
+      { status: 409 }
+    );
+  }
+  const division = targetReg.division;
 
   // A team is ONE row in tournament_registrations — the partner is
   // tracked as partner_id on that row, not as a second row. Keep the
@@ -124,10 +144,28 @@ export async function POST(
   // requester there; if the requester had their own row (e.g. they
   // also posted Need Partner in this tournament) delete it so we
   // don't end up with two rows representing the same team.
-  await service
+  //
+  // The conditional `partner_id IS NULL` clause is the atomicity
+  // guard: two simultaneous accepts on competing requests can both
+  // pass the in-memory checks above (the SELECT-then-UPDATE window),
+  // but only one UPDATE will actually match the row at the database
+  // level — Postgres acquires the row lock and re-evaluates WHERE
+  // under it, so the loser sees zero rows updated and we abort.
+  // Without this clause the loser would silently overwrite the
+  // winner and produce a corrupted team.
+  const { data: linked, error: linkErr } = await service
     .from("tournament_registrations")
     .update({ partner_id: req.requester_id, division })
-    .eq("id", targetReg.id);
+    .eq("id", targetReg.id)
+    .is("partner_id", null)
+    .select("id")
+    .maybeSingle();
+  if (linkErr || !linked) {
+    return NextResponse.json(
+      { error: "You already have a partner for this tournament" },
+      { status: 409 }
+    );
+  }
 
   if (requesterReg) {
     await service
@@ -137,12 +175,16 @@ export async function POST(
   }
 
   // Flip this request to confirmed; cascade-decline anything else
-  // involving either side in this tournament.
+  // involving either side in this tournament. The status='pending'
+  // guard mirrors the partner_id IS NULL guard above — if a parallel
+  // accept somehow already advanced this request we don't want to
+  // double-fire the side-effects below.
   const nowIso = new Date().toISOString();
   await service
     .from("tournament_partner_requests")
     .update({ status: "confirmed", responded_at: nowIso })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", "pending");
 
   // Find every other pending request that involves either side of
   // this newly-confirmed pairing. Fetch BEFORE the cascade-cancel
