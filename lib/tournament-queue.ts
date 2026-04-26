@@ -44,6 +44,10 @@ interface TournamentMatch {
   queue_entered_at: string | null;
   up_next_notified_at: string | null;
   in_3rd_notified_at: string | null;
+  /** Snapshot of allowed court numbers at the moment this match
+   *  entered the queue. NULL = no snapshot (match pre-dates the
+   *  column or hasn't been queued yet). Empty = no court eligible. */
+  queued_court_set: number[] | null;
 }
 
 interface Tournament {
@@ -179,7 +183,7 @@ export async function clearDivisionQueue(
   const service = await createServiceClient();
   await service
     .from("tournament_matches")
-    .update({ queue_entered_at: null })
+    .update({ queue_entered_at: null, queued_court_set: null })
     .eq("tournament_id", tournamentId)
     .eq("division", division)
     .is("court_number", null)
@@ -224,7 +228,7 @@ export async function promoteMatchToCourt(
   const { data: matchesRaw } = await service
     .from("tournament_matches")
     .select(
-      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at, in_3rd_notified_at"
+      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at, in_3rd_notified_at, queued_court_set"
     )
     .eq("tournament_id", tournamentId);
   const matches = (matchesRaw ?? []) as TournamentMatch[];
@@ -236,14 +240,21 @@ export async function promoteMatchToCourt(
   }
 
   // Range gate — if the tournament has court ranges, a manual
-  // "Send to Court N" still has to honor them. Auto-assignment
-  // already does; this is the symmetric block on manual moves.
+  // "Send to Court N" still has to honor them. Prefer the snapshot
+  // taken at enqueue time (queued_court_set) so a match queued
+  // under a different range layout can't be shoved to a court that
+  // wasn't eligible when it joined the queue.
   const courtRanges = await loadCourtRanges(tournamentId);
   const isCourtEligible = makeCourtEligibility(numCourts, courtRanges);
-  if (!isCourtEligible(match.division, courtNumber)) {
+  const snap = (match as any).queued_court_set as number[] | null | undefined;
+  const isAllowed =
+    snap != null
+      ? snap.includes(courtNumber)
+      : isCourtEligible(match.division, courtNumber);
+  if (!isAllowed) {
     return {
       ok: false,
-      error: `Court ${courtNumber} isn't part of this division's assigned range.`,
+      error: `Court ${courtNumber} isn't in this match's assigned range.`,
     };
   }
 
@@ -339,7 +350,7 @@ export async function runAssignmentPass(
   if (opts.reinterleave) {
     await service
       .from("tournament_matches")
-      .update({ queue_entered_at: null })
+      .update({ queue_entered_at: null, queued_court_set: null })
       .eq("tournament_id", tournamentId)
       .eq("status", "pending")
       .is("court_number", null)
@@ -349,7 +360,7 @@ export async function runAssignmentPass(
   const { data: matchesRaw } = await service
     .from("tournament_matches")
     .select(
-      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at, in_3rd_notified_at"
+      "id, tournament_id, division, round, match_number, bracket, player1_id, player2_id, status, court_number, queue_entered_at, up_next_notified_at, in_3rd_notified_at, queued_court_set"
     )
     .eq("tournament_id", tournamentId);
   const matches = (matchesRaw ?? []) as TournamentMatch[];
@@ -377,14 +388,26 @@ export async function runAssignmentPass(
     const nowMs = Date.now();
     for (let i = 0; i < orderedNewlyEligible.length; i++) {
       const ts = new Date(nowMs + i).toISOString();
+      // Snapshot the courts this division is allowed to play on
+      // RIGHT NOW, so a future edit to tournament_court_ranges
+      // doesn't reroute this match. (Empty array when no court is
+      // currently eligible — match still queues, just stays put.)
+      const allowed = eligibleCourtsForDivision(
+        numCourts,
+        orderedNewlyEligible[i].division,
+        isCourtEligible
+      );
       await service
         .from("tournament_matches")
-        .update({ queue_entered_at: ts })
+        .update({ queue_entered_at: ts, queued_court_set: allowed })
         .eq("id", orderedNewlyEligible[i].id);
       // Reflect the write in our local copy so the rest of this pass
       // treats the match as queued with the right ordering.
       const local = matches.find((m) => m.id === orderedNewlyEligible[i].id);
-      if (local) local.queue_entered_at = ts;
+      if (local) {
+        local.queue_entered_at = ts;
+        local.queued_court_set = allowed;
+      }
     }
   }
 
@@ -438,13 +461,21 @@ export async function runAssignmentPass(
     // With ranges defined, a match might be locked to courts 1–10
     // even though courts 11–20 are free for other divisions. Skip
     // (don't break) so a later match in the queue whose range still
-    // has openings can take the next free court.
-    const court = nextFreeCourtForDivision(
-      numCourts,
-      usedCourtNumbers,
-      m.division,
-      isCourtEligible
-    );
+    // has openings can take the next free court. Prefer the snapshot
+    // taken at enqueue time over re-reading the live ranges — that's
+    // what keeps already-queued matches stable when an organizer
+    // updates the layout after they're in line.
+    let court: number | null;
+    if (m.queued_court_set != null) {
+      court = nextFreeFromSet(usedCourtNumbers, m.queued_court_set);
+    } else {
+      court = nextFreeCourtForDivision(
+        numCourts,
+        usedCourtNumbers,
+        m.division,
+        isCourtEligible
+      );
+    }
     if (court === null) continue;
 
     assignments.push({ match: m, court });
@@ -667,6 +698,37 @@ function nextFreeCourtForDivision(
     if (used.has(i)) continue;
     if (!isCourtEligible(division, i)) continue;
     return i;
+  }
+  return null;
+}
+
+/**
+ * Materialise the full list of court numbers a given division can
+ * land on under the current range layout. Snapshotted onto each
+ * match at enqueue time so subsequent edits to court ranges only
+ * affect future matches — already-queued matches keep targeting
+ * whatever courts they were eligible for at the moment they
+ * entered the queue.
+ */
+function eligibleCourtsForDivision(
+  numCourts: number,
+  division: string | null,
+  isCourtEligible: (division: string | null, court: number) => boolean
+): number[] {
+  const out: number[] = [];
+  for (let i = 1; i <= numCourts; i++) {
+    if (isCourtEligible(division, i)) out.push(i);
+  }
+  return out;
+}
+
+/** Picks a free court from a snapshot of allowed court numbers. */
+function nextFreeFromSet(
+  used: Set<number>,
+  allowed: number[]
+): number | null {
+  for (const c of allowed) {
+    if (!used.has(c)) return c;
   }
   return null;
 }

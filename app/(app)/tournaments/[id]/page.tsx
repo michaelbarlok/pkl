@@ -327,6 +327,27 @@ export default async function TournamentDetailPage({
       })()
     : null;
 
+  // Court ranges editor — same lift-into-right-column treatment
+  // as the Court Tracker so on desktop it sits ABOVE the tracker
+  // in the right lane (and on mobile it appears just above the
+  // tracker in source order).
+  const courtRangesBlock =
+    canManage && tournament.status === "in_progress" && ((tournament as any).num_courts ?? 0) > 0 ? (
+      <CourtRangesPanel
+        tournamentId={id}
+        numCourts={(tournament as any).num_courts as number}
+        availableDivisions={Array.from(
+          new Set(
+            confirmedRegistrations
+              .map((r: any) => r.division as string | null)
+              .filter((d): d is string => !!d)
+          )
+        ).sort()}
+        initialRanges={courtRanges}
+        hasActiveDivisions={activeDivisions.length > 0}
+      />
+    ) : null;
+
   const hasDivisionBrackets = matches.length > 0 && canManage;
   const divisionBracketsBlock = hasDivisionBrackets ? (
     <DivisionBrackets
@@ -352,23 +373,31 @@ export default async function TournamentDetailPage({
     />
   ) : null;
 
-  const hasRightColumn = !!(courtTrackerBlock || divisionBracketsBlock);
+  // Once at least one division is live, the operational view (Court
+  // Tracker, Match Queue, Pool Play / Playoff bracket) is the
+  // organizer's primary surface. Push the Registered list, End
+  // Tournament, and Danger Zone cards to the very bottom of the
+  // page in that mode so they're available but out of the way.
+  const liveModeActive = activeDivisions.length > 0;
+
+  const hasRightColumn = !!(courtTrackerBlock || courtRangesBlock || divisionBracketsBlock);
   // Desktop layout:
   //   - Main content (hero, details, registered, etc.) in the left
   //     lane.
-  //   - Court Tracker gets its own sidebar lane when present — it's
-  //     a compact vertical dashboard that reads well at ~600px.
+  //   - Court Tracker (and the Court Ranges editor above it) get
+  //     their own sidebar lane when present — it's a compact
+  //     vertical dashboard that reads well at ~600px.
   //   - Division Brackets drop BELOW the grid as a full-width band
   //     when present. Elimination + round-robin playoff trees need
   //     at least 900px to render without horizontal scroll; forcing
   //     them into a sidebar lane was clipping half the bracket.
-  const hasCourtTrackerLane = !!courtTrackerBlock;
+  const hasCourtTrackerLane = !!(courtTrackerBlock || courtRangesBlock);
   // Tournaments with lots of courts want a wider Court Tracker lane
   // so the internal courts-grid can fit 3 columns of tiles. Favor
   // the right side when >10 courts; stay even otherwise so the hero
   // + details block doesn't feel cramped.
   const manyCourts = ((tournament as any).num_courts ?? 0) > 10;
-  const containerMaxW = hasCourtTrackerLane || divisionBracketsBlock
+  const containerMaxW = hasRightColumn
     ? "max-w-3xl lg:max-w-none"
     : "max-w-3xl lg:max-w-7xl";
   const gridClasses = hasCourtTrackerLane
@@ -779,8 +808,11 @@ export default async function TournamentDetailPage({
               below). Rendering it in both places keeps the source
               order unchanged on mobile so mid-page content like
               Registered/End Tournament still sits below play state. */}
-          {courtTrackerBlock && (
-            <div className="lg:hidden">{courtTrackerBlock}</div>
+          {(courtRangesBlock || courtTrackerBlock) && (
+            <div className="lg:hidden space-y-6">
+              {courtRangesBlock}
+              {courtTrackerBlock}
+            </div>
           )}
 
           {needsNumCourts && (
@@ -798,25 +830,6 @@ export default async function TournamentDetailPage({
                 Edit tournament
               </Link>
             </div>
-          )}
-
-          {/* Court ranges (optional) — only relevant once brackets
-              are generated and the Court Tracker is on screen. We
-              compute the divisions that actually have registrations
-              so the checkboxes don't list empty divisions. */}
-          {canManage && tournament.status === "in_progress" && ((tournament as any).num_courts ?? 0) > 0 && (
-            <CourtRangesPanel
-              tournamentId={id}
-              numCourts={(tournament as any).num_courts as number}
-              availableDivisions={Array.from(
-                new Set(
-                  confirmedRegistrations
-                    .map((r: any) => r.division as string | null)
-                    .filter((d): d is string => !!d)
-                )
-              ).sort()}
-              initialRanges={courtRanges}
-            />
           )}
 
           {/* Simple status controls for non-bracket transitions */}
@@ -913,8 +926,10 @@ export default async function TournamentDetailPage({
       {/* Registrations List — once the tournament goes live the
           registered list takes a back seat to the Court Tracker +
           Live Divisions cards, so collapse it by default (organizer
-          can expand to look up a specific team or handle payments). */}
-      {(() => {
+          can expand to look up a specific team or handle payments).
+          When liveModeActive, this whole block lifts to the bottom
+          of the page (rendered after divisionBracketsBlock). */}
+      {!liveModeActive && (() => {
         const shouldCollapse =
           tournament.status === "in_progress" || tournament.status === "completed";
         const paidCount = confirmedRegistrations.filter((r: any) => r.paid).length;
@@ -1131,10 +1146,10 @@ export default async function TournamentDetailPage({
         </div>
       )}
 
-      {/* End Tournament — collapsible and closed by default so a
-          stray tap can't trigger the confirm modal. Organizer has
-          to expand deliberately. Lives just above Danger Zone. */}
-      {canManage && tournament.status === "in_progress" && (
+      {/* End Tournament — moved to the bottom of the page once
+          divisions are live (rendered after divisionBracketsBlock
+          in that case). */}
+      {!liveModeActive && canManage && tournament.status === "in_progress" && (
         <CollapsibleCard title="End Tournament" defaultOpen={false}>
           <p className="text-xs text-surface-muted">
             Ending the tournament locks all results and emails a recap to every player and organizer. You can&apos;t end it until every match has a score.
@@ -1144,14 +1159,22 @@ export default async function TournamentDetailPage({
       )}
 
       {/* Danger Zone — collapsible, closed by default. Wrapped in
-          red ring so it's visually unmistakable even folded. */}
-      {canManage && tournament.status !== "cancelled" && (
+          red ring so it's visually unmistakable even folded. Once
+          a tournament is in_progress with no scored matches yet,
+          Undo Bracket Generation lives here too — it's destructive
+          enough that an organizer should expand the box on purpose
+          rather than tap a stray button mid-screen. */}
+      {!liveModeActive && canManage && tournament.status !== "cancelled" && (
         <div className="rounded-lg ring-1 ring-red-500/30">
           <CollapsibleCard title="Danger Zone" defaultOpen={false}>
             <p className="text-xs text-surface-muted">
               Cancel or delete this tournament. Both are destructive and can&apos;t be undone.
             </p>
             <div className="flex flex-wrap gap-2">
+              {tournament.status === "in_progress" &&
+                !matches.some((m: any) => m.status === "completed") && (
+                  <UndoBracketGenerationButton tournamentId={id} />
+                )}
               {tournament.status !== "completed" && (
                 <StatusAdvanceButton
                   tournamentId={id}
@@ -1167,9 +1190,12 @@ export default async function TournamentDetailPage({
       )}
         </div>
 
-        {/* Court Tracker sidebar on lg+ — only shown when present. */}
-        {courtTrackerBlock && (
+        {/* Court Tracker sidebar on lg+ — only shown when present.
+            Court Ranges editor (if any) sits above so the layout
+            tools come before the live state. */}
+        {(courtRangesBlock || courtTrackerBlock) && (
           <div className="hidden lg:block space-y-6 min-w-0">
+            {courtRangesBlock}
             {courtTrackerBlock}
           </div>
         )}
@@ -1184,6 +1210,229 @@ export default async function TournamentDetailPage({
           {divisionBracketsBlock}
         </div>
       )}
+
+      {/* When at least one division is active, the Registered list,
+          End Tournament card, and Danger Zone all relocate here so
+          the operational view (tracker, brackets) stays at the top
+          and the secondary surfaces sit out of the way at the bottom. */}
+      <div className="space-y-6">
+      {/* Registrations List — once the tournament goes live the
+          registered list takes a back seat to the Court Tracker +
+          Live Divisions cards, so collapse it by default (organizer
+          can expand to look up a specific team or handle payments).
+          When liveModeActive, this whole block lifts to the bottom
+          of the page (rendered after divisionBracketsBlock). */}
+      {liveModeActive && (() => {
+        const shouldCollapse =
+          tournament.status === "in_progress" || tournament.status === "completed";
+        const paidCount = confirmedRegistrations.filter((r: any) => r.paid).length;
+        const unpaidCount = confirmedRegistrations.length - paidCount;
+        const registeredCountLabel = `Registered (${confirmedRegistrations.length}${tournament.player_cap ? `/${tournament.player_cap}` : ""})`;
+        const paidSubtitle = canManage && tournament.entry_fee && confirmedRegistrations.length > 0
+          ? `${paidCount} of ${confirmedRegistrations.length} paid`
+          : undefined;
+        // Pre-resolve the unpaid list for the bulk-mark-paid modal
+        // so the client component receives display-ready strings and
+        // doesn't need access to the registration join shape.
+        const unpaidForBulk = confirmedRegistrations
+          .filter((r: any) => !r.paid)
+          .map((r: any) => ({
+            id: r.id as string,
+            playerName: (r.player?.display_name as string | undefined) ?? "Unknown",
+            partnerName: (r.partner?.display_name as string | undefined) ?? null,
+            divisionLabel: r.division ? getDivisionLabel(r.division) : null,
+          }));
+
+        const headerRow = (
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <h2 className="text-lg font-semibold text-dark-100">
+              {registeredCountLabel}
+            </h2>
+            {canManage && tournament.entry_fee && confirmedRegistrations.length > 0 && (
+              <>
+                <span className="text-xs text-surface-muted">
+                  {paidCount} of {confirmedRegistrations.length} paid
+                </span>
+                <BulkPaidButton unpaid={unpaidForBulk} />
+                <PaymentReminderButton tournamentId={id} unpaidCount={unpaidCount} />
+              </>
+            )}
+          </div>
+        );
+
+        const tableOrEmpty = confirmedRegistrations.length > 0 ? (
+          <div className="card overflow-x-auto p-0">
+            <table className="min-w-full divide-y divide-surface-border">
+              <thead className="bg-surface-overlay">
+                <tr>
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted w-8">#</th>
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Player</th>
+                  {tournament.type === "doubles" && (
+                    <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Partner</th>
+                  )}
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-surface-muted">Division</th>
+                  {canManage && (
+                    <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Seed</th>
+                  )}
+                  {canManage && tournament.entry_fee && (
+                    <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-surface-muted">Paid</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border bg-surface-raised">
+                {confirmedRegistrations.map((reg, i) => {
+                  const playerId = (reg as any).player_id as string | undefined;
+                  const needsPartner =
+                    tournament.type === "doubles" &&
+                    !(reg as any).partner_id;
+                  // The viewer can ask if they themselves are still
+                  // partner-less — that includes the "I haven't
+                  // registered" case AND the "I registered solo
+                  // looking for a partner" case. Previously the
+                  // second case was blocked, so two need-partner
+                  // players couldn't pair up without one withdrawing
+                  // and re-registering.
+                  const viewerIsPartnerless =
+                    !myRegistration ||
+                    !(myRegistration as any).partner_id;
+                  const viewerCanAsk =
+                    needsPartner &&
+                    profile &&
+                    playerId &&
+                    profile.id !== playerId &&
+                    viewerIsPartnerless;
+                  return (
+                  <tr key={reg.id}>
+                    <td className="px-2 sm:px-4 py-2 text-sm text-surface-muted">{i + 1}</td>
+                    <td className="px-2 sm:px-4 py-2 text-sm font-medium text-dark-100">
+                      {(reg as any).player?.display_name ?? "Unknown"}
+                    </td>
+                    {tournament.type === "doubles" && (
+                      <td className="px-2 sm:px-4 py-2 text-sm text-dark-200">
+                        {(reg as any).partner?.display_name ? (
+                          (reg as any).partner.display_name
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-accent-500/15 text-accent-300 ring-1 ring-accent-500/40">
+                              Need Partner
+                            </span>
+                            {viewerCanAsk && playerId && (
+                              <AskToPartnerButton
+                                tournamentId={id}
+                                targetId={playerId}
+                                targetName={(reg as any).player?.display_name ?? "this player"}
+                              />
+                            )}
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    <td className="px-2 sm:px-4 py-2 text-xs">
+                      {(reg as any).division ? (
+                        <span className="badge-blue">{getDivisionLabel((reg as any).division)}</span>
+                      ) : (
+                        <span className="text-surface-muted">—</span>
+                      )}
+                    </td>
+                    {canManage && (
+                      <td className="px-2 sm:px-4 py-2 text-center text-sm text-surface-muted">
+                        {reg.seed ?? "—"}
+                      </td>
+                    )}
+                    {canManage && tournament.entry_fee && (
+                      <td className="px-2 sm:px-4 py-2 text-center">
+                        <PaidToggle
+                          registrationId={reg.id}
+                          isPaid={(reg as any).paid ?? false}
+                        />
+                      </td>
+                    )}
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="No registrations yet"
+            description="Be the first to register for this tournament."
+          />
+        );
+
+        if (shouldCollapse) {
+          // Payment reminder UI is tucked into the body because it
+          // has interactive state; CollapsibleCard only carries the
+          // plain count + paid-summary in its subtitle.
+          return (
+            <CollapsibleCard
+              title={registeredCountLabel}
+              subtitle={paidSubtitle}
+              defaultOpen={false}
+            >
+              {canManage && tournament.entry_fee && confirmedRegistrations.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <BulkPaidButton unpaid={unpaidForBulk} />
+                  <PaymentReminderButton tournamentId={id} unpaidCount={unpaidCount} />
+                </div>
+              )}
+              {tableOrEmpty}
+            </CollapsibleCard>
+          );
+        }
+
+        return (
+          <div>
+            {headerRow}
+            {tableOrEmpty}
+          </div>
+        );
+      })()}
+
+
+      {/* End Tournament — moved to the bottom of the page once
+          divisions are live (rendered after divisionBracketsBlock
+          in that case). */}
+      {liveModeActive && canManage && tournament.status === "in_progress" && (
+        <CollapsibleCard title="End Tournament" defaultOpen={false}>
+          <p className="text-xs text-surface-muted">
+            Ending the tournament locks all results and emails a recap to every player and organizer. You can&apos;t end it until every match has a score.
+          </p>
+          <EndTournamentButton tournamentId={id} />
+        </CollapsibleCard>
+      )}
+
+      {/* Danger Zone — collapsible, closed by default. Wrapped in
+          red ring so it's visually unmistakable even folded. Once
+          a tournament is in_progress with no scored matches yet,
+          Undo Bracket Generation lives here too — it's destructive
+          enough that an organizer should expand the box on purpose
+          rather than tap a stray button mid-screen. */}
+      {liveModeActive && canManage && tournament.status !== "cancelled" && (
+        <div className="rounded-lg ring-1 ring-red-500/30">
+          <CollapsibleCard title="Danger Zone" defaultOpen={false}>
+            <p className="text-xs text-surface-muted">
+              Cancel or delete this tournament. Both are destructive and can&apos;t be undone.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {tournament.status === "in_progress" &&
+                !matches.some((m: any) => m.status === "completed") && (
+                  <UndoBracketGenerationButton tournamentId={id} />
+                )}
+              {tournament.status !== "completed" && (
+                <StatusAdvanceButton
+                  tournamentId={id}
+                  nextStatus="cancelled"
+                  label="Cancel Tournament"
+                  variant="danger"
+                />
+              )}
+              <DeleteTournamentButton tournamentId={id} />
+            </div>
+          </CollapsibleCard>
+        </div>
+      )}
+      </div>
     </div>
   );
 }
@@ -1203,7 +1452,6 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 function OrganizerControls({
   tournamentId,
   status,
-  hasScoredMatches,
 }: {
   tournamentId: string;
   status: string;
@@ -1215,27 +1463,11 @@ function OrganizerControls({
     registration_closed: { label: "Reopen Registration", next: "registration_open", variant: "secondary" },
   };
 
-  // in_progress lets the organizer back out of bracket generation
-  // — but ONLY before any score has been recorded. Once a match is
-  // completed, undoing would silently wipe real results, so the
-  // button disappears in that case.
-  if (status === "in_progress") {
-    if (hasScoredMatches) return null;
-    return (
-      <div className="card">
-        <h2 className="text-sm font-semibold text-dark-200 mb-3">Organizer Controls</h2>
-        <p className="text-xs text-surface-muted mb-3">
-          Brackets are generated but no scores have been entered yet.
-          You can undo to tweak division settings — this deletes the
-          generated matches and puts the tournament back into bracket
-          setup with your previous picks preserved.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <UndoBracketGenerationButton tournamentId={tournamentId} />
-        </div>
-      </div>
-    );
-  }
+  // Once a tournament is in_progress, the only "control" left is
+  // Undo Bracket Generation — and that lives in the Danger Zone
+  // card now (with the same scored-matches guard). The org card
+  // stops rendering anything for in_progress / completed.
+  if (status === "in_progress" || status === "completed") return null;
 
   const action = nextAction[status];
   if (!action) return null;

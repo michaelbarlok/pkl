@@ -21,6 +21,12 @@ interface Props {
    *  empty division. */
   availableDivisions: string[];
   initialRanges: CourtRange[];
+  /** True when at least one division is already activated for live
+   *  play. Used to auto-collapse the card so the editor doesn't
+   *  steal viewport space once the tournament is actually running.
+   *  Organizer can still expand to tweak ranges mid-tournament —
+   *  changes only affect future matches entering the queue. */
+  hasActiveDivisions?: boolean;
 }
 
 /**
@@ -36,6 +42,7 @@ export function CourtRangesPanel({
   numCourts,
   availableDivisions,
   initialRanges,
+  hasActiveDivisions,
 }: Props) {
   const router = useRouter();
   const [ranges, setRanges] = useState<CourtRange[]>(initialRanges);
@@ -170,7 +177,7 @@ export function CourtRangesPanel({
     <CollapsibleCard
       title="Court ranges"
       subtitle={subtitle}
-      defaultOpen={initialRanges.length > 0}
+      defaultOpen={initialRanges.length > 0 && !hasActiveDivisions}
     >
       <p className="text-xs text-surface-muted mb-3">
         Carve the tournament's {numCourts} courts into ranges and pin
