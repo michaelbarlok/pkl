@@ -764,6 +764,7 @@ export default async function TournamentDetailPage({
           <OrganizerControls
             tournamentId={id}
             status={tournament.status}
+            hasScoredMatches={matches.some((m: any) => m.status === "completed")}
           />
         </>
       )}
@@ -1143,9 +1144,11 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 function OrganizerControls({
   tournamentId,
   status,
+  hasScoredMatches,
 }: {
   tournamentId: string;
   status: string;
+  hasScoredMatches: boolean;
 }) {
   const nextAction: Record<string, { label: string; next: string; variant?: "primary" | "secondary" | "danger" }> = {
     draft: { label: "Open Registration", next: "registration_open" },
@@ -1153,10 +1156,27 @@ function OrganizerControls({
     registration_closed: { label: "Reopen Registration", next: "registration_open", variant: "secondary" },
   };
 
-  // in_progress → completed moves to the bottom of the page (just
-  // above the Danger Zone) so the organizer has to scroll past all
-  // the live data before ending things. Rendered separately below.
-  if (status === "in_progress") return null;
+  // in_progress lets the organizer back out of bracket generation
+  // — but ONLY before any score has been recorded. Once a match is
+  // completed, undoing would silently wipe real results, so the
+  // button disappears in that case.
+  if (status === "in_progress") {
+    if (hasScoredMatches) return null;
+    return (
+      <div className="card">
+        <h2 className="text-sm font-semibold text-dark-200 mb-3">Organizer Controls</h2>
+        <p className="text-xs text-surface-muted mb-3">
+          Brackets are generated but no scores have been entered yet.
+          You can undo to tweak division settings — this deletes the
+          generated matches and puts the tournament back into bracket
+          setup with your previous picks preserved.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <UndoBracketGenerationButton tournamentId={tournamentId} />
+        </div>
+      </div>
+    );
+  }
 
   const action = nextAction[status];
   if (!action) return null;
@@ -1173,6 +1193,58 @@ function OrganizerControls({
         />
       </div>
     </div>
+  );
+}
+
+function UndoBracketGenerationButton({ tournamentId }: { tournamentId: string }) {
+  async function undo() {
+    "use server";
+    const supabase = await createClient();
+    // Re-check the safety invariant on the server (the client also
+    // gates rendering, but a stale page from before someone scored
+    // a match shouldn't be able to nuke that match by clicking).
+    const { count: completedCount } = await supabase
+      .from("tournament_matches")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "completed");
+    if ((completedCount ?? 0) > 0) return;
+    // Status guard — only undo from in_progress.
+    const { data: t } = await supabase
+      .from("tournaments")
+      .select("status")
+      .eq("id", tournamentId)
+      .single();
+    if (!t || t.status !== "in_progress") return;
+    // Wipe matches + the active-division flags so the tournament
+    // page re-shows the division-review panel. division_settings
+    // on the tournament row is intentionally preserved so the
+    // organizer's previous picks pre-fill on the next generate.
+    await supabase
+      .from("tournament_active_divisions")
+      .delete()
+      .eq("tournament_id", tournamentId);
+    await supabase
+      .from("tournament_matches")
+      .delete()
+      .eq("tournament_id", tournamentId);
+    await supabase
+      .from("tournaments")
+      .update({ status: "registration_closed" })
+      .eq("id", tournamentId);
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath(`/tournaments/${tournamentId}`);
+  }
+
+  return (
+    <form action={undo}>
+      <button
+        type="submit"
+        className="btn-secondary !border-amber-500/50 !text-amber-300 hover:!bg-amber-900/20"
+      >
+        Undo bracket generation
+      </button>
+    </form>
   );
 }
 
