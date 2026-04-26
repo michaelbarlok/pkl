@@ -6,6 +6,7 @@ interface Props {
   scoreToWinPool?: number;
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
+  winBy2?: boolean;
   divisionSettings: {
     games_per_team?: number;
     num_pools?: number;
@@ -30,6 +31,7 @@ export function DivisionRulesCard({
   scoreToWinPool,
   scoreToWinPlayoff,
   finalsBestOf3,
+  winBy2,
   divisionSettings,
   embedded = false,
 }: Props) {
@@ -83,6 +85,12 @@ export function DivisionRulesCard({
               <div>
                 <dt className="inline font-medium">Championship final:</dt>{" "}
                 <dd className="inline text-surface-muted">Best 2 of 3 games</dd>
+              </div>
+            )}
+            {winBy2 && (
+              <div>
+                <dt className="inline font-medium">Win rule:</dt>{" "}
+                <dd className="inline text-surface-muted">Must win by 2 points</dd>
               </div>
             )}
           </>

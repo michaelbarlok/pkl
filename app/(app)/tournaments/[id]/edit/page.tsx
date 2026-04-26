@@ -40,6 +40,7 @@ export default function EditTournamentPage() {
   const [scoreToWinPool, setScoreToWinPool] = useState("11");
   const [scoreToWinPlayoff, setScoreToWinPlayoff] = useState("11");
   const [finalsBestOf3, setFinalsBestOf3] = useState(false);
+  const [winBy2, setWinBy2] = useState(false);
   const [numCourts, setNumCourts] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
@@ -92,6 +93,7 @@ export default function EditTournamentPage() {
         setScoreToWinPool(data.score_to_win_pool?.toString() ?? "11");
         setScoreToWinPlayoff(data.score_to_win_playoff?.toString() ?? "11");
         setFinalsBestOf3(data.finals_best_of_3 ?? false);
+        setWinBy2((data as any).win_by_2 ?? false);
         setNumCourts((data as any).num_courts?.toString() ?? "");
         setLogoUrl((data as any).logo_url ?? null);
       }
@@ -207,6 +209,7 @@ export default function EditTournamentPage() {
         score_to_win_pool: format === "round_robin" ? parseInt(scoreToWinPool) || 11 : null,
         score_to_win_playoff: format === "round_robin" ? parseInt(scoreToWinPlayoff) || 11 : null,
         finals_best_of_3: format === "round_robin" ? finalsBestOf3 : false,
+        win_by_2: winBy2,
         num_courts: numCourts ? parseInt(numCourts) || null : null,
         division_settings: Object.keys(divisionSettings).length > 0 ? divisionSettings : null,
         logo_url: logoUrl,
@@ -332,6 +335,18 @@ export default function EditTournamentPage() {
             </label>
             <p className="text-xs text-surface-muted -mt-2">
               Championship match will be best 2 out of 3 games (each played to the playoff score above)
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={winBy2}
+                onChange={(e) => setWinBy2(e.target.checked)}
+                className="rounded border-surface-border text-brand-300 focus:ring-brand-300"
+              />
+              <span className="text-sm text-dark-200">Win by 2</span>
+            </label>
+            <p className="text-xs text-surface-muted -mt-2">
+              Winning team must lead by at least 2 points (e.g. 12&ndash;10, 14&ndash;12). Score validation enforces this when entering match scores.
             </p>
           </div>
         )}

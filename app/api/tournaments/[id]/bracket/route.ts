@@ -168,7 +168,7 @@ export async function PUT(
   // Fetch tournament format
   const { data: tournament } = await supabase
     .from("tournaments")
-    .select("format, status, finals_best_of_3")
+    .select("format, status, finals_best_of_3, win_by_2, score_to_win_pool, score_to_win_playoff, division_settings")
     .eq("id", tournamentId)
     .single();
 
@@ -181,6 +181,17 @@ export async function PUT(
   if (tournament.status === "cancelled") {
     return NextResponse.json(
       { error: "This tournament has been cancelled — scores can't be recorded." },
+      { status: 409 }
+    );
+  }
+
+  // Completed tournaments are also frozen. Auto-completion no longer
+  // happens server-side — the organizer has to explicitly press
+  // "End Tournament" — so reaching this state means they've locked
+  // results on purpose.
+  if (tournament.status === "completed") {
+    return NextResponse.json(
+      { error: "This tournament has been ended — scores can't be edited." },
       { status: 409 }
     );
   }
@@ -215,6 +226,66 @@ export async function PUT(
   const inferredWinner = p1Wins > p2Wins ? existingMatch.player1_id : existingMatch.player2_id;
   if (inferredWinner !== winner_id) {
     return NextResponse.json({ error: "winner_id doesn't match the scores" }, { status: 400 });
+  }
+
+  // Per-game score validation. The winning team in each game must
+  // reach the division's "score to win" target, and (if the
+  // organizer enabled the rule) win by at least 2. Pool play uses
+  // score_to_win_pool, playoff/championship games use _playoff.
+  // Per-division overrides in division_settings take precedence over
+  // the tournament-level default. The check is skipped if neither a
+  // division override nor a tournament default is set, so older
+  // tournaments without scoring config keep their previous behavior.
+  const divisionOverrides =
+    (tournament.division_settings as Record<string, { score_to_win_pool?: number; score_to_win_playoff?: number } | null> | null)?.[
+      existingMatch.division ?? ""
+    ] ?? null;
+  const isPlayoffMatch = existingMatch.bracket === "playoff" || existingMatch.bracket === "grand_final";
+  const targetScore = isPlayoffMatch
+    ? divisionOverrides?.score_to_win_playoff ?? tournament.score_to_win_playoff
+    : divisionOverrides?.score_to_win_pool ?? tournament.score_to_win_pool;
+  const winBy2 = (tournament as any).win_by_2 === true;
+
+  if (typeof targetScore === "number" && targetScore > 0) {
+    for (let i = 0; i < s1.length; i++) {
+      const a = s1[i];
+      const b = s2[i];
+      const hi = Math.max(a, b);
+      const lo = Math.min(a, b);
+      if (hi < targetScore) {
+        return NextResponse.json(
+          {
+            error: winBy2
+              ? `Game ${i + 1}: at least one team must reach ${targetScore} (win by 2).`
+              : `Game ${i + 1}: at least one team must reach ${targetScore}.`,
+          },
+          { status: 400 }
+        );
+      }
+      if (winBy2) {
+        // Win-by-2: either the winner is exactly at the target and
+        // leads by 2+ (e.g. 11-9 to 11), or the game ran past the
+        // target and the winner leads by exactly 2 (12-10, 13-11).
+        if (hi === targetScore) {
+          if (hi - lo < 2) {
+            return NextResponse.json(
+              { error: `Game ${i + 1}: win by 2 — ${hi}-${lo} isn't a valid finish.` },
+              { status: 400 }
+            );
+          }
+        } else if (hi - lo !== 2) {
+          return NextResponse.json(
+            { error: `Game ${i + 1}: win by 2 — once past ${targetScore}, the winner must lead by exactly 2 (e.g. ${targetScore + 1}-${targetScore - 1}).` },
+            { status: 400 }
+          );
+        }
+      } else if (hi === lo) {
+        return NextResponse.json(
+          { error: `Game ${i + 1}: scores can't be tied.` },
+          { status: 400 }
+        );
+      }
+    }
   }
 
   const previousWinner = existingMatch.status === "completed" ? existingMatch.winner_id : null;
@@ -390,6 +461,30 @@ export async function PUT(
             score2: [],
           });
         }
+
+        // If editing a series game flips the result so the series is
+        // now decided (one team has 2 wins), any later game rows in
+        // the series are orphaned — e.g. Game 2 was 11-9 for B
+        // (1-1, Game 3 spawned), now corrected to 9-11 for A so A
+        // sweeps 2-0 and Game 3 should never be played. Delete every
+        // pending future game row in the series so the bracket
+        // collapses and the championship is awarded.
+        if (decided) {
+          const orphanIds = seriesGames
+            .filter(
+              (g: any) =>
+                typeof g.series_game === "number" &&
+                g.series_game > (match.series_game as number) &&
+                g.status !== "completed"
+            )
+            .map((g: any) => g.id);
+          if (orphanIds.length > 0) {
+            await supabase
+              .from("tournament_matches")
+              .delete()
+              .in("id", orphanIds);
+          }
+        }
       }
 
       // Determine loser
@@ -534,52 +629,13 @@ export async function PUT(
     }
   }
 
-  // Check if tournament is complete
-  // For round robin: all divisions must have playoff matches AND all matches must be completed
-  // For other formats: all matches must be completed
-  const { data: pendingMatches } = await supabase
-    .from("tournament_matches")
-    .select("id")
-    .eq("tournament_id", tournamentId)
-    .in("status", ["pending", "in_progress"])
-    .limit(1);
-
-  if (!pendingMatches || pendingMatches.length === 0) {
-    // For round robin, also check that all divisions have entered playoffs
-    let canComplete = true;
-    if (tournament.format === "round_robin") {
-      const { data: tournamentData } = await supabase
-        .from("tournaments")
-        .select("divisions")
-        .eq("id", tournamentId)
-        .single();
-
-      if (tournamentData?.divisions) {
-        const divisions = tournamentData.divisions as string[];
-        for (const div of divisions) {
-          const { data: playoffCheck } = await supabase
-            .from("tournament_matches")
-            .select("id")
-            .eq("tournament_id", tournamentId)
-            .eq("division", div)
-            .eq("bracket", "playoff")
-            .limit(1);
-
-          if (!playoffCheck || playoffCheck.length === 0) {
-            canComplete = false;
-            break;
-          }
-        }
-      }
-    }
-
-    if (canComplete) {
-      await supabase
-        .from("tournaments")
-        .update({ status: "completed" })
-        .eq("id", tournamentId);
-    }
-  }
+  // Tournament status is no longer flipped to "completed" here.
+  // Final results are only locked when the organizer explicitly hits
+  // "End Tournament" (POST /api/tournaments/[id]/complete) — that
+  // gate keeps every match editable for as long as the bracket is
+  // still in_progress, including championship games that have already
+  // been entered. Auto-completing here would hide the End Tournament
+  // button and reject any subsequent score correction with a 409.
 
   // Promote the next queued match to the freed court (if any). Fire
   // and forget — a failure in the engine shouldn't roll back the

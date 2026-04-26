@@ -63,6 +63,54 @@ export async function PATCH(
     return NextResponse.json({ error: "Each player can only appear in one slot" }, { status: 400 });
   }
 
+  // Group-level scoring rule check on score corrections too —
+  // an admin "fixing" a score still has to land on a valid finish.
+  const { data: prefs } = await auth.supabase
+    .from("group_preferences")
+    .select("game_limit_4p, win_by_2")
+    .eq("group_id", groupId)
+    .maybeSingle();
+
+  if (prefs) {
+    const gameLimit = prefs.game_limit_4p;
+    if (typeof gameLimit === "number" && gameLimit > 0) {
+      const hi = Math.max(scoreA, scoreB);
+      const lo = Math.min(scoreA, scoreB);
+      if (hi < gameLimit) {
+        return NextResponse.json(
+          {
+            error: prefs.win_by_2
+              ? `At least one team must reach ${gameLimit} points (win by 2).`
+              : `At least one team must reach ${gameLimit} points.`,
+          },
+          { status: 400 }
+        );
+      }
+      if (prefs.win_by_2) {
+        if (hi === gameLimit) {
+          if (hi - lo < 2) {
+            return NextResponse.json(
+              { error: `Win by 2 — ${hi}-${lo} isn't a valid finish.` },
+              { status: 400 }
+            );
+          }
+        } else if (hi - lo !== 2) {
+          return NextResponse.json(
+            {
+              error: `Win by 2 — once past ${gameLimit}, the winner must lead by exactly 2 (e.g. ${gameLimit + 1}-${gameLimit - 1}).`,
+            },
+            { status: 400 }
+          );
+        }
+      } else if (hi === lo) {
+        return NextResponse.json(
+          { error: "Tie scores aren't allowed — someone has to win." },
+          { status: 400 }
+        );
+      }
+    }
+  }
+
   // Verify the match belongs to this session and group
   const { data: existing } = await auth.supabase
     .from("free_play_matches")

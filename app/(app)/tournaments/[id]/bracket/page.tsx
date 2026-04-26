@@ -91,6 +91,7 @@ export default async function PublicBracketPage({
             score_to_win_pool: (tournament as any).score_to_win_pool ?? undefined,
             score_to_win_playoff: (tournament as any).score_to_win_playoff ?? undefined,
             finals_best_of_3: (tournament as any).finals_best_of_3 ?? undefined,
+            win_by_2: (tournament as any).win_by_2 ?? undefined,
           }}
           canManage={false}
           tournamentId={id}

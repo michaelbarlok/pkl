@@ -53,7 +53,7 @@ export default async function TournamentLivePage({
       supabase
         .from("tournaments")
         .select(
-          "id, title, status, format, type, num_courts, score_to_win_pool, score_to_win_playoff, finals_best_of_3, division_settings"
+          "id, title, status, format, type, num_courts, score_to_win_pool, score_to_win_playoff, finals_best_of_3, win_by_2, division_settings"
         )
         .eq("id", tournamentId)
         .single(),
@@ -330,6 +330,7 @@ export default async function TournamentLivePage({
           scoreToWinPool={tournament.score_to_win_pool ?? undefined}
           scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
           finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
+          winBy2={(tournament as any).win_by_2 ?? undefined}
           divisionSettings={(tournament as any).division_settings?.[myDivision] ?? null}
           embedded
         />
@@ -368,6 +369,7 @@ export default async function TournamentLivePage({
           tournament.score_to_win_playoff ?? undefined
         }
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
+        winBy2={(tournament as any).win_by_2 ?? undefined}
         partnerMap={partnerMap}
         seedByPlayerId={seedByPlayerId}
       />
@@ -385,6 +387,7 @@ export default async function TournamentLivePage({
         scoreToWinPool={tournament.score_to_win_pool ?? undefined}
         scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
         finalsBestOf3={tournament.finals_best_of_3 ?? undefined}
+        winBy2={(tournament as any).win_by_2 ?? undefined}
         divisionSettings={(tournament as any).division_settings ?? null}
         partnerMap={partnerMap}
         seedByPlayerId={seedByPlayerId}

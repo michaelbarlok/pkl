@@ -59,6 +59,60 @@ export async function POST(
     );
   }
 
+  // Group-level scoring rule check (game limit + optional win-by-2).
+  // Mirrors what ladder-league session scoring enforces in
+  // /api/sessions/[id]/score so free-play and league entries share
+  // the same contract. Existing rows aren't re-validated — this only
+  // gates new inserts, so historic matches remain untouched.
+  const { data: prefs } = await auth.supabase
+    .from("group_preferences")
+    .select("game_limit_4p, game_limit_5p, win_by_2")
+    .eq("group_id", groupId)
+    .maybeSingle();
+
+  if (prefs) {
+    // Free-play matches are 1v1 (2 players) or 2v2 (4 players). The
+    // 5-person variant only exists for shootout pools, so we always
+    // use the 4-person game limit here as the per-team target.
+    const gameLimit = prefs.game_limit_4p;
+    if (typeof gameLimit === "number" && gameLimit > 0) {
+      const hi = Math.max(score_a, score_b);
+      const lo = Math.min(score_a, score_b);
+      if (hi < gameLimit) {
+        return NextResponse.json(
+          {
+            error: prefs.win_by_2
+              ? `At least one team must reach ${gameLimit} points (win by 2).`
+              : `At least one team must reach ${gameLimit} points.`,
+          },
+          { status: 400 }
+        );
+      }
+      if (prefs.win_by_2) {
+        if (hi === gameLimit) {
+          if (hi - lo < 2) {
+            return NextResponse.json(
+              { error: `Win by 2 — ${hi}-${lo} isn't a valid finish.` },
+              { status: 400 }
+            );
+          }
+        } else if (hi - lo !== 2) {
+          return NextResponse.json(
+            {
+              error: `Win by 2 — once past ${gameLimit}, the winner must lead by exactly 2 (e.g. ${gameLimit + 1}-${gameLimit - 1}).`,
+            },
+            { status: 400 }
+          );
+        }
+      } else if (hi === lo) {
+        return NextResponse.json(
+          { error: "Tie scores aren't allowed — someone has to win." },
+          { status: 400 }
+        );
+      }
+    }
+  }
+
   // Validate all players are group members
   const playerIds = [team_a_p1, team_a_p2, team_b_p1, team_b_p2].filter(Boolean);
   const { data: memberCheck } = await auth.supabase

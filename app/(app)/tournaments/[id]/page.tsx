@@ -294,6 +294,10 @@ export default async function TournamentDetailPage({
             numCourts={numCourts}
             onCourt={onCourtMatches}
             queue={queuedMatches}
+            scoreToWinPool={tournament.score_to_win_pool ?? undefined}
+            scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
+            winBy2={(tournament as any).win_by_2 ?? undefined}
+            divisionSettings={(tournament as any).division_settings ?? null}
           />
         );
       })()
@@ -311,6 +315,7 @@ export default async function TournamentDetailPage({
         score_to_win_pool: tournament.score_to_win_pool ?? undefined,
         score_to_win_playoff: tournament.score_to_win_playoff ?? undefined,
         finals_best_of_3: tournament.finals_best_of_3 ?? undefined,
+        win_by_2: (tournament as any).win_by_2 ?? undefined,
       }}
       canManage={canManage}
       tournamentId={id}
@@ -600,6 +605,12 @@ export default async function TournamentDetailPage({
                 <div>
                   <p className="text-xs text-surface-muted uppercase font-medium">Finals</p>
                   <p className="text-sm text-dark-100">Best 2 of 3</p>
+                </div>
+              )}
+              {(tournament as any).win_by_2 && (
+                <div>
+                  <p className="text-xs text-surface-muted uppercase font-medium">Win Rule</p>
+                  <p className="text-sm text-dark-100">Win by 2</p>
                 </div>
               )}
             </div>

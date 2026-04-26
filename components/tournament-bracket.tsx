@@ -18,6 +18,7 @@ interface Props {
   scoreToWinPool?: number;
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
+  winBy2?: boolean;
   partnerMap?: PartnerMap;
   /** Map of "<division>|<team-primary-player_id>" → playoff seed
    *  number. Compound key is required because the same player can
@@ -28,7 +29,7 @@ interface Props {
   seedByPlayerId?: Map<string, number>;
 }
 
-export function TournamentBracketView({ matches, format, canManage, tournamentId, division, scoreToWinPool, scoreToWinPlayoff, finalsBestOf3, partnerMap, seedByPlayerId }: Props) {
+export function TournamentBracketView({ matches, format, canManage, tournamentId, division, scoreToWinPool, scoreToWinPlayoff, finalsBestOf3, winBy2, partnerMap, seedByPlayerId }: Props) {
   if (format === "round_robin") {
     return (
       <RoundRobinView
@@ -39,6 +40,7 @@ export function TournamentBracketView({ matches, format, canManage, tournamentId
         scoreToWinPool={scoreToWinPool}
         scoreToWinPlayoff={scoreToWinPlayoff}
         finalsBestOf3={finalsBestOf3}
+        winBy2={winBy2}
         partnerMap={partnerMap}
         seedByPlayerId={seedByPlayerId}
       />
@@ -214,6 +216,7 @@ function RoundRobinView({
   scoreToWinPool,
   scoreToWinPlayoff,
   finalsBestOf3,
+  winBy2,
   partnerMap,
   seedByPlayerId,
 }: {
@@ -224,6 +227,7 @@ function RoundRobinView({
   scoreToWinPool?: number;
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
+  winBy2?: boolean;
   partnerMap?: PartnerMap;
   seedByPlayerId?: Map<string, number>;
 }) {
@@ -378,6 +382,7 @@ function RoundRobinView({
               canManage={canManage}
               tournamentId={tournamentId}
               scoreToWin={scoreToWinPool}
+              winBy2={winBy2}
               partnerMap={partnerMap}
             />
           );
@@ -449,6 +454,7 @@ function RoundRobinView({
       tournamentId={tournamentId}
       scoreToWin={scoreToWinPlayoff}
       finalsBestOf3={finalsBestOf3}
+      winBy2={winBy2}
       partnerMap={partnerMap}
       seedByPlayerId={seedByPlayerId}
     />
@@ -561,6 +567,7 @@ function PoolSection({
   canManage,
   tournamentId,
   scoreToWin,
+  winBy2,
   partnerMap,
 }: {
   label: string;
@@ -568,6 +575,7 @@ function PoolSection({
   canManage: boolean;
   tournamentId: string;
   scoreToWin?: number;
+  winBy2?: boolean;
   partnerMap?: PartnerMap;
 }) {
   // Collapsible by default-open. Multi-pool divisions (Winners/
@@ -755,7 +763,9 @@ function PoolSection({
                   match={match}
                   canManage={canManage}
                   tournamentId={tournamentId}
-                  gameInfo={scoreToWin ? `Game to ${scoreToWin}` : undefined}
+                  gameInfo={scoreToWin ? `Game to ${scoreToWin}${winBy2 ? " (win by 2)" : ""}` : undefined}
+                  scoreToWin={scoreToWin}
+                  winBy2={winBy2}
                   partnerMap={partnerMap}
                 />
               ))}
@@ -777,6 +787,7 @@ function PlayoffBracketView({
   tournamentId,
   scoreToWin,
   finalsBestOf3,
+  winBy2,
   partnerMap,
   seedByPlayerId,
 }: {
@@ -785,6 +796,7 @@ function PlayoffBracketView({
   tournamentId: string;
   scoreToWin?: number;
   finalsBestOf3?: boolean;
+  winBy2?: boolean;
   partnerMap?: PartnerMap;
   seedByPlayerId?: Map<string, number>;
 }) {
@@ -830,7 +842,7 @@ function PlayoffBracketView({
                 const isLegacyBestOf3Row =
                   isChampionship && !!finalsBestOf3 && !seriesGame;
                 const gameInfoText = scoreToWin
-                  ? `Game to ${scoreToWin}${isLegacyBestOf3Row ? " (Best 2 of 3)" : ""}`
+                  ? `Game to ${scoreToWin}${winBy2 ? " (win by 2)" : ""}${isLegacyBestOf3Row ? " · Best 2 of 3" : ""}`
                   : isLegacyBestOf3Row
                     ? "Best 2 of 3"
                     : undefined;
@@ -851,6 +863,8 @@ function PlayoffBracketView({
                       canManage={canManage}
                       tournamentId={tournamentId}
                       gameInfo={gameInfoText ?? (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
+                      scoreToWin={scoreToWin}
+                      winBy2={winBy2}
                       partnerMap={partnerMap}
                       bestOf3={isLegacyBestOf3Row}
                       seedByPlayerId={seedByPlayerId}
@@ -980,6 +994,8 @@ function MatchCard({
   canManage,
   tournamentId,
   gameInfo,
+  scoreToWin,
+  winBy2,
   partnerMap,
   bestOf3,
   seedByPlayerId,
@@ -988,6 +1004,8 @@ function MatchCard({
   canManage: boolean;
   tournamentId: string;
   gameInfo?: string;
+  scoreToWin?: number;
+  winBy2?: boolean;
   partnerMap?: PartnerMap;
   bestOf3?: boolean;
   seedByPlayerId?: Map<string, number>;
@@ -1069,68 +1087,113 @@ function MatchCard({
   }
 
   async function submitScore() {
+    if (saving) return;
     setSaving(true);
     setError("");
 
-    const s1: number[] = [];
-    const s2: number[] = [];
-    for (const game of gameScores) {
-      const v1 = parseInt(game.s1.trim());
-      const v2 = parseInt(game.s2.trim());
-      if (isNaN(v1) || isNaN(v2)) continue;
-      s1.push(v1);
-      s2.push(v2);
-    }
+    try {
+      const s1: number[] = [];
+      const s2: number[] = [];
+      for (const game of gameScores) {
+        const v1 = parseInt(game.s1.trim());
+        const v2 = parseInt(game.s2.trim());
+        if (isNaN(v1) || isNaN(v2)) continue;
+        s1.push(v1);
+        s2.push(v2);
+      }
 
-    if (s1.length === 0) {
-      setError("Enter scores for at least one game");
-      setSaving(false);
-      return;
-    }
-
-    // Determine winner by games won
-    let p1Games = 0, p2Games = 0;
-    for (let i = 0; i < s1.length; i++) {
-      if (s1[i] > s2[i]) p1Games++;
-      else if (s2[i] > s1[i]) p2Games++;
-    }
-
-    // Best-of-3 validation: need exactly 2 wins
-    if (bestOf3) {
-      if (p1Games < 2 && p2Games < 2) {
-        setError("Best 2 of 3: a team must win 2 games. Add another game score.");
-        setSaving(false);
+      if (s1.length === 0) {
+        setError("Enter scores for at least one game");
         return;
       }
-      if (s1.length > 3) {
-        setError("Best 2 of 3: maximum 3 games allowed.");
-        setSaving(false);
+
+      // Per-game validation against the division's "score to win" and
+      // optional win-by-2 rule. Mirrors the server check so organizers
+      // see the issue before a round-trip.
+      if (typeof scoreToWin === "number" && scoreToWin > 0) {
+        for (let i = 0; i < s1.length; i++) {
+          const a = s1[i];
+          const b = s2[i];
+          const hi = Math.max(a, b);
+          const lo = Math.min(a, b);
+          if (hi < scoreToWin) {
+            setError(
+              winBy2
+                ? `Game ${i + 1}: at least one team must reach ${scoreToWin} (win by 2).`
+                : `Game ${i + 1}: at least one team must reach ${scoreToWin}.`
+            );
+            return;
+          }
+          if (winBy2) {
+            if (hi === scoreToWin) {
+              if (hi - lo < 2) {
+                setError(`Game ${i + 1}: win by 2 — ${hi}-${lo} isn't a valid finish.`);
+                return;
+              }
+            } else if (hi - lo !== 2) {
+              setError(
+                `Game ${i + 1}: win by 2 — once past ${scoreToWin}, the winner must lead by exactly 2 (e.g. ${scoreToWin + 1}-${scoreToWin - 1}).`
+              );
+              return;
+            }
+          } else if (hi === lo) {
+            setError(`Game ${i + 1}: scores can't be tied.`);
+            return;
+          }
+        }
+      }
+
+      // Determine winner by games won
+      let p1Games = 0, p2Games = 0;
+      for (let i = 0; i < s1.length; i++) {
+        if (s1[i] > s2[i]) p1Games++;
+        else if (s2[i] > s1[i]) p2Games++;
+      }
+
+      // Best-of-3 validation: need exactly 2 wins
+      if (bestOf3) {
+        if (p1Games < 2 && p2Games < 2) {
+          setError("Best 2 of 3: a team must win 2 games. Add another game score.");
+          return;
+        }
+        if (s1.length > 3) {
+          setError("Best 2 of 3: maximum 3 games allowed.");
+          return;
+        }
+      }
+
+      const winner = p1Games >= p2Games ? match.player1_id : match.player2_id;
+
+      let res: Response;
+      try {
+        res = await fetch(`/api/tournaments/${tournamentId}/bracket`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            match_id: match.id,
+            score1: s1,
+            score2: s2,
+            winner_id: winner,
+          }),
+        });
+      } catch {
+        setError("Network error — check your connection and try again.");
         return;
       }
-    }
 
-    const winner = p1Games >= p2Games ? match.player1_id : match.player2_id;
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Failed to save");
+        return;
+      }
 
-    const res = await fetch(`/api/tournaments/${tournamentId}/bracket`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        match_id: match.id,
-        score1: s1,
-        score2: s2,
-        winner_id: winner,
-      }),
-    });
-
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error ?? "Failed to save");
+      setScoring(false);
+      router.refresh();
+    } finally {
+      // Always release the button so the user can retry on error or
+      // reopen the editor on success without a stale "Saving..." label.
       setSaving(false);
-      return;
     }
-
-    setScoring(false);
-    router.refresh();
   }
 
   // Multi-game match (best-of-3 etc)

@@ -33,6 +33,16 @@ interface Props {
   numCourts: number;
   onCourt: CourtTrackerMatch[];
   queue: CourtTrackerMatch[];
+  /** Tournament-level score-to-win defaults; division overrides
+   *  in `divisionSettings` win when present. Used by the inline
+   *  ScoreEntryModal to validate before round-tripping. */
+  scoreToWinPool?: number;
+  scoreToWinPlayoff?: number;
+  winBy2?: boolean;
+  divisionSettings?: Record<
+    string,
+    { score_to_win_pool?: number; score_to_win_playoff?: number } | null
+  > | null;
 }
 
 /**
@@ -52,6 +62,10 @@ export function CourtTracker({
   numCourts,
   onCourt,
   queue,
+  scoreToWinPool,
+  scoreToWinPlayoff,
+  winBy2,
+  divisionSettings,
 }: Props) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -315,17 +329,29 @@ export function CourtTracker({
 
       {error && <p className="text-xs text-red-400">{error}</p>}
 
-      {scoring && (
-        <ScoreEntryModal
-          match={scoring}
-          tournamentId={tournamentId}
-          onClose={() => setScoring(null)}
-          onSaved={() => {
-            setScoring(null);
-            router.refresh();
-          }}
-        />
-      )}
+      {scoring && (() => {
+        const isPlayoff =
+          scoring.bracket === "playoff" || scoring.bracket === "grand_final";
+        const override = scoring.division
+          ? divisionSettings?.[scoring.division]
+          : null;
+        const effectiveScoreToWin = isPlayoff
+          ? override?.score_to_win_playoff ?? scoreToWinPlayoff
+          : override?.score_to_win_pool ?? scoreToWinPool;
+        return (
+          <ScoreEntryModal
+            match={scoring}
+            tournamentId={tournamentId}
+            scoreToWin={effectiveScoreToWin}
+            winBy2={winBy2}
+            onClose={() => setScoring(null)}
+            onSaved={() => {
+              setScoring(null);
+              router.refresh();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -339,11 +365,15 @@ export function CourtTracker({
 function ScoreEntryModal({
   match,
   tournamentId,
+  scoreToWin,
+  winBy2,
   onClose,
   onSaved,
 }: {
   match: CourtTrackerMatch;
   tournamentId: string;
+  scoreToWin?: number;
+  winBy2?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -395,6 +425,7 @@ function ScoreEntryModal({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
     setError("");
     const score1 = parseInt(s1);
     const score2 = parseInt(s2);
@@ -410,25 +441,57 @@ function ScoreEntryModal({
       setError("Match is missing a player id.");
       return;
     }
+    // Mirror the server-side scoring rule check so a clearly invalid
+    // entry (e.g. 5-3 in a game to 11) is caught before we round-trip.
+    if (typeof scoreToWin === "number" && scoreToWin > 0) {
+      const hi = Math.max(score1, score2);
+      const lo = Math.min(score1, score2);
+      if (hi < scoreToWin) {
+        setError(
+          winBy2
+            ? `At least one team must reach ${scoreToWin} (win by 2).`
+            : `At least one team must reach ${scoreToWin}.`
+        );
+        return;
+      }
+      if (winBy2) {
+        if (hi === scoreToWin) {
+          if (hi - lo < 2) {
+            setError(`Win by 2 — ${hi}-${lo} isn't a valid finish.`);
+            return;
+          }
+        } else if (hi - lo !== 2) {
+          setError(
+            `Win by 2 — once past ${scoreToWin}, the winner must lead by exactly 2 (e.g. ${scoreToWin + 1}-${scoreToWin - 1}).`
+          );
+          return;
+        }
+      }
+    }
     const winner_id = score1 > score2 ? match.player1_id : match.player2_id;
     setSaving(true);
-    const res = await fetch(`/api/tournaments/${tournamentId}/bracket`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        match_id: match.id,
-        score1: [score1],
-        score2: [score2],
-        winner_id,
-      }),
-    });
-    if (res.ok) {
-      onSaved();
-      return;
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}/bracket`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          match_id: match.id,
+          score1: [score1],
+          score2: [score2],
+          winner_id,
+        }),
+      });
+      if (res.ok) {
+        onSaved();
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Could not save score");
+    } catch {
+      setError("Network error — check your connection and try again.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    const data = await res.json().catch(() => ({}));
-    setError(data.error ?? "Could not save score");
   }
 
   // Stack partner names vertically inside each score column for
