@@ -411,6 +411,116 @@ export default async function TournamentDetailPage({
       : "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6 lg:items-start space-y-6 lg:space-y-0"
     : "space-y-6";
 
+  // Hero card — built once and rendered in one of two slots based
+  // on liveModeActive. Pre-live: top of the main column (legacy
+  // position). Live: ABOVE the new top grid so the page header
+  // sits above brackets/tracker. Lifting it to a const avoids
+  // duplicating ~110 lines of JSX.
+  const heroBlock = (() => {
+    const chip = tournamentDateChip(tournament.start_date, tournament.end_date ?? null);
+    const heroTint = tournamentHeroGradient(id);
+    const isLive = tournament.status === "in_progress";
+    return (
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${heroTint} ring-1 ring-surface-border`}>
+        <div className="p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[tournament.status]}`}>
+                  {isLive && <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-accent-300 animate-pulse align-middle" />}
+                  {STATUS_LABELS[tournament.status]}
+                </span>
+                {(tournament as any).is_hidden && canManage && (
+                  <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-300">
+                    Hidden from public
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 flex items-start gap-3 min-w-0">
+                {(tournament as any).logo_url && (
+                  <div className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg bg-surface-overlay ring-1 ring-surface-border flex items-center justify-center overflow-hidden">
+                    <img
+                      src={(tournament as any).logo_url}
+                      alt=""
+                      className="h-full w-full object-contain p-1"
+                      loading="eager"
+                    />
+                  </div>
+                )}
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-dark-100 break-words min-w-0">
+                  {tournament.title}
+                </h1>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-dark-200">
+                <span className="inline-flex items-center gap-1.5">
+                  <svg className="h-4 w-4 text-dark-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0zM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                  </svg>
+                  {tournament.location}
+                </span>
+                {tournament.start_time && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <svg className="h-4 w-4 text-dark-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                    </svg>
+                    {formatTime(tournament.start_time)}
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span className="badge-blue text-xs">
+                  {FORMAT_LABELS[tournament.format]}
+                </span>
+                <span className="badge-gray text-xs">
+                  {tournament.type === "doubles" ? "Doubles" : "Singles"}
+                </span>
+                <span className="badge-gray text-xs">
+                  {tournament.divisions?.length ?? 0} division{(tournament.divisions?.length ?? 0) !== 1 ? "s" : ""}
+                </span>
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-dark-200 leading-none">
+                {chip.month}
+              </p>
+              <p className="text-4xl sm:text-5xl font-bold leading-none mt-1 text-dark-100">
+                {chip.day}
+                {chip.endDay && (
+                  <span className="text-xl font-semibold text-dark-200 align-top ml-0.5">
+                    {chip.endDay}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {!(tournament as any).is_hidden && (
+              <ShareTournamentButton
+                tournamentId={id}
+                title={tournament.title}
+                summary={`${tournament.title} — ${formatDate(tournament.start_date + "T00:00:00")} at ${tournament.location}`}
+              />
+            )}
+            {matches.length > 0 && !(tournament as any).is_hidden && (
+              <ShareBracketButton tournamentId={id} />
+            )}
+            {canManage && (
+              <Link href={`/tournaments/${id}/edit`} className="btn-secondary text-xs">
+                Edit
+              </Link>
+            )}
+            {isAdmin && (
+              <HideTournamentToggle
+                tournamentId={id}
+                isHidden={(tournament as any).is_hidden ?? false}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  })();
+
   return (
     <div className={`${containerMaxW} mx-auto space-y-6`}>
       {/* Real-time bracket updates */}
@@ -429,6 +539,11 @@ export default async function TournamentDetailPage({
           partnerMap={partnerMap}
         />
       )}
+
+      {/* Hero pinned at the top in live mode so the page header
+          sits above brackets/tracker. Pre-live mode renders the
+          hero inside the main column instead (see below). */}
+      {liveModeActive && heroBlock}
 
       {/* Live operational layout (desktop only) — brackets left,
           court ranges + tracker right. Renders only when at least
@@ -449,124 +564,9 @@ export default async function TournamentDetailPage({
       <div className={gridClasses}>
         <div className="space-y-6 min-w-0">
 
-      {/* Hero */}
-      {(() => {
-        const chip = tournamentDateChip(tournament.start_date, tournament.end_date ?? null);
-        const heroTint = tournamentHeroGradient(id);
-        const isLive = tournament.status === "in_progress";
-        return (
-          <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${heroTint} ring-1 ring-surface-border`}>
-            <div className="p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[tournament.status]}`}>
-                      {isLive && <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-accent-300 animate-pulse align-middle" />}
-                      {STATUS_LABELS[tournament.status]}
-                    </span>
-                    {(tournament as any).is_hidden && canManage && (
-                      <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-900/40 text-amber-300">
-                        Hidden from public
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex items-start gap-3 min-w-0">
-                    {(tournament as any).logo_url && (
-                      // object-contain + tinted frame so wide / tall /
-                      // transparent logos render fully at a consistent
-                      // 56-64px box — no cropping.
-                      <div className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg bg-surface-overlay ring-1 ring-surface-border flex items-center justify-center overflow-hidden">
-                        <img
-                          src={(tournament as any).logo_url}
-                          alt=""
-                          className="h-full w-full object-contain p-1"
-                          loading="eager"
-                        />
-                      </div>
-                    )}
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-dark-100 break-words min-w-0">
-                      {tournament.title}
-                    </h1>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-dark-200">
-                    <span className="inline-flex items-center gap-1.5">
-                      <svg className="h-4 w-4 text-dark-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0zM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                      </svg>
-                      {tournament.location}
-                    </span>
-                    {tournament.start_time && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <svg className="h-4 w-4 text-dark-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                        </svg>
-                        {formatTime(tournament.start_time)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Format pill row */}
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <span className="badge-blue text-xs">
-                      {FORMAT_LABELS[tournament.format]}
-                    </span>
-                    <span className="badge-gray text-xs">
-                      {tournament.type === "doubles" ? "Doubles" : "Singles"}
-                    </span>
-                    <span className="badge-gray text-xs">
-                      {tournament.divisions?.length ?? 0} division{(tournament.divisions?.length ?? 0) !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Date chip */}
-                <div className="shrink-0 text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-dark-200 leading-none">
-                    {chip.month}
-                  </p>
-                  <p className="text-4xl sm:text-5xl font-bold leading-none mt-1 text-dark-100">
-                    {chip.day}
-                    {chip.endDay && (
-                      <span className="text-xl font-semibold text-dark-200 align-top ml-0.5">
-                        {chip.endDay}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* Hero action row */}
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {!(tournament as any).is_hidden && (
-                  <ShareTournamentButton
-                    tournamentId={id}
-                    title={tournament.title}
-                    summary={`${tournament.title} — ${formatDate(tournament.start_date + "T00:00:00")} at ${tournament.location}`}
-                  />
-                )}
-                {matches.length > 0 && !(tournament as any).is_hidden && (
-                  <ShareBracketButton tournamentId={id} />
-                )}
-                {canManage && (
-                  <Link href={`/tournaments/${id}/edit`} className="btn-secondary text-xs">
-                    Edit
-                  </Link>
-                )}
-                {/* Global admins can flip visibility right from the page;
-                     exposed here (in addition to /admin/tournaments) so the
-                     toggle is one tap away on mobile. The API gates this
-                     to admins, so non-admin managers don't see it. */}
-                {isAdmin && (
-                  <HideTournamentToggle
-                    tournamentId={id}
-                    isHidden={(tournament as any).is_hidden ?? false}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Hero — shown here only in pre-live mode. Live mode renders
+          it ABOVE the top grid (see above). */}
+      {!liveModeActive && heroBlock}
 
       {/* Tournament details — collapsible once play is underway so
           the Court Tracker and Live Divisions cards own the viewport

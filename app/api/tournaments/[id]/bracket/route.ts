@@ -524,41 +524,108 @@ export async function PUT(
             }
           }
         } else {
-          // Earlier rounds: standard single-elim advancement
-          // Check if this is the 6-team QF layout (2 QF matches feed into 2 SF matches 1:1)
-          const matchesInThisRound = allPlayoff.filter(
-            (m: any) => m.round === match.round
-          ).length;
-          const matchesInNextRound = allPlayoff.filter(
-            (m: any) => m.round === match.round + 1
-          ).length;
-          const isSixTeamQF = matchesInThisRound === 2 && matchesInNextRound === 2;
+          // Earlier rounds (anything before SF): playoff re-seeding.
+          // Wait until every match in the current round is decided,
+          // then pair the remaining teams highest-seed vs lowest-
+          // seed and write those pairings into the next round. This
+          // way #1 always plays the lowest remaining team each
+          // round; the SF→Final hop is handled by the existing
+          // branch above.
+          //
+          // We include the just-saved match's outcome in the cached
+          // allPlayoff snapshot manually since the SELECT above ran
+          // BEFORE the score update was committed.
+          const cachedSelf = allPlayoff.find((p: any) => p.id === match.id);
+          if (cachedSelf) {
+            cachedSelf.status = "completed";
+            cachedSelf.winner_id = winner_id;
+          }
 
-          if (isSixTeamQF) {
-            // 6-team bracket: R1M1 winner → R2M1 player2, R1M2 winner → R2M2 player2
-            const sfMatch = allPlayoff.find(
-              (m: any) => m.round === match.round + 1 && m.match_number === match.match_number
-            );
-            if (sfMatch) {
-              await supabase
-                .from("tournament_matches")
-                .update({ player2_id: winner_id })
-                .eq("id", sfMatch.id);
+          const currentRoundMatches = allPlayoff.filter(
+            (m: any) => m.round === match.round
+          );
+          const allRoundDone = currentRoundMatches.every(
+            (m: any) => m.status === "completed" || m.status === "bye"
+          );
+
+          if (allRoundDone) {
+            // Winners + bye-advancers from this round.
+            const advancers: string[] = [];
+            for (const m of currentRoundMatches) {
+              if (m.status === "completed" && m.winner_id) {
+                advancers.push(m.winner_id);
+              } else if (m.status === "bye") {
+                const pid = (m.player1_id ?? m.player2_id) as string | null;
+                if (pid) advancers.push(pid);
+              }
             }
-          } else {
-            // Standard bracket: advance to ceil(matchNumber/2) in next round
-            const nextMatchNumber = Math.ceil(match.match_number / 2);
-            const slot = match.match_number % 2 === 1 ? "player1_id" : "player2_id";
-            const nextMatch = allPlayoff.find(
-              (m: any) => m.round === match.round + 1 && m.match_number === nextMatchNumber
+
+            // Carry-overs: teams already sitting in the next round
+            // because they bypassed this round entirely (e.g. seeds
+            // 1 and 2 in a 6-team bracket are pre-seeded directly
+            // into the SF row rather than playing R1). We dedupe
+            // against advancers since per-match advancement has
+            // been removed for non-SF rounds — anything in next-
+            // round slots that isn't a fresh winner is a true
+            // carry-over.
+            const nextRoundMatches = allPlayoff.filter(
+              (m: any) => m.round === match.round + 1
             );
-            if (nextMatch) {
+            const advancerSet = new Set(advancers);
+            const carryOvers: string[] = [];
+            for (const m of nextRoundMatches) {
+              if (m.player1_id && !advancerSet.has(m.player1_id)) {
+                carryOvers.push(m.player1_id);
+              }
+              if (m.player2_id && !advancerSet.has(m.player2_id)) {
+                carryOvers.push(m.player2_id);
+              }
+            }
+
+            const remaining = Array.from(new Set([...advancers, ...carryOvers]));
+
+            // Look up seeds (persisted on tournament_registrations
+            // by the advance_to_playoffs flow). Lower seed number =
+            // higher rank.
+            let seedQuery = supabase
+              .from("tournament_registrations")
+              .select("player_id, seed")
+              .eq("tournament_id", tournamentId)
+              .in("player_id", remaining);
+            if (match.division) {
+              seedQuery = seedQuery.eq("division", match.division);
+            }
+            const { data: seedRows } = await seedQuery;
+            const seedByPlayer = new Map<string, number>(
+              ((seedRows ?? []) as { player_id: string; seed: number | null }[])
+                .map((r) => [r.player_id, r.seed ?? 999])
+            );
+
+            // Sort highest seed (lowest number) first.
+            remaining.sort(
+              (a, b) => (seedByPlayer.get(a) ?? 999) - (seedByPlayer.get(b) ?? 999)
+            );
+
+            // Pair highest vs lowest, second-highest vs second-lowest,
+            // etc. Slot into next-round matches in match_number order.
+            const sortedNextRound = [...nextRoundMatches].sort(
+              (a: any, b: any) => a.match_number - b.match_number
+            );
+            const pairCount = Math.floor(remaining.length / 2);
+            for (let i = 0; i < pairCount; i++) {
+              const target = sortedNextRound[i];
+              if (!target) continue;
+              const high = remaining[i];
+              const low = remaining[remaining.length - 1 - i];
               await supabase
                 .from("tournament_matches")
-                .update({ [slot]: winner_id })
-                .eq("id", nextMatch.id);
+                .update({ player1_id: high, player2_id: low })
+                .eq("id", target.id);
             }
           }
+          // If not all R matches are done yet, do nothing — the
+          // next score in this round will fire this branch and
+          // eventually trigger the re-seed when allRoundDone flips.
         }
       }
     }
