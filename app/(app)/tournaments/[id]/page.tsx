@@ -222,6 +222,14 @@ export default async function TournamentDetailPage({
     canManage &&
     tournament.status === "in_progress" &&
     ((tournament as any).num_courts ?? 0) > 0;
+  // Rescue banner for legacy tournaments created without num_courts
+  // — the Court Tracker / Match Queue / Activate Divisions UI all
+  // hide silently in that case, leaving the organizer with no way
+  // to run live play. Surface a clear "go fix the setting" prompt.
+  const needsNumCourts =
+    canManage &&
+    tournament.status === "in_progress" &&
+    !((tournament as any).num_courts ?? 0);
 
   const courtTrackerBlock = hasCourtTracker
     ? (() => {
@@ -758,6 +766,23 @@ export default async function TournamentDetailPage({
               Registered/End Tournament still sits below play state. */}
           {courtTrackerBlock && (
             <div className="lg:hidden">{courtTrackerBlock}</div>
+          )}
+
+          {needsNumCourts && (
+            <div className="card border border-amber-500/40 bg-amber-500/10">
+              <h2 className="text-sm font-semibold text-amber-300 mb-2">
+                Set the number of courts to start live play
+              </h2>
+              <p className="text-xs text-dark-200 mb-3">
+                This tournament is in progress but has no court count set,
+                so the Court Tracker, Match Queue, and division activation
+                are all hidden. Edit the tournament to set it before going
+                live.
+              </p>
+              <Link href={`/tournaments/${id}/edit`} className="btn-primary text-xs">
+                Edit tournament
+              </Link>
+            </div>
           )}
 
           {/* Simple status controls for non-bracket transitions */}
