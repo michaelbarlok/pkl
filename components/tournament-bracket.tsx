@@ -255,10 +255,7 @@ function RoundRobinView({
   // Determine division results from completed playoff matches
   const divisionResults = getDivisionResults(playoffMatches, partnerMap);
 
-  function handleReviewAdvancement() {
-    // Compute the proposed seeding from pool standings
-    let proposed: typeof editableSeeds;
-
+  function computeProposedSeeds(): typeof editableSeeds {
     if (isMultiPool || poolBrackets.length === 2) {
       // Multi-pool (≥3 pools, top 2 each) and the 8-14 team layout
       // (2 pools, top 3 each) both go through the cross-pool merger
@@ -294,7 +291,7 @@ function RoundRobinView({
       // Map the seeded ids back to the rendered rows (with names).
       const byId = new Map<string, typeof poolStandings[number][number]>();
       for (const ps of poolStandings) for (const r of ps) byId.set(r.id, r);
-      proposed = seeded.map((s) => {
+      return seeded.map((s) => {
         const row = byId.get(s.id);
         return {
           id: s.id,
@@ -308,16 +305,35 @@ function RoundRobinView({
           tiebreakerReason: s.tiebreakerReason,
         };
       });
-    } else {
-      // Single pool: top 4 — pool standings already contain the
-      // tiebreakerReason annotations from computePoolStandings.
-      const standings = computeStandings(poolMatches, partnerMap);
-      proposed = standings.slice(0, Math.min(4, standings.length));
     }
+    // Single pool: top 4 — pool standings already contain the
+    // tiebreakerReason annotations from computePoolStandings.
+    const standings = computeStandings(poolMatches, partnerMap);
+    return standings.slice(0, Math.min(4, standings.length));
+  }
 
-    setEditableSeeds(proposed);
+  function handleReviewAdvancement() {
+    setEditableSeeds(computeProposedSeeds());
     setShowReview(true);
   }
+
+  // Keep the Review Advancement panel in sync with the latest pool
+  // results. A score edit reaches us as a new `matches` prop (via
+  // realtime → router.refresh()), but editableSeeds was a one-shot
+  // snapshot taken when the button was first clicked. Without this
+  // effect the panel kept showing stale advancing teams (and stale
+  // seeding order) until collapsed and reopened. We always replace
+  // with the freshly computed proposal so both the set of advancing
+  // teams and their seeding order track live standings; the organizer
+  // can re-apply any manual reorder afterward if they still want it.
+  useEffect(() => {
+    if (!showReview) return;
+    setEditableSeeds(computeProposedSeeds());
+    // computeProposedSeeds closes over poolMatches/poolBrackets/etc.
+    // which all derive from the matches + partnerMap props, so those
+    // two are the only inputs that can change the result.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches, partnerMap, showReview]);
 
   function moveSeed(index: number, direction: -1 | 1) {
     const newIndex = index + direction;
