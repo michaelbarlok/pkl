@@ -828,7 +828,15 @@ function PlayoffBracketView({
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-dark-200 uppercase tracking-wider">Playoffs</h3>
-      <div className="flex flex-col gap-4">
+      {/* Mobile: vertical list of rounds (current behaviour, easy to
+          scroll through on a phone). Desktop (lg+): rounds become
+          side-by-side columns of a true bracket. lg:items-stretch +
+          lg:flex-1 give every column the same height, and the inner
+          column uses lg:justify-around so later rounds (with fewer
+          matches) align roughly with the midpoint of their feeder
+          round — i.e. semifinals sit between the round-1 pair that
+          feeds them, as a bracket tree should. */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-6">
         {rounds.map((round) => {
           // Best-of-3 finals share match_number=1 across game rows;
           // secondary sort on series_game keeps Game 1 above Game 2
@@ -842,52 +850,54 @@ function PlayoffBracketView({
             );
 
           return (
-            <div key={round} className="flex flex-col gap-3">
-              <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider">
+            <div key={round} className="flex flex-col lg:flex-1 lg:min-w-0">
+              <p className="text-xs font-semibold text-surface-muted text-center uppercase tracking-wider mb-3">
                 {roundLabels(round)}
               </p>
-              {roundMatches.map((match) => {
-                const isThirdPlace = round === maxRound && match.match_number === 2;
-                const isChampionship = round === maxRound && match.match_number === 1;
-                const seriesGame = (match as any).series_game as number | undefined;
-                // Best-of-3 finals are now split into individual
-                // game rows (series_game = 1, 2, 3). Each game row
-                // is a single-game match — the multi-game MatchCard
-                // UI is reserved for legacy single-row best-of-3
-                // finals (no series_game).
-                const isLegacyBestOf3Row =
-                  isChampionship && !!finalsBestOf3 && !seriesGame;
-                const gameInfoText = scoreToWin
-                  ? `Game to ${scoreToWin}${winBy2 ? " (win by 2)" : ""}${isLegacyBestOf3Row ? " · Best 2 of 3" : ""}`
-                  : isLegacyBestOf3Row
-                    ? "Best 2 of 3"
-                    : undefined;
-                return (
-                  <div key={match.id}>
-                    {isThirdPlace && (
-                      <p className="text-xs text-surface-muted mb-1 text-center">3rd Place</p>
-                    )}
-                    {isChampionship && (
-                      <p className="text-xs text-surface-muted mb-1 text-center">
-                        {seriesGame
-                          ? `Championship · Game ${seriesGame}`
-                          : `Championship${isLegacyBestOf3Row ? " (Best 2 of 3)" : ""}`}
-                      </p>
-                    )}
-                    <MatchCard
-                      match={match}
-                      canManage={canManage}
-                      tournamentId={tournamentId}
-                      gameInfo={gameInfoText ?? (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
-                      scoreToWin={scoreToWin}
-                      winBy2={winBy2}
-                      partnerMap={partnerMap}
-                      bestOf3={isLegacyBestOf3Row}
-                      seedByPlayerId={seedByPlayerId}
-                    />
-                  </div>
-                );
-              })}
+              <div className="flex flex-col gap-3 lg:flex-1 lg:justify-around lg:gap-6">
+                {roundMatches.map((match) => {
+                  const isThirdPlace = round === maxRound && match.match_number === 2;
+                  const isChampionship = round === maxRound && match.match_number === 1;
+                  const seriesGame = (match as any).series_game as number | undefined;
+                  // Best-of-3 finals are now split into individual
+                  // game rows (series_game = 1, 2, 3). Each game row
+                  // is a single-game match — the multi-game MatchCard
+                  // UI is reserved for legacy single-row best-of-3
+                  // finals (no series_game).
+                  const isLegacyBestOf3Row =
+                    isChampionship && !!finalsBestOf3 && !seriesGame;
+                  const gameInfoText = scoreToWin
+                    ? `Game to ${scoreToWin}${winBy2 ? " (win by 2)" : ""}${isLegacyBestOf3Row ? " · Best 2 of 3" : ""}`
+                    : isLegacyBestOf3Row
+                      ? "Best 2 of 3"
+                      : undefined;
+                  return (
+                    <div key={match.id}>
+                      {isThirdPlace && (
+                        <p className="text-xs text-surface-muted mb-1 text-center">3rd Place</p>
+                      )}
+                      {isChampionship && (
+                        <p className="text-xs text-surface-muted mb-1 text-center">
+                          {seriesGame
+                            ? `Championship · Game ${seriesGame}`
+                            : `Championship${isLegacyBestOf3Row ? " (Best 2 of 3)" : ""}`}
+                        </p>
+                      )}
+                      <MatchCard
+                        match={match}
+                        canManage={canManage}
+                        tournamentId={tournamentId}
+                        gameInfo={gameInfoText ?? (scoreToWin ? `Game to ${scoreToWin}` : undefined)}
+                        scoreToWin={scoreToWin}
+                        winBy2={winBy2}
+                        partnerMap={partnerMap}
+                        bestOf3={isLegacyBestOf3Row}
+                        seedByPlayerId={seedByPlayerId}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
