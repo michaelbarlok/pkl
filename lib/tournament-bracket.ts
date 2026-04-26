@@ -952,9 +952,11 @@ export function computePoolStandings(
  *      for them.
  *   4. Stable hash of player_id for cross-pool ties — deterministic
  *      so the same standings always produce the same seed order on
- *      reload, but visually random across teams. Surfaced to the
- *      organizer as "Random selection (cross-pool tie)" so they
- *      know the algorithm couldn't separate the teams on stats.
+ *      reload, but visually random across teams. Surfaced as
+ *      "Coin flip (different pools — these teams never played each
+ *      other)" so the organizer (and the players in the seeding
+ *      panel) understand the bracket position was decided by a
+ *      coin-flip equivalent rather than any on-court result.
  *
  * tiebreakerReason annotates the row that ranked above the row
  * directly below when wins+PD couldn't split them. Same-pool ties
@@ -1038,7 +1040,8 @@ export function computeCrossPoolSeeding(
       // have it here, so default to a generic same-pool note.
       a.tiebreakerReason = "Higher head-to-head finish (same pool)";
     } else {
-      a.tiebreakerReason = "Random (cross-pool tie)";
+      a.tiebreakerReason =
+        "Coin flip (different pools — these teams never played each other)";
     }
   }
 
