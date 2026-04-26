@@ -131,6 +131,52 @@ export function CourtTracker({
 
   const openCourts = courtsList.filter((c) => !c.match).map((c) => c.court);
 
+  // Range-aware court-grid sections. Same layout idea as the queue
+  // groups below, but for the grid of court cards at the top: one
+  // labelled section per range so an at-a-glance read of the
+  // tracker tells you "courts 1-10 are Men's, 11-20 are Women's".
+  // With no ranges, a single un-labelled section preserves the
+  // legacy single-grid look.
+  const courtSections = useMemo(() => {
+    if (!courtRanges || courtRanges.length === 0) {
+      return [{
+        key: "all",
+        label: null as string | null,
+        sublabel: null as string | null,
+        courts: courtsList,
+      }];
+    }
+    const rangedCourts = new Set<number>();
+    for (const r of courtRanges) {
+      for (let c = r.court_start; c <= r.court_end; c++) rangedCourts.add(c);
+    }
+    const sections: { key: string; label: string | null; sublabel: string | null; courts: typeof courtsList }[] = [];
+    for (const r of courtRanges) {
+      const cards = courtsList.filter(
+        (c) => c.court >= r.court_start && c.court <= r.court_end
+      );
+      sections.push({
+        key: r.id,
+        label: `${r.label} · Courts ${r.court_start}–${r.court_end}`,
+        sublabel:
+          r.divisions.length > 0
+            ? r.divisions.map((d) => getDivisionLabel(d)).join(" · ")
+            : "No divisions assigned",
+        courts: cards,
+      });
+    }
+    const unrangedCards = courtsList.filter((c) => !rangedCourts.has(c.court));
+    if (unrangedCards.length > 0) {
+      sections.push({
+        key: "unranged",
+        label: `Other courts · ${unrangedCards.map((c) => c.court).join(", ")}`,
+        sublabel: "Open to any unassigned division",
+        courts: unrangedCards,
+      });
+    }
+    return sections;
+  }, [courtRanges, courtsList]);
+
   // Range-aware queue groups. With no ranges defined we render the
   // queue as a single global list (legacy default). With ranges,
   // each range becomes its own queue section showing only matches
@@ -249,6 +295,19 @@ export function CourtTracker({
           >10-court tournaments get a tighter tile (minimum 220px)
           AND tighter padding so three columns fit comfortably in
           the Court Tracker lane on standard laptops. */}
+      <div className="space-y-4">
+      {courtSections.map((section) => (
+      <div key={section.key}>
+        {section.label && (
+          <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-l-2 border-brand-500/60 pl-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-dark-100">
+              {section.label}
+            </h4>
+            {section.sublabel && (
+              <p className="text-[11px] text-surface-muted">{section.sublabel}</p>
+            )}
+          </div>
+        )}
       <div
         className="grid grid-cols-1 gap-2 sm:[grid-template-columns:repeat(auto-fit,minmax(var(--court-min,260px),1fr))]"
         style={
@@ -257,7 +316,7 @@ export function CourtTracker({
           } as React.CSSProperties
         }
       >
-        {courtsList.map(({ court, match }) => (
+        {section.courts.map(({ court, match }) => (
           <div
             key={court}
             className={
@@ -333,6 +392,9 @@ export function CourtTracker({
             )}
           </div>
         ))}
+      </div>
+      </div>
+      ))}
       </div>
 
       {/* Queue — single global list when no ranges defined,
