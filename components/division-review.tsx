@@ -10,6 +10,30 @@ import {
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+/**
+ * Smallest games-per-team value that schedules cleanly for every
+ * pool in the structure. For multi-pool divisions where one or more
+ * pools is odd-sized this is (smallest-valid lap multiple) — i.e.
+ * (oddPoolSize − 1) for a single odd pool, or the LCM of every odd
+ * pool's lap when there are several. Returns null when no override
+ * is needed (single pool, or all-even pools where any integer
+ * works). Callers use this both as the UI's pre-selected default
+ * and as the value sent on submit so every pool ends up playing the
+ * same number of games.
+ */
+function defaultGamesPerTeamForStructure(structure: {
+  numPools: number;
+  poolSizes: number[];
+  maxGamesPerTeam: number;
+}): number | null {
+  if (structure.numPools < 2) return null;
+  if (!structure.poolSizes.some((s) => s % 2 === 1)) return null;
+  for (let v = 1; v <= structure.maxGamesPerTeam; v++) {
+    if (structure.poolSizes.every((s) => isValidGamesPerTeam(s, v))) return v;
+  }
+  return null;
+}
+
 function describePoolSplit(structure: { numPools: number; poolSizes: number[] }): string {
   const { numPools, poolSizes } = structure;
   const unique = [...new Set(poolSizes)];
@@ -202,10 +226,25 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
           score_to_win_pool?: number;
           score_to_win_playoff?: number;
         } = {};
-        const gpt = parseInt(gamesPerTeam[d.division] ?? "");
-        if (gpt > 0) settings.games_per_team = gpt;
         const np = parseInt(numPoolsOverride[d.division] ?? "");
         if (np > 0) settings.num_pools = np;
+        const gpt = parseInt(gamesPerTeam[d.division] ?? "");
+        if (gpt > 0) {
+          settings.games_per_team = gpt;
+        } else {
+          // For a multi-pool division with at least one odd pool we
+          // ALWAYS need to pin games_per_team — the lib's per-pool
+          // default would otherwise let an even pool play (size−1)
+          // and an odd pool round up to its own (size−1), which means
+          // each pool plays a different number of games. Sending the
+          // structure's smallest valid lap multiple keeps every pool
+          // synced.
+          const structure = getPoolStructure(d.count, {
+            numPools: np > 0 ? np : undefined,
+          });
+          const fallback = defaultGamesPerTeamForStructure(structure);
+          if (fallback != null) settings.games_per_team = fallback;
+        }
         const pa = parseInt(playoffAdvancing[d.division] ?? "");
         if (pa > 0) settings.playoff_advancing = pa;
         const stwPool = parseInt(scoreToWinPool[d.division] ?? "");
@@ -566,10 +605,19 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
 
                   {/* Games per team */}
                   {(() => {
-                    const gpt = parseInt(gamesPerTeam[d.division] ?? "") || null;
+                    const userGpt = parseInt(gamesPerTeam[d.division] ?? "") || null;
+                    // Multi-pool + at least one odd pool forces a
+                    // specific games-per-team so every pool plays
+                    // the same number. Single-pool or all-even
+                    // returns null and we fall back to the lib's
+                    // per-pool default. Used as both the effective
+                    // value for the description AND the dropdown's
+                    // pre-selected option.
+                    const forcedDefault = defaultGamesPerTeamForStructure(poolStructure);
+                    const gpt = userGpt ?? forcedDefault;
                     // Build description based on what each pool will actually do
                     let description: string;
-                    if (gpt === null) {
+                    if (gpt == null) {
                       description = "default: each team plays every opponent once";
                     } else {
                       const maxPoolSize = Math.max(...poolStructure.poolSizes);
@@ -626,9 +674,16 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                             // dropdown of valid values is a better
                             // control than free-text — the organizer
                             // literally can't pick something that
-                            // won't schedule cleanly.
+                            // won't schedule cleanly. When the split
+                            // produces multi-pool with an odd pool we
+                            // pre-select the smallest valid lap so
+                            // every pool plays the same number of
+                            // games out of the gate.
                             <select
-                              value={gamesPerTeam[d.division] ?? ""}
+                              value={
+                                gamesPerTeam[d.division] ??
+                                (forcedDefault != null ? String(forcedDefault) : "")
+                              }
                               onChange={(e) =>
                                 setGamesPerTeam((prev) => ({
                                   ...prev,
@@ -637,7 +692,9 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                               }
                               className="input w-auto py-1 text-center text-xs"
                             >
-                              <option value="">default</option>
+                              {forcedDefault == null && (
+                                <option value="">default</option>
+                              )}
                               {allowedValues.map((v) => (
                                 <option key={v} value={v}>{v}</option>
                               ))}
