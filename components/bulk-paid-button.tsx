@@ -78,6 +78,16 @@ export function BulkPaidButton({ unpaid }: Props) {
       setError(updErr.message);
       return;
     }
+    // Tell every PaidToggle in the page that these ids just flipped
+    // paid=true so they can update optimistic state without waiting
+    // for router.refresh() to round-trip the server component. The
+    // refresh still fires below to keep the "X of Y paid" header
+    // counts and any other server-rendered totals in sync.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("bulk-paid", { detail: { ids, paid: true } })
+      );
+    }
     setOpen(false);
     router.refresh();
   }
