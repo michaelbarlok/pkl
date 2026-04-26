@@ -321,23 +321,14 @@ function RoundRobinView({
   // results. A score edit reaches us as a new `matches` prop (via
   // realtime → router.refresh()), but editableSeeds was a one-shot
   // snapshot taken when the button was first clicked. Without this
-  // effect the panel kept showing the stale advancing teams until
-  // collapsed and reopened. When the advancing team set is unchanged
-  // we preserve the organizer's manual reorder and just refresh the
-  // stats; when the set itself changes we replace the proposal so the
-  // newly-advancing team appears.
+  // effect the panel kept showing stale advancing teams (and stale
+  // seeding order) until collapsed and reopened. We always replace
+  // with the freshly computed proposal so both the set of advancing
+  // teams and their seeding order track live standings; the organizer
+  // can re-apply any manual reorder afterward if they still want it.
   useEffect(() => {
     if (!showReview) return;
-    const proposed = computeProposedSeeds();
-    setEditableSeeds((prev) => {
-      const prevIds = new Set(prev.map((s) => s.id));
-      const sameSet =
-        prev.length === proposed.length &&
-        proposed.every((s) => prevIds.has(s.id));
-      if (!sameSet) return proposed;
-      const proposedById = new Map(proposed.map((s) => [s.id, s]));
-      return prev.map((s) => proposedById.get(s.id) ?? s);
-    });
+    setEditableSeeds(computeProposedSeeds());
     // computeProposedSeeds closes over poolMatches/poolBrackets/etc.
     // which all derive from the matches + partnerMap props, so those
     // two are the only inputs that can change the result.
