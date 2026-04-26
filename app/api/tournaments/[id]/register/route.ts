@@ -306,12 +306,43 @@ export async function DELETE(
 
   // Send withdrawal notification — non-blocking, test users suppressed inside notify()
   const tournamentTitle = tournament?.title ?? "the tournament";
-  const withdrawalEmailData = { tournamentTitle, tournamentId };
 
-  notify({ profileId: reg.player_id, type: "tournament_withdrawal", title: "Withdrawal Confirmed", body: `You have been withdrawn from ${tournamentTitle}.`, link: `/tournaments/${tournamentId}`, emailTemplate: "TournamentWithdrawal", emailData: withdrawalEmailData }).catch(() => {});
+  // Either teammate can hit DELETE, so figure out who actually
+  // clicked Withdraw (the actor) vs the other side of the team (the
+  // partner). The partner needs different copy: their team just
+  // dissolved out from under them and if they still want to play
+  // they have to register again with someone new. Without this, the
+  // partner used to receive the same "Withdrawal Confirmed" message
+  // the actor got, with no hint that they were dropped or that
+  // re-registration is required.
+  const actorId = auth.profile.id;
+  const partnerId =
+    reg.player_id === actorId
+      ? reg.partner_id
+      : reg.partner_id === actorId
+        ? reg.player_id
+        : null;
 
-  if (reg.partner_id) {
-    notify({ profileId: reg.partner_id, type: "tournament_withdrawal", title: "Withdrawal Confirmed", body: `Your team has been withdrawn from ${tournamentTitle}.`, link: `/tournaments/${tournamentId}`, emailTemplate: "TournamentWithdrawal", emailData: withdrawalEmailData }).catch(() => {});
+  notify({
+    profileId: actorId,
+    type: "tournament_withdrawal",
+    title: "Withdrawal Confirmed",
+    body: `You have been withdrawn from ${tournamentTitle}.`,
+    link: `/tournaments/${tournamentId}`,
+    emailTemplate: "TournamentWithdrawal",
+    emailData: { tournamentTitle, tournamentId },
+  }).catch(() => {});
+
+  if (partnerId && partnerId !== actorId) {
+    notify({
+      profileId: partnerId,
+      type: "tournament_withdrawal",
+      title: "Your partner withdrew",
+      body: `Your partner withdrew from ${tournamentTitle}, so your team has been removed. Register again with another partner if you'd like to play.`,
+      link: `/tournaments/${tournamentId}`,
+      emailTemplate: "TournamentWithdrawal",
+      emailData: { tournamentTitle, tournamentId, partnerWithdrew: true },
+    }).catch(() => {});
   }
 
   revalidatePath(`/tournaments/${tournamentId}`);
