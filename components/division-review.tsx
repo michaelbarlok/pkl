@@ -376,7 +376,12 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
           const poolStructure = isRoundRobin
             ? getPoolStructure(d.count, { numPools: poolCountOverride ?? undefined })
             : null;
-          const maxPoolCount = Math.max(1, Math.floor(d.count / 2));
+          // Hard min of 3 teams per pool — a pool of 2 is just a
+          // single head-to-head, not a round robin worth playing
+          // out. getPoolStructure enforces the same clamp so even a
+          // typed-in value above this gets pulled back down before
+          // generation.
+          const maxPoolCount = Math.max(1, Math.floor(d.count / 3));
 
           return (
             <div key={d.division} className="space-y-0">
@@ -564,7 +569,7 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                     const gpt = parseInt(gamesPerTeam[d.division] ?? "") || null;
                     // Build description based on what each pool will actually do
                     let description: string;
-                    if (gpt === null) {
+                    if (gpt == null) {
                       description = "default: each team plays every opponent once";
                     } else {
                       const maxPoolSize = Math.max(...poolStructure.poolSizes);
@@ -621,7 +626,11 @@ export function DivisionReview({ tournamentId, divisions: initialDivisions, form
                             // dropdown of valid values is a better
                             // control than free-text — the organizer
                             // literally can't pick something that
-                            // won't schedule cleanly.
+                            // won't schedule cleanly. The default
+                            // entry lets each pool fall back to its
+                            // own (size − 1) so every team plays
+                            // every opponent in their own pool once,
+                            // even when pool sizes differ.
                             <select
                               value={gamesPerTeam[d.division] ?? ""}
                               onChange={(e) =>

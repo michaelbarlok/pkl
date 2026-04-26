@@ -134,6 +134,13 @@ export default function EditTournamentPage() {
       return;
     }
 
+    const numCourtsParsed = parseInt(numCourts);
+    if (!numCourts || !Number.isFinite(numCourtsParsed) || numCourtsParsed < 1) {
+      setError("Number of courts available is required (1 or more).");
+      setSubmitting(false);
+      return;
+    }
+
     // Cross-field date sanity — same rules as the create form.
     const opensIso = localDateTimeToIso(registrationOpensAt);
     const closesIso = localDateTimeToIso(registrationClosesAt);
@@ -279,18 +286,19 @@ export default function EditTournamentPage() {
         {/* Live-play logistics */}
         <div>
           <label className="block text-sm font-medium text-dark-200 mb-1">
-            Number of courts available
+            Number of courts available <span className="text-red-400">*</span>
           </label>
           <input
             type="number"
             min={1}
+            required
             value={numCourts}
             onChange={(e) => setNumCourts(e.target.value)}
             className="input"
             placeholder="e.g. 4"
           />
           <p className="text-xs text-surface-muted mt-1">
-            Used when divisions go live to auto-assign matches to courts. Leave blank if unknown.
+            Used when divisions go live to auto-assign matches to courts.
           </p>
         </div>
 

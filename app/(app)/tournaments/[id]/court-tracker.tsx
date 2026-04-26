@@ -28,11 +28,25 @@ export interface CourtTrackerMatch {
   position_label: string;
 }
 
+export interface CourtRange {
+  id: string;
+  label: string;
+  court_start: number;
+  court_end: number;
+  divisions: string[];
+}
+
 interface Props {
   tournamentId: string;
   numCourts: number;
   onCourt: CourtTrackerMatch[];
   queue: CourtTrackerMatch[];
+  /** Optional court-range layout. When present, the Match Queue
+   *  splits into one queue per range (showing only matches whose
+   *  division belongs to that range). When empty/absent, the queue
+   *  renders as one global list — legacy behavior. The court grid
+   *  above the queue stays single across all courts either way. */
+  courtRanges?: CourtRange[];
   /** Tournament-level score-to-win defaults; division overrides
    *  in `divisionSettings` win when present. Used by the inline
    *  ScoreEntryModal to validate before round-tripping. */
@@ -62,6 +76,7 @@ export function CourtTracker({
   numCourts,
   onCourt,
   queue,
+  courtRanges,
   scoreToWinPool,
   scoreToWinPlayoff,
   winBy2,
@@ -115,6 +130,60 @@ export function CourtTracker({
   }, [onCourt, numCourts]);
 
   const openCourts = courtsList.filter((c) => !c.match).map((c) => c.court);
+
+  // Range-aware queue groups. With no ranges defined we render the
+  // queue as a single global list (legacy default). With ranges,
+  // each range becomes its own queue section showing only matches
+  // whose division is in that range; the "Send to Court N" buttons
+  // are also restricted to courts within that range so an organizer
+  // can't push a Men's match onto a Women's court by accident.
+  const queueGroups = useMemo(() => {
+    if (!courtRanges || courtRanges.length === 0) {
+      return [{
+        key: "all",
+        label: null as string | null,
+        courts: openCourts,
+        matches: queue,
+      }];
+    }
+    const rangedDivisions = new Set<string>();
+    const rangedCourts = new Set<number>();
+    for (const r of courtRanges) {
+      for (const d of r.divisions) rangedDivisions.add(d);
+      for (let c = r.court_start; c <= r.court_end; c++) rangedCourts.add(c);
+    }
+    const groups: { key: string; label: string | null; courts: number[]; matches: CourtTrackerMatch[] }[] = [];
+    for (const r of courtRanges) {
+      const courts: number[] = [];
+      for (let c = r.court_start; c <= r.court_end; c++) {
+        if (openCourts.includes(c)) courts.push(c);
+      }
+      const matches = queue.filter(
+        (m) => m.division != null && r.divisions.includes(m.division)
+      );
+      groups.push({
+        key: r.id,
+        label: `${r.label} · Courts ${r.court_start}–${r.court_end}`,
+        courts,
+        matches,
+      });
+    }
+    // Catch-all for divisions not assigned to any range — they can
+    // still queue, but only on courts that aren't owned by a range.
+    const otherMatches = queue.filter(
+      (m) => m.division == null || !rangedDivisions.has(m.division)
+    );
+    if (otherMatches.length > 0) {
+      const otherCourts = openCourts.filter((c) => !rangedCourts.has(c));
+      groups.push({
+        key: "other",
+        label: "Unassigned divisions",
+        courts: otherCourts,
+        matches: otherMatches,
+      });
+    }
+    return groups;
+  }, [courtRanges, queue, openCourts]);
 
   async function send(matchId: string, court: number) {
     setBusy(`${matchId}:${court}`);
@@ -266,8 +335,10 @@ export function CourtTracker({
         ))}
       </div>
 
-      {/* Queue */}
-      <div>
+      {/* Queue — single global list when no ranges defined,
+          per-range sections otherwise. The court grid above stays
+          a single canvas across all courts either way. */}
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-surface-muted">
             Match Queue ({queue.length})
@@ -280,50 +351,72 @@ export function CourtTracker({
         </div>
 
         {queue.length === 0 ? (
-          <p className="mt-2 text-xs text-surface-muted">
+          <p className="text-xs text-surface-muted">
             Nothing queued. Matches become eligible once the previous round in their pool finishes.
           </p>
         ) : (
-          <ul className="mt-2 space-y-1.5">
-            {queue.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-start justify-between gap-3 rounded-md bg-surface-overlay ring-1 ring-dark-500 shadow-sm px-3 py-2"
-              >
-                <div className="text-xs min-w-0 flex-1">
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                    <p className="text-dark-100 break-words min-w-0 text-left">
-                      {formatTeam(m.player1_name, m.partner1_name)}
-                    </p>
-                    <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
-                    <p className="text-dark-100 break-words min-w-0 text-right">
-                      {formatTeam(m.player2_name, m.partner2_name)}
-                    </p>
-                  </div>
-                  <p className="text-surface-muted mt-1">
-                    {m.division ? getDivisionLabel(m.division) : ""} · {m.position_label}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                  {openCourts.length === 0 ? (
-                    <span className="text-[11px] text-surface-muted">Waiting on a court</span>
-                  ) : (
-                    openCourts.map((court) => (
-                      <button
-                        key={court}
-                        type="button"
-                        onClick={() => send(m.id, court)}
-                        disabled={busy !== null}
-                        className="btn-primary text-[11px] py-1 px-2 disabled:opacity-50"
-                      >
-                        {busy === `${m.id}:${court}` ? "…" : `Send to ${court}`}
-                      </button>
-                    ))
+          queueGroups.map((group) => (
+            <div key={group.key}>
+              {group.label && (
+                <div className="flex items-center justify-between mb-1.5">
+                  <h4 className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted">
+                    {group.label} ({group.matches.length})
+                  </h4>
+                  {group.courts.length > 0 && (
+                    <span className="text-[11px] text-brand-vivid">
+                      {group.courts.length} open
+                    </span>
                   )}
                 </div>
-              </li>
-            ))}
-          </ul>
+              )}
+              {group.matches.length === 0 ? (
+                <p className="text-xs text-surface-muted italic">
+                  No matches queued for this range right now.
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {group.matches.map((m) => (
+                    <li
+                      key={m.id}
+                      className="flex items-start justify-between gap-3 rounded-md bg-surface-overlay ring-1 ring-dark-500 shadow-sm px-3 py-2"
+                    >
+                      <div className="text-xs min-w-0 flex-1">
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                          <p className="text-dark-100 break-words min-w-0 text-left">
+                            {formatTeam(m.player1_name, m.partner1_name)}
+                          </p>
+                          <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
+                          <p className="text-dark-100 break-words min-w-0 text-right">
+                            {formatTeam(m.player2_name, m.partner2_name)}
+                          </p>
+                        </div>
+                        <p className="text-surface-muted mt-1">
+                          {m.division ? getDivisionLabel(m.division) : ""} · {m.position_label}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        {group.courts.length === 0 ? (
+                          <span className="text-[11px] text-surface-muted">Waiting on a court</span>
+                        ) : (
+                          group.courts.map((court) => (
+                            <button
+                              key={court}
+                              type="button"
+                              onClick={() => send(m.id, court)}
+                              disabled={busy !== null}
+                              className="btn-primary text-[11px] py-1 px-2 disabled:opacity-50"
+                            >
+                              {busy === `${m.id}:${court}` ? "…" : `Send to ${court}`}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))
         )}
       </div>
 

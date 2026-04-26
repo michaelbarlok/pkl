@@ -141,7 +141,13 @@ export async function getTournamentRegistrations(
     .from("tournament_registrations")
     .select("*, division, player:profiles!player_id(id, display_name, avatar_url), partner:profiles!partner_id(id, display_name, avatar_url)")
     .eq("tournament_id", tournamentId)
-    .order("registered_at", { ascending: true });
+    .order("registered_at", { ascending: true })
+    // Stable tiebreaker on id — without it, rows that share a
+    // registered_at (e.g. teams inserted in the same transaction or
+    // within the same nanosecond) come back in a non-deterministic
+    // order, so a paid-toggle that triggers a refetch would silently
+    // shuffle the rendered table.
+    .order("id", { ascending: true });
 
   if (error || !data) return [];
   return data as unknown as TournamentRegistrationWithPlayers[];

@@ -9,6 +9,7 @@ import { DivisionReview } from "@/components/division-review";
 import { ActiveDivisionsManager } from "./active-divisions-manager";
 import { CourtTracker } from "./court-tracker";
 import type { CourtTrackerMatch } from "./court-tracker";
+import { CourtRangesPanel } from "./court-ranges-panel";
 import { EndTournamentButton } from "./end-tournament-button";
 import {
   AskToPartnerButton,
@@ -97,6 +98,7 @@ export default async function TournamentDetailPage({
     organizersResult,
     activeDivisionsResult,
     pendingPartnerRequestsResult,
+    courtRangesResult,
     { data: { user } },
   ] = await Promise.all([
       getTournament(id),
@@ -119,6 +121,11 @@ export default async function TournamentDetailPage({
         )
         .eq("tournament_id", id)
         .eq("status", "pending"),
+      supabase
+        .from("tournament_court_ranges")
+        .select("id, label, court_start, court_end, divisions, position")
+        .eq("tournament_id", id)
+        .order("position", { ascending: true }),
       supabase.auth.getUser(),
     ]);
 
@@ -132,6 +139,13 @@ export default async function TournamentDetailPage({
 
   const coOrganizers = (organizersResult.data ?? []) as any[];
   const activeDivisions = ((activeDivisionsResult.data ?? []) as any[]).map((r) => r.division as string);
+  const courtRanges = ((courtRangesResult.data ?? []) as any[]).map((r) => ({
+    id: r.id as string,
+    label: r.label as string,
+    court_start: r.court_start as number,
+    court_end: r.court_end as number,
+    divisions: (r.divisions as string[] | null) ?? [],
+  }));
   const pendingPartnerRequests = (pendingPartnerRequestsResult.data ?? []) as any[];
   const isCoOrganizer = profile ? coOrganizers.some((o: any) => o.profile_id === profile.id) : false;
   const canManage = isCreator || isAdmin || isCoOrganizer;
@@ -222,6 +236,14 @@ export default async function TournamentDetailPage({
     canManage &&
     tournament.status === "in_progress" &&
     ((tournament as any).num_courts ?? 0) > 0;
+  // Rescue banner for legacy tournaments created without num_courts
+  // — the Court Tracker / Match Queue / Activate Divisions UI all
+  // hide silently in that case, leaving the organizer with no way
+  // to run live play. Surface a clear "go fix the setting" prompt.
+  const needsNumCourts =
+    canManage &&
+    tournament.status === "in_progress" &&
+    !((tournament as any).num_courts ?? 0);
 
   const courtTrackerBlock = hasCourtTracker
     ? (() => {
@@ -295,6 +317,7 @@ export default async function TournamentDetailPage({
             numCourts={numCourts}
             onCourt={onCourtMatches}
             queue={queuedMatches}
+            courtRanges={courtRanges}
             scoreToWinPool={tournament.score_to_win_pool ?? undefined}
             scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
             winBy2={(tournament as any).win_by_2 ?? undefined}
@@ -760,10 +783,47 @@ export default async function TournamentDetailPage({
             <div className="lg:hidden">{courtTrackerBlock}</div>
           )}
 
+          {needsNumCourts && (
+            <div className="card border border-amber-500/40 bg-amber-500/10">
+              <h2 className="text-sm font-semibold text-amber-300 mb-2">
+                Set the number of courts to start live play
+              </h2>
+              <p className="text-xs text-dark-200 mb-3">
+                This tournament is in progress but has no court count set,
+                so the Court Tracker, Match Queue, and division activation
+                are all hidden. Edit the tournament to set it before going
+                live.
+              </p>
+              <Link href={`/tournaments/${id}/edit`} className="btn-primary text-xs">
+                Edit tournament
+              </Link>
+            </div>
+          )}
+
+          {/* Court ranges (optional) — only relevant once brackets
+              are generated and the Court Tracker is on screen. We
+              compute the divisions that actually have registrations
+              so the checkboxes don't list empty divisions. */}
+          {canManage && tournament.status === "in_progress" && ((tournament as any).num_courts ?? 0) > 0 && (
+            <CourtRangesPanel
+              tournamentId={id}
+              numCourts={(tournament as any).num_courts as number}
+              availableDivisions={Array.from(
+                new Set(
+                  confirmedRegistrations
+                    .map((r: any) => r.division as string | null)
+                    .filter((d): d is string => !!d)
+                )
+              ).sort()}
+              initialRanges={courtRanges}
+            />
+          )}
+
           {/* Simple status controls for non-bracket transitions */}
           <OrganizerControls
             tournamentId={id}
             status={tournament.status}
+            hasScoredMatches={matches.some((m: any) => m.status === "completed")}
           />
         </>
       )}
@@ -1143,9 +1203,11 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 function OrganizerControls({
   tournamentId,
   status,
+  hasScoredMatches,
 }: {
   tournamentId: string;
   status: string;
+  hasScoredMatches: boolean;
 }) {
   const nextAction: Record<string, { label: string; next: string; variant?: "primary" | "secondary" | "danger" }> = {
     draft: { label: "Open Registration", next: "registration_open" },
@@ -1153,10 +1215,27 @@ function OrganizerControls({
     registration_closed: { label: "Reopen Registration", next: "registration_open", variant: "secondary" },
   };
 
-  // in_progress → completed moves to the bottom of the page (just
-  // above the Danger Zone) so the organizer has to scroll past all
-  // the live data before ending things. Rendered separately below.
-  if (status === "in_progress") return null;
+  // in_progress lets the organizer back out of bracket generation
+  // — but ONLY before any score has been recorded. Once a match is
+  // completed, undoing would silently wipe real results, so the
+  // button disappears in that case.
+  if (status === "in_progress") {
+    if (hasScoredMatches) return null;
+    return (
+      <div className="card">
+        <h2 className="text-sm font-semibold text-dark-200 mb-3">Organizer Controls</h2>
+        <p className="text-xs text-surface-muted mb-3">
+          Brackets are generated but no scores have been entered yet.
+          You can undo to tweak division settings — this deletes the
+          generated matches and puts the tournament back into bracket
+          setup with your previous picks preserved.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <UndoBracketGenerationButton tournamentId={tournamentId} />
+        </div>
+      </div>
+    );
+  }
 
   const action = nextAction[status];
   if (!action) return null;
@@ -1173,6 +1252,58 @@ function OrganizerControls({
         />
       </div>
     </div>
+  );
+}
+
+function UndoBracketGenerationButton({ tournamentId }: { tournamentId: string }) {
+  async function undo() {
+    "use server";
+    const supabase = await createClient();
+    // Re-check the safety invariant on the server (the client also
+    // gates rendering, but a stale page from before someone scored
+    // a match shouldn't be able to nuke that match by clicking).
+    const { count: completedCount } = await supabase
+      .from("tournament_matches")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "completed");
+    if ((completedCount ?? 0) > 0) return;
+    // Status guard — only undo from in_progress.
+    const { data: t } = await supabase
+      .from("tournaments")
+      .select("status")
+      .eq("id", tournamentId)
+      .single();
+    if (!t || t.status !== "in_progress") return;
+    // Wipe matches + the active-division flags so the tournament
+    // page re-shows the division-review panel. division_settings
+    // on the tournament row is intentionally preserved so the
+    // organizer's previous picks pre-fill on the next generate.
+    await supabase
+      .from("tournament_active_divisions")
+      .delete()
+      .eq("tournament_id", tournamentId);
+    await supabase
+      .from("tournament_matches")
+      .delete()
+      .eq("tournament_id", tournamentId);
+    await supabase
+      .from("tournaments")
+      .update({ status: "registration_closed" })
+      .eq("id", tournamentId);
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath(`/tournaments/${tournamentId}`);
+  }
+
+  return (
+    <form action={undo}>
+      <button
+        type="submit"
+        className="btn-secondary !border-amber-500/50 !text-amber-300 hover:!bg-amber-900/20"
+      >
+        Undo bracket generation
+      </button>
+    </form>
   );
 }
 

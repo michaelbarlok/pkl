@@ -121,6 +121,18 @@ export default function CreateTournamentPage() {
       return;
     }
 
+    // Number of courts is required — without it the Court Tracker
+    // and Match Queue silently disappear post-bracket-generation
+    // (the page gates on num_courts > 0) and the organizer can't
+    // activate divisions. Force it here at creation so we never
+    // ship a tournament that wedges in that state.
+    const numCourtsParsed = parseInt(numCourts);
+    if (!numCourts || !Number.isFinite(numCourtsParsed) || numCourtsParsed < 1) {
+      setError("Number of courts available is required (1 or more).");
+      setSubmitting(false);
+      return;
+    }
+
     // Cross-field date sanity. Bail loudly on nonsense ordering so
     // the cron doesn't end up opening registration after the
     // tournament has already started etc.
@@ -300,18 +312,19 @@ export default function CreateTournamentPage() {
           {/* Live-play logistics */}
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-1">
-              Number of courts available
+              Number of courts available <span className="text-red-400">*</span>
             </label>
             <input
               type="number"
               min={1}
+              required
               value={numCourts}
               onChange={(e) => setNumCourts(e.target.value)}
               className="input"
               placeholder="e.g. 4"
             />
             <p className="text-xs text-surface-muted mt-1">
-              Used when divisions go live to auto-assign matches to courts. Leave blank if unknown.
+              Used when divisions go live to auto-assign matches to courts.
             </p>
           </div>
 

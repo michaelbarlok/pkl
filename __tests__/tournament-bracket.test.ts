@@ -167,16 +167,17 @@ describe("getPoolStructure", () => {
     expect(s.poolSizes).toEqual([6, 6]);
   });
 
-  test("organizer override: 10 teams into 4 pools splits 3/3/2/2", () => {
+  test("organizer override clamps to floor(teamCount/3): 10 teams + 4 pools → 3 pools of 4/3/3", () => {
     const s = getPoolStructure(10, { numPools: 4 });
-    expect(s.numPools).toBe(4);
-    expect(s.poolSizes).toEqual([3, 3, 2, 2]);
+    expect(s.numPools).toBe(3);
+    expect(s.poolSizes).toEqual([4, 3, 3]);
+    expect(s.poolSizes.every((size) => size >= 3)).toBe(true);
   });
 
-  test("override clamps to floor(teamCount/2) to guarantee ≥2 per pool", () => {
+  test("override clamps to floor(teamCount/3) to guarantee ≥3 per pool", () => {
     const s = getPoolStructure(6, { numPools: 99 });
-    expect(s.numPools).toBe(3);
-    expect(s.poolSizes.every((size) => size >= 2)).toBe(true);
+    expect(s.numPools).toBe(2);
+    expect(s.poolSizes.every((size) => size >= 3)).toBe(true);
   });
 
   test("override of 0 or negative falls back to auto", () => {

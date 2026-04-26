@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSupabase } from "@/components/providers/supabase-provider";
 
@@ -14,6 +14,23 @@ export function PaidToggle({ registrationId, isPaid }: Props) {
   const router = useRouter();
   const [optimistic, setOptimistic] = useState(isPaid);
   const [saving, setSaving] = useState(false);
+
+  // Listen for bulk-paid events fired by BulkPaidButton so the per-
+  // row toggle updates immediately without waiting for router.refresh
+  // to round-trip. Without this the user marked teams paid in the
+  // modal, the modal closed, but each row's toggle still rendered
+  // "Unpaid" until they manually reloaded.
+  useEffect(() => {
+    function onBulk(e: Event) {
+      const ce = e as CustomEvent<{ ids: string[]; paid: boolean }>;
+      if (!ce.detail || !Array.isArray(ce.detail.ids)) return;
+      if (ce.detail.ids.includes(registrationId)) {
+        setOptimistic(ce.detail.paid);
+      }
+    }
+    window.addEventListener("bulk-paid", onBulk);
+    return () => window.removeEventListener("bulk-paid", onBulk);
+  }, [registrationId]);
 
   async function toggle() {
     const next = !optimistic;
