@@ -61,7 +61,7 @@ export async function DELETE(
   const service = await createServiceClient();
   const { data: match } = await service
     .from("tournament_matches")
-    .select("id, tournament_id, status, court_number")
+    .select("id, tournament_id, status, court_number, queued_court_set")
     .eq("id", matchId)
     .eq("tournament_id", tournamentId)
     .single();
@@ -73,31 +73,43 @@ export async function DELETE(
     );
   }
 
-  // Treat the queue like an explicit ordered array: read every
-  // queued match (excluding the bumped one), splice the bumped match
-  // in at the position-2 slot of the post-promotion queue, then
-  // re-stamp the whole list with fresh, strictly-increasing 1ms
-  // ticks. This is the definitive ordering — no leaning on existing
-  // stamps that might collide, no microsecond hacks. Cross-division
-  // because queue_entered_at is the merged FIFO ordering across
-  // every active division (Court Tracker reads it that way).
+  // The "queue" we operate on is range-scoped — every match that
+  // shares the bumped match's `queued_court_set` snapshot, i.e.
+  // the cohort competing for the same set of courts. Without this
+  // scoping, a global re-stamp would put cross-range matches at
+  // queue positions 1 and 2, and runAssignmentPass would skip
+  // those (they can't take the freed in-range court) and slot the
+  // bumped match RIGHT BACK on the same court — visually a no-op,
+  // which is exactly what the organizer was reporting.
+  //
+  // JSON-stringify the snapshot for a stable equality key. NULL
+  // snapshot (legacy / pre-column matches) groups with other NULL
+  // snapshots and falls through to the global behavior.
+  const scopeKey = match.queued_court_set
+    ? JSON.stringify(match.queued_court_set)
+    : null;
+
   const { data: queuedRaw } = await service
     .from("tournament_matches")
-    .select("id")
+    .select("id, queued_court_set")
     .eq("tournament_id", tournamentId)
     .eq("status", "pending")
     .is("court_number", null)
     .not("queue_entered_at", "is", null)
     .neq("id", matchId)
     .order("queue_entered_at", { ascending: true });
-  const queued = (queuedRaw ?? []) as { id: string }[];
+  const queued = ((queuedRaw ?? []) as { id: string; queued_court_set: number[] | null }[])
+    .filter((q) => {
+      const k = q.queued_court_set ? JSON.stringify(q.queued_court_set) : null;
+      return k === scopeKey;
+    });
 
   // Pre-promotion order should be [Q1, Q2, BUMPED, Q3, Q4, …] so
   // that after runAssignmentPass promotes Q1 to the just-vacated
   // court, the bumped match sits at position 2 of the remaining
-  // queue. Insert at index 2 (after Q1 and Q2). If the queue has
-  // fewer than 2 entries, insert at the end — bumped is the only
-  // remaining queued match anyway.
+  // in-range queue. Insert at index 2 (after Q1 and Q2). If the
+  // queue has fewer than 2 entries, insert at the end — bumped is
+  // the only remaining queued match in this range anyway.
   const insertAt = Math.min(2, queued.length);
   const newOrder = [
     ...queued.slice(0, insertAt).map((q) => q.id),
@@ -105,10 +117,12 @@ export async function DELETE(
     ...queued.slice(insertAt).map((q) => q.id),
   ];
 
-  // Re-stamp every queued match at consecutive 1ms ticks. The
-  // bumped match also gets its court_number cleared and its
-  // notification ack columns reset since its position context
-  // changed. Updates run in parallel — each touches a single row.
+  // Re-stamp ONLY the in-scope matches at consecutive 1ms ticks.
+  // Cross-range matches keep their original timestamps so their
+  // own queue ordering is preserved. The bumped match also gets
+  // its court_number cleared and its notification ack columns
+  // reset since its position context changed. Updates run in
+  // parallel — each touches a single row.
   const baseMs = Date.now();
   await Promise.all(
     newOrder.map((id, i) => {
