@@ -108,22 +108,31 @@ export default async function MySessionsPage() {
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
   // ----- Free-play sessions -----
-  const { data: freePlayParticipations } = await supabase
+  // Two-step fetch (mirrors the shootout side that splits
+  // session_participants from game_results) so we don't have to rely
+  // on embed + order-on-foreign-table semantics. Empirically the
+  // single-query embed-then-order shape we used before silently
+  // returned zero rows under the viewer's auth even when RLS allowed
+  // every underlying read — the rows now come back reliably.
+  const { data: freePlayPlayerRows } = await supabase
     .from("free_play_session_players")
-    .select(
-      `session_id,
-       session:free_play_sessions!inner(
-         id, status, created_at, group_id,
-         group:shootout_groups(id, name, slug, group_type)
-       )`
-    )
-    .eq("player_id", profile.id)
-    .order("created_at", { ascending: false, foreignTable: "session:free_play_sessions" })
-    .limit(200);
+    .select("session_id")
+    .eq("player_id", profile.id);
 
-  const freePlaySessionIds = (freePlayParticipations ?? [])
-    .map((r: any) => r.session?.id)
+  const freePlaySessionIds = (freePlayPlayerRows ?? [])
+    .map((r: any) => r.session_id as string)
     .filter(Boolean);
+
+  const { data: freePlaySessionRows } = freePlaySessionIds.length
+    ? await supabase
+        .from("free_play_sessions")
+        .select(
+          `id, status, created_at, group_id,
+           group:shootout_groups(id, name, slug, group_type)`
+        )
+        .in("id", freePlaySessionIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as any[] };
 
   const { data: freePlayMatches } = freePlaySessionIds.length
     ? await supabase
@@ -148,9 +157,8 @@ export default async function MySessionsPage() {
     freePlayStats.set(g.session_id, rec);
   }
 
-  const freePlayItems: SessionHistoryItem[] = (freePlayParticipations ?? [])
-    .map((r: any) => {
-      const s = r.session;
+  const freePlayItems: SessionHistoryItem[] = (freePlaySessionRows ?? [])
+    .map((s: any) => {
       if (!s) return null;
       const stats = freePlayStats.get(s.id) ?? { wins: 0, losses: 0, pointDiff: 0 };
       return {
