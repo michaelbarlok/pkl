@@ -38,6 +38,8 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
     playerBadges,
     badgeStats,
     { data: sessionParticipations },
+    { data: freePlayStats },
+    { data: freePlaySessions },
   ] = await Promise.all([
     supabase.from("group_memberships").select("*, group:shootout_groups(*, group_preferences(pct_window_sessions))").eq("player_id", id).returns<(GroupMembership & { group: NonNullable<GroupMembership["group"]> })[]>(),
     supabase.from("game_results").select("*").or(`team_a_p1.eq.${id},team_a_p2.eq.${id},team_b_p1.eq.${id},team_b_p2.eq.${id}`).order("created_at", { ascending: false }).limit(10).returns<GameResult[]>(),
@@ -46,6 +48,16 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
     getPlayerBadges(id),
     getBadgeStats(id),
     supabase.from("session_participants").select("checked_in, shootout_sessions!inner(created_at)").eq("player_id", id).order("created_at", { ascending: false, referencedTable: "shootout_sessions" }).limit(50),
+    // Free-play W/L + point diff per group. The view already
+    // respects shootout_groups.stats_reset_at, so a stats reset on
+    // a group automatically zeroes out the card without us having
+    // to re-derive a window here.
+    supabase.from("free_play_player_stats").select("group_id, wins, losses, total_point_diff").eq("player_id", id).returns<{ group_id: string; wins: number; losses: number; total_point_diff: number }[]>(),
+    // Free-play sessions this player checked in to. Used to derive
+    // both the "X sessions" count and a "last played" timestamp for
+    // the free-play card. Filter to completed sessions so an
+    // in-progress session doesn't inflate the count before it ends.
+    supabase.from("free_play_session_players").select("session:free_play_sessions!inner(group_id, status, ended_at)").eq("player_id", id).eq("session.status", "completed").returns<{ session: { group_id: string; status: string; ended_at: string | null } }[]>(),
   ]);
 
   const { data: currentProfile } = await supabase
@@ -82,6 +94,33 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
   for (const p of sessionParticipations ?? []) {
     if ((p as any).checked_in) streak++;
     else break;
+  }
+
+  // Free-play stats keyed by group_id so the group card render can
+  // pull W-L / point diff / sessions count without re-iterating the
+  // raw rows. The free_play_player_stats view doesn't include groups
+  // a player has zero matches in (e.g. they checked in but no match
+  // recorded), so we default to a 0/0/+0 shape on lookup miss.
+  const freePlayStatsByGroup = new Map<string, { wins: number; losses: number; pointDiff: number }>();
+  for (const row of freePlayStats ?? []) {
+    freePlayStatsByGroup.set(row.group_id, {
+      wins: row.wins ?? 0,
+      losses: row.losses ?? 0,
+      pointDiff: row.total_point_diff ?? 0,
+    });
+  }
+  const freePlaySessionsByGroup = new Map<string, { count: number; lastPlayedAt: string | null }>();
+  for (const row of freePlaySessions ?? []) {
+    const s = row.session;
+    if (!s) continue;
+    const cur = freePlaySessionsByGroup.get(s.group_id) ?? { count: 0, lastPlayedAt: null };
+    cur.count += 1;
+    // Pick the latest ended_at across this group's sessions; falls
+    // back to the existing value when ended_at is null.
+    if (s.ended_at && (!cur.lastPlayedAt || s.ended_at > cur.lastPlayedAt)) {
+      cur.lastPlayedAt = s.ended_at;
+    }
+    freePlaySessionsByGroup.set(s.group_id, cur);
   }
 
   // Recent game W/L
@@ -297,7 +336,19 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-muted mb-3">Groups</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {memberships.map((m) => (
+            {memberships.map((m) => {
+              const isFreePlay = m.group.group_type === "free_play";
+              const fpStats = isFreePlay ? freePlayStatsByGroup.get(m.group_id) : null;
+              const fpSessionInfo = isFreePlay ? freePlaySessionsByGroup.get(m.group_id) : null;
+              // Free-play card uses session attendance + free_play
+              // stats view; ladder card sticks with the stored
+              // group_memberships.last_played_at. They're set by
+              // different write paths, so we pick the right one per
+              // card type rather than try to merge them.
+              const lastPlayedAt = isFreePlay
+                ? fpSessionInfo?.lastPlayedAt ?? null
+                : m.last_played_at;
+              return (
               <Link
                 key={m.group_id}
                 href={`/groups/${m.group.slug}`}
@@ -305,39 +356,60 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
               >
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-dark-100 truncate">{m.group.name}</h3>
-                  <span className={m.group.group_type === "free_play" ? "badge-yellow" : "badge-blue"}>
-                    {m.group.group_type === "free_play" ? "Free Play" : "Ladder"}
+                  <span className={isFreePlay ? "badge-yellow" : "badge-blue"}>
+                    {isFreePlay ? "Free Play" : "Ladder"}
                   </span>
                 </div>
-                {(() => {
-                  const shownSessions = displaySessionsForGroup(
-                    m.total_sessions,
-                    (m.group as any)?.group_preferences?.pct_window_sessions
-                  );
-                  return m.group.group_type !== "free_play" ? (
-                    <div className="grid grid-cols-3 gap-1 text-center mt-3">
-                      <div>
-                        <p className="text-base font-bold text-dark-100">{m.current_step}</p>
-                        <p className="text-[10px] text-surface-muted uppercase tracking-wide">Step</p>
-                      </div>
-                      <div>
-                        <p className="text-base font-bold text-dark-100">{m.win_pct}%</p>
-                        <p className="text-[10px] text-surface-muted uppercase tracking-wide">Pts</p>
-                      </div>
-                      <div>
-                        <p className="text-base font-bold text-dark-100">{shownSessions}</p>
-                        <p className="text-[10px] text-surface-muted uppercase tracking-wide">Sessions</p>
-                      </div>
+                {isFreePlay ? (
+                  <div className="grid grid-cols-3 gap-1 text-center mt-3">
+                    <div>
+                      <p className="text-base font-bold text-dark-100">
+                        {fpStats?.wins ?? 0}-{fpStats?.losses ?? 0}
+                      </p>
+                      <p className="text-[10px] text-surface-muted uppercase tracking-wide">W-L</p>
                     </div>
-                  ) : (
-                    <p className="text-sm text-surface-muted">{shownSessions} sessions</p>
-                  );
-                })()}
-                {m.last_played_at && (
-                  <p className="mt-2 text-xs text-surface-muted">Last played {formatDate(m.last_played_at)}</p>
+                    <div>
+                      <p className="text-base font-bold text-dark-100">
+                        {(fpStats?.pointDiff ?? 0) > 0 ? "+" : ""}
+                        {fpStats?.pointDiff ?? 0}
+                      </p>
+                      <p className="text-[10px] text-surface-muted uppercase tracking-wide">Pt Diff</p>
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-dark-100">{fpSessionInfo?.count ?? 0}</p>
+                      <p className="text-[10px] text-surface-muted uppercase tracking-wide">Sessions</p>
+                    </div>
+                  </div>
+                ) : (
+                  (() => {
+                    const shownSessions = displaySessionsForGroup(
+                      m.total_sessions,
+                      (m.group as any)?.group_preferences?.pct_window_sessions
+                    );
+                    return (
+                      <div className="grid grid-cols-3 gap-1 text-center mt-3">
+                        <div>
+                          <p className="text-base font-bold text-dark-100">{m.current_step}</p>
+                          <p className="text-[10px] text-surface-muted uppercase tracking-wide">Step</p>
+                        </div>
+                        <div>
+                          <p className="text-base font-bold text-dark-100">{m.win_pct}%</p>
+                          <p className="text-[10px] text-surface-muted uppercase tracking-wide">Pts</p>
+                        </div>
+                        <div>
+                          <p className="text-base font-bold text-dark-100">{shownSessions}</p>
+                          <p className="text-[10px] text-surface-muted uppercase tracking-wide">Sessions</p>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
+                {lastPlayedAt && (
+                  <p className="mt-2 text-xs text-surface-muted">Last played {formatDate(lastPlayedAt)}</p>
                 )}
               </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
