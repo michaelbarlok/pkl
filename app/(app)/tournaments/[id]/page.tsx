@@ -375,9 +375,11 @@ export default async function TournamentDetailPage({
 
   // Once at least one division is live, the operational view (Court
   // Tracker, Match Queue, Pool Play / Playoff bracket) is the
-  // organizer's primary surface. Push the Registered list, End
-  // Tournament, and Danger Zone cards to the very bottom of the
-  // page in that mode so they're available but out of the way.
+  // organizer's primary surface. On desktop we lift those into a
+  // top-of-page two-column grid (brackets left, tracker right) and
+  // push every other card — Tournament Info, Live Divisions,
+  // Registered, End Tournament, Danger Zone — below it. On mobile
+  // we leave the natural source-order stacking alone.
   const liveModeActive = activeDivisions.length > 0;
 
   const hasRightColumn = !!(courtTrackerBlock || courtRangesBlock || divisionBracketsBlock);
@@ -391,7 +393,10 @@ export default async function TournamentDetailPage({
   //     when present. Elimination + round-robin playoff trees need
   //     at least 900px to render without horizontal scroll; forcing
   //     them into a sidebar lane was clipping half the bracket.
-  const hasCourtTrackerLane = !!(courtTrackerBlock || courtRangesBlock);
+  // When liveModeActive, the brackets+tracker move to the new top
+  // grid, so the existing main grid's right lane is empty and the
+  // main column flows full-width below the top grid.
+  const hasCourtTrackerLane = !liveModeActive && !!(courtTrackerBlock || courtRangesBlock);
   // Tournaments with lots of courts want a wider Court Tracker lane
   // so the internal courts-grid can fit 3 columns of tiles. Favor
   // the right side when >10 courts; stay even otherwise so the hero
@@ -423,6 +428,22 @@ export default async function TournamentDetailPage({
           matches={matches as any}
           partnerMap={partnerMap}
         />
+      )}
+
+      {/* Live operational layout (desktop only) — brackets left,
+          court ranges + tracker right. Renders only when at least
+          one division is activated; mobile keeps the inline source-
+          order stacking that already lives inside the main column. */}
+      {liveModeActive && (
+        <div className="hidden lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
+          <div className="min-w-0 space-y-6">
+            {divisionBracketsBlock}
+          </div>
+          <div className="min-w-0 space-y-6">
+            {courtRangesBlock}
+            {courtTrackerBlock}
+          </div>
+        </div>
       )}
 
       <div className={gridClasses}>
@@ -1190,10 +1211,10 @@ export default async function TournamentDetailPage({
       )}
         </div>
 
-        {/* Court Tracker sidebar on lg+ — only shown when present.
-            Court Ranges editor (if any) sits above so the layout
-            tools come before the live state. */}
-        {(courtRangesBlock || courtTrackerBlock) && (
+        {/* Court Tracker sidebar on lg+ — only shown when present
+            and live mode hasn't kicked in. Once divisions are
+            active these move into the top grid above. */}
+        {!liveModeActive && (courtRangesBlock || courtTrackerBlock) && (
           <div className="hidden lg:block space-y-6 min-w-0">
             {courtRangesBlock}
             {courtTrackerBlock}
@@ -1204,8 +1225,10 @@ export default async function TournamentDetailPage({
       {/* Division Brackets get the full container width on lg+ so
            wide elimination trees (or round-robin playoff brackets
            with multiple rounds) render without horizontal clipping.
-           Inline lg:hidden copies elsewhere handle the mobile view. */}
-      {divisionBracketsBlock && (
+           Inline lg:hidden copies elsewhere handle the mobile view.
+           Suppressed once live mode kicks in — the brackets move
+           into the top grid in that case. */}
+      {!liveModeActive && divisionBracketsBlock && (
         <div className="hidden lg:block space-y-6 min-w-0">
           {divisionBracketsBlock}
         </div>
