@@ -20,6 +20,7 @@ interface Props {
     score_to_win_pool?: number;
     score_to_win_playoff?: number;
     finals_best_of_3?: boolean;
+    win_by_2?: boolean;
   };
   canManage: boolean;
   tournamentId: string;
@@ -131,6 +132,7 @@ export function DivisionBrackets({
             scoreToWinPool={scores.pool}
             scoreToWinPlayoff={scores.playoff}
             finalsBestOf3={tournament.finals_best_of_3}
+            winBy2={tournament.win_by_2}
           />
         )}
         <TournamentBracketView
@@ -142,6 +144,7 @@ export function DivisionBrackets({
           scoreToWinPool={scores.pool}
           scoreToWinPlayoff={scores.playoff}
           finalsBestOf3={tournament.finals_best_of_3}
+          winBy2={tournament.win_by_2}
           partnerMap={partnerMap}
           seedByPlayerId={seedByPlayerId}
         />
@@ -282,6 +285,7 @@ export function DivisionBrackets({
                 scoreToWinPool={scores.pool}
                 scoreToWinPlayoff={scores.playoff}
                 finalsBestOf3={tournament.finals_best_of_3}
+                winBy2={tournament.win_by_2}
               />
             )}
 
@@ -295,6 +299,7 @@ export function DivisionBrackets({
               scoreToWinPool={scores.pool}
               scoreToWinPlayoff={scores.playoff}
               finalsBestOf3={tournament.finals_best_of_3}
+              winBy2={tournament.win_by_2}
               partnerMap={partnerMap}
               seedByPlayerId={seedByPlayerId}
             />
@@ -310,11 +315,13 @@ function DivisionRules({
   scoreToWinPool,
   scoreToWinPlayoff,
   finalsBestOf3,
+  winBy2,
 }: {
   division: string;
   scoreToWinPool?: number;
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
+  winBy2?: boolean;
 }) {
   return (
     <div className="card border border-brand-300/20 mb-4">
@@ -331,6 +338,9 @@ function DivisionRules({
         </p>
         {finalsBestOf3 && (
           <p><span className="font-medium">Championship final:</span> Best 2 out of 3 games</p>
+        )}
+        {winBy2 && (
+          <p><span className="font-medium">Win rule:</span> Must win by 2 points</p>
         )}
         <p className="text-surface-muted">
           Standings are determined by win-loss record, then point differential. Brackets update live as scores are entered.

@@ -20,6 +20,7 @@ interface Props {
   scoreToWinPool?: number;
   scoreToWinPlayoff?: number;
   finalsBestOf3?: boolean;
+  winBy2?: boolean;
   /** Per-division setting overrides — used to resolve the right
    *  score-to-win for whichever pool the viewer picks. */
   divisionSettings?: Record<
@@ -56,6 +57,7 @@ export function OtherPoolsViewer({
   scoreToWinPool,
   scoreToWinPlayoff,
   finalsBestOf3,
+  winBy2,
   divisionSettings,
   partnerMap,
   seedByPlayerId,
@@ -151,6 +153,7 @@ export function OtherPoolsViewer({
             scoreToWinPool={override?.score_to_win_pool ?? scoreToWinPool}
             scoreToWinPlayoff={override?.score_to_win_playoff ?? scoreToWinPlayoff}
             finalsBestOf3={finalsBestOf3}
+            winBy2={winBy2}
             partnerMap={partnerMap}
             seedByPlayerId={seedByPlayerId}
           />

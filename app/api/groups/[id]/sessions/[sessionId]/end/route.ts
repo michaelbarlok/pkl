@@ -36,8 +36,65 @@ export async function POST(
 
   const round = session.current_round as any;
 
-  // If scores provided for the current round, persist them first
+  // If scores provided for the current round, persist them first.
+  // Same group-level scoring rule check as next-round so an end-of-
+  // session save can't slip past validation that the round-advance
+  // path enforces.
   if (scores && round && scores.length === round.matches.length) {
+    const { data: prefs } = await auth.supabase
+      .from("group_preferences")
+      .select("game_limit_4p, win_by_2")
+      .eq("group_id", groupId)
+      .maybeSingle();
+
+    if (prefs && typeof prefs.game_limit_4p === "number" && prefs.game_limit_4p > 0) {
+      const gameLimit = prefs.game_limit_4p;
+      for (let i = 0; i < scores.length; i++) {
+        const a = scores[i].scoreA;
+        const b = scores[i].scoreB;
+        if (typeof a !== "number" || typeof b !== "number" || a < 0 || b < 0) {
+          return NextResponse.json(
+            { error: `Match ${i + 1}: scores must be non-negative numbers.` },
+            { status: 400 }
+          );
+        }
+        const hi = Math.max(a, b);
+        const lo = Math.min(a, b);
+        if (hi < gameLimit) {
+          return NextResponse.json(
+            {
+              error: prefs.win_by_2
+                ? `Match ${i + 1}: at least one team must reach ${gameLimit} (win by 2).`
+                : `Match ${i + 1}: at least one team must reach ${gameLimit}.`,
+            },
+            { status: 400 }
+          );
+        }
+        if (prefs.win_by_2) {
+          if (hi === gameLimit) {
+            if (hi - lo < 2) {
+              return NextResponse.json(
+                { error: `Match ${i + 1}: win by 2 — ${hi}-${lo} isn't a valid finish.` },
+                { status: 400 }
+              );
+            }
+          } else if (hi - lo !== 2) {
+            return NextResponse.json(
+              {
+                error: `Match ${i + 1}: win by 2 — once past ${gameLimit}, the winner must lead by exactly 2 (e.g. ${gameLimit + 1}-${gameLimit - 1}).`,
+              },
+              { status: 400 }
+            );
+          }
+        } else if (hi === lo) {
+          return NextResponse.json(
+            { error: `Match ${i + 1}: tie scores aren't allowed — someone has to win.` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const matchRows = round.matches.map((m: any, i: number) => ({
       group_id: groupId,
       created_by: auth.profile.id,

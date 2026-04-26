@@ -402,6 +402,7 @@ export interface Tournament {
   score_to_win_pool?: number | null;
   score_to_win_playoff?: number | null;
   finals_best_of_3?: boolean | null;
+  win_by_2?: boolean | null;
   division_settings?: Record<string, {
     games_per_team?: number;
     num_pools?: number;
