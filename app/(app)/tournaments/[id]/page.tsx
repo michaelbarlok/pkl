@@ -435,7 +435,7 @@ export default async function TournamentDetailPage({
           one division is activated; mobile keeps the inline source-
           order stacking that already lives inside the main column. */}
       {liveModeActive && (
-        <div className="hidden lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
+        <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
           <div className="min-w-0 space-y-6">
             {divisionBracketsBlock}
           </div>
