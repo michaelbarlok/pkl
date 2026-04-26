@@ -9,6 +9,7 @@ import { DivisionReview } from "@/components/division-review";
 import { ActiveDivisionsManager } from "./active-divisions-manager";
 import { CourtTracker } from "./court-tracker";
 import type { CourtTrackerMatch } from "./court-tracker";
+import { CourtRangesPanel } from "./court-ranges-panel";
 import { EndTournamentButton } from "./end-tournament-button";
 import {
   AskToPartnerButton,
@@ -97,6 +98,7 @@ export default async function TournamentDetailPage({
     organizersResult,
     activeDivisionsResult,
     pendingPartnerRequestsResult,
+    courtRangesResult,
     { data: { user } },
   ] = await Promise.all([
       getTournament(id),
@@ -119,6 +121,11 @@ export default async function TournamentDetailPage({
         )
         .eq("tournament_id", id)
         .eq("status", "pending"),
+      supabase
+        .from("tournament_court_ranges")
+        .select("id, label, court_start, court_end, divisions, position")
+        .eq("tournament_id", id)
+        .order("position", { ascending: true }),
       supabase.auth.getUser(),
     ]);
 
@@ -132,6 +139,13 @@ export default async function TournamentDetailPage({
 
   const coOrganizers = (organizersResult.data ?? []) as any[];
   const activeDivisions = ((activeDivisionsResult.data ?? []) as any[]).map((r) => r.division as string);
+  const courtRanges = ((courtRangesResult.data ?? []) as any[]).map((r) => ({
+    id: r.id as string,
+    label: r.label as string,
+    court_start: r.court_start as number,
+    court_end: r.court_end as number,
+    divisions: (r.divisions as string[] | null) ?? [],
+  }));
   const pendingPartnerRequests = (pendingPartnerRequestsResult.data ?? []) as any[];
   const isCoOrganizer = profile ? coOrganizers.some((o: any) => o.profile_id === profile.id) : false;
   const canManage = isCreator || isAdmin || isCoOrganizer;
@@ -303,6 +317,7 @@ export default async function TournamentDetailPage({
             numCourts={numCourts}
             onCourt={onCourtMatches}
             queue={queuedMatches}
+            courtRanges={courtRanges}
             scoreToWinPool={tournament.score_to_win_pool ?? undefined}
             scoreToWinPlayoff={tournament.score_to_win_playoff ?? undefined}
             winBy2={(tournament as any).win_by_2 ?? undefined}
@@ -783,6 +798,25 @@ export default async function TournamentDetailPage({
                 Edit tournament
               </Link>
             </div>
+          )}
+
+          {/* Court ranges (optional) — only relevant once brackets
+              are generated and the Court Tracker is on screen. We
+              compute the divisions that actually have registrations
+              so the checkboxes don't list empty divisions. */}
+          {canManage && tournament.status === "in_progress" && ((tournament as any).num_courts ?? 0) > 0 && (
+            <CourtRangesPanel
+              tournamentId={id}
+              numCourts={(tournament as any).num_courts as number}
+              availableDivisions={Array.from(
+                new Set(
+                  confirmedRegistrations
+                    .map((r: any) => r.division as string | null)
+                    .filter((d): d is string => !!d)
+                )
+              ).sort()}
+              initialRanges={courtRanges}
+            />
           )}
 
           {/* Simple status controls for non-bracket transitions */}
