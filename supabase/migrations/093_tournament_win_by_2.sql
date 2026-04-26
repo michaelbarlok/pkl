@@ -13,3 +13,9 @@
 
 ALTER TABLE tournaments
   ADD COLUMN IF NOT EXISTS win_by_2 BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Force PostgREST to reload its schema cache so the new column is
+-- visible to the API immediately. Without this, inserts referencing
+-- win_by_2 fail with "Could not find the 'win_by_2' column of
+-- 'tournaments' in the schema cache" until the cache TTL expires.
+NOTIFY pgrst, 'reload schema';
