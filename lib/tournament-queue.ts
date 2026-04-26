@@ -235,6 +235,18 @@ export async function promoteMatchToCourt(
     return { ok: false, error: "Match isn't eligible to be scheduled yet" };
   }
 
+  // Range gate — if the tournament has court ranges, a manual
+  // "Send to Court N" still has to honor them. Auto-assignment
+  // already does; this is the symmetric block on manual moves.
+  const courtRanges = await loadCourtRanges(tournamentId);
+  const isCourtEligible = makeCourtEligibility(numCourts, courtRanges);
+  if (!isCourtEligible(match.division, courtNumber)) {
+    return {
+      ok: false,
+      error: `Court ${courtNumber} isn't part of this division's assigned range.`,
+    };
+  }
+
   // Court must be free — no other pending match holds it.
   const courtHolder = matches.find(
     (m) => m.court_number === courtNumber && m.status === "pending"
@@ -312,6 +324,10 @@ export async function runAssignmentPass(
     .eq("tournament_id", tournamentId);
   const activeSet = new Set((activeDivs ?? []).map((r: any) => r.division));
   if (activeSet.size === 0) return;
+
+  // Court-range layout (may be empty → all-on-all default).
+  const courtRanges = await loadCourtRanges(tournamentId);
+  const isCourtEligible = makeCourtEligibility(numCourts, courtRanges);
 
   // When a new division activates we re-interleave the ENTIRE waiting
   // queue, not just freshly-eligible matches. Otherwise a late-
@@ -419,8 +435,17 @@ export async function runAssignmentPass(
     if (!m.player1_id || !m.player2_id) continue;
     if (busyPlayers.has(m.player1_id) || busyPlayers.has(m.player2_id)) continue;
 
-    const court = nextFreeCourt(numCourts, usedCourtNumbers);
-    if (court === null) break;
+    // With ranges defined, a match might be locked to courts 1–10
+    // even though courts 11–20 are free for other divisions. Skip
+    // (don't break) so a later match in the queue whose range still
+    // has openings can take the next free court.
+    const court = nextFreeCourtForDivision(
+      numCourts,
+      usedCourtNumbers,
+      m.division,
+      isCourtEligible
+    );
+    if (court === null) continue;
 
     assignments.push({ match: m, court });
     busyPlayers.add(m.player1_id);
@@ -560,6 +585,88 @@ function nextFreeCourt(
 ): number | null {
   for (let i = 1; i <= numCourts; i++) {
     if (!used.has(i)) return i;
+  }
+  return null;
+}
+
+/**
+ * One row from tournament_court_ranges, kept narrow to what the
+ * assignment logic actually needs.
+ */
+interface CourtRange {
+  court_start: number;
+  court_end: number;
+  divisions: string[];
+}
+
+/**
+ * Pull the tournament's court ranges (if any) ordered by position.
+ * Returned shape is intentionally minimal — assignment doesn't need
+ * label or id, just the bounds and the division allowlist.
+ */
+async function loadCourtRanges(tournamentId: string): Promise<CourtRange[]> {
+  const service = await createServiceClient();
+  const { data } = await service
+    .from("tournament_court_ranges")
+    .select("court_start, court_end, divisions")
+    .eq("tournament_id", tournamentId)
+    .order("position", { ascending: true });
+  return (data ?? []) as CourtRange[];
+}
+
+/**
+ * Given the tournament's range layout, returns a predicate that
+ * answers "can this match's division use court X?"
+ *
+ * Rules:
+ *   * No ranges defined → any division on any court (legacy default).
+ *   * Division IS in some range R → only courts within [R.start..R.end].
+ *   * Division is NOT in any range, but ranges exist → only courts
+ *     that aren't owned by any range. Lets organizers carve out a
+ *     subset of divisions onto specific courts and leave the rest
+ *     on whatever's free.
+ */
+function makeCourtEligibility(
+  numCourts: number,
+  ranges: CourtRange[]
+): (division: string | null, court: number) => boolean {
+  if (ranges.length === 0) {
+    return () => true;
+  }
+  const divisionToRange = new Map<string, CourtRange>();
+  const rangedCourts = new Set<number>();
+  for (const r of ranges) {
+    for (let c = r.court_start; c <= r.court_end; c++) rangedCourts.add(c);
+    for (const d of r.divisions) divisionToRange.set(d, r);
+  }
+  return (division, court) => {
+    if (court < 1 || court > numCourts) return false;
+    if (!division) return !rangedCourts.has(court);
+    const range = divisionToRange.get(division);
+    if (range) {
+      return court >= range.court_start && court <= range.court_end;
+    }
+    // Division has no range assignment — only free-form (unranged)
+    // courts are eligible so it doesn't steal a slot reserved for a
+    // ranged division.
+    return !rangedCourts.has(court);
+  };
+}
+
+/**
+ * First free court that the given match's division is allowed to use.
+ * Returns null if none — the match stays in queue this pass.
+ */
+function nextFreeCourtForDivision(
+  numCourts: number,
+  used: Set<number>,
+  division: string | null,
+  isCourtEligible: (division: string | null, court: number) => boolean
+): number | null {
+  for (let i = 1; i <= numCourts; i++) {
+    if (used.has(i)) continue;
+    if (!isCourtEligible(division, i)) continue;
+    return i;
   }
   return null;
 }
