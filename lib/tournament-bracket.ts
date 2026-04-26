@@ -1020,6 +1020,12 @@ export function computeCrossPoolSeeding(
 
   teams.sort((a, b) => {
     if (a.wins !== b.wins) return b.wins - a.wins;
+    // Cross-pool: pools may have different sizes so a team can land
+    // here with the same `wins` but a different `losses` count
+    // (e.g. 2-1 from a 4-team pool vs 2-2 from a 5-team pool). The
+    // 2-1 team has a stronger record — sort losses ascending before
+    // we even look at point differential.
+    if (a.losses !== b.losses) return a.losses - b.losses;
     if (a.pointDiff !== b.pointDiff) return b.pointDiff - a.pointDiff;
     if (a.pool === b.pool) {
       // Same pool — fall through to the underlying pool standings
@@ -1036,6 +1042,13 @@ export function computeCrossPoolSeeding(
     const a = teams[k];
     const b = teams[k + 1];
     if (a.wins !== b.wins) continue;
+    // Same wins but fewer losses → record-strength tiebreaker. Note
+    // it explicitly so the Review Advancement UI can show the
+    // organizer why a 2-1 jumped above a 2-2.
+    if (a.losses !== b.losses) {
+      a.tiebreakerReason = "Better record — same wins, fewer losses";
+      continue;
+    }
     if (a.pointDiff !== b.pointDiff) continue;
     if (a.pool === b.pool) {
       // Same-pool tie — pull through whatever H2H reason the pool
