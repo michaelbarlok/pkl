@@ -48,19 +48,23 @@ function divisionStatus(
   activeSet: Set<string>
 ): DivisionStatus {
   if (entry.matches.length === 0) return "upcoming";
-  const allDone = entry.matches.every(
-    (m) => m.status === "completed" || m.status === "bye"
-  );
-  if (allDone) return "complete";
   // "Ready" = pool play wrapped, but the playoff bracket hasn't been
   // generated yet. This is the moment an organizer should hit Review
   // Advancement, so we surface it loudly in the tabs and the banner.
+  // Must be checked before the all-matches-done branch below: when
+  // pool play is complete and no playoff rows exist yet, every match
+  // in entry.matches is in completed/bye, which would otherwise tip
+  // the division into "complete" and hide the ready-to-advance UI.
   const poolMatches = entry.matches.filter((m) => m.bracket !== "playoff");
   const poolDone =
     poolMatches.length > 0 &&
     poolMatches.every((m) => m.status === "completed" || m.status === "bye");
   const hasPlayoff = entry.matches.some((m) => m.bracket === "playoff");
   if (poolDone && !hasPlayoff) return "ready";
+  const allDone = entry.matches.every(
+    (m) => m.status === "completed" || m.status === "bye"
+  );
+  if (allDone) return "complete";
   if (activeSet.has(entry.division)) return "live";
   return "upcoming";
 }
