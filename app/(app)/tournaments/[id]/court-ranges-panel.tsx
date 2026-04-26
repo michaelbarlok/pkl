@@ -3,6 +3,7 @@
 import { getDivisionLabel } from "@/lib/divisions";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CollapsibleCard } from "./collapsible-card";
 
 interface CourtRange {
   id?: string;
@@ -157,11 +158,20 @@ export function CourtRangesPanel({
   }
   const dedupedErrors = Array.from(new Set(validationErrors));
 
+  // Subtitle gives a one-glance summary so the organizer doesn't
+  // have to expand the card to know whether ranges are configured
+  // and whether the layout is currently saved.
+  const subtitle =
+    initialRanges.length === 0 && ranges.length === 0
+      ? "Optional — every division on every court"
+      : `${ranges.length} range${ranges.length === 1 ? "" : "s"} configured`;
+
   return (
-    <div className="card">
-      <h2 className="text-sm font-semibold text-dark-200 mb-1">
-        Court ranges <span className="text-surface-muted font-normal">(optional)</span>
-      </h2>
+    <CollapsibleCard
+      title="Court ranges"
+      subtitle={subtitle}
+      defaultOpen={initialRanges.length > 0}
+    >
       <p className="text-xs text-surface-muted mb-3">
         Carve the tournament's {numCourts} courts into ranges and pin
         divisions to each. Matches in those divisions will only queue
@@ -289,6 +299,6 @@ export function CourtRangesPanel({
         </ul>
       )}
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
-    </div>
+    </CollapsibleCard>
   );
 }
