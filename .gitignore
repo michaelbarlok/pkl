@@ -6,6 +6,7 @@ dist/
 .env
 .env.local
 .env.production.local
+.mcp.json
 supabase/.temp/
 _archive/
 tsconfig.tsbuildinfo
