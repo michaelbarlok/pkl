@@ -25,6 +25,7 @@ import { ContactOrganizersButton } from "@/components/contact-organizers-button"
 import { Breadcrumb } from "@/components/breadcrumb";
 import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import { PaidToggle } from "@/components/paid-toggle";
+import { BulkPaidButton } from "@/components/bulk-paid-button";
 import { PaymentReminderButton } from "@/components/payment-reminder-button";
 import { ShareBracketButton } from "@/components/share-bracket-button";
 import { ShareTournamentButton } from "@/components/share-tournament-button";
@@ -862,6 +863,17 @@ export default async function TournamentDetailPage({
         const paidSubtitle = canManage && tournament.entry_fee && confirmedRegistrations.length > 0
           ? `${paidCount} of ${confirmedRegistrations.length} paid`
           : undefined;
+        // Pre-resolve the unpaid list for the bulk-mark-paid modal
+        // so the client component receives display-ready strings and
+        // doesn't need access to the registration join shape.
+        const unpaidForBulk = confirmedRegistrations
+          .filter((r: any) => !r.paid)
+          .map((r: any) => ({
+            id: r.id as string,
+            playerName: (r.player?.display_name as string | undefined) ?? "Unknown",
+            partnerName: (r.partner?.display_name as string | undefined) ?? null,
+            divisionLabel: r.division ? getDivisionLabel(r.division) : null,
+          }));
 
         const headerRow = (
           <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -873,6 +885,7 @@ export default async function TournamentDetailPage({
                 <span className="text-xs text-surface-muted">
                   {paidCount} of {confirmedRegistrations.length} paid
                 </span>
+                <BulkPaidButton unpaid={unpaidForBulk} />
                 <PaymentReminderButton tournamentId={id} unpaidCount={unpaidCount} />
               </>
             )}
@@ -991,6 +1004,7 @@ export default async function TournamentDetailPage({
             >
               {canManage && tournament.entry_fee && confirmedRegistrations.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
+                  <BulkPaidButton unpaid={unpaidForBulk} />
                   <PaymentReminderButton tournamentId={id} unpaidCount={unpaidCount} />
                 </div>
               )}

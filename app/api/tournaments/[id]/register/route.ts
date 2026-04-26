@@ -81,6 +81,18 @@ export async function POST(
     );
   }
 
+  // Defence in depth: the form prevents picking yourself, but anyone
+  // hitting the API directly could submit player_id === partner_id
+  // and we'd write a nonsensical row representing a "team" of one
+  // person. Reject it here so the data model never has to deal with
+  // the case downstream.
+  if (partner_id && partner_id === auth.profile.id) {
+    return NextResponse.json(
+      { error: "You can't register with yourself as your own partner." },
+      { status: 400 }
+    );
+  }
+
   // Pull every existing non-withdrawn registration involving the
   // player or the partner. Multi-division registration is allowed
   // ("Men's + Mixed" / "Women's + Mixed"), so we can't just bail
