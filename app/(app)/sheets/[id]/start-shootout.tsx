@@ -201,7 +201,7 @@ export function StartShootout({
             : undefined
         }
       >
-        {starting ? "Starting..." : "Start Shootout"}
+        {starting ? "Starting..." : "Start Session"}
       </button>
       {confirmedPlayerIds.length < 4 && (
         <p className="mt-1 text-xs text-surface-muted">

@@ -203,7 +203,7 @@ export function CourtPreviewSection({
       </div>
       <p className="text-xs text-surface-muted">
         Seeded by step → scoring % → last played → total sessions. The real
-        seeding runs again when you press <span className="font-medium text-dark-300">Start Shootout</span>,
+        seeding runs again when you press <span className="font-medium text-dark-300">Start Session</span>,
         so any last-minute roster changes will be picked up.
       </p>
     </section>

@@ -472,7 +472,7 @@ export default function AdminSheetDetailPage() {
                 : undefined
             }
           >
-            Start Shootout
+            Start Session
           </button>
         </div>
       </div>
