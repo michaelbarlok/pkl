@@ -7,6 +7,7 @@ import { useSupabase } from "@/components/providers/supabase-provider";
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, getExistingSubscription } from "@/lib/push-client";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function EditProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -736,6 +737,25 @@ export default function EditProfilePage() {
             and updates automatically when you change it.
           </p>
           <ThemeSelector />
+        </div>
+      )}
+
+      {/* Security — also gated on isOwnProfile so only the account
+          holder sees their own password controls. The actual update
+          happens on /reset-password (already used by the email link
+          flow) — same form, just reached from inside the app. No
+          email round-trip required since the user is already
+          authenticated. */}
+      {isOwnProfile && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-dark-100 mb-1">Security</h2>
+          <p className="text-sm text-surface-muted mb-3">
+            Change your account password. You&apos;ll stay signed in on this
+            device after the update.
+          </p>
+          <Link href="/reset-password" className="btn-secondary inline-block">
+            Change Password
+          </Link>
         </div>
       )}
 
