@@ -33,14 +33,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthPage = path.startsWith("/login") || path.startsWith("/register");
   const isApiRoute = path.startsWith("/api");
-  // Public bracket page: /tournaments/<id>/bracket renders without
-  // an account so organizers can share the link with players /
-  // spectators. The page itself hides organizer-only affordances
-  // and rejects hidden tournaments via notFound(). The detail page
-  // (/tournaments/<id>) stays gated since it exposes registration,
-  // payment, and partner-request UI.
-  const isPublicTournamentBracket = /^\/tournaments\/[^/]+\/bracket\/?$/.test(path);
-  const isPublicPage = path === "/" || path === "/contact" || path === "/groups" || path.startsWith("/groups/") || path.startsWith("/ratings") || path.startsWith("/ladder") || path === "/confirmed" || path.startsWith("/auth/confirm") || path.startsWith("/auth/callback") || path === "/reset-password" || path === "/forgot-password" || path === "/privacy" || path === "/terms" || path === "/how-it-works" || isPublicTournamentBracket;
+  const isPublicPage = path === "/" || path === "/contact" || path === "/groups" || path.startsWith("/groups/") || path.startsWith("/ratings") || path.startsWith("/ladder") || path === "/confirmed" || path.startsWith("/auth/confirm") || path.startsWith("/auth/callback") || path === "/reset-password" || path === "/forgot-password" || path === "/privacy" || path === "/terms" || path === "/how-it-works";
 
   if (!user && !isAuthPage && !isApiRoute && !isPublicPage) {
     const url = request.nextUrl.clone();

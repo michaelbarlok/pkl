@@ -28,7 +28,6 @@ import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import { PaidToggle } from "@/components/paid-toggle";
 import { BulkPaidButton } from "@/components/bulk-paid-button";
 import { PaymentReminderButton } from "@/components/payment-reminder-button";
-import { ShareBracketButton } from "@/components/share-bracket-button";
 import { ShareTournamentButton } from "@/components/share-tournament-button";
 import { HideTournamentToggle } from "@/app/(app)/admin/tournaments/hide-toggle";
 import { TournamentWinnersCard } from "@/components/tournament-winners-card";
@@ -500,9 +499,6 @@ export default async function TournamentDetailPage({
                 title={tournament.title}
                 summary={`${tournament.title} — ${formatDate(tournament.start_date + "T00:00:00")} at ${tournament.location}`}
               />
-            )}
-            {matches.length > 0 && !(tournament as any).is_hidden && (
-              <ShareBracketButton tournamentId={id} />
             )}
             {canManage && (
               <Link href={`/tournaments/${id}/edit`} className="btn-secondary text-xs">
