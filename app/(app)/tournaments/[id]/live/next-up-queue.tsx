@@ -24,6 +24,10 @@ interface Props {
    *  so the queue spans every active division. The court grid above
    *  is always full-tournament so players can spot friends. */
   queueScopeDivisions?: string[] | null;
+  /** Short, viewer-facing label for the scope — shown next to the
+   *  "Match Queue" heading so a player understands they're looking
+   *  at their own range's queue and not the entire tournament. */
+  queueScopeLabel?: string | null;
 }
 
 /**
@@ -47,6 +51,7 @@ export async function NextUpQueue({
   numCourts = null,
   embedded = false,
   queueScopeDivisions = null,
+  queueScopeLabel = null,
 }: Props) {
   if (isOnCourt) {
     return (
@@ -275,9 +280,22 @@ export async function NextUpQueue({
 
       {/* Queue */}
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted mb-1.5 mt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted mb-0.5 mt-3">
           Match Queue ({queue.length})
         </p>
+        {queueScopeLabel ? (
+          // When the tournament has court ranges, make it explicit
+          // that this list is the viewer's range queue — not the
+          // whole tournament's. Players who don't see this can
+          // mistake "my queue" for "everyone's queue" and worry
+          // about their wait time relative to teams playing on
+          // entirely different courts.
+          <p className="text-[11px] text-surface-muted mb-1.5">
+            Your range: <span className="text-dark-200">{queueScopeLabel}</span>
+          </p>
+        ) : (
+          <div className="mb-1.5" />
+        )}
         {queue.length === 0 ? (
           <p className="text-xs text-surface-muted">
             Nothing queued right now.
