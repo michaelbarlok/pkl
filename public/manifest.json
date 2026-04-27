@@ -3,7 +3,7 @@
   "name": "Tri-Star Pickleball",
   "short_name": "Tri-Star",
   "description": "Pickleball ladder league platform",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "minimal-ui",
   "display_override": ["minimal-ui", "browser"],
