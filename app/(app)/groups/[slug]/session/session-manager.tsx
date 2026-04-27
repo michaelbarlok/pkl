@@ -90,6 +90,7 @@ export function SessionManager({
       <CheckInPhase
         group={group}
         members={members}
+        isAdmin={isAdmin}
         onSessionCreated={() => router.refresh()}
       />
     );
@@ -116,10 +117,12 @@ export function SessionManager({
 function CheckInPhase({
   group,
   members,
+  isAdmin,
   onSessionCreated,
 }: {
   group: { id: string; name: string; slug: string };
   members: Member[];
+  isAdmin: boolean;
   onSessionCreated: () => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -257,9 +260,15 @@ function CheckInPhase({
 
       <FormError message={error} />
 
+      {!isAdmin && (
+        <p className="text-sm text-surface-muted">
+          Only group admins can start a session.
+        </p>
+      )}
+
       <button
         onClick={startSession}
-        disabled={loading || selected.size < 4}
+        disabled={loading || selected.size < 4 || !isAdmin}
         className="btn-primary w-full"
       >
         {loading

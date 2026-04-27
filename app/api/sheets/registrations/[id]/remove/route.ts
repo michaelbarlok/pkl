@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { promoteNextWaitlistPlayer } from "@/lib/waitlist";
 import { revalidatePath } from "next/cache";
@@ -10,16 +10,16 @@ export async function POST(
 ) {
   const { id: registrationId } = await params;
 
-  const auth = await requireAdmin();
+  const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
   // Use service client to bypass RLS for updating other users' registrations
   const admin = await createServiceClient();
 
-  // Fetch the registration
+  // Fetch the registration (with sheet group_id for the admin check)
   const { data: registration, error: regErr } = await admin
     .from("registrations")
-    .select("id, sheet_id, status")
+    .select("id, sheet_id, status, sheet:signup_sheets(group_id)")
     .eq("id", registrationId)
     .in("status", ["confirmed", "waitlist"])
     .single();
@@ -29,6 +29,21 @@ export async function POST(
       { error: "Registration not found" },
       { status: 404 }
     );
+  }
+
+  const groupId = (registration.sheet as { group_id?: string } | null)?.group_id;
+  if (!groupId) {
+    return NextResponse.json({ error: "Sheet group not found" }, { status: 404 });
+  }
+
+  const canManage = await isGroupAdmin(
+    auth.supabase,
+    auth.profile.id,
+    groupId,
+    auth.profile.role
+  );
+  if (!canManage) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const wasConfirmed = registration.status === "confirmed";

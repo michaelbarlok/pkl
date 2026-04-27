@@ -465,12 +465,14 @@ export default async function GroupPage({
       {isFreePlay && isMember && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-3">
-            <Link
-              href={`/groups/${slug}/session`}
-              className="btn-primary"
-            >
-              {activeSessionId ? "Continue Session" : "Start Session"}
-            </Link>
+            {(activeSessionId || isGroupAdmin) && (
+              <Link
+                href={`/groups/${slug}/session`}
+                className="btn-primary"
+              >
+                {activeSessionId ? "Continue Session" : "Start Session"}
+              </Link>
+            )}
             <ResetStatsButton groupId={group.id} />
           </div>
           {isGroupAdmin && (

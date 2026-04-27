@@ -1,4 +1,4 @@
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { generateRound, pairKey } from "@/lib/free-play-engine";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -39,15 +39,17 @@ export async function POST(
     return NextResponse.json({ error: "Not a free play group" }, { status: 400 });
   }
 
-  const { data: membership } = await auth.supabase
-    .from("group_memberships")
-    .select("player_id")
-    .eq("group_id", groupId)
-    .eq("player_id", auth.profile.id)
-    .maybeSingle();
-
-  if (!membership) {
-    return NextResponse.json({ error: "Not a group member" }, { status: 403 });
+  const canManage = await isGroupAdmin(
+    auth.supabase,
+    auth.profile.id,
+    groupId,
+    auth.profile.role
+  );
+  if (!canManage) {
+    return NextResponse.json(
+      { error: "Only group admins can start a session" },
+      { status: 403 }
+    );
   }
 
   // Check for existing active session

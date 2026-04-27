@@ -44,6 +44,10 @@ export default async function SessionPage({
     .eq("status", "active")
     .maybeSingle();
 
+  // Non-admins can only land on this page to view an active session.
+  // Starting a new session is admin-only, so bounce them back.
+  if (!activeSession && !isAdmin) redirect(`/groups/${slug}`);
+
   // Get checked-in player IDs for the active session
   let checkedInPlayerIds: string[] = [];
   if (activeSession) {
