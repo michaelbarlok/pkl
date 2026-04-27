@@ -133,6 +133,43 @@ export default async function TournamentLivePage({
     redirect(`/tournaments/${tournamentId}`);
   }
 
+  // Court ranges scope the player's queue. If the tournament has
+  // ranges defined and the viewer's division is in range R, the
+  // Match Queue should show only matches in R's divisions —
+  // matches outside their range queue for different courts and
+  // aren't relevant to the player's wait time. Without ranges, the
+  // queue stays global.
+  const { data: courtRangeRows } = await supabase
+    .from("tournament_court_ranges")
+    .select("court_start, court_end, divisions")
+    .eq("tournament_id", tournamentId);
+  const courtRanges = (courtRangeRows ?? []) as {
+    court_start: number;
+    court_end: number;
+    divisions: string[];
+  }[];
+  let queueScopeDivisions: string[] | null;
+  if (courtRanges.length === 0) {
+    queueScopeDivisions = null;
+  } else {
+    const myRange = courtRanges.find((r) => r.divisions.includes(myDivision));
+    if (myRange) {
+      queueScopeDivisions = myRange.divisions;
+    } else {
+      // Division isn't pinned to any range — share the queue with
+      // every other unranged division (matches eligible for the
+      // tournament's "leftover" courts).
+      const ranged = new Set<string>();
+      for (const r of courtRanges) for (const d of r.divisions) ranged.add(d);
+      queueScopeDivisions = Array.from(activeDivisionSet).filter(
+        (d) => !ranged.has(d)
+      );
+    }
+  }
+  const scopeDivisionSet = queueScopeDivisions
+    ? new Set(queueScopeDivisions)
+    : null;
+
   // Pull matches for every active division — the viewer's primary
   // pool renders at the top, but the "Other pools" dropdown below
   // lets them peek at any other live pool read-only (same spirit as
@@ -273,9 +310,14 @@ export default async function TournamentLivePage({
     .eq("status", "pending")
     .not("queue_entered_at", "is", null)
     .order("queue_entered_at", { ascending: true });
-  const queueRows = (queueRowsRaw ?? []).filter(
-    (m: any) => m.division && activeDivisionSet.has(m.division)
-  );
+  // Restrict the queue snapshot to the viewer's range scope so the
+  // "Nth in line" subtitle reflects their actual wait time, not a
+  // tournament-wide count that includes other ranges.
+  const queueRows = (queueRowsRaw ?? []).filter((m: any) => {
+    if (!m.division || !activeDivisionSet.has(m.division)) return false;
+    if (scopeDivisionSet && !scopeDivisionSet.has(m.division)) return false;
+    return true;
+  });
   const myQueueIdx = queueRows.findIndex(
     (m: any) => m.player1_id === teamPrimaryId || m.player2_id === teamPrimaryId
   );
@@ -350,6 +392,7 @@ export default async function TournamentLivePage({
           myTeamPrimaryId={teamPrimaryId}
           isOnCourt={!!myCourtCardData}
           numCourts={tournament.num_courts ?? null}
+          queueScopeDivisions={queueScopeDivisions}
           embedded
         />
       </CollapsibleCard>
