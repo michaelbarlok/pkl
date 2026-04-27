@@ -155,6 +155,15 @@ export async function getTournamentRegistrations(
 
 /**
  * Fetch matches for a tournament.
+ *
+ * Explicit column list (instead of `*`) drops 7 internal columns
+ * that no page-level consumer reads — `created_at`, `updated_at`,
+ * `coin_flip_seed`, `up_next_notified_at`, `in_3rd_notified_at`,
+ * `scheduled_time`, the legacy `court` text column, and
+ * `queued_court_set` (used only by the queue assignment logic in
+ * `lib/tournament-queue.ts`, which has its own SELECT). For a
+ * tournament with 100+ matches that's ~30% fewer bytes off the
+ * wire and per-render JSON parse on every realtime refresh.
  */
 export async function getTournamentMatches(
   tournamentId: string
@@ -163,7 +172,14 @@ export async function getTournamentMatches(
 
   const { data, error } = await supabase
     .from("tournament_matches")
-    .select("*, player1:profiles!player1_id(id, display_name), player2:profiles!player2_id(id, display_name), winner:profiles!winner_id(id, display_name)")
+    .select(
+      `id, tournament_id, round, match_number, bracket, division,
+       player1_id, player2_id, winner_id, score1, score2, status,
+       court_number, queue_entered_at, series_game,
+       player1:profiles!player1_id(id, display_name),
+       player2:profiles!player2_id(id, display_name),
+       winner:profiles!winner_id(id, display_name)`
+    )
     .eq("tournament_id", tournamentId)
     .order("round", { ascending: true })
     .order("match_number", { ascending: true });

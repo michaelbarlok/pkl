@@ -89,34 +89,14 @@ export function CourtTracker({
   const [busy, setBusy] = useState<string | null>(null);
   const [scoring, setScoring] = useState<CourtTrackerMatch | null>(null);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel(`court-tracker-${tournamentId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "tournament_matches",
-          filter: `tournament_id=eq.${tournamentId}`,
-        },
-        () => router.refresh()
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "tournament_active_divisions",
-          filter: `tournament_id=eq.${tournamentId}`,
-        },
-        () => router.refresh()
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [supabase, router, tournamentId]);
+  // Realtime updates for tournament_matches + tournament_active_divisions
+  // are handled by the parent page's <TournamentRealtimeSubscription>,
+  // which lives at the page root and triggers a debounced
+  // router.refresh() shared across every component on the page. We
+  // used to maintain a duplicate channel here that fired the same
+  // refresh — dropping it halves the realtime connection count per
+  // organizer with the page open and is a no-op for behavior since
+  // the parent refresh re-passes new props.
 
   const courtsList = useMemo(() => {
     const byCourt = new Map<number, CourtTrackerMatch>();

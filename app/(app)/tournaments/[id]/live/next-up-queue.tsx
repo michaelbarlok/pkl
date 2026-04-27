@@ -18,6 +18,12 @@ interface Props {
    *  caller's already rendering those in the surrounding collapsible
    *  card. */
   embedded?: boolean;
+  /** Restricts the Match Queue to a specific set of divisions —
+   *  the divisions belonging to the viewer's court range. NULL or
+   *  undefined means no scoping (legacy / no court ranges defined),
+   *  so the queue spans every active division. The court grid above
+   *  is always full-tournament so players can spot friends. */
+  queueScopeDivisions?: string[] | null;
 }
 
 /**
@@ -40,6 +46,7 @@ export async function NextUpQueue({
   isOnCourt = false,
   numCourts = null,
   embedded = false,
+  queueScopeDivisions = null,
 }: Props) {
   if (isOnCourt) {
     return (
@@ -94,9 +101,15 @@ export async function NextUpQueue({
     .order("queue_entered_at", { ascending: true })
     .limit(200);
 
-  const queue = (matchesRaw ?? []).filter(
-    (m: any) => m.division && activeSet.has(m.division)
-  );
+  // Scope the queue to the viewer's court range when one applies.
+  // queueScopeDivisions = null means "no scoping, show every active
+  // division" (legacy default for tournaments without court ranges).
+  const scopeSet = queueScopeDivisions ? new Set(queueScopeDivisions) : null;
+  const queue = (matchesRaw ?? []).filter((m: any) => {
+    if (!m.division || !activeSet.has(m.division)) return false;
+    if (scopeSet && !scopeSet.has(m.division)) return false;
+    return true;
+  });
 
   // Per-division max playoff round so playoff cards can label
   // themselves "Semifinal" / "Final" / "3rd Place". Cheap separate
