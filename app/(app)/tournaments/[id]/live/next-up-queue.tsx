@@ -28,6 +28,24 @@ interface Props {
    *  "Match Queue" heading so a player understands they're looking
    *  at their own range's queue and not the entire tournament. */
   queueScopeLabel?: string | null;
+  /** Court range layout for the tournament. When present, the
+   *  Courts grid splits into one labelled section per range so a
+   *  player sees "Men's Side · Courts 1–10" framing the same way
+   *  the organizer's tracker does. The section that matches the
+   *  viewer's own range is highlighted. NULL or empty means a
+   *  single un-labelled grid. */
+  courtRanges?: {
+    id: string;
+    label: string;
+    court_start: number;
+    court_end: number;
+    divisions: string[];
+  }[] | null;
+  /** ID of the range the viewer's division belongs to (if any) so
+   *  we can visually mark "your range" inside the grid. NULL when
+   *  the viewer's division isn't assigned to any range, or when
+   *  the tournament doesn't define ranges. */
+  myRangeId?: string | null;
 }
 
 /**
@@ -52,6 +70,8 @@ export async function NextUpQueue({
   embedded = false,
   queueScopeDivisions = null,
   queueScopeLabel = null,
+  courtRanges = null,
+  myRangeId = null,
 }: Props) {
   if (isOnCourt) {
     return (
@@ -185,6 +205,63 @@ export async function NextUpQueue({
         }))
       : onCourt.map((m: any) => ({ court: m.court_number!, match: m }));
 
+  // Range-aware court-grid sections — same layout as the organizer's
+  // CourtTracker. Without ranges, single un-labelled section.
+  // With ranges, one labelled section per range plus an "Other"
+  // catch-all for any courts not owned by a range. The section
+  // matching the viewer's own range gets a subtle accent so they
+  // can spot their own courts at a glance.
+  const courtSections: {
+    key: string;
+    label: string | null;
+    sublabel: string | null;
+    isMine: boolean;
+    courts: typeof courtsList;
+  }[] = (() => {
+    if (!courtRanges || courtRanges.length === 0) {
+      return [{
+        key: "all",
+        label: null as string | null,
+        sublabel: null as string | null,
+        isMine: false,
+        courts: courtsList,
+      }];
+    }
+    const rangedCourts = new Set<number>();
+    for (const r of courtRanges) {
+      for (let c = r.court_start; c <= r.court_end; c++) rangedCourts.add(c);
+    }
+    const sections: typeof courtSections = [];
+    for (const r of courtRanges) {
+      const cards = courtsList.filter(
+        (c) => c.court >= r.court_start && c.court <= r.court_end
+      );
+      sections.push({
+        key: r.id,
+        label: `${r.label} · Courts ${r.court_start}–${r.court_end}`,
+        sublabel:
+          r.divisions.length > 0
+            ? r.divisions.map((d) => getDivisionLabel(d)).join(" · ")
+            : "No divisions assigned",
+        isMine: !!myRangeId && r.id === myRangeId,
+        courts: cards,
+      });
+    }
+    const unrangedCards = courtsList.filter(
+      (c) => !rangedCourts.has(c.court)
+    );
+    if (unrangedCards.length > 0) {
+      sections.push({
+        key: "unranged",
+        label: `Other courts · ${unrangedCards.map((c) => c.court).join(", ")}`,
+        sublabel: "Open to any unassigned division",
+        isMine: !myRangeId,
+        courts: unrangedCards,
+      });
+    }
+    return sections;
+  })();
+
   return (
     <div className="space-y-3">
       {!embedded && (
@@ -204,19 +281,48 @@ export async function NextUpQueue({
       {/* Courts grid — same visual language as the organizer's
           Court Tracker, minus the action buttons. Scales to 3-4
           columns when there are a lot of courts so the section
-          doesn't dominate the page. */}
+          doesn't dominate the page. When the tournament defines
+          court ranges, the grid splits into one labelled section
+          per range and the viewer's own range gets a subtle accent. */}
       {courtsList.length > 0 && (
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted mb-1.5">
-            Courts
-          </p>
+        <div className="space-y-3">
+          {courtSections.map((section) => (
+          <div key={section.key}>
+            {section.label ? (
+              <div
+                className={
+                  "mb-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-l-2 pl-3 " +
+                  (section.isMine
+                    ? "border-accent-400"
+                    : "border-brand-500/60")
+                }
+              >
+                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-dark-100">
+                  {section.label}
+                </h4>
+                {section.isMine && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-300">
+                    Your range
+                  </span>
+                )}
+                {section.sublabel && (
+                  <p className="text-[11px] text-surface-muted">
+                    {section.sublabel}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted mb-1.5">
+                Courts
+              </p>
+            )}
           <div
             className={
               "grid grid-cols-1 gap-2 sm:grid-cols-2 " +
-              (courtsList.length > 10 ? "lg:grid-cols-3 xl:grid-cols-4" : "")
+              (section.courts.length > 10 ? "lg:grid-cols-3 xl:grid-cols-4" : "")
             }
           >
-            {courtsList.map(({ court, match }) => {
+            {section.courts.map(({ court, match }) => {
               const includesMe =
                 match &&
                 (match.player1_id === myTeamPrimaryId ||
@@ -275,6 +381,8 @@ export async function NextUpQueue({
               );
             })}
           </div>
+          </div>
+          ))}
         </div>
       )}
 

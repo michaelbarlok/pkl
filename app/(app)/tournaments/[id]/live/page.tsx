@@ -141,9 +141,11 @@ export default async function TournamentLivePage({
   // queue stays global.
   const { data: courtRangeRows } = await supabase
     .from("tournament_court_ranges")
-    .select("label, court_start, court_end, divisions")
-    .eq("tournament_id", tournamentId);
+    .select("id, label, court_start, court_end, divisions")
+    .eq("tournament_id", tournamentId)
+    .order("position", { ascending: true });
   const courtRanges = (courtRangeRows ?? []) as {
+    id: string;
     label: string;
     court_start: number;
     court_end: number;
@@ -155,6 +157,7 @@ export default async function TournamentLivePage({
   // global queue. NULL when no scoping applies (legacy / no court
   // ranges defined) — UI falls back to a plain "Match queue" title.
   let queueScopeLabel: string | null = null;
+  let myRangeId: string | null = null;
   if (courtRanges.length === 0) {
     queueScopeDivisions = null;
   } else {
@@ -162,6 +165,7 @@ export default async function TournamentLivePage({
     if (myRange) {
       queueScopeDivisions = myRange.divisions;
       queueScopeLabel = `${myRange.label} · Courts ${myRange.court_start}–${myRange.court_end}`;
+      myRangeId = myRange.id;
     } else {
       // Division isn't pinned to any range — share the queue with
       // every other unranged division (matches eligible for the
@@ -412,6 +416,8 @@ export default async function TournamentLivePage({
           numCourts={tournament.num_courts ?? null}
           queueScopeDivisions={queueScopeDivisions}
           queueScopeLabel={queueScopeLabel}
+          courtRanges={courtRanges.length > 0 ? courtRanges : null}
+          myRangeId={myRangeId}
           embedded
         />
       </CollapsibleCard>
