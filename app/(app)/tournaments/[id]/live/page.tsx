@@ -141,20 +141,27 @@ export default async function TournamentLivePage({
   // queue stays global.
   const { data: courtRangeRows } = await supabase
     .from("tournament_court_ranges")
-    .select("court_start, court_end, divisions")
+    .select("label, court_start, court_end, divisions")
     .eq("tournament_id", tournamentId);
   const courtRanges = (courtRangeRows ?? []) as {
+    label: string;
     court_start: number;
     court_end: number;
     divisions: string[];
   }[];
   let queueScopeDivisions: string[] | null;
+  // Short, viewer-facing label for the queue scope so the Match
+  // Queue card can say "your range" instead of looking like the
+  // global queue. NULL when no scoping applies (legacy / no court
+  // ranges defined) — UI falls back to a plain "Match queue" title.
+  let queueScopeLabel: string | null = null;
   if (courtRanges.length === 0) {
     queueScopeDivisions = null;
   } else {
     const myRange = courtRanges.find((r) => r.divisions.includes(myDivision));
     if (myRange) {
       queueScopeDivisions = myRange.divisions;
+      queueScopeLabel = `${myRange.label} · Courts ${myRange.court_start}–${myRange.court_end}`;
     } else {
       // Division isn't pinned to any range — share the queue with
       // every other unranged division (matches eligible for the
@@ -164,6 +171,7 @@ export default async function TournamentLivePage({
       queueScopeDivisions = Array.from(activeDivisionSet).filter(
         (d) => !ranged.has(d)
       );
+      queueScopeLabel = "Unassigned divisions";
     }
   }
   const scopeDivisionSet = queueScopeDivisions
@@ -383,7 +391,17 @@ export default async function TournamentLivePage({
           otherwise it's the full read-only Court Tracker + queue so
           players can spot friends and identify which court to watch. */}
       <CollapsibleCard
-        title={myCourtCardData ? "Court Tracker" : "Match queue"}
+        // When the tournament has court ranges, name the viewer's
+        // range right in the card title — "Match queue · Men's
+        // Side" — so it's obvious this is THEIR queue, not a
+        // global one. No-op when no ranges are defined.
+        title={
+          myCourtCardData
+            ? "Court Tracker"
+            : queueScopeLabel
+              ? `Match queue · ${queueScopeLabel}`
+              : "Match queue"
+        }
         subtitle={queueSubtitle}
         defaultOpen={false}
       >
@@ -393,6 +411,7 @@ export default async function TournamentLivePage({
           isOnCourt={!!myCourtCardData}
           numCourts={tournament.num_courts ?? null}
           queueScopeDivisions={queueScopeDivisions}
+          queueScopeLabel={queueScopeLabel}
           embedded
         />
       </CollapsibleCard>
