@@ -3,6 +3,7 @@
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 
 /**
  * Subscribes to postgres_changes on tournament_matches and
@@ -12,11 +13,16 @@ import { useEffect } from "react";
  * assignments, and division start/stop all re-render automatically.
  *
  * The channel is scoped by tournament_id filter so idle tabs watching
- * other tournaments don't get spammed.
+ * other tournaments don't get spammed. Refreshes are trailing-
+ * debounced (200ms) so a burst of events (e.g. multiple matches
+ * scoring at once or a division going live and immediately stamping
+ * queue_entered_at on dozens of rows) coalesces into a single
+ * refetch instead of N concurrent ones.
  */
 export function LiveTournamentRealtime({ tournamentId }: { tournamentId: string }) {
   const { supabase } = useSupabase();
   const router = useRouter();
+  const debouncedRefresh = useDebouncedCallback(() => router.refresh(), 200);
 
   useEffect(() => {
     const channel = supabase
@@ -29,7 +35,7 @@ export function LiveTournamentRealtime({ tournamentId }: { tournamentId: string 
           table: "tournament_matches",
           filter: `tournament_id=eq.${tournamentId}`,
         },
-        () => router.refresh()
+        () => debouncedRefresh()
       )
       .on(
         "postgres_changes",
@@ -39,14 +45,14 @@ export function LiveTournamentRealtime({ tournamentId }: { tournamentId: string 
           table: "tournament_active_divisions",
           filter: `tournament_id=eq.${tournamentId}`,
         },
-        () => router.refresh()
+        () => debouncedRefresh()
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, router, tournamentId]);
+  }, [supabase, tournamentId, debouncedRefresh]);
 
   return null;
 }
