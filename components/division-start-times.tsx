@@ -2,6 +2,7 @@
 
 import { fifteenMinuteSlots } from "@/lib/datetime-local";
 import { getDivisionLabel, getDivisionGender } from "@/lib/divisions";
+import { memo } from "react";
 
 interface Props {
   selectedDivisions: string[];
@@ -25,7 +26,7 @@ const TIME_SLOTS = fifteenMinuteSlots();
  * play both at the same time) — that constraint is checked at
  * submit by the parent form, not here.
  */
-export function DivisionStartTimes({
+function DivisionStartTimesInner({
   selectedDivisions,
   values,
   onChange,
@@ -76,3 +77,15 @@ export function DivisionStartTimes({
     </div>
   );
 }
+
+/**
+ * Memoized so unrelated parent re-renders don't churn the per-
+ * division <select> rows. With 12 divisions selected each row has
+ * ~65 time options — so without memo, every keystroke in title /
+ * location / description was re-rendering ~780 <option> elements.
+ * Re-renders only when selectedDivisions, values, onChange, or
+ * defaultTime change. The parent passes a useState setter for
+ * onChange (stable) and the array/record refs only change when
+ * their own state changes — no-op render in the keystroke case.
+ */
+export const DivisionStartTimes = memo(DivisionStartTimesInner);

@@ -1,13 +1,14 @@
 "use client";
 
 import { ALL_DIVISIONS, ALL_DIVISION_CODES, GENDERS, AGES } from "@/lib/divisions";
+import { memo } from "react";
 
 interface Props {
   selected: string[];
   onChange: (codes: string[]) => void;
 }
 
-export function DivisionCheckboxes({ selected, onChange }: Props) {
+function DivisionCheckboxesInner({ selected, onChange }: Props) {
   const allChecked = ALL_DIVISION_CODES.every((c) => selected.includes(c));
 
   function toggleAll() {
@@ -84,3 +85,14 @@ export function DivisionCheckboxes({ selected, onChange }: Props) {
     </div>
   );
 }
+
+/**
+ * Memoized so unrelated parent re-renders (every keystroke in the
+ * tournament-create form, for example) don't re-render all 24
+ * checkboxes. Re-renders only when `selected` or `onChange`
+ * reference change. The parent passes a useState setter for
+ * onChange (stable identity) and the selected array's reference
+ * only changes when divisions state changes — so this becomes a
+ * no-op render in the common case of typing in title/location/etc.
+ */
+export const DivisionCheckboxes = memo(DivisionCheckboxesInner);
