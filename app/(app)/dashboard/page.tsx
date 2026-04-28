@@ -81,6 +81,83 @@ export default async function DashboardPage() {
   );
   const totalSessions = displayedSessionsByGroup.reduce((s, n) => s + n, 0);
   const groupCount = activeGroupMemberships.length;
+
+  // Free-play groups don't track step/win% at the membership row, so the
+  // "5 / 0% / 0 sessions" default looks broken on the dashboard. For each
+  // free-play group the viewer is in, aggregate their per-group W-L,
+  // total point differential, and the count of free-play sessions
+  // they've actually been checked in to. The card render below branches
+  // on group_type and uses these instead of the membership stats.
+  const freePlayGroupIds = activeGroupMemberships
+    .filter((m) => (m as any).group?.group_type === "free_play")
+    .map((m) => m.group_id);
+
+  type FreePlayCardStats = { wins: number; losses: number; pointDiff: number; sessions: number };
+  const freePlayStatsByGroup = new Map<string, FreePlayCardStats>();
+
+  if (freePlayGroupIds.length > 0) {
+    const [{ data: fpMatches }, { data: fpSessionPlayers }] = await Promise.all([
+      supabase
+        .from("free_play_matches")
+        .select("group_id, team_a_p1, team_a_p2, team_b_p1, team_b_p2, score_a, score_b")
+        .in("group_id", freePlayGroupIds)
+        .or(
+          `team_a_p1.eq.${profile.id},team_a_p2.eq.${profile.id},team_b_p1.eq.${profile.id},team_b_p2.eq.${profile.id}`
+        ),
+      supabase
+        .from("free_play_session_players")
+        .select("session_id, free_play_sessions!inner(group_id)")
+        .eq("player_id", profile.id)
+        .in("free_play_sessions.group_id", freePlayGroupIds),
+    ]);
+
+    for (const m of (fpMatches ?? []) as Array<{
+      group_id: string;
+      team_a_p1: string | null;
+      team_a_p2: string | null;
+      team_b_p1: string | null;
+      team_b_p2: string | null;
+      score_a: number;
+      score_b: number;
+    }>) {
+      const stats = freePlayStatsByGroup.get(m.group_id) ?? {
+        wins: 0,
+        losses: 0,
+        pointDiff: 0,
+        sessions: 0,
+      };
+      const onA = m.team_a_p1 === profile.id || m.team_a_p2 === profile.id;
+      const myScore = onA ? m.score_a : m.score_b;
+      const oppScore = onA ? m.score_b : m.score_a;
+      if (myScore > oppScore) stats.wins++;
+      else if (myScore < oppScore) stats.losses++;
+      stats.pointDiff += myScore - oppScore;
+      freePlayStatsByGroup.set(m.group_id, stats);
+    }
+
+    const sessionsByGroup = new Map<string, Set<string>>();
+    for (const row of (fpSessionPlayers ?? []) as Array<{
+      session_id: string;
+      free_play_sessions: { group_id: string } | { group_id: string }[] | null;
+    }>) {
+      const fps = row.free_play_sessions;
+      const gid = Array.isArray(fps) ? fps[0]?.group_id : fps?.group_id;
+      if (!gid) continue;
+      if (!sessionsByGroup.has(gid)) sessionsByGroup.set(gid, new Set());
+      sessionsByGroup.get(gid)!.add(row.session_id);
+    }
+    for (const [gid, set] of sessionsByGroup) {
+      const stats = freePlayStatsByGroup.get(gid) ?? {
+        wins: 0,
+        losses: 0,
+        pointDiff: 0,
+        sessions: 0,
+      };
+      stats.sessions = set.size;
+      freePlayStatsByGroup.set(gid, stats);
+    }
+  }
+
   const weightedWinPct = totalSessions > 0
     ? Math.round(
         activeGroupMemberships.reduce(
@@ -401,17 +478,51 @@ export default async function DashboardPage() {
                       </p>
                     )}
                     <div className="mt-2 grid grid-cols-3 gap-1 text-center">
-                      <GroupMiniStat label="Step" value={String(m.current_step)} />
-                      <GroupMiniStat label="Pts" value={`${m.win_pct}%`} />
-                      <GroupMiniStat
-                        label="Sessions"
-                        value={String(
-                          displaySessionsForGroup(
-                            m.total_sessions,
-                            g?.group_preferences?.pct_window_sessions
-                          )
-                        )}
-                      />
+                      {g?.group_type === "free_play" ? (() => {
+                        // Free-play groups don't carry a step or win%, so
+                        // the membership row's defaults look like a bug.
+                        // Show the things free play actually tracks: W-L,
+                        // point differential, and how many free-play
+                        // sessions the viewer has been checked in to.
+                        const fp =
+                          freePlayStatsByGroup.get(m.group_id) ?? {
+                            wins: 0,
+                            losses: 0,
+                            pointDiff: 0,
+                            sessions: 0,
+                          };
+                        const diffLabel =
+                          fp.pointDiff > 0
+                            ? `+${fp.pointDiff}`
+                            : `${fp.pointDiff}`;
+                        return (
+                          <>
+                            <GroupMiniStat
+                              label="Record"
+                              value={`${fp.wins}-${fp.losses}`}
+                            />
+                            <GroupMiniStat label="Diff" value={diffLabel} />
+                            <GroupMiniStat
+                              label="Sessions"
+                              value={String(fp.sessions)}
+                            />
+                          </>
+                        );
+                      })() : (
+                        <>
+                          <GroupMiniStat label="Step" value={String(m.current_step)} />
+                          <GroupMiniStat label="Pts" value={`${m.win_pct}%`} />
+                          <GroupMiniStat
+                            label="Sessions"
+                            value={String(
+                              displaySessionsForGroup(
+                                m.total_sessions,
+                                g?.group_preferences?.pct_window_sessions
+                              )
+                            )}
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
                 </Link>
