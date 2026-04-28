@@ -214,11 +214,98 @@ export default function CheckInPage() {
       const isSessionContinuation = session.is_same_day_continuation && session.prev_session_id;
       const isDynamicRanking = session?.group?.ladder_type === "dynamic_ranking";
 
+      // Belt and suspenders: a Court Promotion same-day continuation only
+      // does one-up-one-down if every checked-in player has a populated
+      // target_court_next here. The Play Again / End Session flow is the
+      // primary source of truth for that, but if anything got out of sync
+      // (stale React state, an early End Session that bypassed recompute,
+      // etc.) we self-heal here by asking the server to rebuild targets
+      // from the previous session and stamp them onto these participant
+      // rows. Idempotent — a no-op when targets are already in place.
+      let seedableSource = checkedIn;
+      if (isSessionContinuation && !isDynamicRanking) {
+        const missingTargets = checkedIn.some((p) => p.target_court_next == null);
+        if (missingTargets) {
+          let syncReason: string | null = null;
+          try {
+            const syncRes = await fetch(
+              `/api/sessions/${sessionId}/sync-prev-targets`,
+              { method: "POST" }
+            );
+            const syncBody = await syncRes.json().catch(() => ({}));
+
+            // Genuine server error — do NOT silently rank-sort. Surface it
+            // so the admin sees what's wrong instead of accidentally seeding
+            // by step+win% when court-promotion was intended.
+            if (!syncRes.ok) {
+              setSeedError(
+                `Couldn't load target courts from the previous session: ${
+                  syncBody?.error ?? syncRes.statusText ?? "unknown error"
+                }. Refresh and try again, or score-edit the previous session to force a recompute.`
+              );
+              setSeeding(false);
+              return;
+            }
+
+            syncReason = (syncBody?.reason as string | null) ?? null;
+
+            const { data: refreshed } = await supabase
+              .from("session_participants")
+              .select("id, player_id, target_court_next")
+              .eq("session_id", sessionId);
+            if (refreshed) {
+              const tgtMap = new Map<string, number | null>(
+                refreshed.map((r: { player_id: string; target_court_next: number | null }) => [
+                  r.player_id,
+                  r.target_court_next,
+                ])
+              );
+              seedableSource = checkedIn.map((p) => ({
+                ...p,
+                target_court_next: tgtMap.get(p.player_id) ?? p.target_court_next,
+              }));
+              setParticipants((prev) =>
+                prev.map((p) => ({
+                  ...p,
+                  target_court_next:
+                    tgtMap.get(p.player_id) ?? p.target_court_next,
+                }))
+              );
+            }
+          } catch (err) {
+            // Network error — same treatment as a server error. Don't seed.
+            setSeedError(
+              `Couldn't reach the server to load target courts: ${
+                err instanceof Error ? err.message : String(err)
+              }. Check your connection and try again.`
+            );
+            setSeeding(false);
+            return;
+          }
+
+          // After sync, if every checked-in player still has no target AND
+          // it isn't because the previous session had nothing to score
+          // (legit fallback case), refuse to seed. Silently rank-sorting
+          // here is what produced the Athens placement bug — it now fails
+          // visibly so the admin notices.
+          const stillAllMissing =
+            seedableSource.length > 0 &&
+            seedableSource.every((p) => p.target_court_next == null);
+          if (stillAllMissing && syncReason !== "prev_has_no_targets") {
+            setSeedError(
+              "No target courts came back from the previous session. Refresh the page and try again — if it persists, edit-and-resave any score on the previous session to force a recompute."
+            );
+            setSeeding(false);
+            return;
+          }
+        }
+      }
+
       if (isSessionContinuation && !isDynamicRanking) {
         // Court Promotion: players who finished the previous round are anchored to
         // their target_court_next. Players added fresh (no target court — e.g. a
         // waitlist member subbing in) are sorted by ranking and slotted into space.
-        const seedablePlayers: SeedablePlayer[] = checkedIn.map((p) => ({
+        const seedablePlayers: SeedablePlayer[] = seedableSource.map((p) => ({
           id: p.player_id,
           currentStep: p.current_step,
           winPct: p.win_pct,

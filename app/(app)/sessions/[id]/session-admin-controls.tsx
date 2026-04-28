@@ -119,13 +119,35 @@ export function SessionAdminControls({
     setAdvanceError(null);
 
     try {
-      await supabase
-        .from("shootout_sessions")
-        .update({ status: "session_complete" })
-        .eq("id", session.id);
+      // Finalize the previous session through the end API. With
+      // sendRecap=false it skips the "session done" push (these
+      // players are about to be re-seeded into the next session) but
+      // still runs recompute if pool_finish wasn't already set, which
+      // is what gives every checked-in player a target_court_next.
+      // Without this, a Play Again that follows an early End Session
+      // (or a fresh page-load with stale React state) would inherit
+      // null targets and fall back to ranking-sheet seeding —
+      // breaking one-up-one-down between sessions.
+      const endRes = await fetch(`/api/sessions/${session.id}/end`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sendRecap: false }),
+      });
+      // "Already complete" is fine — the targets are still on the
+      // existing rows and we'll read them below.
+      if (!endRes.ok && endRes.status !== 400) {
+        const data = await endRes.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to finalize previous session");
+      }
+
+      // Read the freshly-computed targets from the DB, not React state.
+      const { data: freshParticipants } = await supabase
+        .from("session_participants")
+        .select("player_id, target_court_next, checked_in")
+        .eq("session_id", session.id);
 
       const targetCourtMap = new Map<string, number>();
-      for (const p of participants) {
+      for (const p of freshParticipants ?? []) {
         if (p.target_court_next != null) {
           targetCourtMap.set(p.player_id, p.target_court_next);
         }
@@ -150,7 +172,7 @@ export function SessionAdminControls({
 
       if (sessErr || !newSession) throw sessErr ?? new Error("Insert failed");
 
-      const checkedInIds = participants
+      const checkedInIds = (freshParticipants ?? [])
         .filter((p) => p.checked_in)
         .map((p) => p.player_id);
 

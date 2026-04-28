@@ -9,6 +9,7 @@ import { matchFirstChoice } from "@/lib/first-choice";
 import { computePoolStandings, type RankedMember } from "@/lib/pool-standings";
 import { expectedGamesPerCourt } from "@/lib/round-progress";
 import type { ShootoutSession, SessionParticipant, ShootoutGroup, GameResult } from "@/types/database";
+import { distributeCourts, rankingSheetSort, type RankedPlayer } from "@/lib/shootout-engine";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import { useParams, useRouter } from "next/navigation";
@@ -63,8 +64,9 @@ export default function AdminSessionDetailPage() {
   const [submittingNewScore, setSubmittingNewScore] = useState(false);
   const [newScoreError, setNewScoreError] = useState<string | null>(null);
 
-  // Play-again flow
-  const [showPlayAgain, setShowPlayAgain] = useState(false);
+  // Play-again flow. The court-count selector defaults to the current
+  // session's count once we hit round_complete (see useEffect below) so
+  // the always-visible Next Session preview has something to render.
   const [numCourtsNext, setNumCourtsNext] = useState<number | null>(null);
   const [startingNext, setStartingNext] = useState(false);
 
@@ -136,15 +138,33 @@ export default function AdminSessionDetailPage() {
     setStartingNext(true);
 
     try {
-      // Mark current session as complete
-      await supabase
-        .from("shootout_sessions")
-        .update({ status: "session_complete" })
-        .eq("id", id);
+      // Finalize the previous session through the end API. With
+      // sendRecap=false the "session done" push is skipped (these
+      // players are about to be re-seeded into the next session), but
+      // recompute still runs if pool_finish wasn't already set — which
+      // is what populates each checked-in player's target_court_next.
+      // Without this step, a Play Again can inherit null targets and
+      // the next session falls back to ranking-sheet seeding instead
+      // of the one-up-one-down anchor.
+      const endRes = await fetch(`/api/sessions/${id}/end`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sendRecap: false }),
+      });
+      if (!endRes.ok && endRes.status !== 400) {
+        const data = await endRes.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to finalize previous session");
+      }
 
-      // Build target court map from participants
+      // Read fresh targets from the DB rather than React state — state
+      // could be one realtime tick behind the recompute we just ran.
+      const { data: freshParticipants } = await supabase
+        .from("session_participants")
+        .select("player_id, target_court_next, checked_in")
+        .eq("session_id", id);
+
       const targetCourtMap = new Map<string, number>();
-      for (const p of participants) {
+      for (const p of freshParticipants ?? []) {
         if (p.target_court_next != null) {
           targetCourtMap.set(p.player_id, p.target_court_next);
         }
@@ -168,7 +188,7 @@ export default function AdminSessionDetailPage() {
       if (sessionErr) throw sessionErr;
 
       // Fetch current steps from group_memberships
-      const checkedInIds = participants.filter((p) => p.checked_in).map((p) => p.player_id);
+      const checkedInIds = (freshParticipants ?? []).filter((p) => p.checked_in).map((p) => p.player_id);
       const { data: memberships } = await supabase
         .from("group_memberships")
         .select("player_id, current_step")
@@ -247,9 +267,45 @@ export default function AdminSessionDetailPage() {
       .order("step_before", { ascending: true });
     if (refreshed) setParticipants(refreshed);
 
+    // After complete-round, group_memberships current_step + win_pct have
+    // moved. Refresh the rank snapshot so the next-session preview (and
+    // any tiebreaker annotations) reflects the post-recompute values.
+    if (nextStatus === "round_complete" && session?.group_id) {
+      const playerIds = (refreshed ?? []).map((row: { player_id: string }) => row.player_id);
+      if (playerIds.length > 0) {
+        const { data: memberships } = await supabase
+          .from("group_memberships")
+          .select("player_id, current_step, win_pct")
+          .eq("group_id", session.group_id)
+          .in("player_id", playerIds);
+        const next = new Map<string, RankedMember>();
+        for (const m of (memberships ?? []) as Array<{
+          player_id: string;
+          current_step: number;
+          win_pct: number;
+        }>) {
+          next.set(m.player_id, { step: m.current_step, winPct: m.win_pct });
+        }
+        setMemberRanks(next);
+      }
+    }
+
     setSession({ ...session, status: nextStatus });
     setUpdating(false);
   }
+
+  // Default the next-session court count to the current session's count
+  // as soon as we reach round_complete, so the always-visible preview
+  // has a value to render against without forcing the admin to click.
+  useEffect(() => {
+    if (
+      session?.status === "round_complete" &&
+      numCourtsNext == null &&
+      session.num_courts != null
+    ) {
+      setNumCourtsNext(session.num_courts);
+    }
+  }, [session?.status, session?.num_courts, numCourtsNext]);
 
   // Realtime: re-fetch participants and scores when they change
   useEffect(() => {
@@ -532,6 +588,59 @@ export default function AdminSessionDetailPage() {
     });
   }, [participants]);
 
+  // Dynamic Ranking preview: predict where each checked-in player would
+  // land if a new session were seeded right now. Uses post-recompute step
+  // (step_after, falling back to step_before for any participant that
+  // somehow doesn't have step_after yet) and the freshly-refreshed win %
+  // from group_memberships. Mirrors what seedSession1 / rankingSheetSort
+  // would actually do, so the admin's preview matches the real seeding.
+  const dynamicRankingPreview = useMemo(() => {
+    if (session?.group?.ladder_type !== "dynamic_ranking") return [];
+    const checkedIn = participants.filter((p) => p.checked_in);
+    if (checkedIn.length < 4) return [];
+
+    const numCourts =
+      numCourtsNext ?? session.num_courts ?? validNextCourtOptions[0] ?? 1;
+
+    const ranked: (RankedPlayer & { _participant: typeof checkedIn[number] })[] = checkedIn.map(
+      (p) => {
+        const m = memberRanks.get(p.player_id);
+        return {
+          id: p.player_id,
+          currentStep: p.step_after ?? p.step_before ?? m?.step ?? 99,
+          winPct: m?.winPct ?? 0,
+          lastPlayedAt: null,
+          totalSessions: 0,
+          _participant: p,
+        };
+      }
+    );
+
+    let courts;
+    try {
+      courts = distributeCourts(ranked.length, numCourts);
+    } catch {
+      return [];
+    }
+
+    const sorted = rankingSheetSort(ranked) as typeof ranked;
+    const groups: Array<[number, typeof checkedIn]> = [];
+    let idx = 0;
+    for (const c of courts) {
+      const slice = sorted.slice(idx, idx + c.size).map((r) => r._participant);
+      groups.push([c.court, slice]);
+      idx += c.size;
+    }
+    return groups;
+  }, [
+    participants,
+    memberRanks,
+    numCourtsNext,
+    session?.num_courts,
+    session?.group?.ladder_type,
+    validNextCourtOptions,
+  ]);
+
   const isRoundLive = session?.status === "round_active" || session?.status === "round_complete";
 
   if (loading) return <div className="text-center py-12 text-surface-muted">Loading...</div>;
@@ -619,26 +728,9 @@ export default function AdminSessionDetailPage() {
             </Link>
           )}
           {session.status === "round_complete" ? (
-            <>
-              {!showPlayAgain ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setNumCourtsNext(session.num_courts ?? null);
-                      setShowPlayAgain(true);
-                    }}
-                    className="btn-primary"
-                  >
-                    Play Again
-                  </button>
-                  <button onClick={endSession} disabled={updating} className="btn-secondary">
-                    {updating ? "Ending..." : "End Session"}
-                  </button>
-                </>
-              ) : (
-                <span className="text-sm text-surface-muted">See court preview below ↓</span>
-              )}
-            </>
+            <span className="text-sm text-surface-muted">
+              See next-session preview below ↓
+            </span>
           ) : session.status !== "session_complete" ? (
             <button onClick={advanceStatus} className="btn-secondary" disabled={updating}>
               {updating ? "Updating..." : `Advance to ${STATUS_LABELS[LIFECYCLE_ORDER[currentIdx + 1]] ?? "—"}`}
@@ -657,28 +749,29 @@ export default function AdminSessionDetailPage() {
         </div>
       </div>
 
-      {/* Play Again Preview */}
-      {showPlayAgain && session.status === "round_complete" && (
+      {/* Next Session Preview — always visible at round_complete so the
+          admin can review who moves up vs. down before committing. For
+          Court Promotion the grid is driven by target_court_next from
+          the just-recomputed round (the actual one-up-one-down anchor
+          the next session's seed will use). For Dynamic Ranking the
+          grid is a simulation: rankingSheetSort by post-recompute step
+          and win % into the same court sizes the seeder would pick.
+          ↑ / ↓ pills compare each player's current court to where the
+          preview puts them. */}
+      {session.status === "round_complete" && (
         <div className="card space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-dark-200">Next Session — Court Preview</h2>
-            <button
-              onClick={() => setShowPlayAgain(false)}
-              className="text-xs text-surface-muted hover:text-dark-200"
-            >
-              Cancel
-            </button>
+          <div>
+            <h2 className="text-sm font-semibold text-dark-200">Next Session Preview</h2>
+            {session.group.ladder_type === "dynamic_ranking" ? (
+              <p className="mt-0.5 text-xs text-surface-muted">
+                <span className="font-medium text-dark-200">Dynamic Ranking</span> — courts assigned by updated step + win %. ↑/↓ shows movement vs. this round.
+              </p>
+            ) : (
+              <p className="mt-0.5 text-xs text-surface-muted">
+                Court assignments below are based on each player&apos;s finish in this round (1st up, last down).
+              </p>
+            )}
           </div>
-
-          {session.group.ladder_type === "dynamic_ranking" ? (
-            <p className="text-xs text-surface-muted">
-              <span className="font-medium text-dark-200">Dynamic Ranking</span> — Courts will be assigned at check-in based on each player&apos;s updated step and win %. No fixed court carries forward.
-            </p>
-          ) : (
-            <p className="text-xs text-surface-muted">
-              Court assignments below are based on each player&apos;s finish in this round.
-            </p>
-          )}
 
           {/* Court count selector */}
           <div className="flex items-center gap-3">
@@ -698,7 +791,7 @@ export default function AdminSessionDetailPage() {
             )}
           </div>
 
-          {/* Court Promotion: show target court preview grid */}
+          {/* Court Promotion: target_court_next groupings (authoritative). */}
           {session.group.ladder_type !== "dynamic_ranking" && (
             <>
               {nextCourtGroups.length > 0 && (
@@ -753,19 +846,63 @@ export default function AdminSessionDetailPage() {
             </>
           )}
 
-          <div className="flex gap-3 pt-1">
+          {/* Dynamic Ranking: simulated rank-sort placement. Step + win %
+              from group_memberships (refreshed post-recompute) drive the
+              order. Same distributeCourts logic the seeder will use. */}
+          {session.group.ladder_type === "dynamic_ranking" && (
+            <>
+              {dynamicRankingPreview.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {dynamicRankingPreview.map(([courtNum, courtPlayers]) => (
+                    <div key={courtNum} className="rounded-lg border border-surface-border bg-surface-raised p-3">
+                      <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-2">
+                        Court {courtNum}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {courtPlayers.map((p) => {
+                          const prev = p.court_number;
+                          const moved = prev != null && prev !== courtNum
+                            ? courtNum < prev ? "up" : "down"
+                            : null;
+                          return (
+                            <span
+                              key={p.player_id}
+                              className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                moved === "up"
+                                  ? "bg-teal-900/40 text-teal-300"
+                                  : moved === "down"
+                                  ? "bg-red-900/30 text-red-400"
+                                  : "bg-surface-overlay text-dark-100"
+                              }`}
+                            >
+                              {(p as any).player?.display_name ?? "?"}
+                              {moved === "up" && " ↑"}
+                              {moved === "down" && " ↓"}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex flex-wrap gap-3 pt-1">
             <button
               onClick={startNextSession}
               disabled={numCourtsNext == null || startingNext}
               className="btn-primary"
             >
-              {startingNext ? "Starting..." : "Start Next Session"}
+              {startingNext ? "Starting..." : "Play Again"}
             </button>
             <button
-              onClick={() => setShowPlayAgain(false)}
+              onClick={endSession}
+              disabled={updating || startingNext}
               className="btn-secondary"
             >
-              Cancel
+              {updating ? "Ending..." : "End Session"}
             </button>
           </div>
         </div>
