@@ -6,6 +6,7 @@ import {
   Hr,
   Html,
   Img,
+  Link,
   Preview,
   Section,
   Text,
@@ -18,6 +19,7 @@ interface BaseEmailProps {
 }
 
 export default function BaseEmail({ preview, heading, children }: BaseEmailProps) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   return (
     <Html>
       <Head />
@@ -27,7 +29,7 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
           {/* Dark branded header */}
           <Section style={header}>
             <Img
-              src={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/TriStarPB-dark-Photoroom.png`}
+              src={`${appUrl}/TriStarPB-dark-Photoroom.png`}
               width="160"
               height="auto"
               alt="Tri-Star Pickleball"
@@ -45,7 +47,18 @@ export default function BaseEmail({ preview, heading, children }: BaseEmailProps
 
           <Hr style={hr} />
           <Text style={footer}>
-            Tri-Star Pickleball · You're receiving this because you have an account on tristarpickleball.com
+            Tri-Star Pickleball · You&apos;re receiving this because you have an account on tristarpickleball.com
+          </Text>
+          {/* Unsubscribe / preferences. Sends the recipient through the
+              recipient-agnostic /profile/notifications redirect, which
+              looks up their profile id server-side and lands them on
+              the notifications anchor of their profile edit page. If
+              they aren't signed in, the auth middleware bounces them
+              through login first and brings them back. */}
+          <Text style={footerLine}>
+            <Link href={`${appUrl}/profile/notifications`} style={footerLink}>
+              Manage email preferences
+            </Link>
           </Text>
         </Container>
       </Body>
@@ -99,6 +112,19 @@ const footer = {
   color: "#94a3b8",
   fontSize: "11px",
   textAlign: "center" as const,
+  padding: "0 32px 4px",
+  margin: 0,
+};
+
+const footerLine = {
+  color: "#94a3b8",
+  fontSize: "11px",
+  textAlign: "center" as const,
   padding: "0 32px 24px",
   margin: 0,
+};
+
+const footerLink = {
+  color: "#0d9490",
+  textDecoration: "underline" as const,
 };
