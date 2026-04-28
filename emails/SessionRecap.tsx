@@ -11,8 +11,6 @@ interface Props {
   losses?: number;
   stepBefore?: number | null;
   stepAfter?: number | null;
-  targetCourtNext?: number | null;
-  isCourtPromotion?: boolean;
   sessionId?: string;
 }
 
@@ -32,8 +30,6 @@ export default function SessionRecap({
   losses = 0,
   stepBefore,
   stepAfter,
-  targetCourtNext,
-  isCourtPromotion,
   sessionId,
 }: Props) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
@@ -74,28 +70,15 @@ export default function SessionRecap({
             <tr>
               <td style={labelCell}>Step</td>
               <td style={valueCell}>
-                {stepBefore} → {stepAfter}
-                {stepChanged && (
-                  <span style={{ marginLeft: 6, color: stepUp ? "#059669" : "#dc2626", fontWeight: 600 }}>
-                    {stepUp ? "↑" : "↓"}
-                  </span>
-                )}
-              </td>
-            </tr>
-          )}
-          {isCourtPromotion && targetCourtNext != null && courtNumber != null && (
-            <tr>
-              <td style={labelCell}>Next Session</td>
-              <td style={valueCell}>
-                Court {targetCourtNext}
-                {targetCourtNext < courtNumber && (
-                  <span style={{ marginLeft: 6, color: "#059669", fontWeight: 600 }}>↑ Moving up</span>
-                )}
-                {targetCourtNext > courtNumber && (
-                  <span style={{ marginLeft: 6, color: "#dc2626", fontWeight: 600 }}>↓ Moving down</span>
-                )}
-                {targetCourtNext === courtNumber && (
-                  <span style={{ marginLeft: 6, color: "#6b7280" }}>→ Staying</span>
+                {stepChanged ? (
+                  <>
+                    {stepBefore} → {stepAfter}
+                    <span style={{ marginLeft: 6, color: stepUp ? "#059669" : "#dc2626", fontWeight: 600 }}>
+                      {stepUp ? "↑" : "↓"}
+                    </span>
+                  </>
+                ) : (
+                  <>{stepAfter}</>
                 )}
               </td>
             </tr>

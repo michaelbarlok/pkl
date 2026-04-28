@@ -1,16 +1,28 @@
 import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { notify } from "@/lib/notify";
+import { recomputeSessionStats } from "@/lib/session-recompute";
 import { NextRequest, NextResponse } from "next/server";
 import { formatDate } from "@/lib/utils";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
   const { id: sessionId } = await params;
+
+  // Parse body — sendRecap can be set to false from the Play Again flow,
+  // which calls this endpoint internally to finalize step movement and
+  // target_court_next without notifying every player they're "done."
+  let sendRecap = true;
+  try {
+    const body = await request.json();
+    if (body && body.sendRecap === false) sendRecap = false;
+  } catch {
+    // No body — keep default sendRecap=true (the End Session button case).
+  }
 
   // Fetch session with group and sheet info
   const { data: session } = await auth.supabase
@@ -33,6 +45,36 @@ export async function POST(
     return NextResponse.json({ error: "Session is already complete" }, { status: 400 });
   }
 
+  // If admin skipped Complete Round (or only partially scored a round) we
+  // still need pool_finish, step_after, and target_court_next set before
+  // marking the session done — otherwise a same-day continuation would
+  // anchor everyone to null and the next session's seeding falls back to
+  // ranking-sheet sort, breaking one-up-one-down.
+  // Only recompute if there are scored games AND any participant is missing
+  // pool_finish; otherwise it's a session that ended without a round (rare,
+  // but a no-op end shouldn't manufacture step movement out of zero data).
+  const { data: missingFinish } = await auth.supabase
+    .from("session_participants")
+    .select("id")
+    .eq("session_id", sessionId)
+    .eq("checked_in", true)
+    .is("pool_finish", null)
+    .limit(1);
+
+  if (missingFinish && missingFinish.length > 0) {
+    const { count: scoredGames } = await auth.supabase
+      .from("game_results")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sessionId);
+
+    if ((scoredGames ?? 0) > 0) {
+      const r = await recomputeSessionStats(auth.supabase, sessionId);
+      if (!r.ok) {
+        return NextResponse.json({ error: r.error }, { status: 500 });
+      }
+    }
+  }
+
   // Mark session complete
   const { error: updateErr } = await auth.supabase
     .from("shootout_sessions")
@@ -43,10 +85,14 @@ export async function POST(
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
 
-  // Fetch participants with their stats for the recap (non-blocking after this point)
-  sendRecapNotifications(auth.supabase, session, sessionId).catch((err) =>
-    console.error("Session recap notifications failed:", err)
-  );
+  // Recap is suppressed when called from Play Again — those players are
+  // about to be re-seeded into the next session, so a "your session is
+  // done" push is wrong.
+  if (sendRecap) {
+    sendRecapNotifications(auth.supabase, session, sessionId).catch((err) =>
+      console.error("Session recap notifications failed:", err)
+    );
+  }
 
   return NextResponse.json({ status: "session_complete" });
 }
@@ -91,7 +137,6 @@ async function sendRecapNotifications(
 
   const groupName = session.group?.name ?? "Session";
   const eventDate = session.sheet?.event_date ? formatDate(session.sheet.event_date) : null;
-  const isCourtPromotion = session.group?.ladder_type === "court_promotion";
 
   const ordinal = (n: number) => {
     const s = ["th", "st", "nd", "rd"];
@@ -106,21 +151,23 @@ async function sendRecapNotifications(
     const stepBefore = p.step_before;
     const stepAfter = p.step_after;
     const courtNumber = p.court_number;
-    const targetCourtNext = p.target_court_next;
 
+    // End-of-session recap shows where they finished + their new step.
+    // Court placement for the *next* session is intentionally omitted —
+    // the next sheet's seeding is driven by step ranking, so promising
+    // a specific court here would be misleading if turnout changes.
     const parts: string[] = [];
     if (finish != null && courtNumber != null) {
       parts.push(`Finished ${ordinal(finish)} on Court ${courtNumber}.`);
     }
     parts.push(`Record: ${wl.wins}W – ${wl.losses}L.`);
-    if (stepBefore != null && stepAfter != null && stepAfter !== stepBefore) {
-      const dir = stepAfter < stepBefore ? "↑" : "↓";
-      parts.push(`Step: ${stepBefore} → ${stepAfter} ${dir}`);
-    }
-    if (isCourtPromotion && targetCourtNext != null && courtNumber != null) {
-      if (targetCourtNext < courtNumber) parts.push(`Next session: Court ${targetCourtNext} ↑`);
-      else if (targetCourtNext > courtNumber) parts.push(`Next session: Court ${targetCourtNext} ↓`);
-      else parts.push(`Next session: Court ${targetCourtNext} →`);
+    if (stepBefore != null && stepAfter != null) {
+      if (stepAfter !== stepBefore) {
+        const dir = stepAfter < stepBefore ? "↑" : "↓";
+        parts.push(`Step: ${stepBefore} → ${stepAfter} ${dir}`);
+      } else {
+        parts.push(`Step: ${stepAfter}`);
+      }
     }
 
     const title = `${groupName} recap${eventDate ? ` — ${eventDate}` : ""}`;
@@ -144,8 +191,6 @@ async function sendRecapNotifications(
         losses: wl.losses,
         stepBefore,
         stepAfter,
-        targetCourtNext,
-        isCourtPromotion,
         sessionId,
       },
     }).catch((err) =>

@@ -136,15 +136,33 @@ export default function AdminSessionDetailPage() {
     setStartingNext(true);
 
     try {
-      // Mark current session as complete
-      await supabase
-        .from("shootout_sessions")
-        .update({ status: "session_complete" })
-        .eq("id", id);
+      // Finalize the previous session through the end API. With
+      // sendRecap=false the "session done" push is skipped (these
+      // players are about to be re-seeded into the next session), but
+      // recompute still runs if pool_finish wasn't already set — which
+      // is what populates each checked-in player's target_court_next.
+      // Without this step, a Play Again can inherit null targets and
+      // the next session falls back to ranking-sheet seeding instead
+      // of the one-up-one-down anchor.
+      const endRes = await fetch(`/api/sessions/${id}/end`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sendRecap: false }),
+      });
+      if (!endRes.ok && endRes.status !== 400) {
+        const data = await endRes.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to finalize previous session");
+      }
 
-      // Build target court map from participants
+      // Read fresh targets from the DB rather than React state — state
+      // could be one realtime tick behind the recompute we just ran.
+      const { data: freshParticipants } = await supabase
+        .from("session_participants")
+        .select("player_id, target_court_next, checked_in")
+        .eq("session_id", id);
+
       const targetCourtMap = new Map<string, number>();
-      for (const p of participants) {
+      for (const p of freshParticipants ?? []) {
         if (p.target_court_next != null) {
           targetCourtMap.set(p.player_id, p.target_court_next);
         }
@@ -168,7 +186,7 @@ export default function AdminSessionDetailPage() {
       if (sessionErr) throw sessionErr;
 
       // Fetch current steps from group_memberships
-      const checkedInIds = participants.filter((p) => p.checked_in).map((p) => p.player_id);
+      const checkedInIds = (freshParticipants ?? []).filter((p) => p.checked_in).map((p) => p.player_id);
       const { data: memberships } = await supabase
         .from("group_memberships")
         .select("player_id, current_step")
