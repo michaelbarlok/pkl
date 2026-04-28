@@ -80,6 +80,8 @@ export interface Profile {
   user_id: string;
   full_name: string;
   display_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
   email: string;
   phone?: string | null;
   avatar_url?: string | null;

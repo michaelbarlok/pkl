@@ -21,6 +21,8 @@ export default function EditProfilePage() {
 
   const [displayName, setDisplayName] = useState("");
   const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [bio, setBio] = useState("");
   const [homeCourt, setHomeCourt] = useState("");
@@ -85,6 +87,8 @@ export default function EditProfilePage() {
 
       setDisplayName(profile.display_name ?? "");
       setFullName(profile.full_name ?? "");
+      setFirstName(profile.first_name ?? "");
+      setLastName(profile.last_name ?? "");
       setPhone(profile.phone ?? "");
       setBio(profile.bio ?? "");
       setHomeCourt(profile.home_court ?? "");
@@ -218,9 +222,20 @@ export default function EditProfilePage() {
     const preferredNotify: string[] = ["email"];
     if (notifyPush) preferredNotify.push("push");
 
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    // If first + last are both filled, keep full_name in sync with them.
+    // Otherwise leave full_name as the manually-edited value.
+    const computedFull =
+      trimmedFirst && trimmedLast
+        ? `${trimmedFirst} ${trimmedLast}`
+        : fullName.trim();
+
     const updates: Record<string, unknown> = {
       display_name: displayName.trim(),
-      full_name: fullName.trim(),
+      full_name: computedFull,
+      first_name: trimmedFirst || null,
+      last_name: trimmedLast || null,
       phone: phone.trim() || null,
       bio: bio.trim() || null,
       home_court: homeCourt.trim() || null,
@@ -295,6 +310,37 @@ export default function EditProfilePage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="firstName" className="block text-sm font-medium text-dark-200 mb-1">
+                First Name
+              </label>
+              <input
+                id="firstName"
+                type="text"
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="input"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="lastName" className="block text-sm font-medium text-dark-200 mb-1">
+                Last Name
+              </label>
+              <input
+                id="lastName"
+                type="text"
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="input"
+                required
+              />
+            </div>
+          </div>
+
           <div>
             <label htmlFor="displayName" className="block text-sm font-medium text-dark-200 mb-1">
               Display Name
@@ -307,6 +353,9 @@ export default function EditProfilePage() {
               className="input"
               required
             />
+            <p className="mt-1 text-xs text-surface-muted">
+              Shown on sheets, leaderboards, and brackets. Defaults to your first + last name.
+            </p>
           </div>
 
           <div>
@@ -321,6 +370,9 @@ export default function EditProfilePage() {
               className="input"
               required
             />
+            <p className="mt-1 text-xs text-surface-muted">
+              Used on receipts and emails. Auto-set to &quot;First Last&quot; when you save with both filled in.
+            </p>
           </div>
 
           <div>

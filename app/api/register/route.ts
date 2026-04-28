@@ -36,15 +36,36 @@ async function consumePendingInvite(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, fullName, email } = body as {
+    const { userId, fullName, firstName, lastName, email } = body as {
       userId?: string;
       fullName?: string;
+      firstName?: string;
+      lastName?: string;
       email?: string;
     };
 
-    if (!userId || !fullName || !email) {
+    // Normalize: prefer the explicit first/last fields; fall back to the
+    // legacy fullName field for backward compatibility with any older
+    // signup paths that still send a single name string.
+    const trimmedFirst = (firstName ?? "").trim();
+    const trimmedLast = (lastName ?? "").trim();
+    const trimmedFull = (fullName ?? "").trim();
+    const resolvedFirst =
+      trimmedFirst ||
+      (trimmedFull.includes(" ")
+        ? trimmedFull.slice(0, trimmedFull.indexOf(" ")).trim()
+        : trimmedFull);
+    const resolvedLast =
+      trimmedLast ||
+      (trimmedFull.includes(" ")
+        ? trimmedFull.slice(trimmedFull.indexOf(" ") + 1).trim()
+        : "");
+    const resolvedFull =
+      trimmedFull || [resolvedFirst, resolvedLast].filter(Boolean).join(" ");
+
+    if (!userId || !resolvedFull || !email) {
       return NextResponse.json(
-        { error: "userId, fullName, and email are required" },
+        { error: "userId, name, and email are required" },
         { status: 400 }
       );
     }
@@ -80,8 +101,10 @@ export async function POST(request: NextRequest) {
       .from("profiles")
       .insert({
         user_id: userId,
-        full_name: fullName,
-        display_name: fullName,
+        full_name: resolvedFull,
+        display_name: resolvedFull,
+        first_name: resolvedFirst || null,
+        last_name: resolvedLast || null,
         email,
         role: "player",
         member_since: new Date().toISOString(),
@@ -101,10 +124,10 @@ export async function POST(request: NextRequest) {
 
     // Auto-claim any pending group memberships for this player (non-blocking)
     const { claimPendingMemberships } = await import("@/lib/pending-memberships");
-    claimPendingMemberships(serviceClient, profile.id, fullName, email).catch(() => {});
+    claimPendingMemberships(serviceClient, profile.id, resolvedFull, email).catch(() => {});
 
     // Send welcome email in the background (don't block the response)
-    sendWelcomeEmail(email, fullName).catch(() => {});
+    sendWelcomeEmail(email, resolvedFull).catch(() => {});
 
     return NextResponse.json({ profile }, { status: 201 });
   } catch (err) {
