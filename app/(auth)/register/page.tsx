@@ -19,7 +19,8 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/dashboard";
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -27,14 +28,20 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
-  const [nameTouched, setNameTouched] = useState(false);
+  const [firstNameTouched, setFirstNameTouched] = useState(false);
+  const [lastNameTouched, setLastNameTouched] = useState(false);
   const [invitePrefilled, setInvitePrefilled] = useState(false);
 
+  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const showEmailError = emailTouched && email.length > 0 && !emailValid;
-  const showNameError = nameTouched && fullName.trim().length === 0;
+  const showFirstNameError = firstNameTouched && firstName.trim().length === 0;
+  const showLastNameError = lastNameTouched && lastName.trim().length === 0;
 
-  // Pre-fill from pending invite when a valid email is entered
+  // Pre-fill from pending invite when a valid email is entered.
+  // The invite stores a display name as a single string, so split it the
+  // same way the migration backfill does: first word → first name, the
+  // rest → last name. The user can adjust on the profile page later.
   async function handleEmailBlur() {
     setEmailTouched(true);
     if (!emailValid || invitePrefilled) return;
@@ -42,8 +49,10 @@ function RegisterForm() {
       const res = await fetch(`/api/pending-invite?email=${encodeURIComponent(email)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.found && data.displayName && !fullName.trim()) {
-          setFullName(data.displayName);
+        if (data.found && data.displayName && !firstName.trim() && !lastName.trim()) {
+          const parts = String(data.displayName).trim().split(/\s+/);
+          setFirstName(parts[0] ?? "");
+          setLastName(parts.slice(1).join(" "));
           setInvitePrefilled(true);
         }
       }
@@ -96,6 +105,8 @@ function RegisterForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: authData.user.id,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           fullName,
           email,
         }),
@@ -183,23 +194,43 @@ function RegisterForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="fullName" className="block text-sm font-medium text-dark-200 mb-1">
-            Full Name
-          </label>
-          <input
-            id="fullName"
-            type="text"
-            autoComplete="name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            onBlur={() => setNameTouched(true)}
-            className={`input ${showNameError ? "input-error" : nameTouched && fullName.trim().length > 0 ? "input-success" : ""}`}
-            required
-          />
-          {showNameError && (
-            <p className="mt-1 text-xs text-red-400">Name is required</p>
-          )}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="firstName" className="block text-sm font-medium text-dark-200 mb-1">
+              First Name
+            </label>
+            <input
+              id="firstName"
+              type="text"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              onBlur={() => setFirstNameTouched(true)}
+              className={`input ${showFirstNameError ? "input-error" : firstNameTouched && firstName.trim().length > 0 ? "input-success" : ""}`}
+              required
+            />
+            {showFirstNameError && (
+              <p className="mt-1 text-xs text-red-400">First name is required</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="lastName" className="block text-sm font-medium text-dark-200 mb-1">
+              Last Name
+            </label>
+            <input
+              id="lastName"
+              type="text"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              onBlur={() => setLastNameTouched(true)}
+              className={`input ${showLastNameError ? "input-error" : lastNameTouched && lastName.trim().length > 0 ? "input-success" : ""}`}
+              required
+            />
+            {showLastNameError && (
+              <p className="mt-1 text-xs text-red-400">Last name is required</p>
+            )}
+          </div>
         </div>
 
         <div>
@@ -306,7 +337,16 @@ function RegisterForm() {
 
         <FormError message={error} />
 
-        <button type="submit" className="btn-primary w-full" disabled={loading || !passwordValid}>
+        <button
+          type="submit"
+          className="btn-primary w-full"
+          disabled={
+            loading ||
+            !passwordValid ||
+            firstName.trim().length === 0 ||
+            lastName.trim().length === 0
+          }
+        >
           {loading ? "Creating account..." : "Create account"}
         </button>
       </form>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
 import { MissingProfile } from "./missing-profile";
+import { LastNameNudge } from "./last-name-nudge";
 import { LandingNav } from "./landing-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { ThemeListener } from "@/components/theme-listener";
@@ -49,6 +50,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       user.email?.split("@")[0] ||
       "Player";
 
+    // Best-effort split of the metadata name into first/last so the
+    // OAuth path produces the same shape as /api/register. The nudge
+    // modal will catch anyone left with a NULL last_name.
+    const firstNameMeta =
+      (user.user_metadata?.given_name as string | undefined) ||
+      (fullName.includes(" ") ? fullName.slice(0, fullName.indexOf(" ")).trim() : fullName);
+    const lastNameMeta =
+      (user.user_metadata?.family_name as string | undefined) ||
+      (fullName.includes(" ") ? fullName.slice(fullName.indexOf(" ") + 1).trim() : "");
+
     const avatarUrl =
       user.user_metadata?.avatar_url ||
       user.user_metadata?.picture ||
@@ -61,6 +72,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           user_id: user.id,
           full_name: fullName,
           display_name: fullName,
+          first_name: firstNameMeta || null,
+          last_name: lastNameMeta || null,
           email: user.email ?? "",
           role: "player",
           member_since: new Date().toISOString(),
@@ -148,6 +161,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
            the first standalone launch on iOS) it also nudges the user
            to flip their notification preferences to push. */}
       <PWAInstallPrompt profileId={profile.id} />
+
+      {/* Pops on every visit until the user fills in a last name. Once
+           profile.last_name is non-null the component returns null and
+           never shows again. We pass current first_name so the modal
+           pre-fills it from the migration backfill. */}
+      <LastNameNudge
+        profileId={profile.id}
+        initialFirstName={profile.first_name ?? null}
+        initialLastName={profile.last_name ?? null}
+      />
     </div>
   );
 }
