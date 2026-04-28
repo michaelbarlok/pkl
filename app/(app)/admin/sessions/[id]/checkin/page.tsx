@@ -226,10 +226,29 @@ export default function CheckInPage() {
       if (isSessionContinuation && !isDynamicRanking) {
         const missingTargets = checkedIn.some((p) => p.target_court_next == null);
         if (missingTargets) {
+          let syncReason: string | null = null;
           try {
-            await fetch(`/api/sessions/${sessionId}/sync-prev-targets`, {
-              method: "POST",
-            });
+            const syncRes = await fetch(
+              `/api/sessions/${sessionId}/sync-prev-targets`,
+              { method: "POST" }
+            );
+            const syncBody = await syncRes.json().catch(() => ({}));
+
+            // Genuine server error — do NOT silently rank-sort. Surface it
+            // so the admin sees what's wrong instead of accidentally seeding
+            // by step+win% when court-promotion was intended.
+            if (!syncRes.ok) {
+              setSeedError(
+                `Couldn't load target courts from the previous session: ${
+                  syncBody?.error ?? syncRes.statusText ?? "unknown error"
+                }. Refresh and try again, or score-edit the previous session to force a recompute.`
+              );
+              setSeeding(false);
+              return;
+            }
+
+            syncReason = (syncBody?.reason as string | null) ?? null;
+
             const { data: refreshed } = await supabase
               .from("session_participants")
               .select("id, player_id, target_court_next")
@@ -253,11 +272,31 @@ export default function CheckInPage() {
                 }))
               );
             }
-          } catch {
-            // Sync failed — fall through with whatever targets we had.
-            // seedSameDaySession will degrade to ranking-sheet sort, which
-            // is exactly what we want to avoid, but it's still better than
-            // crashing the seed entirely.
+          } catch (err) {
+            // Network error — same treatment as a server error. Don't seed.
+            setSeedError(
+              `Couldn't reach the server to load target courts: ${
+                err instanceof Error ? err.message : String(err)
+              }. Check your connection and try again.`
+            );
+            setSeeding(false);
+            return;
+          }
+
+          // After sync, if every checked-in player still has no target AND
+          // it isn't because the previous session had nothing to score
+          // (legit fallback case), refuse to seed. Silently rank-sorting
+          // here is what produced the Athens placement bug — it now fails
+          // visibly so the admin notices.
+          const stillAllMissing =
+            seedableSource.length > 0 &&
+            seedableSource.every((p) => p.target_court_next == null);
+          if (stillAllMissing && syncReason !== "prev_has_no_targets") {
+            setSeedError(
+              "No target courts came back from the previous session. Refresh the page and try again — if it persists, edit-and-resave any score on the previous session to force a recompute."
+            );
+            setSeeding(false);
+            return;
           }
         }
       }
