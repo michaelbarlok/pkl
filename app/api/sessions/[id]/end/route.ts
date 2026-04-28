@@ -45,14 +45,65 @@ export async function POST(
     return NextResponse.json({ error: "Session is already complete" }, { status: 400 });
   }
 
-  // If admin skipped Complete Round (or only partially scored a round) we
-  // still need pool_finish, step_after, and target_court_next set before
-  // marking the session done — otherwise a same-day continuation would
-  // anchor everyone to null and the next session's seeding falls back to
-  // ranking-sheet sort, breaking one-up-one-down.
-  // Only recompute if there are scored games AND any participant is missing
-  // pool_finish; otherwise it's a session that ended without a round (rare,
-  // but a no-op end shouldn't manufacture step movement out of zero data).
+  // If a round is in progress, every expected game has to be scored
+  // before we'll let the session be finalized. Same rule complete-round
+  // already enforces — having it here too means no path (Play Again,
+  // End Session, or a direct API call) can advance past round_active
+  // with partial or zero scores, which is what produced null targets
+  // and the rank-sort fallback in Athens earlier this week.
+  if (session.status === "round_active") {
+    const { data: checkedInParts } = await auth.supabase
+      .from("session_participants")
+      .select("court_number")
+      .eq("session_id", sessionId)
+      .eq("checked_in", true)
+      .not("court_number", "is", null);
+
+    const courtSizes = new Map<number, number>();
+    for (const p of checkedInParts ?? []) {
+      const c = p.court_number as number;
+      courtSizes.set(c, (courtSizes.get(c) ?? 0) + 1);
+    }
+
+    if (courtSizes.size > 0) {
+      const { data: gameResults } = await auth.supabase
+        .from("game_results")
+        .select("pool_number")
+        .eq("session_id", sessionId)
+        .eq("round_number", session.current_round || 1);
+
+      const gameCounts = new Map<number, number>();
+      for (const g of gameResults ?? []) {
+        gameCounts.set(g.pool_number, (gameCounts.get(g.pool_number) ?? 0) + 1);
+      }
+
+      const incomplete: string[] = [];
+      for (const [courtNum, size] of courtSizes) {
+        const expected = size === 5 ? 5 : 3;
+        const got = gameCounts.get(courtNum) ?? 0;
+        if (got < expected) {
+          incomplete.push(`Court ${courtNum} (${got}/${expected})`);
+        }
+      }
+
+      if (incomplete.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Score every game before ending the session — incomplete: ${incomplete.join(", ")}.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+  }
+
+  // If admin skipped Complete Round (or scored everything but never
+  // clicked it), pool_finish / step_after / target_court_next still
+  // need to be set before the session is marked done — otherwise a
+  // same-day continuation anchors everyone to null. The check above
+  // already guarantees scores are complete in round_active; this
+  // recompute fills in the derived fields. Idempotent if recompute
+  // already ran via complete-round.
   const { data: missingFinish } = await auth.supabase
     .from("session_participants")
     .select("id")
