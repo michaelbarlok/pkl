@@ -63,6 +63,44 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
   const [mergeSearchSecondary, setMergeSearchSecondary] = useState("");
   const [mergePrimary, setMergePrimary] = useState<Profile | null>(null);
   const [mergeSecondary, setMergeSecondary] = useState<Profile | null>(null);
+
+  // When the merge modal opens with exactly 2 rows already checked
+  // in the table, pre-fill primary + secondary from that selection so
+  // the admin doesn't have to search for the same accounts again.
+  // Default the more-active member to primary (more group memberships
+  // → primary; ties broken by older created_at, since the original
+  // account is almost always what should be kept). The admin can flip
+  // it with the Swap button next to the cards.
+  useEffect(() => {
+    if (!mergeOpen) return;
+    if (selectedIds.size !== 2) return;
+    if (mergePrimary || mergeSecondary) return;
+
+    const picked = profiles.filter((p) => selectedIds.has(p.id));
+    if (picked.length !== 2) return;
+
+    const [a, b] = picked;
+    const aActivity = (membershipMap[a.id] ?? []).length;
+    const bActivity = (membershipMap[b.id] ?? []).length;
+
+    let primary = a;
+    let secondary = b;
+    if (bActivity > aActivity) {
+      primary = b;
+      secondary = a;
+    } else if (aActivity === bActivity) {
+      // Tiebreak by created_at — older row stays as primary.
+      const aTime = new Date(a.created_at ?? a.member_since ?? 0).getTime();
+      const bTime = new Date(b.created_at ?? b.member_since ?? 0).getTime();
+      if (bTime < aTime) {
+        primary = b;
+        secondary = a;
+      }
+    }
+
+    setMergePrimary(primary);
+    setMergeSecondary(secondary);
+  }, [mergeOpen, selectedIds, profiles, membershipMap, mergePrimary, mergeSecondary]);
   // Let the admin opt in to keeping the SECONDARY account's email /
   // avatar on the surviving primary profile. Stats always follow the
   // primary — these two toggles just handle cosmetic / auth-login
@@ -503,6 +541,27 @@ export function MembersTable({ profiles, membershipMap, currentProfileId }: Memb
                 </div>
               )}
             </div>
+
+            {/* Swap — visible whenever both are picked. Quick way to flip
+                the auto-pick when the admin wants the other account kept. */}
+            {mergePrimary && mergeSecondary && (
+              <div className="flex justify-center -my-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tmp = mergePrimary;
+                    setMergePrimary(mergeSecondary);
+                    setMergeSecondary(tmp);
+                  }}
+                  className="text-xs text-brand-vivid hover:opacity-80 inline-flex items-center gap-1"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
+                  Swap
+                </button>
+              </div>
+            )}
 
             {/* Secondary (remove) */}
             <div className="space-y-1.5">
