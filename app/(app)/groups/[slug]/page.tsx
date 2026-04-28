@@ -11,6 +11,7 @@ import { RollingSessionsSetting } from "./rolling-sessions-setting";
 import { GroupTabs, type TabSpec } from "./group-tabs";
 import { MembersGrid } from "./members-grid";
 import { SendAnnouncement } from "./send-announcement";
+import { LeaveGroupButton } from "./leave-group-button";
 import { groupGradient } from "@/lib/group-gradient";
 import type { GroupWithPreferences } from "@/lib/queries/group";
 
@@ -671,6 +672,9 @@ export default async function GroupPage({
                 Contact Admins
               </a>
             )}
+            {isMember && (
+              <LeaveGroupButton groupId={group.id} groupName={group.name} />
+            )}
           </div>
         </div>
       </div>
@@ -707,6 +711,47 @@ function JoinButton({
     const supabase = await createClient();
     const serviceClient = await createServiceClient();
 
+    // First check the archive — if this player previously left this
+    // group, restore their stats instead of starting from scratch.
+    // Stats kept on rejoin: current_step, win_pct, total_sessions,
+    // last_played_at, imported_win_pct, signup_priority. group_role
+    // is intentionally reset to 'member' (re-promoting is an admin
+    // action), and joined_at gets a fresh timestamp.
+    const { data: archived } = await serviceClient
+      .from("left_group_memberships")
+      .select("*")
+      .eq("group_id", groupId)
+      .eq("player_id", playerId)
+      .maybeSingle();
+
+    let usedArchive = false;
+    if (archived) {
+      const { error: restoreErr } = await serviceClient
+        .from("group_memberships")
+        .upsert(
+          {
+            group_id: groupId,
+            player_id: playerId,
+            current_step: archived.current_step,
+            win_pct: archived.win_pct,
+            total_sessions: archived.total_sessions,
+            last_played_at: archived.last_played_at,
+            imported_win_pct: archived.imported_win_pct,
+            signup_priority: archived.signup_priority ?? "normal",
+            group_role: "member",
+          },
+          { onConflict: "group_id,player_id" }
+        );
+      if (!restoreErr) {
+        await serviceClient
+          .from("left_group_memberships")
+          .delete()
+          .eq("group_id", groupId)
+          .eq("player_id", playerId);
+        usedArchive = true;
+      }
+    }
+
     // Check if there's a pending record for this player in this group.
     // If so, use those stats instead of defaults so imported history is preserved.
     const { data: playerProfile } = await supabase
@@ -716,7 +761,7 @@ function JoinButton({
       .single();
 
     let usedPending = false;
-    if (playerProfile) {
+    if (!usedArchive && playerProfile) {
       const { claimPendingMemberships } = await import("@/lib/pending-memberships");
       const before = await serviceClient
         .from("group_memberships")
@@ -745,8 +790,8 @@ function JoinButton({
       }
     }
 
-    // If no pending record handled the join, fall back to default insert
-    if (!usedPending) {
+    // If no archive or pending record handled the join, fall back to default insert
+    if (!usedArchive && !usedPending) {
       let startStep = 5;
       if (groupType === "ladder_league") {
         const { data: prefs } = await supabase
