@@ -12,6 +12,7 @@ import { GroupTabs, type TabSpec } from "./group-tabs";
 import { MembersGrid } from "./members-grid";
 import { SendAnnouncement } from "./send-announcement";
 import { LeaveGroupButton } from "./leave-group-button";
+import { WeatherBadge } from "@/components/weather-badge";
 import { groupGradient } from "@/lib/group-gradient";
 import type { GroupWithPreferences } from "@/lib/queries/group";
 
@@ -417,6 +418,12 @@ export default async function GroupPage({
                           </span>
                           <span className="text-xs text-surface-muted">
                             {formatTimeInZone(ev.sheet.event_time, ev.sheet.timezone)} · {ev.sheet.location}
+                          </span>
+                          <span className="mt-0.5">
+                            <WeatherBadge
+                              location={ev.sheet.location}
+                              eventTime={ev.sheet.event_time}
+                            />
                           </span>
                         </Link>
                       </li>
