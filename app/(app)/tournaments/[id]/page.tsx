@@ -195,6 +195,25 @@ export default async function TournamentDetailPage({
     }
   }
 
+  // Need-Partner vs. Waiting-on-Partner distinction. A registration
+  // with no partner_id is "Need Partner" (publicly askable) UNLESS
+  // it has a pending invite link out — that means the inviter is
+  // already waiting on a specific person to claim, and the row
+  // should render as "Waiting on partner to join" (no inbound Ask
+  // button). Computed here once and shared by both render sites
+  // (confirmed list + waitlist).
+  const { data: pendingInviteRows } = await supabase
+    .from("tournament_partner_invites")
+    .select("registration_id")
+    .eq("tournament_id", id)
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString());
+  const waitingForInvite = new Set<string>(
+    (pendingInviteRows ?? []).map(
+      (r: { registration_id: string }) => r.registration_id
+    )
+  );
+
   // Only organizers see the bracket grid on the tournament page —
   // regular registered players are pointed to the Play tab for their
   // own pool. The group-by-division build below only feeds
@@ -786,6 +805,7 @@ export default async function TournamentDetailPage({
           divisions={tournament.divisions ?? []}
           myRegistration={myRegistration}
           myRegistrations={myRegistrations}
+          myProfileId={profile.id}
           playerCap={tournament.player_cap}
           maxTeamsPerDivision={tournament.max_teams_per_division}
           confirmedCount={confirmedRegistrations.length}
@@ -1020,9 +1040,18 @@ export default async function TournamentDetailPage({
               <tbody className="divide-y divide-surface-border bg-surface-raised">
                 {confirmedRegistrations.map((reg, i) => {
                   const playerId = (reg as any).player_id as string | undefined;
-                  const needsPartner =
+                  const partnerless =
                     tournament.type === "doubles" &&
                     !(reg as any).partner_id;
+                  // Distinguish the two no-partner states:
+                  //   waitingOnInvite — they sent an invite link to
+                  //     a specific person and are holding the spot
+                  //     for that person. Closed to inbound requests.
+                  //   needsPartner   — explicitly opted in to the
+                  //     "find one for me" pool. Open to inbound asks.
+                  const waitingOnInvite =
+                    partnerless && waitingForInvite.has(reg.id);
+                  const needsPartner = partnerless && !waitingOnInvite;
                   // The viewer can ask if they themselves are still
                   // partner-less — that includes the "I haven't
                   // registered" case AND the "I registered solo
@@ -1051,15 +1080,26 @@ export default async function TournamentDetailPage({
                           (reg as any).partner.display_name
                         ) : (
                           <span className="inline-flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-accent-500/15 text-accent-300 ring-1 ring-accent-500/40">
-                              Need Partner
-                            </span>
-                            {viewerCanAsk && playerId && (
-                              <AskToPartnerButton
-                                tournamentId={id}
-                                targetId={playerId}
-                                targetName={(reg as any).player?.display_name ?? "this player"}
-                              />
+                            {waitingOnInvite ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-overlay text-surface-muted ring-1 ring-surface-border"
+                                title="An invite link is out — waiting for the recipient to register and claim it."
+                              >
+                                Waiting on partner to join
+                              </span>
+                            ) : (
+                              <>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-accent-500/15 text-accent-300 ring-1 ring-accent-500/40">
+                                  Need Partner
+                                </span>
+                                {viewerCanAsk && playerId && (
+                                  <AskToPartnerButton
+                                    tournamentId={id}
+                                    targetId={playerId}
+                                    targetName={(reg as any).player?.display_name ?? "this player"}
+                                  />
+                                )}
+                              </>
                             )}
                           </span>
                         )}
@@ -1316,9 +1356,18 @@ export default async function TournamentDetailPage({
               <tbody className="divide-y divide-surface-border bg-surface-raised">
                 {confirmedRegistrations.map((reg, i) => {
                   const playerId = (reg as any).player_id as string | undefined;
-                  const needsPartner =
+                  const partnerless =
                     tournament.type === "doubles" &&
                     !(reg as any).partner_id;
+                  // Distinguish the two no-partner states:
+                  //   waitingOnInvite — they sent an invite link to
+                  //     a specific person and are holding the spot
+                  //     for that person. Closed to inbound requests.
+                  //   needsPartner   — explicitly opted in to the
+                  //     "find one for me" pool. Open to inbound asks.
+                  const waitingOnInvite =
+                    partnerless && waitingForInvite.has(reg.id);
+                  const needsPartner = partnerless && !waitingOnInvite;
                   // The viewer can ask if they themselves are still
                   // partner-less — that includes the "I haven't
                   // registered" case AND the "I registered solo
@@ -1347,15 +1396,26 @@ export default async function TournamentDetailPage({
                           (reg as any).partner.display_name
                         ) : (
                           <span className="inline-flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-accent-500/15 text-accent-300 ring-1 ring-accent-500/40">
-                              Need Partner
-                            </span>
-                            {viewerCanAsk && playerId && (
-                              <AskToPartnerButton
-                                tournamentId={id}
-                                targetId={playerId}
-                                targetName={(reg as any).player?.display_name ?? "this player"}
-                              />
+                            {waitingOnInvite ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-overlay text-surface-muted ring-1 ring-surface-border"
+                                title="An invite link is out — waiting for the recipient to register and claim it."
+                              >
+                                Waiting on partner to join
+                              </span>
+                            ) : (
+                              <>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-accent-500/15 text-accent-300 ring-1 ring-accent-500/40">
+                                  Need Partner
+                                </span>
+                                {viewerCanAsk && playerId && (
+                                  <AskToPartnerButton
+                                    tournamentId={id}
+                                    targetId={playerId}
+                                    targetName={(reg as any).player?.display_name ?? "this player"}
+                                  />
+                                )}
+                              </>
                             )}
                           </span>
                         )}

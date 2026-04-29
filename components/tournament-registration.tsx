@@ -17,6 +17,11 @@ interface Props {
   /** Every non-withdrawn registration the viewer has — could be 0,
    *  1, or 2 (one gendered + one mixed). */
   myRegistrations?: TournamentRegistration[];
+  /** Viewer's own profile id. Lets the row distinguish "I'm the
+   *  registering player" from "I was added as the partner" so the
+   *  button can read 'Withdraw' vs 'Decline partnership' with the
+   *  matching server-side semantics. */
+  myProfileId?: string;
   playerCap: number | null | undefined;
   maxTeamsPerDivision: number | null | undefined;
   confirmedCount: number;
@@ -29,6 +34,7 @@ export function TournamentRegistrationButton({
   divisions,
   myRegistration,
   myRegistrations,
+  myProfileId,
   playerCap,
   maxTeamsPerDivision,
   confirmedCount,
@@ -39,6 +45,13 @@ export function TournamentRegistrationButton({
   const confirm = useConfirm();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Partner-invite state. When the inviter clicks the "send invite
+  // link" CTA, we hit the partner-invites API which registers them
+  // as Need-Partner and returns a token URL. The UI then surfaces
+  // a small modal with native-share / copy / SMS / mail options.
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteTournamentTitle, setInviteTournamentTitle] = useState<string>("");
 
   // Multi-division support: a player can sign up for at most one
   // gendered division (Men's OR Women's) AND optionally one Mixed
@@ -130,14 +143,31 @@ export function TournamentRegistrationButton({
     router.refresh();
   }
 
-  async function handleWithdraw(divisionCode: string | null | undefined) {
+  // Returns true when the viewer is the partner (not the original
+  // registering player) on a given registration row. Same DELETE
+  // endpoint handles both cases server-side; the only thing this
+  // affects is the button label and the confirm-modal copy.
+  function viewerIsPartner(reg: TournamentRegistration): boolean {
+    if (!myProfileId) return false;
+    const playerId = (reg as unknown as { player_id?: string }).player_id;
+    const partnerId = (reg as unknown as { partner_id?: string | null }).partner_id;
+    return partnerId === myProfileId && playerId !== myProfileId;
+  }
+
+  async function handleWithdraw(reg: TournamentRegistration) {
+    const divisionCode = reg.division;
     const divLabel = divisionCode ? getDivisionLabel(divisionCode) : "this tournament";
+    const isPartnerSide = viewerIsPartner(reg);
+
     const ok = await confirm({
-      title: `Withdraw from ${divLabel}?`,
-      description:
-        "You'll lose your spot in this division. If registration is still open you can rejoin, but your seed may change.",
-      confirmLabel: "Withdraw",
-      cancelLabel: "Stay in",
+      title: isPartnerSide
+        ? `Decline partnership in ${divLabel}?`
+        : `Withdraw from ${divLabel}?`,
+      description: isPartnerSide
+        ? "You'll be removed as their partner. The original registrant stays on the list as a Need-Partner registrant — they can pair with someone else."
+        : "You'll lose your spot in this division. If registration is still open you can rejoin, but your seed may change.",
+      confirmLabel: isPartnerSide ? "Decline" : "Withdraw",
+      cancelLabel: isPartnerSide ? "Stay as partner" : "Stay in",
       variant: "danger",
     });
     if (!ok) return;
@@ -151,7 +181,7 @@ export function TournamentRegistrationButton({
 
     if (!res.ok) {
       const data = await res.json();
-      setError(data.error ?? "Withdrawal failed");
+      setError(data.error ?? (isPartnerSide ? "Could not decline" : "Withdrawal failed"));
       setLoading(null);
       return;
     }
@@ -169,8 +199,19 @@ export function TournamentRegistrationButton({
         <div key={reg.id} className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-teal-vivid">
-              {reg.status === "confirmed" ? "You're registered!" : "You're on the waitlist"}
+              {viewerIsPartner(reg)
+                ? reg.status === "confirmed"
+                  ? "You were added as a partner"
+                  : "Added as partner (waitlist)"
+                : reg.status === "confirmed"
+                  ? "You're registered!"
+                  : "You're on the waitlist"}
             </p>
+            {viewerIsPartner(reg) && reg.player?.display_name && (
+              <p className="text-xs text-surface-muted">
+                Registered by {reg.player.display_name}
+              </p>
+            )}
             {reg.division && (
               <p className="text-xs text-surface-muted">
                 Division: {getDivisionLabel(reg.division)}
@@ -181,11 +222,15 @@ export function TournamentRegistrationButton({
             )}
           </div>
           <button
-            onClick={() => handleWithdraw(reg.division)}
+            onClick={() => handleWithdraw(reg)}
             disabled={loading !== null}
             className="btn-secondary text-xs !border-red-500/50 !text-red-400 shrink-0"
           >
-            {loading === `withdraw:${reg.division ?? ""}` ? "..." : "Withdraw"}
+            {loading === `withdraw:${reg.division ?? ""}`
+              ? "..."
+              : viewerIsPartner(reg)
+                ? "Decline"
+                : "Withdraw"}
           </button>
         </div>
       ))}
@@ -313,8 +358,155 @@ export function TournamentRegistrationButton({
               >
                 I don&apos;t have a partner yet &mdash; find one for me
               </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setError("");
+                  setLoading("invite");
+                  try {
+                    const res = await fetch(
+                      `/api/tournaments/${tournamentId}/partner-invites`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          division: activeDivision || null,
+                        }),
+                      }
+                    );
+                    const data = await res.json();
+                    if (!res.ok) {
+                      setError(data.error ?? "Could not create invite");
+                      return;
+                    }
+                    setInviteUrl(data.url);
+                    setInviteTournamentTitle(data.tournamentTitle ?? "");
+                    setInviteCopied(false);
+                    // Server already registered the inviter as
+                    // Need-Partner — refresh so the form shows their
+                    // new registration row immediately.
+                    router.refresh();
+                  } catch (err) {
+                    setError(
+                      err instanceof Error
+                        ? err.message
+                        : "Could not create invite"
+                    );
+                  } finally {
+                    setLoading(null);
+                  }
+                }}
+                disabled={loading !== null}
+                className="block text-xs text-brand-vivid hover:underline mt-1"
+              >
+                Partner not on Tri-Star Pickleball yet? Send them an invite link
+              </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Share modal — fires after the invite API returns a URL.
+           Tries the native Web Share sheet (which surfaces Messages,
+           Mail, etc. on iOS/Android) and falls back to copy + sms +
+           mailto buttons for desktop browsers without `navigator.share`. */}
+      {inviteUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="card w-full max-w-md space-y-3">
+            <h3 className="text-base font-semibold text-dark-100">
+              Share invite link
+            </h3>
+            <p className="text-xs text-surface-muted">
+              You&apos;re registered as Need-Partner. Send this link to your
+              partner — they&apos;ll register and be locked in as your partner
+              automatically.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={inviteUrl}
+                className="input flex-1 text-xs"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(inviteUrl);
+                    setInviteCopied(true);
+                    setTimeout(() => setInviteCopied(false), 2000);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                className="btn-secondary text-xs whitespace-nowrap"
+              >
+                {inviteCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  // Web Share opens the OS share sheet — Messages,
+                  // Mail, WhatsApp, etc. — on iOS/Android. On desktop
+                  // browsers without it, this falls through silently
+                  // and the user uses Copy / SMS / Email below.
+                  if (
+                    typeof navigator !== "undefined" &&
+                    typeof navigator.share === "function"
+                  ) {
+                    try {
+                      await navigator.share({
+                        title: `Be my partner for ${inviteTournamentTitle}`,
+                        text: `Tap this link to register and join my team for ${inviteTournamentTitle}: ${inviteUrl}`,
+                        url: inviteUrl,
+                      });
+                    } catch {
+                      /* user cancelled — ignore */
+                    }
+                  }
+                }}
+                className="btn-primary text-xs flex-1"
+              >
+                Share…
+              </button>
+              <a
+                href={`sms:?&body=${encodeURIComponent(
+                  `Be my partner for ${inviteTournamentTitle}: ${inviteUrl}`
+                )}`}
+                className="btn-secondary text-xs flex-1 text-center"
+              >
+                SMS
+              </a>
+              <a
+                href={`mailto:?subject=${encodeURIComponent(
+                  `Be my partner for ${inviteTournamentTitle}`
+                )}&body=${encodeURIComponent(
+                  `Tap this link to register and join my team:\n\n${inviteUrl}`
+                )}`}
+                className="btn-secondary text-xs flex-1 text-center"
+              >
+                Email
+              </a>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setInviteUrl(null);
+                setInviteCopied(false);
+              }}
+              className="btn-secondary text-xs w-full mt-1"
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
 
