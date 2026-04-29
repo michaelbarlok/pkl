@@ -150,14 +150,29 @@ export async function POST(
   }
 
   // Mark the invite as claimed.
+  const claimedAtIso = new Date().toISOString();
   await service
     .from("tournament_partner_invites")
     .update({
       status: "claimed",
       claimed_by: auth.profile.id,
-      claimed_at: new Date().toISOString(),
+      claimed_at: claimedAtIso,
     })
     .eq("id", invite.id);
+
+  // Cancel every OTHER pending invite tied to the same registration.
+  // The inviter may have shared the link with multiple people — first
+  // claim wins, the rest are out of luck. Without this cascade, a
+  // second claimant would hit the partner_id-IS-NULL guard and see a
+  // generic 409 with no clear explanation; cancelling the rows up
+  // front means the landing page surfaces a clean "this invite was
+  // claimed by someone else" message instead.
+  await service
+    .from("tournament_partner_invites")
+    .update({ status: "cancelled", claimed_at: claimedAtIso })
+    .eq("registration_id", invite.registration_id)
+    .eq("status", "pending")
+    .neq("id", invite.id);
 
   // Auto-cancel any outstanding partner requests involving the
   // claimer or inviter — same housekeeping the regular accept flow

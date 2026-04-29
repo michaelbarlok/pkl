@@ -61,6 +61,27 @@ export async function POST(
     return NextResponse.json({ error: "That player already has a partner" }, { status: 409 });
   }
 
+  // If the target has any pending invite link out, they're "waiting
+  // on partner to join" — closed to inbound partner requests until
+  // those invites resolve (claimed or expired). The UI hides the
+  // Ask-to-Partner button in this state; this is the API-side guard.
+  const { data: pendingInvites } = await service
+    .from("tournament_partner_invites")
+    .select("id")
+    .eq("registration_id", targetReg.id)
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
+    .limit(1);
+  if (pendingInvites && pendingInvites.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "That player is waiting on a partner to claim their invite link. They aren't accepting partner requests right now.",
+      },
+      { status: 409 }
+    );
+  }
+
   // Requester can't already be partnered on this tournament.
   const { data: requesterReg } = await service
     .from("tournament_registrations")
