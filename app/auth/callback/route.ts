@@ -1,7 +1,17 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { sendWelcomeEmail } from "@/lib/send-welcome-email";
+import { ensureProfile } from "@/lib/ensure-profile";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Google OAuth callback. Exchanges the authorization code for a session,
+ * then delegates profile provisioning to ensureProfile() — the same
+ * helper the email/password verify flow and the layout fallback use.
+ *
+ * ensureProfile handles: name parsing (given_name / family_name),
+ * avatar_url, pending invite consumption (phone / skill_level),
+ * pending group-membership claim, and the welcome email — all
+ * idempotent, all gated on whether the row was actually inserted.
+ */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
@@ -12,54 +22,12 @@ export async function GET(request: NextRequest) {
     const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && sessionData?.user) {
-      const user = sessionData.user;
-
-      // Ensure a profile exists — Google OAuth users skip /api/register
-      const serviceClient = await createServiceClient();
-      // maybeSingle: zero rows is expected for a first-time OAuth user, not an error
-      const { data: existing } = await serviceClient
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!existing) {
-        const fullName =
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.email?.split("@")[0] ||
-          "Player";
-
-        const avatarUrl =
-          user.user_metadata?.avatar_url ||
-          user.user_metadata?.picture ||
-          null;
-
-        // Use upsert so concurrent requests don't cause a duplicate-key error
-        const { data: newProfile } = await serviceClient.from("profiles").upsert(
-          {
-            user_id: user.id,
-            full_name: fullName,
-            display_name: fullName,
-            email: user.email ?? "",
-            role: "player",
-            member_since: new Date().toISOString(),
-            preferred_notify: ["email"],
-            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-          },
-          { onConflict: "user_id", ignoreDuplicates: true }
-        ).select("id").maybeSingle();
-
-        // Auto-claim any pending group memberships (non-blocking)
-        if (newProfile?.id) {
-          const { claimPendingMemberships } = await import("@/lib/pending-memberships");
-          claimPendingMemberships(serviceClient, newProfile.id, fullName, user.email ?? "").catch(() => {});
-        }
-
-        // Send welcome email to new Google OAuth users
-        sendWelcomeEmail(user.email ?? "", fullName).catch(() => {});
+      try {
+        const serviceClient = await createServiceClient();
+        await ensureProfile(serviceClient, sessionData.user);
+      } catch {
+        // Non-fatal — the (app)/layout fallback will run on next page load.
       }
-
       return NextResponse.redirect(new URL(next, request.url));
     }
   }

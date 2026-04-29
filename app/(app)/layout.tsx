@@ -1,4 +1,5 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { ensureProfile } from "@/lib/ensure-profile";
 import { redirect } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
@@ -41,51 +42,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .eq("user_id", user.id)
     .maybeSingle();
 
-  // Profile missing — auto-create it (Google OAuth users who skip /api/register)
+  // Profile missing — auto-create it. This is the last-resort safety
+  // net. The primary creation paths (/auth/confirm for email/password,
+  // /auth/callback for OAuth) already call ensureProfile, so by the
+  // time we get here the row almost always exists. This branch covers
+  // tabs killed mid-verify, server-action throws, etc. We refetch via
+  // the regular client after ensureProfile so the rest of the layout
+  // keeps the generated row type.
   if (!profile) {
-    const serviceClient = await createServiceClient();
-    const fullName =
-      user.user_metadata?.full_name ||
-      user.user_metadata?.name ||
-      user.email?.split("@")[0] ||
-      "Player";
-
-    // Best-effort split of the metadata name into first/last so the
-    // OAuth path produces the same shape as /api/register. The nudge
-    // modal will catch anyone left with a NULL last_name.
-    const firstNameMeta =
-      (user.user_metadata?.given_name as string | undefined) ||
-      (fullName.includes(" ") ? fullName.slice(0, fullName.indexOf(" ")).trim() : fullName);
-    const lastNameMeta =
-      (user.user_metadata?.family_name as string | undefined) ||
-      (fullName.includes(" ") ? fullName.slice(fullName.indexOf(" ") + 1).trim() : "");
-
-    const avatarUrl =
-      user.user_metadata?.avatar_url ||
-      user.user_metadata?.picture ||
-      null;
-
-    const { data: created } = await serviceClient
+    try {
+      const serviceClient = await createServiceClient();
+      await ensureProfile(serviceClient, user);
+    } catch {
+      // Non-fatal — fall through to refetch and the !profile branch.
+    }
+    const { data: refetched } = await supabase
       .from("profiles")
-      .upsert(
-        {
-          user_id: user.id,
-          full_name: fullName,
-          display_name: fullName,
-          first_name: firstNameMeta || null,
-          last_name: lastNameMeta || null,
-          email: user.email ?? "",
-          role: "player",
-          member_since: new Date().toISOString(),
-          preferred_notify: ["email"],
-          ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-        },
-        { onConflict: "user_id" }
-      )
       .select("*")
-      .single();
-
-    profile = created;
+      .eq("user_id", user.id)
+      .maybeSingle();
+    profile = refetched;
   }
 
   if (!profile) {

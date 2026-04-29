@@ -1,38 +1,26 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { sendWelcomeEmail } from "@/lib/send-welcome-email";
+import { ensureProfile } from "@/lib/ensure-profile";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Look up a pending invite by email and return any extra profile fields to apply.
- * Marks the invite as used so it won't be reused.
+ * POST /api/register
+ *
+ * Legacy / direct-call profile-provisioning endpoint. The primary
+ * creation path now runs server-side from /auth/confirm (after email
+ * verify) and /auth/callback (after OAuth exchange) — both of which
+ * call ensureProfile() directly with the verified auth user. This
+ * endpoint stays for any external caller that posts a user-id+name
+ * payload, and routes through the same ensureProfile helper.
+ *
+ * Hardening:
+ *   - Verifies the userId resolves to a real auth user.
+ *   - Verifies the body email matches the auth user's email (case
+ *     insensitive). Without this guard, a hand-rolled payload could
+ *     have written `email = victim@x.com` for an unrelated userId.
+ *   - Stores the explicit first_name / last_name on the auth user's
+ *     metadata before delegating to ensureProfile, so the helper's
+ *     name-resolution priority picks them up.
  */
-async function consumePendingInvite(
-  serviceClient: Awaited<ReturnType<typeof createServiceClient>>,
-  email: string
-): Promise<{ phone?: string; skill_level?: number } | null> {
-  const { data } = await serviceClient
-    .from("pending_invites")
-    .select("id, phone, skill_level")
-    .ilike("email", email)
-    .is("used_at", null)
-    .order("invited_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!data) return null;
-
-  // Mark as used
-  await serviceClient
-    .from("pending_invites")
-    .update({ used_at: new Date().toISOString() })
-    .eq("id", data.id);
-
-  return {
-    phone: data.phone ?? undefined,
-    skill_level: data.skill_level ?? undefined,
-  };
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -44,9 +32,7 @@ export async function POST(request: NextRequest) {
       email?: string;
     };
 
-    // Normalize: prefer the explicit first/last fields; fall back to the
-    // legacy fullName field for backward compatibility with any older
-    // signup paths that still send a single name string.
+    // Normalize: prefer explicit first/last; fall back to splitting fullName.
     const trimmedFirst = (firstName ?? "").trim();
     const trimmedLast = (lastName ?? "").trim();
     const trimmedFull = (fullName ?? "").trim();
@@ -72,64 +58,51 @@ export async function POST(request: NextRequest) {
 
     const serviceClient = await createServiceClient();
 
-    // Verify the auth user exists
     const { data: authUser, error: authError } =
       await serviceClient.auth.admin.getUserById(userId);
 
     if (authError || !authUser?.user) {
+      return NextResponse.json({ error: "Invalid user" }, { status: 400 });
+    }
+
+    // Reject when the body email doesn't match the auth user's email.
+    // The auth user's email is the source of truth — verifyOtp already
+    // confirmed it. Trusting whatever email the client posts here would
+    // let a malicious payload write a profile row with someone else's
+    // address attached to a real userId.
+    const authEmail = (authUser.user.email ?? "").toLowerCase();
+    if (authEmail && authEmail !== email.toLowerCase()) {
       return NextResponse.json(
-        { error: "Invalid user" },
-        { status: 400 }
+        { error: "Email does not match the authenticated user." },
+        { status: 403 }
       );
     }
 
-    // Check if profile already exists (maybeSingle: zero rows is expected, not an error)
-    const { data: existing } = await serviceClient
-      .from("profiles")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle();
+    // Pass the explicit first/last through user_metadata so ensureProfile
+    // picks them up rather than re-splitting full_name.
+    const meta = (authUser.user.user_metadata ?? {}) as Record<string, unknown>;
+    const enrichedUser = {
+      ...authUser.user,
+      user_metadata: {
+        ...meta,
+        full_name: meta.full_name ?? resolvedFull,
+        first_name: meta.first_name ?? (resolvedFirst || undefined),
+        last_name: meta.last_name ?? (resolvedLast || undefined),
+      },
+    };
 
-    if (existing) {
-      return NextResponse.json({ profile: existing }, { status: 200 });
-    }
-
-    // Check for pending invite to pre-populate profile fields
-    const pendingData = await consumePendingInvite(serviceClient, email);
-
-    const { data: profile, error: profileError } = await serviceClient
-      .from("profiles")
-      .insert({
-        user_id: userId,
-        full_name: resolvedFull,
-        display_name: resolvedFull,
-        first_name: resolvedFirst || null,
-        last_name: resolvedLast || null,
-        email,
-        role: "player",
-        member_since: new Date().toISOString(),
-        preferred_notify: ["email"],
-        ...(pendingData?.phone ? { phone: pendingData.phone } : {}),
-        ...(pendingData?.skill_level != null ? { skill_level: pendingData.skill_level } : {}),
-      })
-      .select("*")
-      .single();
-
-    if (profileError) {
+    const result = await ensureProfile(serviceClient, enrichedUser);
+    if (!result) {
       return NextResponse.json(
-        { error: profileError.message },
+        { error: "Failed to create profile" },
         { status: 500 }
       );
     }
 
-    // Auto-claim any pending group memberships for this player (non-blocking)
-    const { claimPendingMemberships } = await import("@/lib/pending-memberships");
-    claimPendingMemberships(serviceClient, profile.id, resolvedFull, email).catch(() => {});
-
-    // Send welcome email in the background (don't block the response)
-    sendWelcomeEmail(email, resolvedFull).catch(() => {});
-
-    return NextResponse.json({ profile }, { status: 201 });
+    return NextResponse.json(
+      { profile: result.profile },
+      { status: result.created ? 201 : 200 }
+    );
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Internal server error";
