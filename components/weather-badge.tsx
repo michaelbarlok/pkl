@@ -15,9 +15,15 @@ const ICONS: Record<WeatherIconCategory, string> = {
 };
 
 interface Props {
-  /** Event location (e.g., "Athens, TN"). When null, the badge
-   *  renders nothing. */
-  location: string | null | undefined;
+  /** Free-form display location (e.g. a venue name like "Ingleside
+   *  Pickleball Courts"). Used as a geocoding fallback only — venue
+   *  names rarely resolve through the US Census geocoder, so prefer
+   *  passing `cityState` whenever the caller has it on hand. */
+  location?: string | null;
+  /** Geocodable city/state hint (e.g. "Athens, TN"). When set, this
+   *  is what we feed to the geocoder; `location` is ignored unless
+   *  this is empty. */
+  cityState?: string | null;
   /** Event start time. Badge renders only when this is set, in the
    *  future, and within 5 days. Forecast lookup rounds up to the
    *  next whole hour (5:30 → 6:00). */
@@ -27,7 +33,8 @@ interface Props {
 
 /**
  * Compact weather chip for an upcoming event. Renders nothing when:
- *   - location or eventTime is missing
+ *   - no usable address (neither cityState nor location)
+ *   - eventTime is missing
  *   - event is in the past or more than 5 days out
  *   - geocode or NWS fetch fails
  *
@@ -35,8 +42,13 @@ interface Props {
  * prompts, no user-location lookup. The forecast is for the EVENT'S
  * location, not the viewer.
  */
-export async function WeatherBadge({ location, eventTime, className }: Props) {
-  const weather = await getEventWeather({ location, eventTime });
+export async function WeatherBadge({
+  location,
+  cityState,
+  eventTime,
+  className,
+}: Props) {
+  const weather = await getEventWeather({ location, cityState, eventTime });
   if (!weather) return null;
 
   const showPrecip = weather.precipPercent >= 20;

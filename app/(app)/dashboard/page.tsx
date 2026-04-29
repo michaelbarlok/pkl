@@ -45,7 +45,7 @@ export default async function DashboardPage() {
     badgeStats,
   ] = await Promise.all([
     supabase.from("group_memberships").select("*, group:shootout_groups(*, group_preferences(pct_window_sessions))").eq("player_id", profile.id),
-    supabase.from("signup_sheets").select("*, group:shootout_groups(name, slug, is_active)").eq("status", "open").order("event_date", { ascending: true }).limit(5),
+    supabase.from("signup_sheets").select("*, group:shootout_groups(name, slug, is_active, city, state)").eq("status", "open").order("event_date", { ascending: true }).limit(5),
     supabase.from("tournament_registrations").select("tournament_id, division, status, tournament:tournaments(id, title, start_date, start_time, location, status)").eq("player_id", profile.id).neq("status", "withdrawn"),
     supabase.from("tournaments").select("id, title, start_date, start_time, location, status").eq("created_by", profile.id).not("status", "in", '("completed","cancelled")'),
     supabase.from("tournament_organizers").select("tournament:tournaments(id, title, start_date, start_time, location, status)").eq("profile_id", profile.id),
@@ -199,8 +199,8 @@ export default async function DashboardPage() {
   type TimelineItem =
     | { kind: "live-session"; id: string; href: string; title: string; subtitle: string; status: "live" }
     | { kind: "live-tournament"; id: string; href: string; title: string; subtitle: string; status: "live" }
-    | { kind: "sheet"; id: string; href: string; title: string; subtitle: string; date: string; status: "open"; eventTime: string | null; location: string | null }
-    | { kind: "tournament"; id: string; href: string; title: string; subtitle: string; date: string; status: "upcoming" | "waitlist" | "organizer"; eventTime: string | null; location: string | null };
+    | { kind: "sheet"; id: string; href: string; title: string; subtitle: string; date: string; status: "open"; eventTime: string | null; location: string | null; cityState: string | null }
+    | { kind: "tournament"; id: string; href: string; title: string; subtitle: string; date: string; status: "upcoming" | "waitlist" | "organizer"; eventTime: string | null; location: string | null; cityState: string | null };
 
   const timeline: TimelineItem[] = [
     ...activeSessions.map((ap: any): TimelineItem => ({
@@ -231,6 +231,8 @@ export default async function DashboardPage() {
       status: "open",
       eventTime: s.event_time ?? null,
       location: s.location ?? null,
+      cityState:
+        [s.group?.city, s.group?.state].filter(Boolean).join(", ") || null,
     })),
     ...upcomingTournaments.map((r: any): TimelineItem => ({
       kind: "tournament",
@@ -253,6 +255,10 @@ export default async function DashboardPage() {
         ? `${r.tournament.start_date}T${r.tournament.start_time}`
         : null,
       location: r.tournament.location ?? null,
+      // Tournaments store a single freeform `location` that organizers
+      // typically already populate with a city/state, so reuse it as
+      // the geocoding hint.
+      cityState: r.tournament.location ?? null,
     })),
   ];
 
@@ -753,6 +759,7 @@ function TimelineRow({ item, todayIso }: { item: any; todayIso: string }) {
             <p className="mt-0.5">
               <WeatherBadge
                 location={item.location}
+                cityState={item.cityState}
                 eventTime={item.eventTime}
               />
             </p>

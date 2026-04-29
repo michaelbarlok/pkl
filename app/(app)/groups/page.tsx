@@ -121,7 +121,18 @@ export default async function GroupsPage() {
   // so groups with no upcoming sheet (or one outside the 5-day
   // window) silently render nothing. One small DB read for all
   // groups, plus the weather lookups (themselves cached).
+  //
+  // We also need the group's city/state for the geocoder — sheets'
+  // `location` is a venue name (e.g. "Ingleside Pickleball Courts")
+  // which the US Census geocoder can't resolve. Build a city/state
+  // map from the in-memory group cards we already fetched so we can
+  // pass it through as the geocoding hint.
   const groupIds = groupCards.map((g) => g.id);
+  const cityStateByGroupId = new Map<string, string>();
+  for (const g of groupCards) {
+    const cs = [g.city, g.state].filter(Boolean).join(", ");
+    if (cs) cityStateByGroupId.set(g.id, cs);
+  }
   const fiveDaysIso = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
   const { data: nextSheets } = groupIds.length
     ? await supabase
@@ -144,7 +155,11 @@ export default async function GroupsPage() {
   const weatherByGroupId: Record<string, React.ReactNode> = {};
   for (const [groupId, sheet] of earliestPerGroup) {
     weatherByGroupId[groupId] = (
-      <WeatherBadge location={sheet.location} eventTime={sheet.event_time} />
+      <WeatherBadge
+        location={sheet.location}
+        cityState={cityStateByGroupId.get(groupId) ?? null}
+        eventTime={sheet.event_time}
+      />
     );
   }
 

@@ -247,16 +247,28 @@ async function fetchForecast(
 
 /**
  * Public entry point. Returns null whenever a badge shouldn't render
- * (no location, no time, in the past, more than 5 days out, geocode
- * failed, NWS down, etc.) so callers can use it directly without
- * extra guards. Errors are swallowed — a missing weather chip is
- * always preferable to a broken page.
+ * (no usable address, no time, in the past, more than 5 days out,
+ * geocode failed, NWS down, etc.) so callers can use it directly
+ * without extra guards. Errors are swallowed — a missing weather chip
+ * is always preferable to a broken page.
+ *
+ * Geocoding hint priority:
+ *   1. `cityState` (e.g. "Athens, TN") — preferred. Sheet venue names
+ *      like "Ingleside Pickleball Courts" don't resolve through the US
+ *      Census geocoder, so the group's city/state is what we actually
+ *      want to feed to it. Tournament organizers also typically enter a
+ *      city/state here.
+ *   2. `location` — fallback for older callers / data with no
+ *      city/state. Will silently fail to geocode if it's a venue name.
  */
 export async function getEventWeather(opts: {
-  location: string | null | undefined;
+  location?: string | null;
+  cityState?: string | null;
   eventTime: Date | string | null | undefined;
 }): Promise<WeatherSummary | null> {
-  if (!opts.location || !opts.eventTime) return null;
+  const geocodeStr =
+    opts.cityState?.trim() || opts.location?.trim() || "";
+  if (!geocodeStr || !opts.eventTime) return null;
 
   const eventTime =
     typeof opts.eventTime === "string" ? new Date(opts.eventTime) : opts.eventTime;
@@ -267,7 +279,7 @@ export async function getEventWeather(opts: {
   if (eventMs < now) return null;
   if (eventMs - now > FIVE_DAYS_MS) return null;
 
-  const coords = await geocode(opts.location);
+  const coords = await geocode(geocodeStr);
   if (!coords) return null;
 
   const periods = await fetchForecast(coords.lat, coords.lon);

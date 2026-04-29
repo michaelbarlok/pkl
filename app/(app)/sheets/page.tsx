@@ -70,7 +70,7 @@ export default async function SheetsPage() {
 
   let sheetsQuery = supabase
     .from("signup_sheets")
-    .select("*, group:shootout_groups(id, name, slug)")
+    .select("*, group:shootout_groups(id, name, slug, city, state)")
     .gte("event_date", cutoffDate.toISOString().split("T")[0])
     .order("event_date", { ascending: false });
 
@@ -224,6 +224,11 @@ export default async function SheetsPage() {
         weather={
           <WeatherBadge
             location={sheet.location}
+            cityState={
+              [sheet.group?.city, sheet.group?.state]
+                .filter(Boolean)
+                .join(", ") || null
+            }
             eventTime={sheet.event_time}
           />
         }
