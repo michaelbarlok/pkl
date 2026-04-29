@@ -39,6 +39,49 @@ export async function POST(
     );
   }
 
+  // Legacy single-bracket generator: ignores `division` and treats
+  // every confirmed registration as one big roster. That's correct
+  // for tournaments without divisions configured but produces
+  // garbage for any tournament with multiple skill / gender / age
+  // brackets — a Mixed 4.0 team would land in the same pool as a
+  // Men's 3.0 team. The dedicated /divisions endpoint is the right
+  // path for those; refuse here so a stale client or direct API
+  // call can't blow away the per-division bracket.
+  const tournamentDivisions = (tournament.divisions ?? []) as string[];
+  if (tournamentDivisions.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "This tournament has divisions configured — use the per-division Generate flow instead. The legacy bracket endpoint can't generate division-aware brackets.",
+      },
+      { status: 400 }
+    );
+  }
+
+  // Doubles tournaments: refuse if any confirmed registration is
+  // partnerless. Same guard the /divisions endpoint enforces — a
+  // half-team in pool play would silently produce matches with one
+  // slot null and corrupt the schedule. Belt-and-suspenders so
+  // direct API hits can't bypass the close-registration nudge.
+  if (tournament.type === "doubles") {
+    const { count: partnerlessCount } = await supabase
+      .from("tournament_registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "confirmed")
+      .is("partner_id", null);
+    if ((partnerlessCount ?? 0) > 0) {
+      return NextResponse.json(
+        {
+          error: `${partnerlessCount} team${
+            (partnerlessCount ?? 0) === 1 ? " is" : "s are"
+          } still without a partner. Withdraw or fix them before generating brackets.`,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   // Fetch confirmed registrations ordered by seed (if set) then registration order
   const { data: registrations } = await supabase
     .from("tournament_registrations")
