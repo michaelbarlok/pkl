@@ -2,6 +2,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { GroupList, type GroupCardData } from "./group-list";
+import { WeatherBadge } from "@/components/weather-badge";
 
 export default async function GroupsPage() {
   const supabase = await createClient();
@@ -114,6 +115,39 @@ export default async function GroupsPage() {
     revalidatePath("/groups");
   }
 
+  // Pre-render a weather chip per group, keyed by group id, for the
+  // group's NEXT upcoming sheet inside the 5-day window. The
+  // WeatherBadge itself returns null if no usable forecast exists,
+  // so groups with no upcoming sheet (or one outside the 5-day
+  // window) silently render nothing. One small DB read for all
+  // groups, plus the weather lookups (themselves cached).
+  const groupIds = groupCards.map((g) => g.id);
+  const fiveDaysIso = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: nextSheets } = groupIds.length
+    ? await supabase
+        .from("signup_sheets")
+        .select("group_id, event_time, location")
+        .in("group_id", groupIds)
+        .gte("event_time", new Date().toISOString())
+        .lte("event_time", fiveDaysIso)
+        .neq("status", "cancelled")
+        .order("event_time", { ascending: true })
+    : { data: null };
+
+  const earliestPerGroup = new Map<string, { event_time: string; location: string }>();
+  for (const s of (nextSheets ?? []) as Array<{ group_id: string; event_time: string; location: string }>) {
+    if (!earliestPerGroup.has(s.group_id)) {
+      earliestPerGroup.set(s.group_id, { event_time: s.event_time, location: s.location });
+    }
+  }
+
+  const weatherByGroupId: Record<string, React.ReactNode> = {};
+  for (const [groupId, sheet] of earliestPerGroup) {
+    weatherByGroupId[groupId] = (
+      <WeatherBadge location={sheet.location} eventTime={sheet.event_time} />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -127,6 +161,7 @@ export default async function GroupsPage() {
         groups={groupCards}
         playerId={profile?.id ?? null}
         joinAction={joinGroup}
+        weatherByGroupId={weatherByGroupId}
       />
     </div>
   );

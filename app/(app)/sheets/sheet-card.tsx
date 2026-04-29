@@ -62,6 +62,10 @@ interface SheetCardProps {
   withdrawClosed: boolean;
   isFull: boolean;
   isLoggedIn: boolean;
+  /** Optional pre-rendered weather chip from a server component. The
+   *  card stays a client component, so async server work has to be
+   *  done by the parent and passed in as a slot. */
+  weather?: React.ReactNode;
 }
 
 function PlayerAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
@@ -160,6 +164,7 @@ export function SheetCard({
   withdrawClosed,
   isFull,
   isLoggedIn,
+  weather,
 }: SheetCardProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -224,6 +229,7 @@ export function SheetCard({
             <span>{eventDate}</span>
             <span>{location}</span>
           </div>
+          {weather && <div className="mt-1">{weather}</div>}
         </Link>
         <div className="flex items-center gap-2 shrink-0">
           <div className="text-right text-sm text-surface-muted whitespace-nowrap">
