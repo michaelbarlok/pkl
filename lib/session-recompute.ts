@@ -87,38 +87,59 @@ export async function recomputeSessionStats(
   );
 
   // --- pool_finish per court (same algorithm as complete-round) ---
+  // Tiebreaker chain (mirrored in lib/pool-standings.ts so the live
+  // preview never disagrees with the persisted finish):
+  //   1. Wins desc
+  //   2. Total point diff desc
+  //   3. Head-to-head record (wins minus losses against the other tied
+  //      player specifically) desc
+  //   4. Head-to-head point margin (sum of my-team-score minus
+  //      opp-team-score across the matches they played on opposite
+  //      teams) desc
+  //   5. Lower pre-session step asc
+  //   6. Higher pre-session pt% desc
   for (const [courtNum, courtPlayers] of courtMap) {
     const courtScores = gameResults.filter((g) => g.pool_number === courtNum);
 
-    type S = { wins: number; losses: number; pointDiff: number; h2hPoints: Map<string, number> };
+    type H2H = { wins: number; losses: number; pointDiff: number };
+    type S = { wins: number; losses: number; pointDiff: number; h2h: Map<string, H2H> };
     const standings = new Map<string, S>();
     for (const p of courtPlayers) {
-      standings.set(p.player_id, { wins: 0, losses: 0, pointDiff: 0, h2hPoints: new Map() });
+      standings.set(p.player_id, { wins: 0, losses: 0, pointDiff: 0, h2h: new Map() });
     }
 
     for (const game of courtScores) {
       const teamAIds = [game.team_a_p1, game.team_a_p2].filter(Boolean) as string[];
       const teamBIds = [game.team_b_p1, game.team_b_p2].filter(Boolean) as string[];
       const aWon = game.score_a > game.score_b;
+      const bWon = game.score_b > game.score_a;
 
       for (const pid of teamAIds) {
         const s = standings.get(pid);
         if (!s) continue;
         if (aWon) s.wins++;
-        else s.losses++;
+        else if (bWon) s.losses++;
         s.pointDiff += game.score_a - game.score_b;
         for (const opp of teamBIds) {
-          s.h2hPoints.set(opp, (s.h2hPoints.get(opp) ?? 0) + game.score_a);
+          const h = s.h2h.get(opp) ?? { wins: 0, losses: 0, pointDiff: 0 };
+          if (aWon) h.wins++;
+          else if (bWon) h.losses++;
+          h.pointDiff += game.score_a - game.score_b;
+          s.h2h.set(opp, h);
         }
       }
       for (const pid of teamBIds) {
         const s = standings.get(pid);
         if (!s) continue;
-        if (!aWon) s.wins++;
-        else s.losses++;
+        if (bWon) s.wins++;
+        else if (aWon) s.losses++;
         s.pointDiff += game.score_b - game.score_a;
         for (const opp of teamAIds) {
-          s.h2hPoints.set(opp, (s.h2hPoints.get(opp) ?? 0) + game.score_b);
+          const h = s.h2h.get(opp) ?? { wins: 0, losses: 0, pointDiff: 0 };
+          if (bWon) h.wins++;
+          else if (aWon) h.losses++;
+          h.pointDiff += game.score_b - game.score_a;
+          s.h2h.set(opp, h);
         }
       }
     }
@@ -126,9 +147,16 @@ export async function recomputeSessionStats(
     const ranked = Array.from(standings.entries()).sort(([idA, a], [idB, b]) => {
       if (a.wins !== b.wins) return b.wins - a.wins;
       if (a.pointDiff !== b.pointDiff) return b.pointDiff - a.pointDiff;
-      const aH2H = a.h2hPoints.get(idB) ?? 0;
-      const bH2H = b.h2hPoints.get(idA) ?? 0;
-      if (aH2H !== bH2H) return bH2H - aH2H;
+
+      const aH = a.h2h.get(idB) ?? { wins: 0, losses: 0, pointDiff: 0 };
+      const bH = b.h2h.get(idA) ?? { wins: 0, losses: 0, pointDiff: 0 };
+
+      const aRec = aH.wins - aH.losses;
+      const bRec = bH.wins - bH.losses;
+      if (aRec !== bRec) return bRec - aRec;
+
+      if (aH.pointDiff !== bH.pointDiff) return bH.pointDiff - aH.pointDiff;
+
       const mA = memberMap.get(idA) ?? { step: 99, pointPct: 0 };
       const mB = memberMap.get(idB) ?? { step: 99, pointPct: 0 };
       if (mA.step !== mB.step) return mA.step - mB.step;

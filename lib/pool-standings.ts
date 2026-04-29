@@ -7,19 +7,19 @@
  *
  * Tiebreaker stack (in order):
  *   1. Wins (desc)
- *   2. Point differential (desc)
- *   3. Head-to-head points — total points the two tied players
- *      scored against each other across their direct matchups (desc).
- *   4. Lower pre-session overall step (asc). The player who stood
- *      higher on the group's overall ladder before this session
- *      wins the tie.
- *   5. Higher pre-session Points % (desc). Last-resort when even
- *      steps are identical.
+ *   2. Total point differential (desc)
+ *   3. Head-to-head record — wins minus losses against the OTHER tied
+ *      player specifically (desc). If they split, fall through.
+ *   4. Head-to-head point margin — sum of (my score − opp score) across
+ *      every match they played on opposite teams (desc).
+ *   5. Lower pre-session overall step (asc).
+ *   6. Higher pre-session Points % (desc). Last resort.
  *
  * Each standing is annotated with `tiebreakerReason` when it benefited
- * from a tiebreaker against the player immediately below it. UIs can
- * render that reason as a small note next to the name so players
- * understand why they got the edge.
+ * from a tiebreaker against the player immediately below it. The
+ * reason names the specific sub-step that decided the tie (e.g.
+ * "Won head-to-head record (2-0)" vs. "Better head-to-head point
+ * margin (+3)") so players can see exactly why one advanced.
  */
 
 export interface PoolStanding {
@@ -53,12 +53,14 @@ interface GameRef {
   score_b: number;
 }
 
+type H2H = { wins: number; losses: number; pointDiff: number };
+
 export function computePoolStandings(
   players: PlayerRef[],
   scores: GameRef[],
   memberMap?: Map<string, RankedMember>
 ): PoolStanding[] {
-  type Internal = PoolStanding & { h2hPoints: Map<string, number> };
+  type Internal = PoolStanding & { h2h: Map<string, H2H> };
   const standings = new Map<string, Internal>();
 
   for (const p of players) {
@@ -69,34 +71,47 @@ export function computePoolStandings(
       losses: 0,
       pointDiff: 0,
       tiebreakerReason: null,
-      h2hPoints: new Map(),
+      h2h: new Map(),
     });
   }
 
+  // Per-pair head-to-head bookkeeping. For every match where players
+  // X and Y are on opposite teams, both X.h2h[Y] and Y.h2h[X] get a
+  // wins/losses bump and a pointDiff delta. That lets the comparator
+  // ask "did A beat B head-to-head?" and "by how much?" separately.
   for (const game of scores) {
     const teamAIds = [game.team_a_p1, game.team_a_p2].filter(Boolean) as string[];
     const teamBIds = [game.team_b_p1, game.team_b_p2].filter(Boolean) as string[];
     const aWon = game.score_a > game.score_b;
+    const bWon = game.score_b > game.score_a;
 
     for (const pid of teamAIds) {
       const s = standings.get(pid);
       if (!s) continue;
       if (aWon) s.wins++;
-      else s.losses++;
+      else if (bWon) s.losses++;
       s.pointDiff += game.score_a - game.score_b;
       for (const opp of teamBIds) {
-        s.h2hPoints.set(opp, (s.h2hPoints.get(opp) ?? 0) + game.score_a);
+        const h = s.h2h.get(opp) ?? { wins: 0, losses: 0, pointDiff: 0 };
+        if (aWon) h.wins++;
+        else if (bWon) h.losses++;
+        h.pointDiff += game.score_a - game.score_b;
+        s.h2h.set(opp, h);
       }
     }
 
     for (const pid of teamBIds) {
       const s = standings.get(pid);
       if (!s) continue;
-      if (!aWon) s.wins++;
-      else s.losses++;
+      if (bWon) s.wins++;
+      else if (aWon) s.losses++;
       s.pointDiff += game.score_b - game.score_a;
       for (const opp of teamAIds) {
-        s.h2hPoints.set(opp, (s.h2hPoints.get(opp) ?? 0) + game.score_b);
+        const h = s.h2h.get(opp) ?? { wins: 0, losses: 0, pointDiff: 0 };
+        if (bWon) h.wins++;
+        else if (aWon) h.losses++;
+        h.pointDiff += game.score_b - game.score_a;
+        s.h2h.set(opp, h);
       }
     }
   }
@@ -104,28 +119,46 @@ export function computePoolStandings(
   const sorted = Array.from(standings.values()).sort((a, b) => {
     if (a.wins !== b.wins) return b.wins - a.wins;
     if (a.pointDiff !== b.pointDiff) return b.pointDiff - a.pointDiff;
-    const aH2H = a.h2hPoints.get(b.playerId) ?? 0;
-    const bH2H = b.h2hPoints.get(a.playerId) ?? 0;
-    if (aH2H !== bH2H) return bH2H - aH2H;
+
+    const aH = a.h2h.get(b.playerId) ?? { wins: 0, losses: 0, pointDiff: 0 };
+    const bH = b.h2h.get(a.playerId) ?? { wins: 0, losses: 0, pointDiff: 0 };
+
+    // 3. Head-to-head record (wins minus losses against the other player)
+    const aRec = aH.wins - aH.losses;
+    const bRec = bH.wins - bH.losses;
+    if (aRec !== bRec) return bRec - aRec;
+
+    // 4. Head-to-head point margin (only meaningful when h2h W-L split)
+    if (aH.pointDiff !== bH.pointDiff) return bH.pointDiff - aH.pointDiff;
+
     const mA = memberMap?.get(a.playerId) ?? { step: 99, winPct: 0 };
     const mB = memberMap?.get(b.playerId) ?? { step: 99, winPct: 0 };
     if (mA.step !== mB.step) return mA.step - mB.step;
     return mB.winPct - mA.winPct;
   });
 
-  // Walk adjacent pairs. When W + point-diff are equal, annotate the
-  // higher-ranked player (sorted[i]) with the reason they beat the
-  // player below them (sorted[i+1]).
+  // Walk adjacent pairs. When wins + total point-diff are equal, name
+  // the specific sub-step of the head-to-head tiebreaker that decided
+  // it so the higher-ranked player's badge tells the whole story.
   for (let i = 0; i < sorted.length - 1; i++) {
     const a = sorted[i];
     const b = sorted[i + 1];
     if (a.wins !== b.wins) continue;
     if (a.pointDiff !== b.pointDiff) continue;
 
-    const aH2H = a.h2hPoints.get(b.playerId) ?? 0;
-    const bH2H = b.h2hPoints.get(a.playerId) ?? 0;
-    if (aH2H !== bH2H) {
-      a.tiebreakerReason = "Won head-to-head";
+    const aH = a.h2h.get(b.playerId) ?? { wins: 0, losses: 0, pointDiff: 0 };
+    const bH = b.h2h.get(a.playerId) ?? { wins: 0, losses: 0, pointDiff: 0 };
+
+    const aRec = aH.wins - aH.losses;
+    const bRec = bH.wins - bH.losses;
+    if (aRec !== bRec) {
+      a.tiebreakerReason = `Won head-to-head record (${aH.wins}-${aH.losses})`;
+      continue;
+    }
+
+    if (aH.pointDiff !== bH.pointDiff) {
+      const sign = aH.pointDiff > 0 ? "+" : "";
+      a.tiebreakerReason = `Better head-to-head point margin (${sign}${aH.pointDiff})`;
       continue;
     }
 
@@ -145,6 +178,6 @@ export function computePoolStandings(
     // sort but effectively arbitrary at this point.
   }
 
-  // Strip the internal h2hPoints field before returning.
-  return sorted.map(({ h2hPoints: _omit, ...rest }) => rest);
+  // Strip the internal h2h field before returning.
+  return sorted.map(({ h2h: _omit, ...rest }) => rest);
 }
