@@ -49,10 +49,14 @@ export function GroupList({
   groups,
   playerId,
   joinAction,
+  weatherByGroupId,
 }: {
   groups: GroupCardData[];
   playerId: string | null;
   joinAction: (groupId: string, groupType: string) => Promise<void>;
+  /** Server-rendered weather chip per group (next upcoming sheet
+   *  inside the 5-day window). Missing entries → no chip. */
+  weatherByGroupId?: Record<string, React.ReactNode>;
 }) {
   const [tab, setTab] = useState<Tab>("mine");
   const [search, setSearch] = useState("");
@@ -174,6 +178,7 @@ export function GroupList({
               showVisibility={tab === "mine"}
               showJoinButton={tab === "search" && !!playerId}
               onJoin={joinAction}
+              weather={weatherByGroupId?.[group.id]}
             />
           ))}
         </div>
@@ -204,11 +209,13 @@ function GroupCard({
   showVisibility,
   showJoinButton,
   onJoin,
+  weather,
 }: {
   group: GroupCardData;
   showVisibility: boolean;
   showJoinButton: boolean;
   onJoin: (groupId: string, groupType: string) => Promise<void>;
+  weather?: React.ReactNode;
 }) {
   const cityState = [group.city, group.state].filter(Boolean).join(", ");
   const firstPlayTime = group.playTimes[0] ?? null;
@@ -257,6 +264,10 @@ function GroupCard({
             </span>
           </p>
         )}
+
+        {/* Weather chip — pre-rendered server-side; renders nothing
+            unless a sheet for this group falls inside the 5-day window. */}
+        {weather && <div className="mt-1">{weather}</div>}
 
         {/* Description */}
         {group.description && (

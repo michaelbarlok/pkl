@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import type { SignupSheet } from "@/types/database";
 import Link from "next/link";
 import { SheetCard } from "./sheet-card";
+import { WeatherBadge } from "@/components/weather-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -220,6 +221,12 @@ export default async function SheetsPage() {
         withdrawClosed={withdrawClosed}
         isFull={confirmed >= sheet.player_limit}
         isLoggedIn={!!profile}
+        weather={
+          <WeatherBadge
+            location={sheet.location}
+            eventTime={sheet.event_time}
+          />
+        }
       />
     );
   };

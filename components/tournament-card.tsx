@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { TournamentWithCounts } from "@/lib/queries/tournament";
 import { formatDate, formatTime } from "@/lib/utils";
 import { TOURNAMENT_STATUS_COLORS, TOURNAMENT_STATUS_LABELS } from "@/lib/status-colors";
+import { WeatherBadge } from "@/components/weather-badge";
 
 const STATUS_ACCENT: Record<string, string> = {
   draft: "card-accent-gray",
@@ -61,6 +62,14 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithCount
             {t.start_time && ` at ${formatTime(t.start_time)}`}
           </p>
           <p>{t.location}</p>
+          {t.start_date && t.start_time && (
+            <div>
+              <WeatherBadge
+                location={t.location}
+                eventTime={`${t.start_date}T${t.start_time}`}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mt-3">
