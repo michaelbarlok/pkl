@@ -104,6 +104,21 @@ export async function DELETE(
       return k === scopeKey;
     });
 
+  // No other queued match in this match's court range means there's
+  // nobody to take the freed court — runAssignmentPass would just
+  // re-promote the bumped match right back to the same court and the
+  // organizer would see no change. Refuse explicitly so the UI can
+  // tell them WHY: there's nobody else in line for these courts.
+  if (queued.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Nothing else is queued for this match's court range — bumping would put it right back. If the team isn't ready, withdraw or cancel the match instead.",
+      },
+      { status: 409 }
+    );
+  }
+
   // Pre-promotion order should be [Q1, Q2, BUMPED, Q3, Q4, …] so
   // that after runAssignmentPass promotes Q1 to the just-vacated
   // court, the bumped match sits at position 2 of the remaining
