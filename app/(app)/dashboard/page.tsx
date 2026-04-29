@@ -11,6 +11,7 @@ import { displaySessionsForGroup, isTestUser } from "@/lib/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatTime } from "@/lib/utils";
+import { WeatherBadge } from "@/components/weather-badge";
 
 /**
  * Authenticated home / dashboard.
@@ -198,8 +199,8 @@ export default async function DashboardPage() {
   type TimelineItem =
     | { kind: "live-session"; id: string; href: string; title: string; subtitle: string; status: "live" }
     | { kind: "live-tournament"; id: string; href: string; title: string; subtitle: string; status: "live" }
-    | { kind: "sheet"; id: string; href: string; title: string; subtitle: string; date: string; status: "open" }
-    | { kind: "tournament"; id: string; href: string; title: string; subtitle: string; date: string; status: "upcoming" | "waitlist" | "organizer" };
+    | { kind: "sheet"; id: string; href: string; title: string; subtitle: string; date: string; status: "open"; eventTime: string | null; location: string | null }
+    | { kind: "tournament"; id: string; href: string; title: string; subtitle: string; date: string; status: "upcoming" | "waitlist" | "organizer"; eventTime: string | null; location: string | null };
 
   const timeline: TimelineItem[] = [
     ...activeSessions.map((ap: any): TimelineItem => ({
@@ -228,6 +229,8 @@ export default async function DashboardPage() {
       subtitle: s.location,
       date: s.event_date,
       status: "open",
+      eventTime: s.event_time ?? null,
+      location: s.location ?? null,
     })),
     ...upcomingTournaments.map((r: any): TimelineItem => ({
       kind: "tournament",
@@ -242,6 +245,14 @@ export default async function DashboardPage() {
         r.status === "organizer" ? "organizer" :
         r.status === "confirmed" ? "upcoming" :
         "waitlist",
+      // Tournaments store start_date and start_time separately. Combine
+      // into a single ISO timestamp so the weather lookup can find the
+      // right hour. start_time is a "HH:MM:SS" string; concatenating
+      // with the date gives a date-string Postgres knows how to parse.
+      eventTime: r.tournament.start_time && r.tournament.start_date
+        ? `${r.tournament.start_date}T${r.tournament.start_time}`
+        : null,
+      location: r.tournament.location ?? null,
     })),
   ];
 
@@ -736,6 +747,16 @@ function TimelineRow({ item, todayIso }: { item: any; todayIso: string }) {
         <div className="min-w-0 flex-1">
           <p className="font-medium text-dark-100 truncate">{item.title}</p>
           <p className="text-xs text-surface-muted truncate">{item.subtitle}</p>
+          {/* Weather chip — renders nothing if event is past, more
+              than 5 days out, missing a time, or NWS lookup failed. */}
+          {(item.kind === "sheet" || item.kind === "tournament") && (
+            <p className="mt-0.5">
+              <WeatherBadge
+                location={item.location}
+                eventTime={item.eventTime}
+              />
+            </p>
+          )}
         </div>
         <span className={`${statusClass} shrink-0`}>
           {isLive ? <span className="animate-pulse">{statusLabel}</span> : statusLabel}

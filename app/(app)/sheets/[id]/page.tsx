@@ -17,6 +17,7 @@ import { ShareButton } from "./share-button";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { PlayerAvatar } from "@/components/player-avatar";
+import { WeatherBadge } from "@/components/weather-badge";
 import { CourtPreviewSection } from "./court-preview";
 import { LiveRosterCount } from "./live-roster-count";
 
@@ -296,7 +297,16 @@ export default async function SheetDetailPage({
               <span className={`${statusPill.cls} shrink-0`}>{statusPill.label}</span>
             </div>
             <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-3 text-sm">
-              <HeroField label="Time" value={eventTimeLine} />
+              <HeroField
+                label="Time"
+                value={eventTimeLine}
+                trailing={
+                  <WeatherBadge
+                    location={sheet.location}
+                    eventTime={sheet.event_time}
+                  />
+                }
+              />
               <HeroField label="Location" value={sheet.location} />
               <LiveRosterCount
                 sheetId={sheet.id}
@@ -568,13 +578,24 @@ function RosterCard({
   );
 }
 
-function HeroField({ label, value }: { label: string; value: string }) {
+function HeroField({
+  label,
+  value,
+  trailing,
+}: {
+  label: string;
+  value: string;
+  trailing?: React.ReactNode;
+}) {
   return (
     <div>
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted">
         {label}
       </dt>
-      <dd className="mt-0.5 text-dark-100 truncate">{value}</dd>
+      <dd className="mt-0.5 text-dark-100 truncate flex items-center gap-2">
+        <span className="truncate">{value}</span>
+        {trailing}
+      </dd>
     </div>
   );
 }
