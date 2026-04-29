@@ -7,6 +7,7 @@ import {
   computePoolStandings,
   computeCrossPoolSeeding,
   getPoolBrackets,
+  getPoolStructure,
 } from "@/lib/tournament-bracket";
 import { getDivision, getDivisionLabel, SKILLS } from "@/lib/divisions";
 import { getTournamentManager } from "@/lib/tournament-auth";
@@ -363,7 +364,7 @@ export async function POST(
   // Fetch tournament
   const { data: tournament } = await supabase
     .from("tournaments")
-    .select("format, status, divisions")
+    .select("format, status, divisions, type")
     .eq("id", tournamentId)
     .single();
 
@@ -381,6 +382,52 @@ export async function POST(
   const divisions = tournament.divisions as string[];
   if (!divisions || divisions.length === 0) {
     return NextResponse.json({ error: "No divisions configured" }, { status: 400 });
+  }
+
+  // Doubles tournaments: refuse to generate if any confirmed
+  // registration is missing a partner. Including a half-team in pool
+  // play would silently bake "ghost" rows into the schedule —
+  // matches with one slot null, opponents playing 1-vs-2, standings
+  // skewed. The Close Registration flow already nudges the organizer
+  // to fix or withdraw these teams, so by the time we get here there
+  // shouldn't be any. This is the belt-and-suspenders guard so a
+  // direct API call or a stale registration_closed snapshot can't
+  // sneak partnerless teams into the bracket.
+  if (tournament.type === "doubles") {
+    const { data: partnerless } = await supabase
+      .from("tournament_registrations")
+      .select(
+        "id, division, player:profiles!tournament_registrations_player_id_fkey(display_name)"
+      )
+      .eq("tournament_id", tournamentId)
+      .eq("status", "confirmed")
+      .is("partner_id", null);
+    if (partnerless && partnerless.length > 0) {
+      type Row = {
+        id: string;
+        division: string | null;
+        player:
+          | { display_name: string | null }
+          | { display_name: string | null }[]
+          | null;
+      };
+      return NextResponse.json(
+        {
+          error: `${partnerless.length} team${
+            partnerless.length === 1 ? " is" : "s are"
+          } still without a partner. Withdraw or fix them before generating brackets.`,
+          partnerless_teams: (partnerless as Row[]).map((r) => {
+            const p = Array.isArray(r.player) ? r.player[0] : r.player;
+            return {
+              id: r.id,
+              division: r.division,
+              playerName: p?.display_name ?? "Unknown",
+            };
+          }),
+        },
+        { status: 409 }
+      );
+    }
   }
 
   // Parse division_settings from request body
@@ -451,6 +498,43 @@ export async function POST(
     // Get pool settings for this division
     const { games_per_team: gamesPerTeam, num_pools: numPools } =
       divisionSettings[division] ?? {};
+
+    // Validate gamesPerTeam bounds for round-robin formats. Lower
+    // bound of 1 stops a "no matches at all" silent emit when
+    // gamesPerTeam is 0 / negative (only relevant for even pools —
+    // odd pools force-round-up to 1 lap regardless). Upper bound is
+    // 2 × (poolSize − 1), i.e. at most a double round robin of the
+    // largest pool — past that the schedule is just rematches piled
+    // on rematches with no organizer benefit. Same getPoolStructure
+    // used by the generator itself, so the cap matches what the UI
+    // actually presents to organizers.
+    if (
+      tournament.format === "round_robin" &&
+      gamesPerTeam !== undefined &&
+      gamesPerTeam !== null
+    ) {
+      if (!Number.isInteger(gamesPerTeam) || gamesPerTeam < 1) {
+        return NextResponse.json(
+          {
+            error: `Games per team for ${getDivisionLabel(
+              division
+            )} must be a whole number ≥ 1.`,
+          },
+          { status: 400 }
+        );
+      }
+      const structure = getPoolStructure(playerIds.length, { numPools });
+      if (gamesPerTeam > structure.maxGamesPerTeam) {
+        return NextResponse.json(
+          {
+            error: `Games per team for ${getDivisionLabel(
+              division
+            )} can be at most ${structure.maxGamesPerTeam} (a double round robin of the largest pool).`,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // Generate bracket
     let bracketMatches;

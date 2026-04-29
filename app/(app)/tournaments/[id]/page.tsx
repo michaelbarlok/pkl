@@ -23,6 +23,7 @@ import { getDivisionLabel } from "@/lib/divisions";
 import { matchPositionLabel } from "@/lib/tournament-bracket";
 import { DivisionBrackets } from "./division-brackets";
 import { ForfeitCard } from "./forfeit-card";
+import { CloseRegistrationButton } from "./close-registration-button";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
@@ -1566,16 +1567,27 @@ function OrganizerControls({
   const action = nextAction[status];
   if (!action) return null;
 
+  // The "registration_open → registration_closed" transition is the
+  // only one that needs a partnerless-teams pre-check. Use the
+  // dedicated client component there; everything else (Open / Reopen)
+  // goes through the simple server-action button.
+  const isClosingRegistration =
+    status === "registration_open" && action.next === "registration_closed";
+
   return (
     <div className="card">
       <h2 className="text-sm font-semibold text-dark-200 mb-3">Organizer Controls</h2>
       <div className="flex flex-wrap gap-2">
-        <StatusAdvanceButton
-          tournamentId={tournamentId}
-          nextStatus={action.next}
-          label={action.label}
-          variant={action.variant ?? "primary"}
-        />
+        {isClosingRegistration ? (
+          <CloseRegistrationButton tournamentId={tournamentId} />
+        ) : (
+          <StatusAdvanceButton
+            tournamentId={tournamentId}
+            nextStatus={action.next}
+            label={action.label}
+            variant={action.variant ?? "primary"}
+          />
+        )}
       </div>
     </div>
   );
