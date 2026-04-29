@@ -22,6 +22,7 @@ import { CollapsibleCard } from "./collapsible-card";
 import { getDivisionLabel } from "@/lib/divisions";
 import { matchPositionLabel } from "@/lib/tournament-bracket";
 import { DivisionBrackets } from "./division-brackets";
+import { ForfeitCard } from "./forfeit-card";
 import { ContactOrganizersButton } from "@/components/contact-organizers-button";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
@@ -372,6 +373,15 @@ export default async function TournamentDetailPage({
     />
   ) : null;
 
+  // Forfeit card sits under the brackets in the live operational
+  // column. Organizer-only — the API gates the same way.
+  const forfeitBlock = canManage && matches.length > 0 ? (
+    <ForfeitCard
+      tournamentId={id}
+      matches={matches as unknown as Parameters<typeof ForfeitCard>[0]["matches"]}
+    />
+  ) : null;
+
   // Once at least one division is live, the operational view (Court
   // Tracker, Match Queue, Pool Play / Playoff bracket) is the
   // organizer's primary surface. On desktop we lift those into a
@@ -549,6 +559,7 @@ export default async function TournamentDetailPage({
         <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-6 lg:items-start">
           <div className="min-w-0 space-y-6">
             {divisionBracketsBlock}
+            {forfeitBlock}
           </div>
           <div className="min-w-0 space-y-6">
             {courtRangesBlock}
@@ -865,7 +876,10 @@ export default async function TournamentDetailPage({
           Tracker: mobile keeps it here in source order, lg+ hides
           this copy and renders the right-column version instead. */}
       {divisionBracketsBlock && (
-        <div className="lg:hidden">{divisionBracketsBlock}</div>
+        <div className="lg:hidden space-y-6">
+          {divisionBracketsBlock}
+          {forfeitBlock}
+        </div>
       )}
 
       {/* Regular registered players get a pointer to the Play tab once
@@ -1227,6 +1241,7 @@ export default async function TournamentDetailPage({
       {!liveModeActive && divisionBracketsBlock && (
         <div className="hidden lg:block space-y-6 min-w-0">
           {divisionBracketsBlock}
+          {forfeitBlock}
         </div>
       )}
 

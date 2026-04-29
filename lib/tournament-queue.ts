@@ -86,6 +86,57 @@ export async function expandTeamsForNotify(
 }
 
 /**
+ * Build a (anchor_id, division) → [anchor, partner?] resolver for one
+ * tournament. Used by the assignment pass to detect double-booking
+ * across divisions: a player who is the anchor in Div A and the
+ * partner in Div B counts as "busy" in BOTH directions when one
+ * of those matches takes a court. Without this, a partner who
+ * isn't an anchor on a given match record is invisible to busy
+ * detection and could be physically required on two courts at once.
+ *
+ * One DB read per pass. The map is keyed by `${player_id}::${division}`
+ * because the same player can have a different partner in each
+ * division they're entered in.
+ */
+async function buildTeamResolver(
+  tournamentId: string
+): Promise<(anchor: string | null, division: string | null) => string[]> {
+  const service = await createServiceClient();
+  const { data } = await service
+    .from("tournament_registrations")
+    .select("player_id, partner_id, division")
+    .eq("tournament_id", tournamentId)
+    .neq("status", "withdrawn");
+
+  const partnerByKey = new Map<string, string | null>();
+  for (const r of (data ?? []) as { player_id: string; partner_id: string | null; division: string }[]) {
+    partnerByKey.set(`${r.player_id}::${r.division}`, r.partner_id ?? null);
+  }
+
+  return (anchor, division) => {
+    if (!anchor) return [];
+    if (!division) return [anchor];
+    const partner = partnerByKey.get(`${anchor}::${division}`);
+    return partner ? [anchor, partner] : [anchor];
+  };
+}
+
+/**
+ * Add every player on the match (anchor + partner of each team) to
+ * the busy set. Wrapper so the queue-walk reads the same way the
+ * eligibility check does.
+ */
+function teamPlayersForMatch(
+  m: TournamentMatch,
+  resolveTeam: (anchor: string | null, division: string | null) => string[]
+): string[] {
+  return [
+    ...resolveTeam(m.player1_id, m.division),
+    ...resolveTeam(m.player2_id, m.division),
+  ];
+}
+
+/**
  * Interleave a queue of matches across divisions. Within each
  * division the pool-play order (round asc, match_number asc) is
  * preserved — this matters so BYEs rotate correctly — but when
@@ -266,25 +317,38 @@ export async function promoteMatchToCourt(
     return { ok: false, error: `Court ${courtNumber} is in use` };
   }
 
-  // Neither team can be on another court right now.
+  // Neither team — including doubles partners on either side — can be
+  // on another court right now. Same partner-aware busy detection
+  // runAssignmentPass uses, so a manual promote can't paint a player
+  // onto two courts at once.
+  const resolveTeam = await buildTeamResolver(tournamentId);
   const busyPlayers = new Set<string>();
   for (const m of matches) {
     if (m.status !== "pending" || m.court_number === null) continue;
     if (m.id === matchId) continue;
-    if (m.player1_id) busyPlayers.add(m.player1_id);
-    if (m.player2_id) busyPlayers.add(m.player2_id);
+    for (const p of teamPlayersForMatch(m, resolveTeam)) busyPlayers.add(p);
   }
-  if (
-    (match.player1_id && busyPlayers.has(match.player1_id)) ||
-    (match.player2_id && busyPlayers.has(match.player2_id))
-  ) {
+  const matchTeam = teamPlayersForMatch(match, resolveTeam);
+  if (matchTeam.some((p) => busyPlayers.has(p))) {
     return { ok: false, error: "One of the teams is on another court already" };
   }
 
-  await service
+  // Partial unique index in migration 102 enforces "only one pending
+  // match per (tournament, court)". A 23505 here means another writer
+  // beat us to this court between our read above and our write — same
+  // race the auto-pass handles, surfaced as a normal "court in use"
+  // error to the organizer.
+  const { error: promoteErr } = await service
     .from("tournament_matches")
     .update({ court_number: courtNumber })
     .eq("id", matchId);
+  if (promoteErr) {
+    const code = (promoteErr as { code?: string }).code;
+    if (code === "23505") {
+      return { ok: false, error: `Court ${courtNumber} is in use` };
+    }
+    return { ok: false, error: promoteErr.message };
+  }
 
   const anchorIds = [match.player1_id, match.player2_id].filter(
     (x): x is string => !!x
@@ -412,20 +476,26 @@ export async function runAssignmentPass(
   }
 
   // ── Step 2: available courts + busy players.
+  //
+  // A pending match holding a court_number occupies that court even
+  // if its division was just deactivated — the players are still on
+  // the court physically, the game is still being played. Filtering
+  // by activeSet here would treat that court as free and the next
+  // pass would assign another match to it, double-booking the court
+  // physically.
   const onCourt = matches.filter(
-    (m) =>
-      m.court_number !== null &&
-      m.status === "pending" &&
-      m.division &&
-      activeSet.has(m.division)
+    (m) => m.court_number !== null && m.status === "pending"
   );
   const usedCourtNumbers = new Set<number>(
     onCourt.map((m) => m.court_number!).filter((n): n is number => n !== null)
   );
+
+  // Expand each on-court team to anchor + partner so a player who is
+  // a partner in another division can't be double-booked. One DB read.
+  const resolveTeam = await buildTeamResolver(tournamentId);
   const busyPlayers = new Set<string>();
   for (const m of onCourt) {
-    if (m.player1_id) busyPlayers.add(m.player1_id);
-    if (m.player2_id) busyPlayers.add(m.player2_id);
+    for (const p of teamPlayersForMatch(m, resolveTeam)) busyPlayers.add(p);
   }
 
   // ── Step 3: walk the queue and assign. Pure FIFO by
@@ -456,7 +526,11 @@ export async function runAssignmentPass(
   for (const m of queue) {
     if (assignments.length >= freeCourts) break;
     if (!m.player1_id || !m.player2_id) continue;
-    if (busyPlayers.has(m.player1_id) || busyPlayers.has(m.player2_id)) continue;
+
+    // Expand BOTH teams to their full doubles roster (anchor +
+    // partner). Singles tournaments degrade to just the anchor.
+    const matchTeam = teamPlayersForMatch(m, resolveTeam);
+    if (matchTeam.some((p) => busyPlayers.has(p))) continue;
 
     // With ranges defined, a match might be locked to courts 1–10
     // even though courts 11–20 are free for other divisions. Skip
@@ -479,22 +553,43 @@ export async function runAssignmentPass(
     if (court === null) continue;
 
     assignments.push({ match: m, court });
-    busyPlayers.add(m.player1_id);
-    busyPlayers.add(m.player2_id);
+    for (const p of matchTeam) busyPlayers.add(p);
     usedCourtNumbers.add(court);
   }
 
-  // Persist assignments.
+  // Persist assignments. The partial unique index from migration 102
+  // (tournament_matches_one_match_per_court_idx) guarantees only one
+  // pending match per (tournament, court). Two parallel passes that
+  // both decided the same court was free will see the loser hit a
+  // 23505. We swallow that and skip — a subsequent pass picks the
+  // bumped match back up. The local copy is only mutated when the
+  // write actually persisted so downstream notification logic doesn't
+  // claim a court that wasn't taken.
+  const persisted: { match: TournamentMatch; court: number }[] = [];
   for (const { match, court } of assignments) {
-    await service
+    const { error } = await service
       .from("tournament_matches")
       .update({ court_number: court })
       .eq("id", match.id);
+    if (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "23505") {
+        // Another pass beat us to this court. Leave the match in
+        // the queue (court_number stays null) and move on.
+        continue;
+      }
+      // Anything else: rethrow so the caller's catch logs it.
+      throw error;
+    }
     match.court_number = court;
+    persisted.push({ match, court });
   }
 
-  // ── Step 4: "Head to Court N" pushes.
-  for (const { match, court } of assignments) {
+  // ── Step 4: "Head to Court N" pushes. Only fire for matches that
+  // actually got their court_number persisted; a 23505 in Step 3
+  // means another pass beat us and the player will get the push
+  // from that pass instead.
+  for (const { match, court } of persisted) {
     const anchorIds = [match.player1_id, match.player2_id].filter(
       (x): x is string => !!x
     );
@@ -525,8 +620,10 @@ export async function runAssignmentPass(
   // two stops we notify at. Each uses its own _notified_at column
   // so a match only gets each ping a single time (a match can only
   // move forward in the line, so we never unset these).
+  // Use `persisted` (not `assignments`) so a match that lost a 23505
+  // race is still considered queued for the position-push count.
   const stillQueued = queue.filter(
-    (m) => !assignments.some((a) => a.match.id === m.id)
+    (m) => !persisted.some((a) => a.match.id === m.id)
   );
   const nowStampIso = new Date().toISOString();
 
@@ -608,16 +705,6 @@ function isEligibleForQueue(
   return priorSamePool.every(
     (o) => o.status === "completed" || o.status === "bye"
   );
-}
-
-function nextFreeCourt(
-  numCourts: number,
-  used: Set<number>
-): number | null {
-  for (let i = 1; i <= numCourts; i++) {
-    if (!used.has(i)) return i;
-  }
-  return null;
 }
 
 /**
