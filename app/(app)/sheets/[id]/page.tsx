@@ -303,6 +303,11 @@ export default async function SheetDetailPage({
                 trailing={
                   <WeatherBadge
                     location={sheet.location}
+                    cityState={
+                      [sheet.group?.city, sheet.group?.state]
+                        .filter(Boolean)
+                        .join(", ") || null
+                    }
                     eventTime={sheet.event_time}
                   />
                 }

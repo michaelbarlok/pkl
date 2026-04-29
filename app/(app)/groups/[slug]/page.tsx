@@ -422,6 +422,11 @@ export default async function GroupPage({
                           <span className="mt-0.5">
                             <WeatherBadge
                               location={ev.sheet.location}
+                              cityState={
+                                [group.city, group.state]
+                                  .filter(Boolean)
+                                  .join(", ") || null
+                              }
                               eventTime={ev.sheet.event_time}
                             />
                           </span>
