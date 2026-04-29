@@ -202,7 +202,31 @@ export async function POST(
   notify({ profileId: auth.profile.id, type: "tournament_registration", title: notifTitle, body: notifBody, link: `/tournaments/${tournamentId}`, emailTemplate: "TournamentRegistered", emailData: { ...baseEmailData, ...(partnerName ? { partnerName } : {}) } }).catch(() => {});
 
   if (partner_id) {
-    notify({ profileId: partner_id, type: "tournament_registration", title: notifTitle, body: notifBody, link: `/tournaments/${tournamentId}`, emailTemplate: "TournamentRegistered", emailData: { ...baseEmailData, ...(playerName ? { partnerName: playerName } : {}) } }).catch(() => {});
+    // The partner was auto-added by the registering player. They're
+    // confirmed by default but should know they can decline at any
+    // time on the tournament page (or via the email's button) and
+    // leave the original player as a Need-Partner registrant. Use a
+    // distinct copy and the addedAsPartner email flag so they don't
+    // think this is a normal "you registered yourself" confirmation.
+    const partnerNotifTitle = playerName
+      ? `${playerName} added you as their partner`
+      : "You were added as a partner";
+    const partnerNotifBody = `Confirmed for ${tournament.title}${
+      division ? ` (${getDivisionLabel(division)})` : ""
+    }. Decline on the tournament page if this wasn't expected.`;
+    notify({
+      profileId: partner_id,
+      type: "tournament_registration",
+      title: partnerNotifTitle,
+      body: partnerNotifBody,
+      link: `/tournaments/${tournamentId}`,
+      emailTemplate: "TournamentRegistered",
+      emailData: {
+        ...baseEmailData,
+        ...(playerName ? { partnerName: playerName } : {}),
+        addedAsPartner: true,
+      },
+    }).catch(() => {});
   }
 
   revalidatePath(`/tournaments/${tournamentId}`);
@@ -280,6 +304,91 @@ export async function DELETE(
   const wasConfirmed = reg.status === "confirmed";
   const division = reg.division;
 
+  // Either side of a doubles team can hit DELETE, but the semantics
+  // differ:
+  //
+  //   Player side  → withdraws the team. The slot frees up, the
+  //                  partner is told their team dissolved, the next
+  //                  waitlisted team gets promoted.
+  //   Partner side → declines / leaves the partnership only. The
+  //                  team's row stays put; partner_id is cleared so
+  //                  the original player becomes a Need-Partner
+  //                  registrant again. No slot freed (the player's
+  //                  slot was theirs all along), no waitlist promo.
+  //
+  // This is what closes the "I was auto-added as a partner without
+  // consent and my only escape was to dissolve their team" gap. The
+  // partner can leave at any time and the player's seat survives.
+  const actorIsPlayer = reg.player_id === auth.profile.id;
+  const actorIsPartner = !actorIsPlayer && reg.partner_id === auth.profile.id;
+
+  // ── Partner-side decline branch ────────────────────────────────
+  if (actorIsPartner) {
+    const { error: detachErr } = await auth.supabase
+      .from("tournament_registrations")
+      .update({ partner_id: null })
+      .eq("id", reg.id);
+    if (detachErr) {
+      return NextResponse.json({ error: detachErr.message }, { status: 500 });
+    }
+
+    // Cancel any pending partner requests where the leaving partner
+    // is the requester or target — those got created in service of
+    // a partnership that no longer exists.
+    await auth.supabase
+      .from("tournament_partner_requests")
+      .update({
+        status: "cancelled",
+        responded_at: new Date().toISOString(),
+      })
+      .eq("tournament_id", tournamentId)
+      .eq("status", "pending")
+      .or(
+        `requester_id.eq.${auth.profile.id},target_id.eq.${auth.profile.id}`
+      );
+
+    // Notify the original player. Their team didn't dissolve — they
+    // just lost their partner — so the copy points them at the
+    // Need-Partner channel rather than telling them to register
+    // again from scratch.
+    const tournamentTitle = tournament?.title ?? "the tournament";
+    const { data: actorProfile } = await auth.supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", auth.profile.id)
+      .single();
+    const actorName = actorProfile?.display_name ?? "Your partner";
+
+    notify({
+      profileId: reg.player_id,
+      type: "tournament_withdrawal",
+      title: `${actorName} declined the partnership`,
+      body: `You're still registered for ${tournamentTitle}, now as a Need-Partner registrant. Send another player a partner request when you're ready.`,
+      link: `/tournaments/${tournamentId}`,
+      emailTemplate: "TournamentWithdrawal",
+      emailData: {
+        tournamentTitle,
+        tournamentId,
+        partnerWithdrew: true,
+      },
+    }).catch(() => {});
+
+    notify({
+      profileId: auth.profile.id,
+      type: "tournament_withdrawal",
+      title: "Partnership declined",
+      body: `You're no longer listed as a partner on ${tournamentTitle}.`,
+      link: `/tournaments/${tournamentId}`,
+      emailTemplate: "TournamentWithdrawal",
+      emailData: { tournamentTitle, tournamentId },
+    }).catch(() => {});
+
+    revalidatePath(`/tournaments/${tournamentId}`);
+    revalidatePath("/tournaments");
+    return NextResponse.json({ status: "partnership_declined" });
+  }
+
+  // ── Player-side withdraw branch (existing behavior) ────────────
   // Withdraw
   await auth.supabase
     .from("tournament_registrations")

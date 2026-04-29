@@ -17,6 +17,11 @@ interface Props {
   /** Every non-withdrawn registration the viewer has — could be 0,
    *  1, or 2 (one gendered + one mixed). */
   myRegistrations?: TournamentRegistration[];
+  /** Viewer's own profile id. Lets the row distinguish "I'm the
+   *  registering player" from "I was added as the partner" so the
+   *  button can read 'Withdraw' vs 'Decline partnership' with the
+   *  matching server-side semantics. */
+  myProfileId?: string;
   playerCap: number | null | undefined;
   maxTeamsPerDivision: number | null | undefined;
   confirmedCount: number;
@@ -29,6 +34,7 @@ export function TournamentRegistrationButton({
   divisions,
   myRegistration,
   myRegistrations,
+  myProfileId,
   playerCap,
   maxTeamsPerDivision,
   confirmedCount,
@@ -130,14 +136,31 @@ export function TournamentRegistrationButton({
     router.refresh();
   }
 
-  async function handleWithdraw(divisionCode: string | null | undefined) {
+  // Returns true when the viewer is the partner (not the original
+  // registering player) on a given registration row. Same DELETE
+  // endpoint handles both cases server-side; the only thing this
+  // affects is the button label and the confirm-modal copy.
+  function viewerIsPartner(reg: TournamentRegistration): boolean {
+    if (!myProfileId) return false;
+    const playerId = (reg as unknown as { player_id?: string }).player_id;
+    const partnerId = (reg as unknown as { partner_id?: string | null }).partner_id;
+    return partnerId === myProfileId && playerId !== myProfileId;
+  }
+
+  async function handleWithdraw(reg: TournamentRegistration) {
+    const divisionCode = reg.division;
     const divLabel = divisionCode ? getDivisionLabel(divisionCode) : "this tournament";
+    const isPartnerSide = viewerIsPartner(reg);
+
     const ok = await confirm({
-      title: `Withdraw from ${divLabel}?`,
-      description:
-        "You'll lose your spot in this division. If registration is still open you can rejoin, but your seed may change.",
-      confirmLabel: "Withdraw",
-      cancelLabel: "Stay in",
+      title: isPartnerSide
+        ? `Decline partnership in ${divLabel}?`
+        : `Withdraw from ${divLabel}?`,
+      description: isPartnerSide
+        ? "You'll be removed as their partner. The original registrant stays on the list as a Need-Partner registrant — they can pair with someone else."
+        : "You'll lose your spot in this division. If registration is still open you can rejoin, but your seed may change.",
+      confirmLabel: isPartnerSide ? "Decline" : "Withdraw",
+      cancelLabel: isPartnerSide ? "Stay as partner" : "Stay in",
       variant: "danger",
     });
     if (!ok) return;
@@ -151,7 +174,7 @@ export function TournamentRegistrationButton({
 
     if (!res.ok) {
       const data = await res.json();
-      setError(data.error ?? "Withdrawal failed");
+      setError(data.error ?? (isPartnerSide ? "Could not decline" : "Withdrawal failed"));
       setLoading(null);
       return;
     }
@@ -169,8 +192,19 @@ export function TournamentRegistrationButton({
         <div key={reg.id} className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-teal-vivid">
-              {reg.status === "confirmed" ? "You're registered!" : "You're on the waitlist"}
+              {viewerIsPartner(reg)
+                ? reg.status === "confirmed"
+                  ? "You were added as a partner"
+                  : "Added as partner (waitlist)"
+                : reg.status === "confirmed"
+                  ? "You're registered!"
+                  : "You're on the waitlist"}
             </p>
+            {viewerIsPartner(reg) && reg.player?.display_name && (
+              <p className="text-xs text-surface-muted">
+                Registered by {reg.player.display_name}
+              </p>
+            )}
             {reg.division && (
               <p className="text-xs text-surface-muted">
                 Division: {getDivisionLabel(reg.division)}
@@ -181,11 +215,15 @@ export function TournamentRegistrationButton({
             )}
           </div>
           <button
-            onClick={() => handleWithdraw(reg.division)}
+            onClick={() => handleWithdraw(reg)}
             disabled={loading !== null}
             className="btn-secondary text-xs !border-red-500/50 !text-red-400 shrink-0"
           >
-            {loading === `withdraw:${reg.division ?? ""}` ? "..." : "Withdraw"}
+            {loading === `withdraw:${reg.division ?? ""}`
+              ? "..."
+              : viewerIsPartner(reg)
+                ? "Decline"
+                : "Withdraw"}
           </button>
         </div>
       ))}

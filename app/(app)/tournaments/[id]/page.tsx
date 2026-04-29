@@ -786,6 +786,7 @@ export default async function TournamentDetailPage({
           divisions={tournament.divisions ?? []}
           myRegistration={myRegistration}
           myRegistrations={myRegistrations}
+          myProfileId={profile.id}
           playerCap={tournament.player_cap}
           maxTeamsPerDivision={tournament.max_teams_per_division}
           confirmedCount={confirmedRegistrations.length}
