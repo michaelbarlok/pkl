@@ -1,8 +1,10 @@
 /**
  * Event weather lookup. Server-side only — never touches user
- * geolocation, never asks for permissions. Geocoding through the US
- * Census Bureau, forecasts through NWS (api.weather.gov). Both are
- * free, key-less, US-only government services.
+ * geolocation, never asks for permissions. Geocoding tries the US
+ * Census Bureau first (best for full street addresses) then falls
+ * back to OpenStreetMap's Nominatim for city/state-only lookups
+ * Census can't resolve. Forecasts come from NWS (api.weather.gov).
+ * All three are free and key-less.
  *
  * Used for: small weather chips on group pages, signup sheets, and
  * the dashboard's upcoming-events list, gated to "event has a start
@@ -158,6 +160,14 @@ async function geocode(
     return { lat: Number(cached.lat), lon: Number(cached.lon) };
   }
 
+  // Try Census first — it's our preferred source for actual street
+  // addresses (precise + US-only by design). Returns nothing for
+  // city/state-only inputs like "Athens, TN" though, since the
+  // onelineaddress endpoint requires a parsed street component.
+  let lat: number | null = null;
+  let lon: number | null = null;
+  let resolvedName: string | null = null;
+
   try {
     const url = new URL(
       "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
@@ -169,26 +179,68 @@ async function geocode(
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const match = data?.result?.addressMatches?.[0];
-    if (!match) return null;
-    const lat = Number(match.coordinates?.y);
-    const lon = Number(match.coordinates?.x);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-
-    await service.from("weather_geocode_cache").upsert({
-      location_key: key,
-      lat,
-      lon,
-      resolved_name: match.matchedAddress ?? null,
-      fetched_at: new Date().toISOString(),
-    });
-
-    return { lat, lon };
+    if (res.ok) {
+      const data = await res.json();
+      const match = data?.result?.addressMatches?.[0];
+      if (match) {
+        const cy = Number(match.coordinates?.y);
+        const cx = Number(match.coordinates?.x);
+        if (Number.isFinite(cy) && Number.isFinite(cx)) {
+          lat = cy;
+          lon = cx;
+          resolvedName = match.matchedAddress ?? null;
+        }
+      }
+    }
   } catch {
-    return null;
+    // Census failed — fall through to Nominatim.
   }
+
+  // Fall back to Nominatim (OpenStreetMap) for city/state-only
+  // inputs that Census can't resolve. Free, no key required, but
+  // capped at 1 req/sec by the public instance — fine for us
+  // because the 30-day geocode cache eats the long tail. We include
+  // a contact in the User-Agent per their usage policy.
+  if (lat === null || lon === null) {
+    try {
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.searchParams.set("q", location);
+      url.searchParams.set("format", "json");
+      url.searchParams.set("limit", "1");
+      url.searchParams.set("countrycodes", "us");
+      const res = await fetch(url.toString(), {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const match = Array.isArray(data) ? data[0] : null;
+        if (match) {
+          const ny = Number(match.lat);
+          const nx = Number(match.lon);
+          if (Number.isFinite(ny) && Number.isFinite(nx)) {
+            lat = ny;
+            lon = nx;
+            resolvedName = (match.display_name as string | undefined) ?? null;
+          }
+        }
+      }
+    } catch {
+      // Nominatim failed too — return null below.
+    }
+  }
+
+  if (lat === null || lon === null) return null;
+
+  await service.from("weather_geocode_cache").upsert({
+    location_key: key,
+    lat,
+    lon,
+    resolved_name: resolvedName,
+    fetched_at: new Date().toISOString(),
+  });
+
+  return { lat, lon };
 }
 
 async function fetchForecast(
