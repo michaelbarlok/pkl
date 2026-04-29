@@ -12,8 +12,13 @@ export async function middleware(request: NextRequest) {
       request.headers.get("x-real-ip") ??
       "unknown";
 
-    // Stricter limits for auth-related and cron routes
-    const isAuthRoute = path.startsWith("/api/register") || path.startsWith("/api/auth");
+    // Stricter limits for auth-related and cron routes.
+    // /api/pending-invite is a pre-signup public lookup — rate-limit it
+    // alongside /api/register to make email enumeration costly.
+    const isAuthRoute =
+      path.startsWith("/api/register") ||
+      path.startsWith("/api/auth") ||
+      path.startsWith("/api/pending-invite");
     const isCronRoute = path.startsWith("/api/cron");
 
     let limit: number;

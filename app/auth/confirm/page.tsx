@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { ensureProfile } from "@/lib/ensure-profile";
 import { Logo } from "@/components/logo";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -72,8 +73,27 @@ export default async function ConfirmPage({
         ? submittedNext
         : "/dashboard";
 
+    // After a successful verify (either flow), make sure the profile
+    // row exists. This is the primary creation point for email/password
+    // signups — we deliberately wait until the email is verified before
+    // writing to the profiles table so unverified emails never produce
+    // a profile. ensureProfile is idempotent; the layout fallback still
+    // runs as a last-resort safety net if this ever throws.
+    async function provisionProfile(userId: string | undefined) {
+      if (!userId) return;
+      try {
+        const service = await createServiceClient();
+        const { data: authUser } = await service.auth.admin.getUserById(userId);
+        if (authUser?.user) {
+          await ensureProfile(service, authUser.user);
+        }
+      } catch {
+        // Non-fatal — the (app)/layout fallback will create on next visit.
+      }
+    }
+
     if (typeof submittedCode === "string" && submittedCode) {
-      const { error } = await supabase.auth.exchangeCodeForSession(
+      const { data, error } = await supabase.auth.exchangeCodeForSession(
         submittedCode
       );
       if (error) {
@@ -81,6 +101,7 @@ export default async function ConfirmPage({
           `/login?error=${encodeURIComponent(error.message)}`
         );
       }
+      await provisionProfile(data?.user?.id);
       redirect(dest);
     }
 
@@ -100,13 +121,14 @@ export default async function ConfirmPage({
       if (!otpType) {
         redirect(`/login?error=${encodeURIComponent("Unknown link type")}`);
       }
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         token_hash: submittedTokenHash,
         type: otpType as Allowed,
       });
       if (error) {
         redirect(`/login?error=${encodeURIComponent(error.message)}`);
       }
+      await provisionProfile(data?.user?.id);
       redirect(dest);
     }
 

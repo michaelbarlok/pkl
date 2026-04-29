@@ -78,17 +78,24 @@ function RegisterForm() {
     setError("");
     setLoading(true);
 
-    // Sign up with Supabase Auth — pass `next` through the email confirmation link
+    // Sign up with Supabase Auth — pass `next` through the email confirmation link.
+    // user_metadata carries the full set of name fields; the profile row gets
+    // created by ensureProfile() on the server *after* the email is verified
+    // (in /auth/confirm's server action). That avoids creating profile rows
+    // for unverified emails and closes the tab-killed-mid-flow race that the
+    // old "signUp then immediately POST /api/register" pattern had.
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
     const confirmUrl = `${appUrl}/auth/confirm?next=${encodeURIComponent(next)}`;
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: confirmUrl,
-        // Store full_name in user_metadata so the layout's fallback profile
-        // creation uses the correct name if /api/register ever fails to run.
-        data: { full_name: fullName },
+        data: {
+          full_name: fullName,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+        },
       },
     });
 
@@ -96,28 +103,6 @@ function RegisterForm() {
       setError(authError.message || "Something went wrong. Please try again.");
       setLoading(false);
       return;
-    }
-
-    if (authData.user) {
-      // Create profile via server-side API (bypasses RLS)
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: authData.user.id,
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          fullName,
-          email,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Failed to create profile");
-        setLoading(false);
-        return;
-      }
     }
 
     setRegistered(true);
