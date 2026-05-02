@@ -6,6 +6,7 @@ import { FormError } from "@/components/form-error";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { matchFirstChoice } from "@/lib/first-choice";
+import { buildSessionFirstChoiceMap } from "@/lib/session-first-choice";
 import { computePoolStandings, type RankedMember } from "@/lib/pool-standings";
 import { expectedGamesPerCourt } from "@/lib/round-progress";
 import type { ShootoutSession, SessionParticipant, ShootoutGroup, GameResult } from "@/types/database";
@@ -543,6 +544,28 @@ export default function AdminSessionDetailPage() {
     }
     return map;
   }, [participants]);
+
+  // First-choice map for the whole session, keyed by
+  // `${round}:${court}:${gameNumber}`. Cross-round balanced so a
+  // player who got skipped on a 4-player court last round gets
+  // prioritized this round.
+  const firstChoiceMap = useMemo(
+    () =>
+      buildSessionFirstChoiceMap(
+        id,
+        session?.current_round ?? 1,
+        participants.map((p: any) => ({ player_id: p.player_id, court_number: p.court_number ?? null })),
+        scores.map((s: any) => ({
+          round_number: s.round_number,
+          pool_number: s.pool_number,
+          team_a_p1: s.team_a_p1,
+          team_a_p2: s.team_a_p2,
+          team_b_p1: s.team_b_p1,
+          team_b_p2: s.team_b_p2,
+        })),
+      ),
+    [id, session?.current_round, participants, scores],
+  );
 
   const courtMatchSchedule = useMemo(() => {
     // MUST match the ordering used by the Play tab's generateMatchSchedule
@@ -1134,7 +1157,10 @@ export default function AdminSessionDetailPage() {
                         )}
                       </div>
                       {(() => {
-                        const firstChoice = matchFirstChoice(id, selectedCourt, match.gameNumber);
+                        const firstChoice =
+                          firstChoiceMap.get(
+                            `${session?.current_round || 1}:${selectedCourt}:${match.gameNumber}`,
+                          ) ?? matchFirstChoice(id, selectedCourt, match.gameNumber);
                         return (
                           <>
                             <div className="flex items-center justify-between gap-2">

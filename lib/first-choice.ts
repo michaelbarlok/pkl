@@ -77,3 +77,58 @@ export function freePlayMatchFirstChoice(
 ): "team1" | "team2" {
   return firstChoiceFromKey(`fp:${sessionId}:${roundNumber}:${matchIndex}`);
 }
+
+/**
+ * Pick first-choice across an ordered batch of matches with per-player
+ * balance. For each match, the team whose two players have the lower
+ * combined first-choice count so far wins it; ties fall back to a
+ * deterministic hash of `fallbackKey`. Counts increment as we walk.
+ *
+ * In ladder play, partners rotate within a court (round-robin), so
+ * assigning first-choice to a "team" position bites: with the standard
+ * 4-player schedule, picking team1 every game would give one player
+ * first-choice in all 3 games and the other 3 players in only 1 each.
+ * Walking the schedule with a balance pass instead spreads it evenly:
+ *   - 5-player rounds: every player ends with exactly 2 first-choices.
+ *   - 4-player rounds: the schedule structure forces a 2-2-2-0 split
+ *     per round (one player must miss out), but cross-round balancing
+ *     rotates which player gets the 0 — so nobody goes a whole session
+ *     without first-choice as long as they play multiple rounds.
+ *
+ * Free play uses the same algorithm to keep first-choice rotating
+ * even when a round is rebuilt (admins reshape teams mid-session).
+ *
+ * Pass `initialCounts` to seed from prior rounds (or prior sessions)
+ * so balance carries forward. Returns both the per-match assignment
+ * and the running counts after the batch — handy when chaining.
+ */
+export function computeBalancedFirstChoices<
+  M extends { team1: readonly string[]; team2: readonly string[] }
+>(
+  matches: readonly M[],
+  fallbackKey: (match: M, index: number) => string,
+  initialCounts?: Map<string, number>,
+): {
+  assignments: Map<M, "team1" | "team2">;
+  finalCounts: Map<string, number>;
+} {
+  const counts = new Map<string, number>(initialCounts ?? []);
+  const assignments = new Map<M, "team1" | "team2">();
+
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const sumA = m.team1.reduce((s, p) => s + (counts.get(p) ?? 0), 0);
+    const sumB = m.team2.reduce((s, p) => s + (counts.get(p) ?? 0), 0);
+
+    let pick: "team1" | "team2";
+    if (sumA < sumB) pick = "team1";
+    else if (sumB < sumA) pick = "team2";
+    else pick = firstChoiceFromKey(fallbackKey(m, i));
+
+    assignments.set(m, pick);
+    const winners = pick === "team1" ? m.team1 : m.team2;
+    for (const p of winners) counts.set(p, (counts.get(p) ?? 0) + 1);
+  }
+
+  return { assignments, finalCounts: counts };
+}

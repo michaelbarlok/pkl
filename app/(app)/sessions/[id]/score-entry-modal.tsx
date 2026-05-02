@@ -8,6 +8,10 @@ import { matchFirstChoice } from "@/lib/first-choice";
 export interface ScoreEntryTarget {
   courtNum: number;
   gameNumber: number;
+  /** Balanced first-choice resolved by the parent (which has the
+   *  whole session's roster). Falls back to the legacy hash if the
+   *  parent didn't pass anything. */
+  firstChoice?: "team1" | "team2";
   team1: string[];
   team2: string[];
 }
@@ -83,11 +87,9 @@ export function ScoreEntryModal({
   const formatTeam = (ids: string[]) =>
     ids.map((id) => playerNames.get(id) ?? "?").join(" & ");
 
-  const firstChoice = matchFirstChoice(
-    sessionId,
-    target.courtNum,
-    target.gameNumber
-  );
+  const firstChoice =
+    target.firstChoice ??
+    matchFirstChoice(sessionId, target.courtNum, target.gameNumber);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

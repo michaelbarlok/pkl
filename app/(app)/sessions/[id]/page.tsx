@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/empty-state";
 import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { matchFirstChoice } from "@/lib/first-choice";
+import { buildSessionFirstChoiceMap } from "@/lib/session-first-choice";
 // Pool standings + the 5-level tiebreaker live in lib/pool-standings so
 // the Play tab, Admin > Sessions, and server-side pool_finish agree
 // on who ranks where (and why, via tiebreakerReason).
@@ -334,6 +335,29 @@ export default function PlayerSessionPage() {
     const courts = new Set(participants.map((p) => p.court_number).filter((c): c is number => c != null));
     return Array.from(courts).sort((a, b) => a - b);
   }, [participants]);
+
+  // First-choice map for the whole session, keyed by
+  // `${round}:${court}:${gameNumber}`. Walks rounds in order so prior-
+  // round counts seed the current round — keeps a player who got
+  // skipped on a 4-player court last round at the front of the line
+  // for first-choice this round.
+  const firstChoiceMap = useMemo(
+    () =>
+      buildSessionFirstChoiceMap(
+        sessionId,
+        session?.current_round ?? 1,
+        participants.map((p) => ({ player_id: p.player_id, court_number: p.court_number ?? null })),
+        scores.map((s) => ({
+          round_number: s.round_number,
+          pool_number: s.pool_number,
+          team_a_p1: s.team_a_p1,
+          team_a_p2: s.team_a_p2,
+          team_b_p1: s.team_b_p1,
+          team_b_p2: s.team_b_p2,
+        })),
+      ),
+    [sessionId, session?.current_round, participants, scores],
+  );
 
   const playerNames = useMemo(() => {
     const map = new Map<string, string>();
@@ -794,7 +818,10 @@ export default function PlayerSessionPage() {
                       );
                     }
 
-                    const firstChoice = matchFirstChoice(sessionId, courtNum, match.gameNumber);
+                    const firstChoice =
+                      firstChoiceMap.get(
+                        `${session.current_round || 1}:${courtNum}:${match.gameNumber}`,
+                      ) ?? matchFirstChoice(sessionId, courtNum, match.gameNumber);
 
                     if (canEnter) {
                       // Open the in-page modal instead of navigating to
@@ -810,6 +837,7 @@ export default function PlayerSessionPage() {
                               gameNumber: match.gameNumber,
                               team1: match.team1,
                               team2: match.team2,
+                              firstChoice,
                             })
                           }
                           className="w-full text-left block rounded-lg overflow-hidden ring-1 ring-surface-border hover:ring-brand-500/50 transition-all group"
