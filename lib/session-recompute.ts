@@ -163,13 +163,61 @@ export async function recomputeSessionStats(
       return mB.pointPct - mA.pointPct;
     });
 
+    // Walk adjacent pairs in finish order and name the specific
+    // sub-step that broke the tie. The reason is keyed by the higher-
+    // ranked player so the row's own annotation reads naturally
+    // ("Won head-to-head record (2-0)" sits next to the player who
+    // benefited). memberMap here is pre-session — using current
+    // group_memberships at this moment is what makes the reason
+    // authoritative; the client can't reconstruct this once the
+    // round-complete RPC overwrites those rows.
+    const reasonByPlayer = new Map<string, string | null>();
+    for (let i = 0; i < ranked.length - 1; i++) {
+      const [idA, a] = ranked[i];
+      const [idB, b] = ranked[i + 1];
+      if (a.wins !== b.wins) continue;
+      if (a.pointDiff !== b.pointDiff) continue;
+
+      const aH = a.h2h.get(idB) ?? { wins: 0, losses: 0, pointDiff: 0 };
+      const bH = b.h2h.get(idA) ?? { wins: 0, losses: 0, pointDiff: 0 };
+      const aRec = aH.wins - aH.losses;
+      const bRec = bH.wins - bH.losses;
+      if (aRec !== bRec) {
+        reasonByPlayer.set(idA, `Won head-to-head record (${aH.wins}-${aH.losses})`);
+        continue;
+      }
+      if (aH.pointDiff !== bH.pointDiff) {
+        const sign = aH.pointDiff > 0 ? "+" : "";
+        reasonByPlayer.set(
+          idA,
+          `Better head-to-head point margin (${sign}${aH.pointDiff})`
+        );
+        continue;
+      }
+      const mA = memberMap.get(idA) ?? { step: 99, pointPct: 0 };
+      const mB = memberMap.get(idB) ?? { step: 99, pointPct: 0 };
+      if (mA.step !== mB.step) {
+        reasonByPlayer.set(idA, "Higher overall rank");
+        continue;
+      }
+      if (mA.pointPct !== mB.pointPct) {
+        reasonByPlayer.set(idA, "Higher Points %");
+        continue;
+      }
+      // Truly identical across every metric — leave null. Stable sort
+      // determines order but there's no defensible reason to surface.
+    }
+
     for (let i = 0; i < ranked.length; i++) {
       const [playerId] = ranked[i];
       const participant = courtPlayers.find((p) => p.player_id === playerId);
       if (participant) {
         await supabase
           .from("session_participants")
-          .update({ pool_finish: i + 1 })
+          .update({
+            pool_finish: i + 1,
+            tiebreaker_reason: reasonByPlayer.get(playerId) ?? null,
+          })
           .eq("id", participant.id);
       }
     }

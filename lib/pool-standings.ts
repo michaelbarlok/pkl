@@ -73,6 +73,14 @@ export function computePoolStandings(
    * row in the table.
    */
   poolFinishMap?: Map<string, number>,
+  /**
+   * Optional server-stamped tiebreaker reason keyed by player_id. The
+   * server writes this during recompute using the pre-session
+   * memberMap, which is the only place those values still exist
+   * intact. When provided, this completely overrides the local
+   * walk-adjacent computation — the client just renders.
+   */
+  reasonMap?: Map<string, string | null>,
 ): PoolStanding[] {
   type Internal = PoolStanding & { h2h: Map<string, H2H> };
   const standings = new Map<string, Internal>();
@@ -164,45 +172,56 @@ export function computePoolStandings(
     return mB.winPct - mA.winPct;
   });
 
-  // Walk adjacent pairs. When wins + total point-diff are equal, name
-  // the specific sub-step of the head-to-head tiebreaker that decided
-  // it so the higher-ranked player's badge tells the whole story.
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const a = sorted[i];
-    const b = sorted[i + 1];
-    if (a.wins !== b.wins) continue;
-    if (a.pointDiff !== b.pointDiff) continue;
-
-    const aH = a.h2h.get(b.playerId) ?? { wins: 0, losses: 0, pointDiff: 0 };
-    const bH = b.h2h.get(a.playerId) ?? { wins: 0, losses: 0, pointDiff: 0 };
-
-    const aRec = aH.wins - aH.losses;
-    const bRec = bH.wins - bH.losses;
-    if (aRec !== bRec) {
-      a.tiebreakerReason = `Won head-to-head record (${aH.wins}-${aH.losses})`;
-      continue;
+  // If the server has already stamped reasons (round_complete /
+  // session_complete), trust them verbatim and skip the local walk —
+  // the client can't reproduce the server's pre-session step/winPct
+  // inputs anyway.
+  if (reasonMap) {
+    for (const s of sorted) {
+      const r = reasonMap.get(s.playerId);
+      if (r) s.tiebreakerReason = r;
     }
+  } else {
+    // Walk adjacent pairs. When wins + total point-diff are equal, name
+    // the specific sub-step of the head-to-head tiebreaker that decided
+    // it so the higher-ranked player's badge tells the whole story.
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      if (a.wins !== b.wins) continue;
+      if (a.pointDiff !== b.pointDiff) continue;
 
-    if (aH.pointDiff !== bH.pointDiff) {
-      const sign = aH.pointDiff > 0 ? "+" : "";
-      a.tiebreakerReason = `Better head-to-head point margin (${sign}${aH.pointDiff})`;
-      continue;
-    }
+      const aH = a.h2h.get(b.playerId) ?? { wins: 0, losses: 0, pointDiff: 0 };
+      const bH = b.h2h.get(a.playerId) ?? { wins: 0, losses: 0, pointDiff: 0 };
 
-    const mA = memberMap?.get(a.playerId);
-    const mB = memberMap?.get(b.playerId);
-    if (mA && mB) {
-      if (mA.step !== mB.step) {
-        a.tiebreakerReason = "Higher overall rank";
+      const aRec = aH.wins - aH.losses;
+      const bRec = bH.wins - bH.losses;
+      if (aRec !== bRec) {
+        a.tiebreakerReason = `Won head-to-head record (${aH.wins}-${aH.losses})`;
         continue;
       }
-      if (mA.winPct !== mB.winPct) {
-        a.tiebreakerReason = "Higher Points %";
+
+      if (aH.pointDiff !== bH.pointDiff) {
+        const sign = aH.pointDiff > 0 ? "+" : "";
+        a.tiebreakerReason = `Better head-to-head point margin (${sign}${aH.pointDiff})`;
         continue;
       }
+
+      const mA = memberMap?.get(a.playerId);
+      const mB = memberMap?.get(b.playerId);
+      if (mA && mB) {
+        if (mA.step !== mB.step) {
+          a.tiebreakerReason = "Higher overall rank";
+          continue;
+        }
+        if (mA.winPct !== mB.winPct) {
+          a.tiebreakerReason = "Higher Points %";
+          continue;
+        }
+      }
+      // Fully tied on every metric — leave null; order is stable from
+      // sort but effectively arbitrary at this point.
     }
-    // Fully tied on every metric — leave null; order is stable from
-    // sort but effectively arbitrary at this point.
   }
 
   // Strip the internal h2h field before returning.
