@@ -484,9 +484,29 @@ export default function AdminSessionDetailPage() {
   // Shared lib applies the same 5-level tiebreaker the server uses
   // for pool_finish, and annotates each standing with tiebreakerReason
   // so the UI can surface WHY a tied player got the nod.
+  // Authoritative pool_finish from the server, used once a round
+  // completes. Without this override the client's tiebreaker chain
+  // (which reads POST-session step/win_pct from group_memberships)
+  // can disagree with the server's, making the "Next Court" arrow
+  // line up next to the wrong row in tied-court scenarios.
+  const poolFinishMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of courtPlayers) {
+      const finish = (p as any).pool_finish as number | null | undefined;
+      if (finish != null) map.set(p.player_id, finish);
+    }
+    return map;
+  }, [courtPlayers]);
+
   const courtStandings = useMemo(
-    () => computePoolStandings(courtPlayers as any, courtScores, memberRanks),
-    [courtPlayers, courtScores, memberRanks]
+    () =>
+      computePoolStandings(
+        courtPlayers as any,
+        courtScores,
+        memberRanks,
+        poolFinishMap.size > 0 ? poolFinishMap : undefined,
+      ),
+    [courtPlayers, courtScores, memberRanks, poolFinishMap]
   );
 
   const playerNameMap = useMemo(() => {
