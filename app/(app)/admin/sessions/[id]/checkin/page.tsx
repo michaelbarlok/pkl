@@ -782,16 +782,36 @@ export default function CheckInPage() {
                 <td className="px-2 sm:px-4 py-3 text-sm text-dark-200">{p.win_pct.toFixed(1)}%</td>
                 <td className="px-2 sm:px-4 py-3">
                   <input
-                    type="number"
-                    min={1}
-                    max={session.num_courts}
-                    value={p.court_number ?? ""}
-                    onChange={(e) =>
-                      updateCourtNumber(
-                        p.id,
-                        e.target.value ? parseInt(e.target.value) : null
-                      )
-                    }
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    // Uncontrolled with a key tied to the saved value:
+                    // remounts when the server-side value changes, but
+                    // the field stays freely editable while the user
+                    // is mid-edit (so backspace can actually clear it
+                    // before retyping).
+                    defaultValue={p.court_number != null ? String(p.court_number) : ""}
+                    key={`court-${p.id}-${p.court_number ?? "null"}`}
+                    onBlur={(e) => {
+                      const raw = e.target.value.trim();
+                      if (raw === "") {
+                        updateCourtNumber(p.id, null);
+                        return;
+                      }
+                      const val = parseInt(raw, 10);
+                      if (!isNaN(val) && val >= 1) {
+                        updateCourtNumber(p.id, val);
+                      } else {
+                        // Bad input — revert to the saved value.
+                        e.currentTarget.value =
+                          p.court_number != null ? String(p.court_number) : "";
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        (e.currentTarget as HTMLInputElement).blur();
+                      }
+                    }}
                     className="w-12 rounded border border-surface-border bg-surface-overlay text-dark-100 text-sm py-1 px-1 text-center focus:ring-1 focus:ring-brand-600 focus:outline-none"
                     placeholder="—"
                   />

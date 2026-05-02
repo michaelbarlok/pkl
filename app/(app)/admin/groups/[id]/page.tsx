@@ -869,28 +869,27 @@ export default function AdminGroupDetailPage() {
                         <td className="px-3 py-2 text-center whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
                             <input
-                              type="number"
-                              min={preferences?.min_step ?? 1}
-                              max={preferences?.max_step ?? 99}
+                              type="text"
                               inputMode="numeric"
-                              value={member.current_step}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                if (!isNaN(val)) setMembers((prev) => prev.map((m) => m.player_id === member.player_id ? { ...m, current_step: val } : m));
-                              }}
+                              pattern="[0-9]*"
+                              // Uncontrolled: defaultValue + key=current_step
+                              // means the input remounts to the new saved
+                              // value whenever it changes (own save or a
+                              // realtime update), but during typing the user
+                              // can clear the field freely without React
+                              // snapping it back. The previous controlled
+                              // pattern silently dropped the empty state on
+                              // backspace, so users had to type-then-delete.
+                              defaultValue={String(member.current_step)}
+                              key={`step-${member.player_id}-${member.current_step}`}
                               onBlur={(e) => {
                                 const val = parseInt(e.target.value, 10);
                                 if (!isNaN(val) && val >= 1) updateStep(member.player_id, val);
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
-                                  // Enter triggers blur so the existing
-                                  // save path runs without needing a form.
                                   (e.currentTarget as HTMLInputElement).blur();
                                 } else if (e.key === "Escape") {
-                                  // Revert any unsaved edit by snapping
-                                  // back to the last-saved server value,
-                                  // then blur without triggering a save.
                                   const input = e.currentTarget as HTMLInputElement;
                                   input.value = String(member.current_step);
                                   input.blur();

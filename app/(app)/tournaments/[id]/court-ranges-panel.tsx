@@ -134,6 +134,10 @@ export function CourtRangesPanel({
   const divOwner = new Map<string, number>();
   for (let i = 0; i < ranges.length; i++) {
     const r = ranges[i];
+    if (r.court_start === 0 || r.court_end === 0) {
+      validationErrors.push(`Range ${i + 1}: enter a starting and ending court number.`);
+      continue;
+    }
     if (r.court_start < 1 || r.court_end < r.court_start) {
       validationErrors.push(
         `Range ${i + 1}: court_start must be ≥ 1 and court_end ≥ court_start.`
@@ -216,24 +220,39 @@ export function CourtRangesPanel({
               <div className="flex items-center gap-2 flex-wrap">
                 <label className="text-xs text-dark-200">Courts</label>
                 <input
-                  type="number"
-                  min={1}
-                  max={numCourts}
-                  value={r.court_start}
-                  onChange={(e) =>
-                    updateRange(i, { court_start: parseInt(e.target.value) || 1 })
-                  }
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={r.court_start === 0 ? "" : String(r.court_start)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      // Allow the box to be empty mid-edit. 0 is a
+                      // sentinel that the save validator rejects; the
+                      // user has to enter a real number before save.
+                      updateRange(i, { court_start: 0 });
+                      return;
+                    }
+                    if (!/^\d+$/.test(raw)) return;
+                    updateRange(i, { court_start: parseInt(raw, 10) });
+                  }}
                   className="input w-20 py-1 text-center text-sm"
                 />
                 <span className="text-xs text-surface-muted">to</span>
                 <input
-                  type="number"
-                  min={r.court_start}
-                  max={numCourts}
-                  value={r.court_end}
-                  onChange={(e) =>
-                    updateRange(i, { court_end: parseInt(e.target.value) || r.court_start })
-                  }
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={r.court_end === 0 ? "" : String(r.court_end)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      updateRange(i, { court_end: 0 });
+                      return;
+                    }
+                    if (!/^\d+$/.test(raw)) return;
+                    updateRange(i, { court_end: parseInt(raw, 10) });
+                  }}
                   className="input w-20 py-1 text-center text-sm"
                 />
                 <span className="text-xs text-surface-muted">
