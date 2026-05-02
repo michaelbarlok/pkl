@@ -1,5 +1,6 @@
 import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { checkAndAwardBadges } from "@/lib/badges";
+import { validateScore } from "@/lib/score-validation";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -22,12 +23,8 @@ export async function POST(
     score_b,
   } = body;
 
-  // Validate scores
   if (typeof score_a !== "number" || typeof score_b !== "number") {
     return NextResponse.json({ error: "Scores must be numbers" }, { status: 400 });
-  }
-  if (score_a < 0 || score_b < 0) {
-    return NextResponse.json({ error: "Scores must be non-negative" }, { status: 400 });
   }
 
   // Fetch session and group preferences for validation
@@ -48,7 +45,6 @@ export async function POST(
     .single();
 
   if (prefs) {
-    // Determine game limit based on how many players are on the court (not in the game)
     const { count: poolSize } = await auth.supabase
       .from("session_participants")
       .select("*", { count: "exact", head: true })
@@ -58,20 +54,14 @@ export async function POST(
 
     const gameLimit = (poolSize ?? 4) >= 5 ? prefs.game_limit_5p : prefs.game_limit_4p;
 
-    // At least one team must reach the game limit
-    if (score_a < gameLimit && score_b < gameLimit) {
-      return NextResponse.json(
-        { error: `At least one team must reach ${gameLimit} points` },
-        { status: 400 }
-      );
-    }
-
-    // Win-by-2 rule
-    if (prefs.win_by_2 && Math.abs(score_a - score_b) < 2) {
-      return NextResponse.json(
-        { error: "Win-by-2 rule requires at least 2 point difference" },
-        { status: 400 }
-      );
+    const v = validateScore({
+      scoreA: score_a,
+      scoreB: score_b,
+      gameLimit,
+      winBy2: !!prefs.win_by_2,
+    });
+    if (!v.ok) {
+      return NextResponse.json({ error: v.error }, { status: 400 });
     }
   }
 
@@ -200,4 +190,112 @@ export async function PUT(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ status: "confirmed" });
+}
+
+/**
+ * PATCH /api/sessions/[id]/score
+ *
+ * Edit the scores on an existing game_results row, validated against
+ * the same rules as POST. Replaces the previous "direct supabase
+ * update from the client" pattern that bypassed validation entirely
+ * (you could enter 18-14 in a 15-point win-by-2 game).
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const { id: sessionId } = await params;
+
+  const body = await request.json();
+  const { game_result_id, score_a, score_b } = body as {
+    game_result_id?: string;
+    score_a?: number;
+    score_b?: number;
+  };
+  if (!game_result_id) {
+    return NextResponse.json({ error: "game_result_id is required" }, { status: 400 });
+  }
+  if (typeof score_a !== "number" || typeof score_b !== "number") {
+    return NextResponse.json({ error: "Scores must be numbers" }, { status: 400 });
+  }
+
+  // Pull the row so we can scope the validation to the correct court
+  // (game_limit_4p vs game_limit_5p depends on poolSize) and so the
+  // session-id in the URL has to match the row.
+  const { data: existing } = await auth.supabase
+    .from("game_results")
+    .select("id, session_id, pool_number")
+    .eq("id", game_result_id)
+    .maybeSingle();
+  if (!existing || existing.session_id !== sessionId) {
+    return NextResponse.json({ error: "Score not found" }, { status: 404 });
+  }
+
+  const { data: session } = await auth.supabase
+    .from("shootout_sessions")
+    .select("group_id")
+    .eq("id", sessionId)
+    .single();
+  if (!session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  const { data: prefs } = await auth.supabase
+    .from("group_preferences")
+    .select("game_limit_4p, game_limit_5p, win_by_2")
+    .eq("group_id", session.group_id)
+    .single();
+
+  if (prefs) {
+    const { count: poolSize } = await auth.supabase
+      .from("session_participants")
+      .select("*", { count: "exact", head: true })
+      .eq("session_id", sessionId)
+      .eq("court_number", existing.pool_number)
+      .eq("checked_in", true);
+    const gameLimit = (poolSize ?? 4) >= 5 ? prefs.game_limit_5p : prefs.game_limit_4p;
+
+    const v = validateScore({
+      scoreA: score_a,
+      scoreB: score_b,
+      gameLimit,
+      winBy2: !!prefs.win_by_2,
+    });
+    if (!v.ok) {
+      return NextResponse.json({ error: v.error }, { status: 400 });
+    }
+  }
+
+  // Permission: anyone who can submit a score for this court can edit
+  // it (own court for members; any court for site admins / group
+  // admins). Mirrors the POST gate.
+  const adminAccess = await isGroupAdmin(
+    auth.supabase,
+    auth.profile.id,
+    session.group_id,
+    auth.profile.role,
+  );
+  if (!adminAccess) {
+    const { data: myParticipant } = await auth.supabase
+      .from("session_participants")
+      .select("court_number")
+      .eq("session_id", sessionId)
+      .eq("player_id", auth.profile.id)
+      .maybeSingle();
+    if (!myParticipant || myParticipant.court_number !== existing.pool_number) {
+      return NextResponse.json(
+        { error: "You can only edit scores for your own court" },
+        { status: 403 },
+      );
+    }
+  }
+
+  const { error } = await auth.supabase
+    .from("game_results")
+    .update({ score_a, score_b })
+    .eq("id", game_result_id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

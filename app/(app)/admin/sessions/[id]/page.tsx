@@ -58,6 +58,7 @@ export default function AdminSessionDetailPage() {
   const [editScoreA, setEditScoreA] = useState("");
   const [editScoreB, setEditScoreB] = useState("");
   const [savingScore, setSavingScore] = useState(false);
+  const [editScoreError, setEditScoreError] = useState<string | null>(null);
   const [enteringGame, setEnteringGame] = useState<string | null>(null);
   const [newScoreA, setNewScoreA] = useState("");
   const [newScoreB, setNewScoreB] = useState("");
@@ -386,16 +387,26 @@ export default function AdminSessionDetailPage() {
 
   async function saveEditedScore(gameId: string) {
     setSavingScore(true);
+    setEditScoreError(null);
     const a = parseInt(editScoreA);
     const b = parseInt(editScoreB);
     if (isNaN(a) || isNaN(b) || a < 0 || b < 0) {
       setSavingScore(false);
       return;
     }
-    await supabase
-      .from("game_results")
-      .update({ score_a: a, score_b: b })
-      .eq("id", gameId);
+    // Route through the API so gameLimit / win-by-2 validation runs.
+    // The previous direct supabase update bypassed it entirely.
+    const res = await fetch(`/api/sessions/${id}/score`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_result_id: gameId, score_a: a, score_b: b }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setEditScoreError(data.error ?? "Failed to update score");
+      setSavingScore(false);
+      return;
+    }
 
     // Editing a score after the round is closed means pool_finish, win_pct
     // and steps are now stale — ask the server to re-derive them. For an
@@ -1076,12 +1087,15 @@ export default function AdminSessionDetailPage() {
                               {savingScore ? "…" : "Save"}
                             </button>
                             <button
-                              onClick={() => setEditingScore(null)}
+                              onClick={() => { setEditingScore(null); setEditScoreError(null); }}
                               className="btn-secondary text-sm px-3 py-2"
                             >
                               Cancel
                             </button>
                           </div>
+                        )}
+                        {editingScore === match.result?.id && editScoreError && (
+                          <p className="mt-2 text-xs text-red-400">{editScoreError}</p>
                         )}
                       </div>
                       {(() => {
