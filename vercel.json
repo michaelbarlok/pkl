@@ -4,24 +4,12 @@
   "outputDirectory": ".next",
   "crons": [
     {
-      "path": "/api/cron/signup-reminders",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/withdraw-reminders",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/start-reminders",
-      "schedule": "* * * * *"
-    },
-    {
       "path": "/api/cron/create-scheduled-sheets",
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/tournament-registration-windows",
-      "schedule": "* * * * *"
+      "path": "/api/cron/tick",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
