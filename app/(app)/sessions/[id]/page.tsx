@@ -440,12 +440,21 @@ export default function PlayerSessionPage() {
           }
           return m;
         })();
+        const myCourtReasonMap = (() => {
+          const m = new Map<string, string | null>();
+          for (const p of myCourtPlayers) {
+            const r = (p as any).tiebreaker_reason as string | null | undefined;
+            if (r) m.set(p.player_id, r);
+          }
+          return m;
+        })();
         const myStanding = me
           ? computePoolStandings(
               myCourtPlayers as any,
               myCourtScores,
               memberRanks,
               myCourtFinishMap.size > 0 ? myCourtFinishMap : undefined,
+              myCourtReasonMap.size > 0 ? myCourtReasonMap : undefined,
             ).find((s) => s.playerId === myPlayerId)
           : undefined;
         const finish = (me as any)?.pool_finish as number | null;
@@ -554,10 +563,10 @@ export default function PlayerSessionPage() {
         const renderCourt = (courtNum: number) => {
           const courtPlayers = participants.filter((p) => p.court_number === courtNum);
           const courtScores = scores.filter((s) => s.pool_number === courtNum);
-          // Trust the server's pool_finish once it's been stamped —
-          // keeps the rendered standings order identical to the
-          // server's "Next Court" arrows, which is what bites in
-          // tied-court scenarios.
+          // Trust the server's pool_finish + tiebreaker_reason once
+          // they've been stamped. Server tiebreaks on pre-session
+          // step/win_pct; the client can't reconstruct that after
+          // group_memberships have been overwritten by round-complete.
           const courtFinishMap = (() => {
             const m = new Map<string, number>();
             for (const p of courtPlayers) {
@@ -566,11 +575,20 @@ export default function PlayerSessionPage() {
             }
             return m;
           })();
+          const courtReasonMap = (() => {
+            const m = new Map<string, string | null>();
+            for (const p of courtPlayers) {
+              const r = (p as any).tiebreaker_reason as string | null | undefined;
+              if (r) m.set(p.player_id, r);
+            }
+            return m;
+          })();
           const standings = computePoolStandings(
             courtPlayers as any,
             courtScores,
             memberRanks,
             courtFinishMap.size > 0 ? courtFinishMap : undefined,
+            courtReasonMap.size > 0 ? courtReasonMap : undefined,
           );
           const schedule = generateMatchSchedule(
             courtPlayers.map((p) => p.player_id),
