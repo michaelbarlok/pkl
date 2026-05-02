@@ -1,9 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { getDivisionLabel } from "@/lib/divisions";
 import { matchPositionLabel } from "@/lib/tournament-bracket";
+import { FirstChoiceBadge } from "@/components/first-choice-badge";
 
 interface Props {
   tournamentId: string;
+  /** Map<match_id, "team1" | "team2"> built upstream from the full
+   *  set of active-division matches. Pool play is balanced; playoffs
+   *  go to the higher seed. Optional — when missing or a match isn't
+   *  in the map, the badge just isn't rendered. */
+  firstChoiceMap?: Map<string, "team1" | "team2"> | null;
   /** The viewer's team primary — matches tournament_matches.player1_id /
    *  player2_id. Used to highlight the viewer's team in the queue. */
   myTeamPrimaryId: string;
@@ -72,6 +78,7 @@ export async function NextUpQueue({
   queueScopeLabel = null,
   courtRanges = null,
   myRangeId = null,
+  firstChoiceMap = null,
 }: Props) {
   if (isOnCourt) {
     return (
@@ -359,16 +366,22 @@ export async function NextUpQueue({
                   </div>
                   {match ? (
                     <div className="mt-2 space-y-1.5">
-                      <p className="text-sm text-dark-100 font-medium break-words">
-                        {teamLabel(match.player1_id, match.player1?.display_name)}
+                      <p className="text-sm text-dark-100 font-medium break-words flex items-center gap-1.5">
+                        <span>{teamLabel(match.player1_id, match.player1?.display_name)}</span>
+                        {firstChoiceMap?.get(match.id) === "team1" && (
+                          <FirstChoiceBadge className="shrink-0" />
+                        )}
                       </p>
                       <div className="flex items-center gap-2 text-[10px] text-surface-muted uppercase tracking-wide">
                         <span className="h-px flex-1 bg-surface-border" />
                         <span>vs</span>
                         <span className="h-px flex-1 bg-surface-border" />
                       </div>
-                      <p className="text-sm text-dark-100 font-medium break-words">
-                        {teamLabel(match.player2_id, match.player2?.display_name)}
+                      <p className="text-sm text-dark-100 font-medium break-words flex items-center gap-1.5">
+                        <span>{teamLabel(match.player2_id, match.player2?.display_name)}</span>
+                        {firstChoiceMap?.get(match.id) === "team2" && (
+                          <FirstChoiceBadge className="shrink-0" />
+                        )}
                       </p>
                       <p className="text-xs text-surface-muted">
                         {getDivisionLabel(match.division)} · {labelFor(match)}
@@ -440,12 +453,18 @@ export async function NextUpQueue({
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                        <p className="text-dark-100 break-words min-w-0 text-left">
-                          {teamLabel(m.player1_id, m.player1?.display_name)}
+                        <p className="text-dark-100 break-words min-w-0 text-left flex items-center gap-1.5">
+                          <span>{teamLabel(m.player1_id, m.player1?.display_name)}</span>
+                          {firstChoiceMap?.get(m.id) === "team1" && (
+                            <FirstChoiceBadge className="shrink-0" />
+                          )}
                         </p>
                         <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
-                        <p className="text-dark-100 break-words min-w-0 text-right">
-                          {teamLabel(m.player2_id, m.player2?.display_name)}
+                        <p className="text-dark-100 break-words min-w-0 text-right flex items-center gap-1.5 justify-end">
+                          {firstChoiceMap?.get(m.id) === "team2" && (
+                            <FirstChoiceBadge className="shrink-0" />
+                          )}
+                          <span>{teamLabel(m.player2_id, m.player2?.display_name)}</span>
                         </p>
                       </div>
                       <p className="text-surface-muted mt-1">

@@ -10,6 +10,7 @@ import { MyCourtCard } from "./my-court-card";
 import { NextUpQueue } from "./next-up-queue";
 import { DivisionRulesCard } from "./division-rules-card";
 import { OtherPoolsViewer } from "./other-pools-viewer";
+import { buildTournamentFirstChoiceMap } from "@/lib/tournament-first-choice";
 
 export const dynamic = "force-dynamic";
 
@@ -259,6 +260,40 @@ export default async function TournamentLivePage({
     }
   }
 
+  // First-choice map for every active match. Pool play (round-robin
+  // bracket within a division) is balanced across teams; playoff
+  // matches go to the higher seed. Built from the registrations we
+  // just loaded — no extra query.
+  const regsForFirstChoice: { player_id: string; division: string | null; seed: number | null }[] = [];
+  if (activeDivisionList.length > 0) {
+    const { data: regsRaw } = await supabase
+      .from("tournament_registrations")
+      .select("player_id, division, seed")
+      .eq("tournament_id", tournamentId)
+      .in("division", activeDivisionList)
+      .neq("status", "withdrawn");
+    for (const r of (regsRaw ?? []) as any[]) {
+      regsForFirstChoice.push({
+        player_id: r.player_id,
+        division: r.division,
+        seed: r.seed,
+      });
+    }
+  }
+  const firstChoiceMap = buildTournamentFirstChoiceMap(
+    (allActiveMatches ?? []).map((m: any) => ({
+      id: m.id,
+      bracket: m.bracket,
+      division: m.division,
+      round: m.round,
+      match_number: m.match_number,
+      player1_id: m.player1_id,
+      player2_id: m.player2_id,
+    })),
+    regsForFirstChoice,
+    tournament.format as "round_robin" | "single_elimination" | "double_elimination",
+  );
+
   // Build the hero-card payload from the on-court match. We figure
   // out which side of the match is "us", then derive the opponent
   // string and the viewer's partner display name.
@@ -271,6 +306,9 @@ export default async function TournamentLivePage({
         bracket: string;
         partner_name: string | null;
         opponent_team: string | null;
+        /** Did the viewer's team get first choice this match?
+         *  null when first-choice can't be resolved (no seeds / odd state). */
+        youHaveFirstChoice: boolean | null;
       }
     | null = null;
   if (myOnCourtMatch) {
@@ -299,6 +337,16 @@ export default async function TournamentLivePage({
           ? myPrimaryName
           : null;
 
+    const fcPick = firstChoiceMap.get(myOnCourtMatch.id) ?? null;
+    const myTeamSlot =
+      myOnCourtMatch.player1_id === teamPrimaryId
+        ? "team1"
+        : myOnCourtMatch.player2_id === teamPrimaryId
+          ? "team2"
+          : null;
+    const youHaveFirstChoice =
+      fcPick && myTeamSlot ? fcPick === myTeamSlot : null;
+
     myCourtCardData = {
       id: myOnCourtMatch.id,
       court_number: myOnCourtMatch.court_number,
@@ -309,6 +357,7 @@ export default async function TournamentLivePage({
       opponent_team: opponentPartnerName
         ? `${opponentPrimaryName} / ${opponentPartnerName}`
         : opponentPrimaryName,
+      youHaveFirstChoice,
     };
   }
 
@@ -418,6 +467,7 @@ export default async function TournamentLivePage({
           queueScopeLabel={queueScopeLabel}
           courtRanges={courtRanges.length > 0 ? courtRanges : null}
           myRangeId={myRangeId}
+          firstChoiceMap={firstChoiceMap}
           embedded
         />
       </CollapsibleCard>
