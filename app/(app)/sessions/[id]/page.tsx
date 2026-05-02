@@ -127,6 +127,7 @@ export default function PlayerSessionPage() {
   const [editScoreA, setEditScoreA] = useState("");
   const [editScoreB, setEditScoreB] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   // Which "other court" the viewer has opened via the dropdown. Only
   // one non-own court is shown at a time so regular members aren't
   // overwhelmed scrolling past every court's full standings.
@@ -298,6 +299,7 @@ export default function PlayerSessionPage() {
     setEditingScoreId(scoreId);
     setEditScoreA(String(currentA));
     setEditScoreB(String(currentB));
+    setEditError(null);
   }
 
   async function saveEdit(scoreId: string) {
@@ -305,10 +307,21 @@ export default function PlayerSessionPage() {
     const b = parseInt(editScoreB);
     if (isNaN(a) || isNaN(b) || a < 0 || b < 0) return;
     setSavingEdit(true);
-    await supabase
-      .from("game_results")
-      .update({ score_a: a, score_b: b })
-      .eq("id", scoreId);
+    setEditError(null);
+    // Route through the API so the same gameLimit / win-by-2 validation
+    // that gates the initial POST also gates edits. The previous
+    // direct supabase update bypassed validation entirely.
+    const res = await fetch(`/api/sessions/${sessionId}/score`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_result_id: scoreId, score_a: a, score_b: b }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setEditError(data.error ?? "Failed to update score");
+      setSavingEdit(false);
+      return;
+    }
     setScores((prev) =>
       prev.map((s) => s.id === scoreId ? { ...s, score_a: a, score_b: b } : s)
     );
@@ -744,8 +757,11 @@ export default function PlayerSessionPage() {
                                   />
                                 </div>
                               </div>
+                              {editError && (
+                                <p className="text-xs text-red-400">{editError}</p>
+                              )}
                               <div className="flex gap-2 justify-end">
-                                <button onClick={() => setEditingScoreId(null)} className="btn-secondary text-xs">Cancel</button>
+                                <button onClick={() => { setEditingScoreId(null); setEditError(null); }} className="btn-secondary text-xs">Cancel</button>
                                 <button onClick={() => saveEdit(match.result!.id)} disabled={savingEdit} className="btn-primary text-xs">
                                   {savingEdit ? "Saving…" : "Save"}
                                 </button>
