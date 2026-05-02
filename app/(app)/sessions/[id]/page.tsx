@@ -432,10 +432,21 @@ export default function PlayerSessionPage() {
         const me = participants.find((p) => p.player_id === myPlayerId);
         const myCourtPlayers = participants.filter((p) => p.court_number === myCourt);
         const myCourtScores = scores.filter((s) => s.pool_number === myCourt);
+        const myCourtFinishMap = (() => {
+          const m = new Map<string, number>();
+          for (const p of myCourtPlayers) {
+            const f = (p as any).pool_finish as number | null | undefined;
+            if (f != null) m.set(p.player_id, f);
+          }
+          return m;
+        })();
         const myStanding = me
-          ? computePoolStandings(myCourtPlayers as any, myCourtScores, memberRanks).find(
-              (s) => s.playerId === myPlayerId
-            )
+          ? computePoolStandings(
+              myCourtPlayers as any,
+              myCourtScores,
+              memberRanks,
+              myCourtFinishMap.size > 0 ? myCourtFinishMap : undefined,
+            ).find((s) => s.playerId === myPlayerId)
           : undefined;
         const finish = (me as any)?.pool_finish as number | null;
         const stepBefore = me?.step_before ?? null;
@@ -543,7 +554,24 @@ export default function PlayerSessionPage() {
         const renderCourt = (courtNum: number) => {
           const courtPlayers = participants.filter((p) => p.court_number === courtNum);
           const courtScores = scores.filter((s) => s.pool_number === courtNum);
-          const standings = computePoolStandings(courtPlayers as any, courtScores, memberRanks);
+          // Trust the server's pool_finish once it's been stamped —
+          // keeps the rendered standings order identical to the
+          // server's "Next Court" arrows, which is what bites in
+          // tied-court scenarios.
+          const courtFinishMap = (() => {
+            const m = new Map<string, number>();
+            for (const p of courtPlayers) {
+              const f = (p as any).pool_finish as number | null | undefined;
+              if (f != null) m.set(p.player_id, f);
+            }
+            return m;
+          })();
+          const standings = computePoolStandings(
+            courtPlayers as any,
+            courtScores,
+            memberRanks,
+            courtFinishMap.size > 0 ? courtFinishMap : undefined,
+          );
           const schedule = generateMatchSchedule(
             courtPlayers.map((p) => p.player_id),
             playerNames,

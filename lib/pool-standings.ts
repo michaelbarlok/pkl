@@ -58,7 +58,21 @@ type H2H = { wins: number; losses: number; pointDiff: number };
 export function computePoolStandings(
   players: PlayerRef[],
   scores: GameRef[],
-  memberMap?: Map<string, RankedMember>
+  memberMap?: Map<string, RankedMember>,
+  /**
+   * Optional authoritative ordering keyed by player_id. When the
+   * server has already stamped session_participants.pool_finish (i.e.
+   * the round is complete), pass it here so the client display
+   * matches the server's ranking exactly. Without this, the client's
+   * step/winPct fallback can disagree with the server's because the
+   * server tiebroke using PRE-session step/win_pct snapshots while
+   * the client reads CURRENT (post-session) values from
+   * group_memberships. The mismatch is invisible most of the time
+   * but bites when three players finish a court tied — the next-court
+   * arrows (driven by server's pool_finish) end up next to the wrong
+   * row in the table.
+   */
+  poolFinishMap?: Map<string, number>,
 ): PoolStanding[] {
   type Internal = PoolStanding & { h2h: Map<string, H2H> };
   const standings = new Map<string, Internal>();
@@ -117,6 +131,19 @@ export function computePoolStandings(
   }
 
   const sorted = Array.from(standings.values()).sort((a, b) => {
+    // Authoritative override: when the server has stamped pool_finish
+    // we trust it. Skipping the live tiebreaker chain here is what
+    // keeps client display consistent with the server's "Next Court"
+    // arrows after round_complete.
+    if (poolFinishMap) {
+      const aF = poolFinishMap.get(a.playerId);
+      const bF = poolFinishMap.get(b.playerId);
+      if (aF != null && bF != null && aF !== bF) return aF - bF;
+      // If only one side has pool_finish (shouldn't happen in practice
+      // — server stamps the whole court at once) fall through to the
+      // live algorithm below for a deterministic order.
+    }
+
     if (a.wins !== b.wins) return b.wins - a.wins;
     if (a.pointDiff !== b.pointDiff) return b.pointDiff - a.pointDiff;
 
