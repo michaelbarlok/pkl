@@ -409,81 +409,88 @@ export async function NextUpQueue({
             })}
           </div>
 
-          {/* Per-range Match Queue. Mirrors the organizer's Court
-               Tracker layout so a player can scan all ranges, see how
-               deep each queue is, and pick out their own row when it
-               falls in their range. The viewer's range section already
-               carries the accent border above. */}
-          <div className="mt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted mb-1">
-              Match Queue ({section.queue.length})
-            </p>
-            {section.queue.length === 0 ? (
-              <p className="text-xs text-surface-muted">
-                Nothing queued right now.
-              </p>
-            ) : (
-              <ul className="space-y-1.5">
-                {section.queue.map((m: any, idx: number) => {
-                  const includesMe =
-                    m.player1_id === myTeamPrimaryId ||
-                    m.player2_id === myTeamPrimaryId;
-                  return (
-                    <li
-                      key={m.id}
-                      className={
-                        "flex items-center justify-between gap-3 rounded-md px-3 py-2 shadow-sm ring-1 " +
-                        (includesMe
-                          ? "bg-accent-500/10 ring-accent-500/40"
-                          : "bg-surface-overlay ring-dark-500")
-                      }
-                    >
-                      <div className="flex items-start gap-2 min-w-0 text-xs">
-                        <span
-                          className={
-                            "shrink-0 font-semibold tabular-nums " +
-                            (idx === 0
-                              ? "text-accent-300"
-                              : includesMe
+          {/* Per-range Match Queue — collapsed by default to keep
+               the live view short. Mirrors the organizer's Court
+               Tracker layout one-for-one so the page reads the same
+               on both surfaces. Native <details> handles state for
+               free; chevron rotates via the open: marker variant. */}
+          <details className="mt-3 group rounded-md bg-surface-overlay/40 ring-1 ring-surface-border/60">
+            <summary className="cursor-pointer list-none px-3 py-2 flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-surface-muted">
+                <svg className="h-3.5 w-3.5 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+                </svg>
+                Match Queue ({section.queue.length})
+              </span>
+            </summary>
+            <div className="px-3 pb-3 pt-1">
+              {section.queue.length === 0 ? (
+                <p className="text-xs text-surface-muted italic">
+                  Nothing queued for this range right now.
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {section.queue.map((m: any, idx: number) => {
+                    const includesMe =
+                      m.player1_id === myTeamPrimaryId ||
+                      m.player2_id === myTeamPrimaryId;
+                    return (
+                      <li
+                        key={m.id}
+                        className={
+                          "flex items-center justify-between gap-3 rounded-md px-3 py-2 shadow-sm ring-1 " +
+                          (includesMe
+                            ? "bg-accent-500/10 ring-accent-500/40"
+                            : "bg-surface-overlay ring-dark-500")
+                        }
+                      >
+                        <div className="flex items-start gap-2 min-w-0 text-xs">
+                          <span
+                            className={
+                              "shrink-0 font-semibold tabular-nums " +
+                              (idx === 0
                                 ? "text-accent-300"
-                                : "text-surface-muted")
-                          }
-                          aria-label={`Position ${idx + 1}`}
-                        >
-                          #{idx + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          {/* Stack teams vertically on mobile so long
-                              doubles names don't wrap into a wall of
-                              whitespace. From sm upward we keep the
-                              original side-by-side grid. No first-choice
-                              badge — that lives on the live court cards
-                              + pool play bracket, not on queue rows. */}
-                          <div className="flex flex-col gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2">
-                            <p className="text-dark-100 break-words min-w-0 sm:text-left">
-                              {teamLabel(m.player1_id, m.player1?.display_name)}
-                            </p>
-                            <span className="text-[10px] text-surface-muted uppercase tracking-wide sm:self-center">vs</span>
-                            <p className="text-dark-100 break-words min-w-0 sm:text-right">
-                              {teamLabel(m.player2_id, m.player2?.display_name)}
+                                : includesMe
+                                  ? "text-accent-300"
+                                  : "text-surface-muted")
+                            }
+                            aria-label={`Position ${idx + 1}`}
+                          >
+                            #{idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            {/* Stack teams vertically on mobile so long
+                                doubles names don't wrap into a wall of
+                                whitespace. From sm upward we keep the
+                                original side-by-side grid. No first-choice
+                                badge — that lives on the live court cards
+                                + pool play bracket, not on queue rows. */}
+                            <div className="flex flex-col gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2">
+                              <p className="text-dark-100 break-words min-w-0 sm:text-left">
+                                {teamLabel(m.player1_id, m.player1?.display_name)}
+                              </p>
+                              <span className="text-[10px] text-surface-muted uppercase tracking-wide sm:self-center">vs</span>
+                              <p className="text-dark-100 break-words min-w-0 sm:text-right">
+                                {teamLabel(m.player2_id, m.player2?.display_name)}
+                              </p>
+                            </div>
+                            <p className="text-surface-muted mt-1">
+                              {getDivisionLabel(m.division)} · {labelFor(m)}
                             </p>
                           </div>
-                          <p className="text-surface-muted mt-1">
-                            {getDivisionLabel(m.division)} · {labelFor(m)}
-                          </p>
                         </div>
-                      </div>
-                      {idx === 0 && (
-                        <span className="text-[11px] font-semibold text-accent-300 whitespace-nowrap">
-                          Up next
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+                        {idx === 0 && (
+                          <span className="text-[11px] font-semibold text-accent-300 whitespace-nowrap">
+                            Up next
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </details>
           </div>
           ))}
         </div>
