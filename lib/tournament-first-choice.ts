@@ -140,3 +140,59 @@ export function buildTournamentFirstChoiceMap(
 
   return result;
 }
+
+/**
+ * One-shot helper for the notification path. Given a single match
+ * row, fetches the data the balance walker needs (the rest of the
+ * pool's matches for round-robin pool play, or just the
+ * registration seeds for playoff matches) and returns the
+ * first-choice assignment, or null if it can't be resolved.
+ *
+ * Designed to be called from the queue route just before we send
+ * "Head to Court N" pushes — keeps the notification body in sync
+ * with whatever the UI badge will show as soon as the player opens
+ * the app.
+ */
+export async function resolveTournamentMatchFirstChoice(
+  // Untyped on purpose — this runs inside Next.js API/route code with a
+  // Supabase service client. Strongly-typing the chained query builder
+  // here would force every caller into the same generated-types dance
+  // for marginal benefit; we trust the inline `as any` casts below.
+  service: { from: (table: string) => any },
+  tournamentId: string,
+  match: TournamentMatchInput,
+  format: TournamentFormat,
+): Promise<"team1" | "team2" | null> {
+  if (!match.player1_id || !match.player2_id) return null;
+
+  const isPool =
+    format === "round_robin" &&
+    (match.bracket.startsWith("pool_") ||
+      match.bracket === "winners" ||
+      match.bracket === "losers");
+
+  let allMatches: TournamentMatchInput[] = [match];
+  if (isPool && match.division) {
+    const { data: poolMatches } = await service
+      .from("tournament_matches")
+      .select("id, bracket, division, round, match_number, player1_id, player2_id")
+      .eq("tournament_id", tournamentId)
+      .eq("division", match.division)
+      .eq("bracket", match.bracket);
+    if (poolMatches && poolMatches.length > 0) {
+      allMatches = poolMatches as TournamentMatchInput[];
+    }
+  }
+
+  let regs: RegistrationSeedRow[] = [];
+  if (!isPool) {
+    const { data: regsData } = await service
+      .from("tournament_registrations")
+      .select("player_id, division, seed")
+      .eq("tournament_id", tournamentId);
+    regs = (regsData as RegistrationSeedRow[] | null) ?? [];
+  }
+
+  const map = buildTournamentFirstChoiceMap(allMatches, regs, format);
+  return map.get(match.id) ?? null;
+}

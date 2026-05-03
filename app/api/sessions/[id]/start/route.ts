@@ -16,6 +16,7 @@
 import { requireAuth, isGroupAdmin } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notify";
+import { buildSessionFirstChoiceMap } from "@/lib/session-first-choice";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -29,7 +30,7 @@ export async function POST(
 
   const { data: session, error: sessionErr } = await auth.supabase
     .from("shootout_sessions")
-    .select("id, status, group_id, group:shootout_groups(name)")
+    .select("id, status, group_id, current_round, group:shootout_groups(name)")
     .eq("id", sessionId)
     .single();
 
@@ -76,20 +77,84 @@ export async function POST(
     (session.group as { name?: string } | null)?.name ?? "your session";
   const link = `/sessions/${sessionId}`;
 
+  // Build the session-wide first-choice map so each player's push can
+  // tell them whether their team has first choice on game 1 of their
+  // court. Cross-round seeding (from past games) is folded in
+  // automatically for round 2+ Play Again starts.
+  const currentRound = (session as { current_round?: number }).current_round ?? 1;
+  const { data: gameRows } = await serviceClient
+    .from("game_results")
+    .select("round_number, pool_number, team_a_p1, team_a_p2, team_b_p1, team_b_p2")
+    .eq("session_id", sessionId);
+  const firstChoiceMap = buildSessionFirstChoiceMap(
+    sessionId,
+    currentRound,
+    (participants ?? []).map((p) => ({
+      player_id: p.player_id,
+      court_number: p.court_number ?? null,
+    })),
+    gameRows ?? [],
+  );
+
+  // Cache the sorted player ids for each court so we can decide which
+  // team a player is on for game 1 (4-player: top two = team1; bottom
+  // two = team2; same for 5-player with the 5th sitting out G1).
+  const courtRosters = new Map<number, string[]>();
+  for (const p of participants ?? []) {
+    if (p.court_number == null) continue;
+    const arr = courtRosters.get(p.court_number) ?? [];
+    arr.push(p.player_id);
+    courtRosters.set(p.court_number, arr);
+  }
+  for (const [court, ids] of courtRosters) {
+    courtRosters.set(court, [...ids].sort());
+  }
+
+  function game1TeamFor(playerId: string, courtNumber: number): "team1" | "team2" | null {
+    const sorted = courtRosters.get(courtNumber);
+    if (!sorted) return null;
+    const idx = sorted.indexOf(playerId);
+    if (idx < 0) return null;
+    if (sorted.length === 4) {
+      // G1: team1 = [a, b], team2 = [c, d]
+      return idx <= 1 ? "team1" : "team2";
+    }
+    if (sorted.length === 5) {
+      // G1: team1 = [a, b], team2 = [c, d], bye = e
+      if (idx <= 1) return "team1";
+      if (idx <= 3) return "team2";
+      return null;
+    }
+    return null;
+  }
+
   // Parallelize the notify() calls — notify() internally writes an
   // in-app row + optionally sends push/email. Concurrency keeps the
   // request fast even for a 30-person session.
   const results = await Promise.allSettled(
     (participants ?? []).map((p) => {
-      const body =
+      const courtSegment =
         p.court_number != null
           ? `Head to Court ${p.court_number}!`
           : "Session started — check the app for your court.";
+
+      let firstChoiceLine = "";
+      if (p.court_number != null) {
+        const myTeam = game1TeamFor(p.player_id, p.court_number);
+        const fcPick = firstChoiceMap.get(`${currentRound}:${p.court_number}:1`);
+        if (myTeam && fcPick) {
+          firstChoiceLine =
+            myTeam === fcPick
+              ? " You have first choice on Game 1."
+              : " Opponents have first choice on Game 1.";
+        }
+      }
+
       return notify({
         profileId: p.player_id,
         type: "pool_assigned",
         title: `Session started: ${groupName}`,
-        body,
+        body: `${courtSegment}${firstChoiceLine}`,
         link,
         groupId: session.group_id,
       });
