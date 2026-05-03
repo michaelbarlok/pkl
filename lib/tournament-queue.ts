@@ -29,6 +29,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { notifyMany } from "@/lib/notify";
 import { getDivisionLabel } from "@/lib/divisions";
+import { resolveTournamentMatchFirstChoice } from "@/lib/tournament-first-choice";
 
 interface TournamentMatch {
   id: string;
@@ -54,6 +55,7 @@ interface Tournament {
   id: string;
   title: string;
   num_courts: number | null;
+  format: "round_robin" | "single_elimination" | "double_elimination";
 }
 
 /**
@@ -260,7 +262,7 @@ export async function promoteMatchToCourt(
 
   const { data: tournamentRaw } = await service
     .from("tournaments")
-    .select("id, title, num_courts")
+    .select("id, title, num_courts, format")
     .eq("id", tournamentId)
     .single();
   if (!tournamentRaw) return { ok: false, error: "Tournament not found" };
@@ -350,30 +352,7 @@ export async function promoteMatchToCourt(
     return { ok: false, error: promoteErr.message };
   }
 
-  const anchorIds = [match.player1_id, match.player2_id].filter(
-    (x): x is string => !!x
-  );
-  const playerIds = await expandTeamsForNotify(tournamentId, anchorIds);
-  if (playerIds.length > 0) {
-    const divLabel = match.division ? getDivisionLabel(match.division) : "";
-    const courtTitle = `Head to Court ${courtNumber}`;
-    const courtBody = divLabel
-      ? `${tournament.title} — ${divLabel}. Your match is ready.`
-      : `${tournament.title}. Your match is ready.`;
-    await notifyMany(playerIds, {
-      type: "tournament_court_assigned",
-      title: courtTitle,
-      body: courtBody,
-      link: `/tournaments/${tournamentId}/live`,
-      emailTemplate: "TournamentAlert",
-      emailData: {
-        tournamentTitle: tournament.title,
-        alertTitle: courtTitle,
-        alertBody: courtBody,
-        link: `/tournaments/${tournamentId}/live`,
-      },
-    });
-  }
+  await sendCourtReadyPushes(service, tournamentId, tournament, match, courtNumber);
 
   return { ok: true };
 }
@@ -386,7 +365,7 @@ export async function runAssignmentPass(
 
   const { data: tournamentRaw } = await service
     .from("tournaments")
-    .select("id, title, num_courts")
+    .select("id, title, num_courts, format")
     .eq("id", tournamentId)
     .single();
   if (!tournamentRaw) return;
@@ -588,31 +567,10 @@ export async function runAssignmentPass(
   // ── Step 4: "Head to Court N" pushes. Only fire for matches that
   // actually got their court_number persisted; a 23505 in Step 3
   // means another pass beat us and the player will get the push
-  // from that pass instead.
+  // from that pass instead. sendCourtReadyPushes splits the fan-out
+  // by team so the body can name which side has first choice.
   for (const { match, court } of persisted) {
-    const anchorIds = [match.player1_id, match.player2_id].filter(
-      (x): x is string => !!x
-    );
-    const playerIds = await expandTeamsForNotify(tournamentId, anchorIds);
-    if (playerIds.length === 0) continue;
-    const divLabel = match.division ? getDivisionLabel(match.division) : "";
-    const courtTitle = `Head to Court ${court}`;
-    const courtBody = divLabel
-      ? `${tournament.title} — ${divLabel}. Your match is ready.`
-      : `${tournament.title}. Your match is ready.`;
-    await notifyMany(playerIds, {
-      type: "tournament_court_assigned",
-      title: courtTitle,
-      body: courtBody,
-      link: `/tournaments/${tournamentId}/live`,
-      emailTemplate: "TournamentAlert",
-      emailData: {
-        tournamentTitle: tournament.title,
-        alertTitle: courtTitle,
-        alertBody: courtBody,
-        link: `/tournaments/${tournamentId}/live`,
-      },
-    });
+    await sendCourtReadyPushes(service, tournamentId, tournament, match, court);
   }
 
   // ── Step 5: queue-position pushes. Fires once per transition.
@@ -715,6 +673,99 @@ interface CourtRange {
   court_start: number;
   court_end: number;
   divisions: string[];
+}
+
+/**
+ * "Head to Court N" push fan-out, split per team so the body can name
+ * which side has first choice. Pool play is balanced (resolves to one
+ * team per match); playoffs go to the higher seed. Falls back to a
+ * single combined push when first-choice can't be resolved (shouldn't
+ * happen in practice but keeps the notification reliable).
+ */
+async function sendCourtReadyPushes(
+  service: Awaited<ReturnType<typeof createServiceClient>>,
+  tournamentId: string,
+  tournament: Tournament,
+  match: Pick<TournamentMatch, "id" | "bracket" | "division" | "round" | "match_number" | "player1_id" | "player2_id">,
+  courtNumber: number,
+): Promise<void> {
+  const divLabel = match.division ? getDivisionLabel(match.division) : "";
+  const courtTitle = `Head to Court ${courtNumber}`;
+  const baseBody = divLabel
+    ? `${tournament.title} — ${divLabel}. Your match is ready.`
+    : `${tournament.title}. Your match is ready.`;
+
+  const team1Anchor = match.player1_id;
+  const team2Anchor = match.player2_id;
+
+  const fcPick = await resolveTournamentMatchFirstChoice(
+    service,
+    tournamentId,
+    {
+      id: match.id,
+      bracket: match.bracket,
+      division: match.division ?? null,
+      round: match.round,
+      match_number: match.match_number,
+      player1_id: match.player1_id,
+      player2_id: match.player2_id,
+    },
+    tournament.format,
+  );
+
+  async function pushFor(
+    anchorId: string | null,
+    extra: string,
+  ): Promise<void> {
+    if (!anchorId) return;
+    const recipients = await expandTeamsForNotify(tournamentId, [anchorId]);
+    if (recipients.length === 0) return;
+    const body = `${baseBody} ${extra}`.trim();
+    await notifyMany(recipients, {
+      type: "tournament_court_assigned",
+      title: courtTitle,
+      body,
+      link: `/tournaments/${tournamentId}/live`,
+      emailTemplate: "TournamentAlert",
+      emailData: {
+        tournamentTitle: tournament.title,
+        alertTitle: courtTitle,
+        alertBody: body,
+        link: `/tournaments/${tournamentId}/live`,
+      },
+    });
+  }
+
+  if (fcPick === "team1") {
+    await pushFor(team1Anchor, "You have first choice.");
+    await pushFor(team2Anchor, "Opponents have first choice.");
+  } else if (fcPick === "team2") {
+    await pushFor(team1Anchor, "Opponents have first choice.");
+    await pushFor(team2Anchor, "You have first choice.");
+  } else {
+    // Fallback: send the legacy combined push if we couldn't resolve
+    // first-choice. Better to land the "your match is ready" alert
+    // without the extra line than to drop it.
+    const anchorIds = [team1Anchor, team2Anchor].filter(
+      (x): x is string => !!x,
+    );
+    const recipients = await expandTeamsForNotify(tournamentId, anchorIds);
+    if (recipients.length > 0) {
+      await notifyMany(recipients, {
+        type: "tournament_court_assigned",
+        title: courtTitle,
+        body: baseBody,
+        link: `/tournaments/${tournamentId}/live`,
+        emailTemplate: "TournamentAlert",
+        emailData: {
+          tournamentTitle: tournament.title,
+          alertTitle: courtTitle,
+          alertBody: baseBody,
+          link: `/tournaments/${tournamentId}/live`,
+        },
+      });
+    }
+  }
 }
 
 /**
