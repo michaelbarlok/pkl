@@ -4,6 +4,7 @@ import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { matchFirstChoice } from "@/lib/first-choice";
+import { buildSessionFirstChoiceMap } from "@/lib/session-first-choice";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 
@@ -57,6 +58,7 @@ export default function ScoreEntryPage() {
   const { supabase } = useSupabase();
   const [session, setSession] = useState<any>(null);
   const [players, setPlayers] = useState<PoolPlayer[]>([]);
+  const [scores, setScores] = useState<any[]>([]);
   const [myPlayerId, setMyPlayerId] = useState<string>("");
   const [myCourt, setMyCourt] = useState<number | null>(null);
   const [teamAP1, setTeamAP1] = useState("");
@@ -107,6 +109,14 @@ export default function ScoreEntryPage() {
         const me = mapped.find((m) => m.player_id === profile?.id);
         if (me) setMyCourt(me.court_number);
       }
+
+      // Pull all game_results so the balanced first-choice computation
+      // sees prior rounds' rosters too.
+      const { data: gameRows } = await supabase
+        .from("game_results")
+        .select("round_number, pool_number, team_a_p1, team_a_p2, team_b_p1, team_b_p2")
+        .eq("session_id", sessionId);
+      setScores(gameRows ?? []);
     }
     fetchData();
   }, [sessionId, supabase]);
@@ -213,9 +223,18 @@ export default function ScoreEntryPage() {
             {/* Game header — tags whichever team has "first choice" so the
                 scorekeeper can confirm it before play. */}
             {(() => {
-              const firstChoice = activeCourt != null
-                ? matchFirstChoice(sessionId, activeCourt, prefilledMatch.gameNumber)
-                : null;
+              const firstChoiceMap = buildSessionFirstChoiceMap(
+                sessionId,
+                session?.current_round ?? 1,
+                players.map((p) => ({ player_id: p.player_id, court_number: p.court_number ?? null })),
+                scores,
+              );
+              const firstChoice =
+                activeCourt != null
+                  ? firstChoiceMap.get(
+                      `${session?.current_round || 1}:${activeCourt}:${prefilledMatch.gameNumber}`,
+                    ) ?? matchFirstChoice(sessionId, activeCourt, prefilledMatch.gameNumber)
+                  : null;
               return (
                 <div className="card bg-surface-overlay text-center py-3">
                   <p className="text-xs font-semibold text-surface-muted uppercase tracking-wider mb-1">

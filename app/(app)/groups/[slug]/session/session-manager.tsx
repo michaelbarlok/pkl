@@ -6,7 +6,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { FormError } from "@/components/form-error";
 import { FirstChoiceBadge } from "@/components/first-choice-badge";
-import { freePlayMatchFirstChoice } from "@/lib/first-choice";
+import { computeBalancedFirstChoices, freePlayMatchFirstChoice } from "@/lib/first-choice";
 import { RosterManagerModal } from "./roster-manager-modal";
 
 interface PlayerStanding {
@@ -664,14 +664,27 @@ function ActivePhase({
 
       {/* Matches */}
       <div className="space-y-4">
-        {round.matches.map((match, i) => {
-          // One team in every free-play match gets "first choice" (serve/return
-          // or side of the court). Hidden while the admin is reshaping teams
-          // and once a score has been entered — it's exercised pre-game.
+        {(() => {
+          // Pre-compute first-choice for the whole round in one balanced
+          // pass so that, when a player happens to land in two matches
+          // of the same round (admin rebuilds), they don't get
+          // first-choice in both. Hash fallback used only on real ties.
+          const balanced = computeBalancedFirstChoices(
+            (round.matches ?? []).map((m) => ({
+              team1: [m.teamA[0], m.teamA[1]] as string[],
+              team2: [m.teamB[0], m.teamB[1]] as string[],
+            })),
+            (_, i) => `fp:${session.id}:${round.roundNumber}:${i}`,
+          );
+          return (round.matches ?? []).map((match, i) => {
           const isScored = match.scoreA != null && match.scoreB != null;
+          const balancedKey = balanced.assignments;
+          // The map keys are the wrapper objects we just created, so
+          // re-derive by index — order is preserved.
+          const balancedPick = Array.from(balancedKey.values())[i];
           const firstChoice =
             !editMode && !isScored
-              ? freePlayMatchFirstChoice(session.id, round.roundNumber, i)
+              ? balancedPick ?? freePlayMatchFirstChoice(session.id, round.roundNumber, i)
               : null;
           return (
           <div key={i} className="card space-y-3">
@@ -778,7 +791,8 @@ function ActivePhase({
             </div>
           </div>
           );
-        })}
+        });
+      })()}
       </div>
 
       {/* Sitting players */}

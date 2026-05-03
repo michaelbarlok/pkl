@@ -1,5 +1,6 @@
 import { getDivisionLabel } from "@/lib/divisions";
 import { tournamentHeroGradient } from "@/lib/tournament-hero";
+import { FirstChoiceBadge } from "@/components/first-choice-badge";
 
 interface OnCourtMatch {
   id: string;
@@ -9,6 +10,9 @@ interface OnCourtMatch {
   bracket: string;
   partner_name: string | null;
   opponent_team: string | null;
+  /** True = our team has first choice; false = opponents do; null
+   *  = unresolved (mostly playoffs with seeds not yet stamped). */
+  youHaveFirstChoice?: boolean | null;
 }
 
 interface Props {
@@ -97,6 +101,15 @@ export function MyCourtCard({
             <p>
               <span className="text-dark-200">Opponent:</span>{" "}
               <span className="text-dark-100 font-medium">{match.opponent_team}</span>
+            </p>
+          )}
+          {match.youHaveFirstChoice != null && (
+            <p className="pt-1 flex items-center gap-1.5">
+              <span className="text-dark-200">First choice:</span>
+              <span className="text-dark-100 font-medium">
+                {match.youHaveFirstChoice ? "you" : "opponents"}
+              </span>
+              {match.youHaveFirstChoice && <FirstChoiceBadge />}
             </p>
           )}
         </div>
