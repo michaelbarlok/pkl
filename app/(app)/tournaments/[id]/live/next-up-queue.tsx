@@ -452,15 +452,19 @@ export async function NextUpQueue({
                       #{idx + 1}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                        <p className="text-dark-100 break-words min-w-0 text-left flex items-center gap-1.5">
+                      {/* Stack teams vertically on mobile so long
+                          doubles names don't wrap into a wall of
+                          whitespace. From sm upward we keep the
+                          original side-by-side grid. */}
+                      <div className="flex flex-col gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2">
+                        <p className="text-dark-100 break-words min-w-0 flex items-center gap-1.5 sm:text-left">
                           <span>{teamLabel(m.player1_id, m.player1?.display_name)}</span>
                           {firstChoiceMap?.get(m.id) === "team1" && (
                             <FirstChoiceBadge className="shrink-0" />
                           )}
                         </p>
-                        <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
-                        <p className="text-dark-100 break-words min-w-0 text-right flex items-center gap-1.5 justify-end">
+                        <span className="text-[10px] text-surface-muted uppercase tracking-wide sm:self-center">vs</span>
+                        <p className="text-dark-100 break-words min-w-0 flex items-center gap-1.5 sm:text-right sm:justify-end">
                           {firstChoiceMap?.get(m.id) === "team2" && (
                             <FirstChoiceBadge className="shrink-0" />
                           )}

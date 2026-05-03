@@ -396,13 +396,20 @@ export function CourtTracker({
                   className="flex items-start justify-between gap-3 rounded-md bg-surface-overlay ring-1 ring-dark-500 shadow-sm px-3 py-2"
                 >
                   <div className="text-xs min-w-0 flex-1">
-                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                      <p className="text-dark-100 break-words min-w-0 text-left flex items-center gap-1.5">
+                    {/* Stacked teams on mobile, side-by-side from sm
+                        upward. The old 3-column grid forced long
+                        doubles names ("[TEST] M27 Greg Ellis") to
+                        wrap onto 3+ lines per team in narrow columns
+                        — leaving the card mostly whitespace. Stacking
+                        each team on its own row uses the full card
+                        width and reads clean. */}
+                    <div className="flex flex-col gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2">
+                      <p className="text-dark-100 break-words min-w-0 flex items-center gap-1.5 sm:text-left">
                         <span>{formatTeam(m.player1_name, m.partner1_name)}</span>
                         {m.first_choice === "team1" && <FirstChoiceBadge className="shrink-0" />}
                       </p>
-                      <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
-                      <p className="text-dark-100 break-words min-w-0 text-right flex items-center gap-1.5 justify-end">
+                      <span className="text-[10px] text-surface-muted uppercase tracking-wide sm:self-center">vs</span>
+                      <p className="text-dark-100 break-words min-w-0 flex items-center gap-1.5 sm:text-right sm:justify-end">
                         {m.first_choice === "team2" && <FirstChoiceBadge className="shrink-0" />}
                         <span>{formatTeam(m.player2_name, m.partner2_name)}</span>
                       </p>
