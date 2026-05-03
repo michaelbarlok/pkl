@@ -91,8 +91,22 @@ export async function POST(
     );
   }
 
+  // Pool play in round_robin can land in pool_X / winners / losers
+  // depending on the generator. In single/double elim, "winners" /
+  // "losers" are bracket names, not pools — tournament forfeit
+  // doesn't apply there.
+  const { data: tForFmt } = await service
+    .from("tournaments")
+    .select("format")
+    .eq("id", tournamentId)
+    .single();
+  const tournamentFormat = tForFmt?.format ?? null;
   const isPool =
-    typeof match.bracket === "string" && match.bracket.startsWith("pool_");
+    tournamentFormat === "round_robin" &&
+    typeof match.bracket === "string" &&
+    (match.bracket.startsWith("pool_") ||
+      match.bracket === "winners" ||
+      match.bracket === "losers");
   if (entireTournament && !isPool) {
     return NextResponse.json(
       {

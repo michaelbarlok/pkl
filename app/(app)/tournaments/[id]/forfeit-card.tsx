@@ -20,6 +20,11 @@ interface MatchRow {
 
 interface Props {
   tournamentId: string;
+  /** Tournament format. Used to disambiguate "winners" / "losers"
+   *  bracket names — those are pool play in a round_robin tournament
+   *  but elimination brackets in single/double elim, where
+   *  "forfeit entire tournament" doesn't apply. */
+  format: "round_robin" | "single_elimination" | "double_elimination";
   matches: MatchRow[];
 }
 
@@ -42,7 +47,7 @@ interface Props {
  *   appears in is voided (deleted) so standings recompute as if they
  *   were never there. The registration is marked withdrawn.
  */
-export function ForfeitCard({ tournamentId, matches }: Props) {
+export function ForfeitCard({ tournamentId, format, matches }: Props) {
   const router = useRouter();
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
@@ -84,7 +89,16 @@ export function ForfeitCard({ tournamentId, matches }: Props) {
     () => forfeitableMatches.find((m) => m.id === matchId),
     [forfeitableMatches, matchId]
   );
-  const isPoolMatch = selectedMatch?.bracket?.startsWith("pool_") ?? false;
+  // In round_robin format, pool-play brackets can be named pool_X
+  // OR "winners" / "losers" depending on the generator. In
+  // single/double elim, every "winners" / "losers" bracket is an
+  // elimination bracket where pool-forfeit doesn't apply.
+  const isPoolMatch =
+    !!selectedMatch?.bracket &&
+    format === "round_robin" &&
+    (selectedMatch.bracket.startsWith("pool_") ||
+      selectedMatch.bracket === "winners" ||
+      selectedMatch.bracket === "losers");
 
   function reset() {
     setMatchId("");
