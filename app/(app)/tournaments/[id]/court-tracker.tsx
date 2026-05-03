@@ -3,6 +3,7 @@
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useConfirm } from "@/components/confirm-modal";
 import { getDivisionLabel } from "@/lib/divisions";
+import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -26,6 +27,10 @@ export interface CourtTrackerMatch {
    *  "Semifinal", "Final", "3rd Place". Parent calculates because
    *  it has access to the per-division max playoff round. */
   position_label: string;
+  /** Server-resolved first-choice for this match. Pool play is
+   *  balanced across teams; playoffs go to the higher seed. Null
+   *  when the match isn't ready (BYE, unknown teams, etc.). */
+  first_choice?: "team1" | "team2" | null;
 }
 
 export interface CourtRange {
@@ -313,16 +318,18 @@ export function CourtTracker({
                     names and the other didn't — every card reads
                     consistently when each team gets a full row. */}
                 <div className="space-y-1">
-                  <p className="text-sm text-dark-100 font-medium break-words">
-                    {formatTeam(match.player1_name, match.partner1_name)}
+                  <p className="text-sm text-dark-100 font-medium break-words flex items-center gap-1.5">
+                    <span>{formatTeam(match.player1_name, match.partner1_name)}</span>
+                    {match.first_choice === "team1" && <FirstChoiceBadge className="shrink-0" />}
                   </p>
                   <div className="flex items-center gap-2 text-[10px] text-surface-muted uppercase tracking-wide">
                     <span className="h-px flex-1 bg-surface-border" />
                     <span>vs</span>
                     <span className="h-px flex-1 bg-surface-border" />
                   </div>
-                  <p className="text-sm text-dark-100 font-medium break-words">
-                    {formatTeam(match.player2_name, match.partner2_name)}
+                  <p className="text-sm text-dark-100 font-medium break-words flex items-center gap-1.5">
+                    <span>{formatTeam(match.player2_name, match.partner2_name)}</span>
+                    {match.first_choice === "team2" && <FirstChoiceBadge className="shrink-0" />}
                   </p>
                 </div>
                 <p className="text-xs text-surface-muted">
@@ -390,12 +397,14 @@ export function CourtTracker({
                 >
                   <div className="text-xs min-w-0 flex-1">
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                      <p className="text-dark-100 break-words min-w-0 text-left">
-                        {formatTeam(m.player1_name, m.partner1_name)}
+                      <p className="text-dark-100 break-words min-w-0 text-left flex items-center gap-1.5">
+                        <span>{formatTeam(m.player1_name, m.partner1_name)}</span>
+                        {m.first_choice === "team1" && <FirstChoiceBadge className="shrink-0" />}
                       </p>
                       <span className="text-[10px] text-surface-muted uppercase tracking-wide">vs</span>
-                      <p className="text-dark-100 break-words min-w-0 text-right">
-                        {formatTeam(m.player2_name, m.partner2_name)}
+                      <p className="text-dark-100 break-words min-w-0 text-right flex items-center gap-1.5 justify-end">
+                        {m.first_choice === "team2" && <FirstChoiceBadge className="shrink-0" />}
+                        <span>{formatTeam(m.player2_name, m.partner2_name)}</span>
                       </p>
                     </div>
                     <p className="text-surface-muted mt-1">

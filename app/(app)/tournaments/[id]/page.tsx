@@ -35,6 +35,7 @@ import { HideTournamentToggle } from "@/app/(app)/admin/tournaments/hide-toggle"
 import { TournamentWinnersCard } from "@/components/tournament-winners-card";
 import { LocalDateTime } from "@/components/local-date-time";
 import { tournamentHeroGradient } from "@/lib/tournament-hero";
+import { buildTournamentFirstChoiceMap } from "@/lib/tournament-first-choice";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -280,6 +281,31 @@ export default async function TournamentDetailPage({
           if (m.round > cur) maxPlayoffRoundByDivision.set(m.division, m.round);
         }
         const finalsBestOf3 = (tournament.finals_best_of_3 ?? false) as boolean;
+        // Build the first-choice map once for all live matches —
+        // pool play balanced, playoffs to higher seed. Wired into
+        // the CourtTrackerMatch row below so the badge renders
+        // alongside the team name on each court card and queue row.
+        const fcRegs = Array.from(seedByPlayerId.entries()).map(([key, seed]) => {
+          const sep = key.indexOf("|");
+          return {
+            player_id: sep >= 0 ? key.slice(sep + 1) : key,
+            division: sep >= 0 ? key.slice(0, sep) : null,
+            seed,
+          };
+        });
+        const trackerFirstChoiceMap = buildTournamentFirstChoiceMap(
+          (matches as any[]).map((m) => ({
+            id: m.id,
+            bracket: m.bracket,
+            division: m.division ?? null,
+            round: m.round,
+            match_number: m.match_number,
+            player1_id: m.player1_id,
+            player2_id: m.player2_id,
+          })),
+          fcRegs,
+          tournament.format as "round_robin" | "single_elimination" | "double_elimination",
+        );
         const toTracker = (m: any): CourtTrackerMatch => ({
           id: m.id,
           division: m.division ?? null,
@@ -300,6 +326,7 @@ export default async function TournamentDetailPage({
             m.division ? maxPlayoffRoundByDivision.get(m.division) ?? null : null,
             finalsBestOf3
           ),
+          first_choice: trackerFirstChoiceMap.get(m.id) ?? null,
         });
 
         const onCourtMatches = matches
@@ -398,6 +425,7 @@ export default async function TournamentDetailPage({
   const forfeitBlock = canManage && matches.length > 0 ? (
     <ForfeitCard
       tournamentId={id}
+      format={tournament.format}
       matches={matches as unknown as Parameters<typeof ForfeitCard>[0]["matches"]}
     />
   ) : null;

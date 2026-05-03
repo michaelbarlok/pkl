@@ -1,7 +1,9 @@
 "use client";
 
 import { FormError } from "@/components/form-error";
+import { FirstChoiceBadge } from "@/components/first-choice-badge";
 import { computeCrossPoolSeeding, computePoolStandings, getPoolBrackets, getPoolLabel } from "@/lib/tournament-bracket";
+import { buildTournamentFirstChoiceMap } from "@/lib/tournament-first-choice";
 import type { TournamentMatch, TournamentFormat } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
@@ -30,6 +32,33 @@ interface Props {
 }
 
 export function TournamentBracketView({ matches, format, canManage, tournamentId, division, scoreToWinPool, scoreToWinPlayoff, finalsBestOf3, winBy2, partnerMap, seedByPlayerId }: Props) {
+  // First-choice map: pool play balanced across teams, playoffs to
+  // the higher seed. Built once per render so every MatchCard below
+  // can look up its assignment without redoing the walk.
+  const firstChoiceMap = useMemo(() => {
+    const regs = Array.from(seedByPlayerId?.entries() ?? []).map(([key, seed]) => {
+      const sep = key.indexOf("|");
+      return {
+        player_id: sep >= 0 ? key.slice(sep + 1) : key,
+        division: sep >= 0 ? key.slice(0, sep) : null,
+        seed,
+      };
+    });
+    return buildTournamentFirstChoiceMap(
+      matches.map((m: any) => ({
+        id: m.id,
+        bracket: m.bracket,
+        division: m.division ?? null,
+        round: m.round,
+        match_number: m.match_number,
+        player1_id: m.player1_id,
+        player2_id: m.player2_id,
+      })),
+      regs,
+      format,
+    );
+  }, [matches, seedByPlayerId, format]);
+
   if (format === "round_robin") {
     return (
       <RoundRobinView
@@ -43,10 +72,20 @@ export function TournamentBracketView({ matches, format, canManage, tournamentId
         winBy2={winBy2}
         partnerMap={partnerMap}
         seedByPlayerId={seedByPlayerId}
+        firstChoiceMap={firstChoiceMap}
       />
     );
   }
-  return <EliminationBracketView matches={matches} format={format} canManage={canManage} tournamentId={tournamentId} partnerMap={partnerMap} />;
+  return (
+    <EliminationBracketView
+      matches={matches}
+      format={format}
+      canManage={canManage}
+      tournamentId={tournamentId}
+      partnerMap={partnerMap}
+      firstChoiceMap={firstChoiceMap}
+    />
+  );
 }
 
 /** Build a team display label: "Player & Partner" for doubles, just "Player" for singles */
@@ -77,12 +116,14 @@ function EliminationBracketView({
   canManage,
   tournamentId,
   partnerMap,
+  firstChoiceMap,
 }: {
   matches: TournamentMatch[];
   format: TournamentFormat;
   canManage: boolean;
   tournamentId: string;
   partnerMap?: PartnerMap;
+  firstChoiceMap?: Map<string, "team1" | "team2">;
 }) {
   const winnersMatches = matches.filter((m) => m.bracket === "winners");
   const losersMatches = matches.filter((m) => m.bracket === "losers");
@@ -125,6 +166,7 @@ function EliminationBracketView({
                         canManage={canManage}
                         tournamentId={tournamentId}
                         partnerMap={partnerMap}
+                        firstChoiceMap={firstChoiceMap}
                       />
                     ))}
                   </div>
@@ -172,6 +214,7 @@ function EliminationBracketView({
                             canManage={canManage}
                             tournamentId={tournamentId}
                             partnerMap={partnerMap}
+                            firstChoiceMap={firstChoiceMap}
                           />
                         ))}
                       </div>
@@ -196,6 +239,7 @@ function EliminationBracketView({
               canManage={canManage}
               tournamentId={tournamentId}
               partnerMap={partnerMap}
+              firstChoiceMap={firstChoiceMap}
             />
           </div>
         </div>
@@ -219,6 +263,7 @@ function RoundRobinView({
   winBy2,
   partnerMap,
   seedByPlayerId,
+  firstChoiceMap,
 }: {
   matches: TournamentMatch[];
   canManage: boolean;
@@ -230,6 +275,7 @@ function RoundRobinView({
   winBy2?: boolean;
   partnerMap?: PartnerMap;
   seedByPlayerId?: Map<string, number>;
+  firstChoiceMap?: Map<string, "team1" | "team2">;
 }) {
   const router = useRouter();
   const [advancing, setAdvancing] = useState(false);
@@ -400,6 +446,7 @@ function RoundRobinView({
               scoreToWin={scoreToWinPool}
               winBy2={winBy2}
               partnerMap={partnerMap}
+              firstChoiceMap={firstChoiceMap}
             />
           );
         })}
@@ -473,6 +520,7 @@ function RoundRobinView({
       winBy2={winBy2}
       partnerMap={partnerMap}
       seedByPlayerId={seedByPlayerId}
+      firstChoiceMap={firstChoiceMap}
     />
   ) : null;
 
@@ -585,6 +633,7 @@ function PoolSection({
   scoreToWin,
   winBy2,
   partnerMap,
+  firstChoiceMap,
 }: {
   label: string;
   matches: TournamentMatch[];
@@ -593,6 +642,7 @@ function PoolSection({
   scoreToWin?: number;
   winBy2?: boolean;
   partnerMap?: PartnerMap;
+  firstChoiceMap?: Map<string, "team1" | "team2">;
 }) {
   // Collapsible by default-open. Multi-pool divisions (Winners/
   // Losers, or 3+ pools) would otherwise push a lot of stacked
@@ -783,6 +833,7 @@ function PoolSection({
                   scoreToWin={scoreToWin}
                   winBy2={winBy2}
                   partnerMap={partnerMap}
+                  firstChoiceMap={firstChoiceMap}
                 />
               ))}
             </div>
@@ -806,6 +857,7 @@ function PlayoffBracketView({
   winBy2,
   partnerMap,
   seedByPlayerId,
+  firstChoiceMap,
 }: {
   matches: TournamentMatch[];
   canManage: boolean;
@@ -815,6 +867,7 @@ function PlayoffBracketView({
   winBy2?: boolean;
   partnerMap?: PartnerMap;
   seedByPlayerId?: Map<string, number>;
+  firstChoiceMap?: Map<string, "team1" | "team2">;
 }) {
   const maxRound = Math.max(...matches.map((m) => m.round), 0);
   const rounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b);
@@ -893,6 +946,7 @@ function PlayoffBracketView({
                         partnerMap={partnerMap}
                         bestOf3={isLegacyBestOf3Row}
                         seedByPlayerId={seedByPlayerId}
+                        firstChoiceMap={firstChoiceMap}
                       />
                     </div>
                   );
@@ -1025,6 +1079,7 @@ function MatchCard({
   partnerMap,
   bestOf3,
   seedByPlayerId,
+  firstChoiceMap,
 }: {
   match: TournamentMatch;
   canManage: boolean;
@@ -1035,6 +1090,7 @@ function MatchCard({
   partnerMap?: PartnerMap;
   bestOf3?: boolean;
   seedByPlayerId?: Map<string, number>;
+  firstChoiceMap?: Map<string, "team1" | "team2">;
 }) {
   const router = useRouter();
   const [scoring, setScoring] = useState(false);
@@ -1063,6 +1119,11 @@ function MatchCard({
 
   const isCompleted = match.status === "completed";
   const isBye = match.status === "bye";
+  // Only show first-choice on un-played, real matches. After scoring,
+  // who had first choice is irrelevant; for BYEs there's no opponent.
+  const showFirstChoice =
+    !isCompleted && !isBye && !!match.player1_id && !!match.player2_id;
+  const fcPick = showFirstChoice ? firstChoiceMap?.get(match.id) ?? null : null;
   const canScore = canManage && match.player1_id && match.player2_id && !isBye;
   const canEnterNew = canScore && !isCompleted;
   const canEdit = canScore && isCompleted;
@@ -1330,9 +1391,10 @@ function MatchCard({
           <>
             {/* Player 1 row */}
             <div className={`flex items-center justify-between gap-2 px-3 py-2 ${p1Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-              <span className={`text-sm min-w-0 break-words leading-snug ${p1Won ? "font-semibold text-teal-vivid" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
+              <span className={`text-sm min-w-0 break-words leading-snug flex items-center gap-1.5 ${p1Won ? "font-semibold text-teal-vivid" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
                 {p1Won && <span className="mr-1 text-teal-400">✓</span>}
-                {p1Name}
+                <span>{p1Name}</span>
+                {fcPick === "team1" && <FirstChoiceBadge className="shrink-0" />}
               </span>
               {isCompleted && match.score1.length > 0 && (
                 <span className={`font-mono text-sm font-semibold shrink-0 ml-2 ${p1Won ? "text-teal-vivid" : "text-dark-300"}`}>
@@ -1346,9 +1408,10 @@ function MatchCard({
 
             {/* Player 2 row */}
             <div className={`flex items-center justify-between gap-2 px-3 py-2 ${p2Won ? "bg-teal-900/30" : "bg-surface-raised"}`}>
-              <span className={`text-sm min-w-0 break-words leading-snug ${p2Won ? "font-semibold text-teal-vivid" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
+              <span className={`text-sm min-w-0 break-words leading-snug flex items-center gap-1.5 ${p2Won ? "font-semibold text-teal-vivid" : isCompleted ? "text-dark-300" : "text-dark-100"}`}>
                 {p2Won && <span className="mr-1 text-teal-400">✓</span>}
-                {p2Name}
+                <span>{p2Name}</span>
+                {fcPick === "team2" && <FirstChoiceBadge className="shrink-0" />}
               </span>
               {isCompleted && match.score2.length > 0 && (
                 <span className={`font-mono text-sm font-semibold shrink-0 ml-2 ${p2Won ? "text-teal-vivid" : "text-dark-300"}`}>
