@@ -403,15 +403,17 @@ export function CourtTracker({
                         — leaving the card mostly whitespace. Stacking
                         each team on its own row uses the full card
                         width and reads clean. */}
+                    {/* No first-choice badge in the queue list — by
+                        design it lives on the live court cards and
+                        the pool play bracket view. The queue is for
+                        "what's coming up", not pre-game ritual. */}
                     <div className="flex flex-col gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2">
-                      <p className="text-dark-100 break-words min-w-0 flex items-center gap-1.5 sm:text-left">
-                        <span>{formatTeam(m.player1_name, m.partner1_name)}</span>
-                        {m.first_choice === "team1" && <FirstChoiceBadge className="shrink-0" />}
+                      <p className="text-dark-100 break-words min-w-0 sm:text-left">
+                        {formatTeam(m.player1_name, m.partner1_name)}
                       </p>
                       <span className="text-[10px] text-surface-muted uppercase tracking-wide sm:self-center">vs</span>
-                      <p className="text-dark-100 break-words min-w-0 flex items-center gap-1.5 sm:text-right sm:justify-end">
-                        {m.first_choice === "team2" && <FirstChoiceBadge className="shrink-0" />}
-                        <span>{formatTeam(m.player2_name, m.partner2_name)}</span>
+                      <p className="text-dark-100 break-words min-w-0 sm:text-right">
+                        {formatTeam(m.player2_name, m.partner2_name)}
                       </p>
                     </div>
                     <p className="text-surface-muted mt-1">

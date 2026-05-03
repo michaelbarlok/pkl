@@ -455,20 +455,16 @@ export async function NextUpQueue({
                       {/* Stack teams vertically on mobile so long
                           doubles names don't wrap into a wall of
                           whitespace. From sm upward we keep the
-                          original side-by-side grid. */}
+                          original side-by-side grid. No first-choice
+                          badge — that lives on the live court cards
+                          + pool play bracket, not on queue rows. */}
                       <div className="flex flex-col gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2">
-                        <p className="text-dark-100 break-words min-w-0 flex items-center gap-1.5 sm:text-left">
-                          <span>{teamLabel(m.player1_id, m.player1?.display_name)}</span>
-                          {firstChoiceMap?.get(m.id) === "team1" && (
-                            <FirstChoiceBadge className="shrink-0" />
-                          )}
+                        <p className="text-dark-100 break-words min-w-0 sm:text-left">
+                          {teamLabel(m.player1_id, m.player1?.display_name)}
                         </p>
                         <span className="text-[10px] text-surface-muted uppercase tracking-wide sm:self-center">vs</span>
-                        <p className="text-dark-100 break-words min-w-0 flex items-center gap-1.5 sm:text-right sm:justify-end">
-                          {firstChoiceMap?.get(m.id) === "team2" && (
-                            <FirstChoiceBadge className="shrink-0" />
-                          )}
-                          <span>{teamLabel(m.player2_id, m.player2?.display_name)}</span>
+                        <p className="text-dark-100 break-words min-w-0 sm:text-right">
+                          {teamLabel(m.player2_id, m.player2?.display_name)}
                         </p>
                       </div>
                       <p className="text-surface-muted mt-1">
