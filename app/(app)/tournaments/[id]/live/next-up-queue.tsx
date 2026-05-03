@@ -133,13 +133,12 @@ export async function NextUpQueue({
     .order("queue_entered_at", { ascending: true })
     .limit(200);
 
-  // Scope the queue to the viewer's court range when one applies.
-  // queueScopeDivisions = null means "no scoping, show every active
-  // division" (legacy default for tournaments without court ranges).
-  const scopeSet = queueScopeDivisions ? new Set(queueScopeDivisions) : null;
+  // Scope to active divisions, but DON'T filter by the viewer's
+  // range — the layout below splits the queue into one bucket per
+  // range (mirroring the organizer's Court Tracker), so a player can
+  // see who's queued in every range, not just their own.
   const queue = (matchesRaw ?? []).filter((m: any) => {
     if (!m.division || !activeSet.has(m.division)) return false;
-    if (scopeSet && !scopeSet.has(m.division)) return false;
     return true;
   });
 
@@ -212,18 +211,18 @@ export async function NextUpQueue({
         }))
       : onCourt.map((m: any) => ({ court: m.court_number!, match: m }));
 
-  // Range-aware court-grid sections — same layout as the organizer's
-  // CourtTracker. Without ranges, single un-labelled section.
-  // With ranges, one labelled section per range plus an "Other"
-  // catch-all for any courts not owned by a range. The section
-  // matching the viewer's own range gets a subtle accent so they
-  // can spot their own courts at a glance.
+  // Range-aware sections: each owns its courts grid AND its queue.
+  // Without ranges, one un-labelled section. With ranges, one
+  // labelled section per range plus an "Other" catch-all for any
+  // courts/queues not bound to a range. The section matching the
+  // viewer's own range gets a subtle accent.
   const courtSections: {
     key: string;
     label: string | null;
     sublabel: string | null;
     isMine: boolean;
     courts: typeof courtsList;
+    queue: typeof queue;
   }[] = (() => {
     if (!courtRanges || courtRanges.length === 0) {
       return [{
@@ -232,16 +231,23 @@ export async function NextUpQueue({
         sublabel: null as string | null,
         isMine: false,
         courts: courtsList,
+        queue,
       }];
     }
     const rangedCourts = new Set<number>();
+    const rangedDivisions = new Set<string>();
     for (const r of courtRanges) {
       for (let c = r.court_start; c <= r.court_end; c++) rangedCourts.add(c);
+      for (const d of r.divisions) rangedDivisions.add(d);
     }
     const sections: typeof courtSections = [];
     for (const r of courtRanges) {
       const cards = courtsList.filter(
         (c) => c.court >= r.court_start && c.court <= r.court_end
+      );
+      const rangeDivSet = new Set(r.divisions);
+      const rangeQueue = queue.filter(
+        (m: any) => m.division != null && rangeDivSet.has(m.division)
       );
       sections.push({
         key: r.id,
@@ -252,18 +258,26 @@ export async function NextUpQueue({
             : "No divisions assigned",
         isMine: !!myRangeId && r.id === myRangeId,
         courts: cards,
+        queue: rangeQueue,
       });
     }
     const unrangedCards = courtsList.filter(
       (c) => !rangedCourts.has(c.court)
     );
-    if (unrangedCards.length > 0) {
+    const unrangedQueue = queue.filter(
+      (m: any) => m.division == null || !rangedDivisions.has(m.division)
+    );
+    if (unrangedCards.length > 0 || unrangedQueue.length > 0) {
       sections.push({
         key: "unranged",
-        label: `Other courts · ${unrangedCards.map((c) => c.court).join(", ")}`,
+        label:
+          unrangedCards.length > 0
+            ? `Other courts · ${unrangedCards.map((c) => c.court).join(", ")}`
+            : "Unassigned divisions",
         sublabel: "Open to any unassigned division",
         isMine: !myRangeId,
         courts: unrangedCards,
+        queue: unrangedQueue,
       });
     }
     return sections;
@@ -394,95 +408,86 @@ export async function NextUpQueue({
               );
             })}
           </div>
+
+          {/* Per-range Match Queue. Mirrors the organizer's Court
+               Tracker layout so a player can scan all ranges, see how
+               deep each queue is, and pick out their own row when it
+               falls in their range. The viewer's range section already
+               carries the accent border above. */}
+          <div className="mt-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted mb-1">
+              Match Queue ({section.queue.length})
+            </p>
+            {section.queue.length === 0 ? (
+              <p className="text-xs text-surface-muted">
+                Nothing queued right now.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {section.queue.map((m: any, idx: number) => {
+                  const includesMe =
+                    m.player1_id === myTeamPrimaryId ||
+                    m.player2_id === myTeamPrimaryId;
+                  return (
+                    <li
+                      key={m.id}
+                      className={
+                        "flex items-center justify-between gap-3 rounded-md px-3 py-2 shadow-sm ring-1 " +
+                        (includesMe
+                          ? "bg-accent-500/10 ring-accent-500/40"
+                          : "bg-surface-overlay ring-dark-500")
+                      }
+                    >
+                      <div className="flex items-start gap-2 min-w-0 text-xs">
+                        <span
+                          className={
+                            "shrink-0 font-semibold tabular-nums " +
+                            (idx === 0
+                              ? "text-accent-300"
+                              : includesMe
+                                ? "text-accent-300"
+                                : "text-surface-muted")
+                          }
+                          aria-label={`Position ${idx + 1}`}
+                        >
+                          #{idx + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          {/* Stack teams vertically on mobile so long
+                              doubles names don't wrap into a wall of
+                              whitespace. From sm upward we keep the
+                              original side-by-side grid. No first-choice
+                              badge — that lives on the live court cards
+                              + pool play bracket, not on queue rows. */}
+                          <div className="flex flex-col gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2">
+                            <p className="text-dark-100 break-words min-w-0 sm:text-left">
+                              {teamLabel(m.player1_id, m.player1?.display_name)}
+                            </p>
+                            <span className="text-[10px] text-surface-muted uppercase tracking-wide sm:self-center">vs</span>
+                            <p className="text-dark-100 break-words min-w-0 sm:text-right">
+                              {teamLabel(m.player2_id, m.player2?.display_name)}
+                            </p>
+                          </div>
+                          <p className="text-surface-muted mt-1">
+                            {getDivisionLabel(m.division)} · {labelFor(m)}
+                          </p>
+                        </div>
+                      </div>
+                      {idx === 0 && (
+                        <span className="text-[11px] font-semibold text-accent-300 whitespace-nowrap">
+                          Up next
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
           </div>
           ))}
         </div>
       )}
-
-      {/* Queue */}
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-surface-muted mb-0.5 mt-3">
-          Match Queue ({queue.length})
-        </p>
-        {queueScopeLabel ? (
-          // When the tournament has court ranges, make it explicit
-          // that this list is the viewer's range queue — not the
-          // whole tournament's. Players who don't see this can
-          // mistake "my queue" for "everyone's queue" and worry
-          // about their wait time relative to teams playing on
-          // entirely different courts.
-          <p className="text-[11px] text-surface-muted mb-1.5">
-            Your range: <span className="text-dark-200">{queueScopeLabel}</span>
-          </p>
-        ) : (
-          <div className="mb-1.5" />
-        )}
-        {queue.length === 0 ? (
-          <p className="text-xs text-surface-muted">
-            Nothing queued right now.
-          </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {queue.map((m: any, idx: number) => {
-              const includesMe =
-                m.player1_id === myTeamPrimaryId ||
-                m.player2_id === myTeamPrimaryId;
-              return (
-                <li
-                  key={m.id}
-                  className={
-                    "flex items-center justify-between gap-3 rounded-md px-3 py-2 shadow-sm ring-1 " +
-                    (includesMe
-                      ? "bg-accent-500/10 ring-accent-500/40"
-                      : "bg-surface-overlay ring-dark-500")
-                  }
-                >
-                  <div className="flex items-start gap-2 min-w-0 text-xs">
-                    <span
-                      className={
-                        "shrink-0 font-semibold tabular-nums " +
-                        (idx === 0
-                          ? "text-accent-300"
-                          : includesMe
-                            ? "text-accent-300"
-                            : "text-surface-muted")
-                      }
-                      aria-label={`Position ${idx + 1}`}
-                    >
-                      #{idx + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      {/* Stack teams vertically on mobile so long
-                          doubles names don't wrap into a wall of
-                          whitespace. From sm upward we keep the
-                          original side-by-side grid. No first-choice
-                          badge — that lives on the live court cards
-                          + pool play bracket, not on queue rows. */}
-                      <div className="flex flex-col gap-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2">
-                        <p className="text-dark-100 break-words min-w-0 sm:text-left">
-                          {teamLabel(m.player1_id, m.player1?.display_name)}
-                        </p>
-                        <span className="text-[10px] text-surface-muted uppercase tracking-wide sm:self-center">vs</span>
-                        <p className="text-dark-100 break-words min-w-0 sm:text-right">
-                          {teamLabel(m.player2_id, m.player2?.display_name)}
-                        </p>
-                      </div>
-                      <p className="text-surface-muted mt-1">
-                        {getDivisionLabel(m.division)} · {labelFor(m)}
-                      </p>
-                    </div>
-                  </div>
-                  {idx === 0 && (
-                    <span className="text-[11px] font-semibold text-accent-300 whitespace-nowrap">
-                      Up next
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
     </div>
   );
 }
