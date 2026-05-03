@@ -266,31 +266,58 @@ export function ForfeitCard({ tournamentId, format, matches }: Props) {
             </div>
           )}
 
-          {/* Tournament-forfeit toggle (pool only) */}
+          {/* Tournament-forfeit toggle (pool only) — branded button
+              instead of a native checkbox so the enabled / disabled
+              state is unambiguous and the touch target is finger-
+              sized on mobile. */}
           {selectedMatch && forfeitingAnchor && (
-            <label
-              className={`flex items-start gap-2 text-xs ${
-                isPoolMatch ? "cursor-pointer text-dark-200" : "text-surface-muted"
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={entireTournament}
-                disabled={!isPoolMatch}
-                onChange={(e) => setEntireTournament(e.target.checked)}
-                className="mt-0.5 accent-red-500"
-              />
-              <span>
-                <span className="font-medium text-dark-100">
-                  Forfeit entire tournament
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={entireTournament}
+                aria-disabled={!isPoolMatch}
+                onClick={() => {
+                  if (!isPoolMatch) return;
+                  setEntireTournament((v) => !v);
+                }}
+                className={`w-full flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                  !isPoolMatch
+                    ? "cursor-not-allowed border-surface-border bg-surface-overlay/40 text-surface-muted"
+                    : entireTournament
+                      ? "border-red-500/60 bg-red-900/20 text-dark-100"
+                      : "border-surface-border bg-surface-overlay text-dark-200 hover:bg-surface-raised"
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Forfeit entire tournament</p>
+                  <p className="text-xs text-surface-muted mt-0.5">
+                    {isPoolMatch
+                      ? "Removes the team from this pool, voids every pool match they're in (even completed ones), and recomputes standings."
+                      : "Only available for pool-play matches. Use match-only forfeit for playoffs."}
+                  </p>
+                </div>
+                {/* Pill indicator. Branded teal/red instead of the
+                    OS-native checkmark so it matches the rest of the
+                    organizer surface. */}
+                <span
+                  aria-hidden
+                  className={`shrink-0 inline-flex h-6 w-10 items-center rounded-full transition-colors ${
+                    !isPoolMatch
+                      ? "bg-surface-border"
+                      : entireTournament
+                        ? "bg-red-500"
+                        : "bg-surface-border"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform ${
+                      entireTournament && isPoolMatch ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
                 </span>
-                <span className="block text-surface-muted">
-                  {isPoolMatch
-                    ? "Removes the team from this pool, voids every pool match they're in (even completed ones), and recomputes standings."
-                    : "Only available for pool-play matches. Use match-only forfeit for playoffs."}
-                </span>
-              </span>
-            </label>
+              </button>
+            </div>
           )}
 
           {error && <p className="text-xs text-red-400">{error}</p>}
