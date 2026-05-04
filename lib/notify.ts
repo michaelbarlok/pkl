@@ -6,19 +6,29 @@ import type { NotificationType } from "@/types/database";
 
 /**
  * Notifications that are too time-sensitive to let a user opt out
- * of — tournament live-play pings. A player who silences these
- * could miss their court assignment and hold the whole schedule up,
- * so we ignore the per-type "off" switch for this set and fire on
- * whichever of push/email the user has in their global preferences
- * (falling back to email if neither is configured). In-app rows are
- * always written regardless.
+ * of — tournament live-play pings + ladder/sheet alerts where
+ * missing the message means missing the play window. A player who
+ * silenced these could miss their court assignment or their
+ * withdrawal window and hold the schedule up, so we ignore the
+ * per-type "off" switch for this set and fire on whichever of
+ * push/email the user has in their global preferences (push
+ * preferred when a subscription exists, email otherwise). In-app
+ * rows are always written regardless.
+ *
+ * Side effect of "required": these always go via push when a
+ * subscription is present, which means iOS displays them with our
+ * service-worker icon + badge instead of the iOS Mail "first letter
+ * of sender" avatar.
  */
 const REQUIRED_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
   "tournament_division_started",
   "tournament_up_next",
-  "tournament_in_3rd",
   "tournament_court_assigned",
   "tournament_playoffs_starting",
+  "withdraw_closing",
+  "signup_reminder",
+  "session_starting",
+  "pool_assigned",
 ]);
 
 interface NotifyParams {
