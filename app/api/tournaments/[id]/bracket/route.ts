@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import {
   generateSingleElimination,
   generateDoubleElimination,
@@ -747,14 +748,28 @@ export async function PUT(
   // been entered. Auto-completing here would hide the End Tournament
   // button and reject any subsequent score correction with a 409.
 
-  // Promote the next queued match to the freed court (if any). Fire
-  // and forget — a failure in the engine shouldn't roll back the
-  // score that was just recorded.
-  try {
-    await onMatchCompleted(tournamentId);
-  } catch (err) {
-    console.error("tournament-queue: onMatchCompleted failed", err);
-  }
+  // Promote the next queued match to the freed court (if any), and
+  // fan out "Head to Court N" pushes for whoever just got assigned.
+  // Done via waitUntil so the response returns the moment the score
+  // is committed — the organizer sees the row flip from "in progress"
+  // to "completed" without waiting on email/push delivery (which can
+  // hang up to 10s on a stale push subscription).
+  //
+  // The score row, the optimistic-lock check, and every bracket
+  // advancement update have already been awaited above, so the score
+  // is durably persisted before this point. Nothing here writes back
+  // to the just-scored match's score columns, so a slow notification
+  // can't corrupt or roll back the score the organizer just recorded.
+  //
+  // waitUntil keeps the Vercel function alive until the promise
+  // resolves even though the response has been sent — without it, a
+  // bare `void onMatchCompleted(...)` would get killed when Vercel
+  // freezes the function instance after the response.
+  waitUntil(
+    onMatchCompleted(tournamentId).catch((err) => {
+      console.error("tournament-queue: onMatchCompleted failed", err);
+    })
+  );
 
   return NextResponse.json(match);
 }
