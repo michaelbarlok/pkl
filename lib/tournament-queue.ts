@@ -199,6 +199,18 @@ export function interleaveQueueByDivision<
 }
 
 /**
+ * Result of an assignment pass — the inputs the notification phase
+ * needs. Returned from runAssignmentPass when caller wants to defer
+ * notifications via waitUntil so the HTTP response can return as
+ * soon as the DB writes (queue stamping + court assignment) commit.
+ */
+export interface AssignmentPassResult {
+  tournament: Tournament;
+  persisted: { match: TournamentMatch; court: number }[];
+  stillQueued: TournamentMatch[];
+}
+
+/**
  * Called after an organizer records a match score (the caller has
  * already flipped the match to completed + cleared court_number).
  * Mirrors a division-activation pass — same queue logic applies.
@@ -359,8 +371,8 @@ export async function promoteMatchToCourt(
 
 export async function runAssignmentPass(
   tournamentId: string,
-  opts: { reinterleave?: boolean } = {}
-): Promise<void> {
+  opts: { reinterleave?: boolean; skipNotifications?: boolean } = {}
+): Promise<AssignmentPassResult | null> {
   const service = await createServiceClient();
 
   const { data: tournamentRaw } = await service
@@ -368,7 +380,7 @@ export async function runAssignmentPass(
     .select("id, title, num_courts, format")
     .eq("id", tournamentId)
     .single();
-  if (!tournamentRaw) return;
+  if (!tournamentRaw) return null;
   const tournament = tournamentRaw as Tournament;
   const numCourts = tournament.num_courts ?? 0;
 
@@ -377,7 +389,7 @@ export async function runAssignmentPass(
     .select("division")
     .eq("tournament_id", tournamentId);
   const activeSet = new Set((activeDivs ?? []).map((r: any) => r.division));
-  if (activeSet.size === 0) return;
+  if (activeSet.size === 0) return null;
 
   // Court-range layout (may be empty → all-on-all default).
   const courtRanges = await loadCourtRanges(tournamentId);
@@ -564,27 +576,51 @@ export async function runAssignmentPass(
     persisted.push({ match, court });
   }
 
-  // ── Step 4: "Head to Court N" pushes. Only fire for matches that
-  // actually got their court_number persisted; a 23505 in Step 3
-  // means another pass beat us and the player will get the push
-  // from that pass instead. sendCourtReadyPushes splits the fan-out
-  // by team so the body can name which side has first choice.
+  // Build the data the notification phase needs. `stillQueued` is
+  // filtered AGAINST `persisted` so a match that lost a 23505 race
+  // (didn't actually take its assigned court) is still in line for
+  // position-push counting.
+  const stillQueued = queue.filter(
+    (m) => !persisted.some((a) => a.match.id === m.id)
+  );
+  const result: AssignmentPassResult = { tournament, persisted, stillQueued };
+
+  // Notification phase. Heavy — push delivery can hang up to 10s on
+  // stale subscriptions and Resend takes 1-3s per email. Gated by
+  // opts.skipNotifications so the score-write hot path can run the
+  // assignment in the request and defer this to waitUntil.
+  if (!opts.skipNotifications) {
+    await sendAssignmentPassNotifications(tournamentId, result);
+  }
+
+  return result;
+}
+
+/**
+ * Steps 4 + 5 of the assignment pass — "Head to Court N" pushes for
+ * freshly-assigned matches and queue-position pushes ("Up next",
+ * "3rd in line") for the remaining queue. Extracted so a caller can
+ * defer this work via waitUntil after a fast assignment phase.
+ *
+ * Idempotent on the position-push columns: each match has its own
+ * `*_notified_at` column that's checked before sending and stamped
+ * after, so a re-run of this function is a no-op for already-pushed
+ * matches.
+ */
+export async function sendAssignmentPassNotifications(
+  tournamentId: string,
+  result: AssignmentPassResult,
+): Promise<void> {
+  const service = await createServiceClient();
+  const { tournament, persisted, stillQueued } = result;
+
+  // ── Step 4: "Head to Court N" pushes for freshly-assigned matches.
   for (const { match, court } of persisted) {
     await sendCourtReadyPushes(service, tournamentId, tournament, match, court);
   }
 
   // ── Step 5: queue-position pushes. Fires once per transition.
-  // Position 1 ("Up next") and position 3 ("3rd in line") are the
-  // two stops we notify at. Each uses its own _notified_at column
-  // so a match only gets each ping a single time (a match can only
-  // move forward in the line, so we never unset these).
-  // Use `persisted` (not `assignments`) so a match that lost a 23505
-  // race is still considered queued for the position-push count.
-  const stillQueued = queue.filter(
-    (m) => !persisted.some((a) => a.match.id === m.id)
-  );
   const nowStampIso = new Date().toISOString();
-
   const positionTargets: Array<{
     match: TournamentMatch | undefined;
     column: "up_next_notified_at" | "in_3rd_notified_at";

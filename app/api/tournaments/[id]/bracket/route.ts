@@ -6,7 +6,10 @@ import {
   generateRoundRobin,
 } from "@/lib/tournament-bracket";
 import { getTournamentManager } from "@/lib/tournament-auth";
-import { onMatchCompleted } from "@/lib/tournament-queue";
+import {
+  runAssignmentPass,
+  sendAssignmentPassNotifications,
+} from "@/lib/tournament-queue";
 
 /**
  * POST: Generate bracket and advance tournament to in_progress.
@@ -748,28 +751,43 @@ export async function PUT(
   // been entered. Auto-completing here would hide the End Tournament
   // button and reject any subsequent score correction with a 409.
 
-  // Promote the next queued match to the freed court (if any), and
-  // fan out "Head to Court N" pushes for whoever just got assigned.
-  // Done via waitUntil so the response returns the moment the score
-  // is committed — the organizer sees the row flip from "in progress"
-  // to "completed" without waiting on email/push delivery (which can
-  // hang up to 10s on a stale push subscription).
+  // Two-phase post-score work:
   //
-  // The score row, the optimistic-lock check, and every bracket
-  // advancement update have already been awaited above, so the score
-  // is durably persisted before this point. Nothing here writes back
-  // to the just-scored match's score columns, so a slow notification
-  // can't corrupt or roll back the score the organizer just recorded.
+  //   1. ASSIGNMENT (awaited): walk the queue, stamp queue_entered_at
+  //      on newly-eligible matches, and assign the next queued match
+  //      to whichever court just freed up. Pure DB writes — fast.
+  //      Awaited so the response includes the freshly-filled court,
+  //      and the client's router.refresh() reads the new state in
+  //      the same round trip. (Realtime is unreliable for closing
+  //      this gap on its own — the user saw a stale view earlier.)
   //
-  // waitUntil keeps the Vercel function alive until the promise
-  // resolves even though the response has been sent — without it, a
-  // bare `void onMatchCompleted(...)` would get killed when Vercel
-  // freezes the function instance after the response.
-  waitUntil(
-    onMatchCompleted(tournamentId).catch((err) => {
-      console.error("tournament-queue: onMatchCompleted failed", err);
-    })
-  );
+  //   2. NOTIFICATIONS (waitUntil): "Head to Court N" pushes for the
+  //      newly-assigned team and "Up next / 3rd in line" pushes for
+  //      the next two queue rows. Heavy — push delivery can hang up
+  //      to 10s on a stale subscription and Resend takes 1-3s per
+  //      email. Detached from the request lifecycle via waitUntil so
+  //      Vercel keeps the function alive without blocking the
+  //      response. A bare `void` would get killed when the function
+  //      instance freezes post-response.
+  let passResult: Awaited<ReturnType<typeof runAssignmentPass>> = null;
+  try {
+    passResult = await runAssignmentPass(tournamentId, {
+      skipNotifications: true,
+    });
+  } catch (err) {
+    console.error("tournament-queue: runAssignmentPass failed", err);
+  }
+
+  if (passResult) {
+    waitUntil(
+      sendAssignmentPassNotifications(tournamentId, passResult).catch((err) => {
+        console.error(
+          "tournament-queue: sendAssignmentPassNotifications failed",
+          err,
+        );
+      })
+    );
+  }
 
   return NextResponse.json(match);
 }
