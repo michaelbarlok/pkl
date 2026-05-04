@@ -18,6 +18,7 @@
     "@react-email/components": "^0.0.31",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.99.0",
+    "@vercel/functions": "^3.5.0",
     "clsx": "^2.1.1",
     "heic2any": "^0.0.4",
     "next": "^14.2.0",
