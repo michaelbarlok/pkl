@@ -52,11 +52,19 @@ export default async function SheetDetailPage({
   if (error || !sheet) notFound();
 
   // Registrations — with a fallback when the join errors out under RLS.
-  let registrations: (Registration & { player?: Profile })[] | null = null;
+  // The registered_by_profile join exposes the person who added a guest
+  // signup; rendered as "Signed up by …" under the player's name on the
+  // roster and waitlist so everyone can see proxy signups.
+  let registrations: (Registration & {
+    player?: Profile;
+    registered_by_profile?: { display_name: string | null; first_name: string | null; last_name: string | null } | null;
+  })[] | null = null;
   {
     const { data, error: regError } = await supabase
       .from("registrations")
-      .select("*, player:profiles!registrations_player_id_fkey(*)")
+      .select(
+        "*, player:profiles!registrations_player_id_fkey(*), registered_by_profile:profiles!registrations_registered_by_fkey(display_name, first_name, last_name)"
+      )
       .eq("sheet_id", id)
       .in("status", ["confirmed", "waitlist"])
       .order("signed_up_at", { ascending: true });
@@ -72,15 +80,32 @@ export default async function SheetDetailPage({
 
       if (plainRegs && plainRegs.length > 0) {
         const playerIds = plainRegs.map((r) => r.player_id);
-        const { data: players } = await supabase
+        // Pull both the player AND the registered_by profile in one
+        // round-trip — split lookups would still work but this keeps
+        // the fallback path's shape close to the joined query above.
+        const proxyIds = (plainRegs as { registered_by: string | null }[])
+          .map((r) => r.registered_by)
+          .filter((x): x is string => !!x);
+        const allIds = Array.from(new Set([...playerIds, ...proxyIds]));
+        const { data: profiles } = await supabase
           .from("profiles")
-          .select("*")
-          .in("id", playerIds);
-        const playerMap = new Map((players ?? []).map((p) => [p.id, p]));
-        registrations = plainRegs.map((r) => ({
-          ...r,
-          player: playerMap.get(r.player_id) ?? undefined,
-        }));
+          .select("id, display_name, first_name, last_name, avatar_url, skill_level")
+          .in("id", allIds);
+        const profMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+        registrations = plainRegs.map((r) => {
+          const proxy = r.registered_by ? profMap.get(r.registered_by) : null;
+          return {
+            ...r,
+            player: profMap.get(r.player_id) as Profile | undefined,
+            registered_by_profile: proxy
+              ? {
+                  display_name: proxy.display_name ?? null,
+                  first_name: proxy.first_name ?? null,
+                  last_name: proxy.last_name ?? null,
+                }
+              : null,
+          };
+        });
       } else {
         registrations = [];
       }
@@ -444,7 +469,7 @@ export default async function SheetDetailPage({
         </header>
         {confirmed.length > 0 ? (
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-0.5 p-2">
-            {confirmed.map((reg: Registration & { player?: Profile }) => (
+            {confirmed.map((reg) => (
               <RosterCard
                 key={reg.id}
                 reg={reg}
@@ -477,32 +502,45 @@ export default async function SheetDetailPage({
             </span>
           </header>
           <ul className="divide-y divide-surface-border">
-            {waitlisted.map((reg: Registration & { player?: Profile }, idx: number) => (
-              <li
-                key={reg.id}
-                className={`flex items-center gap-3 px-4 py-2.5 ${
-                  reg.player_id === profile.id ? "bg-brand-500/5" : ""
-                }`}
-              >
-                <span className="text-xs font-semibold text-surface-muted w-6 text-right shrink-0">
-                  #{idx + 1}
-                </span>
-                <PlayerAvatar
-                  displayName={reg.player?.display_name ?? "?"}
-                  avatarUrl={reg.player?.avatar_url ?? null}
-                  size="sm"
-                />
-                <span className="flex-1 truncate text-sm text-dark-100">
-                  {reg.player?.display_name ?? "Unknown"}
-                </span>
-                {hasAdminView && !isCancelled && (
-                  <AdminRemovePlayer
-                    registrationId={reg.id}
-                    playerName={reg.player?.display_name ?? "this player"}
+            {waitlisted.map((reg, idx) => {
+              const proxyName =
+                reg.registered_by && reg.registered_by !== reg.player_id
+                  ? formatProxyName(reg.registered_by_profile)
+                  : null;
+              return (
+                <li
+                  key={reg.id}
+                  className={`flex items-center gap-3 px-4 py-2.5 ${
+                    reg.player_id === profile.id ? "bg-brand-500/5" : ""
+                  }`}
+                >
+                  <span className="text-xs font-semibold text-surface-muted w-6 text-right shrink-0">
+                    #{idx + 1}
+                  </span>
+                  <PlayerAvatar
+                    displayName={reg.player?.display_name ?? "?"}
+                    avatarUrl={reg.player?.avatar_url ?? null}
+                    size="sm"
                   />
-                )}
-              </li>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-sm text-dark-100">
+                      {reg.player?.display_name ?? "Unknown"}
+                    </p>
+                    {proxyName && (
+                      <p className="text-[11px] italic text-surface-muted truncate">
+                        Signed up by {proxyName}
+                      </p>
+                    )}
+                  </div>
+                  {hasAdminView && !isCancelled && (
+                    <AdminRemovePlayer
+                      registrationId={reg.id}
+                      playerName={reg.player?.display_name ?? "this player"}
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
@@ -524,6 +562,16 @@ export default async function SheetDetailPage({
 // Sub-components
 // ─────────────────────────────────────────────────────────────
 
+function formatProxyName(
+  proxy: { first_name: string | null; last_name: string | null; display_name: string | null } | null | undefined,
+): string | null {
+  if (!proxy) return null;
+  const f = proxy.first_name?.trim() ?? "";
+  const l = proxy.last_name?.trim() ?? "";
+  const combined = [f, l].filter(Boolean).join(" ");
+  return combined || proxy.display_name?.trim() || null;
+}
+
 function RosterCard({
   reg,
   court,
@@ -531,7 +579,10 @@ function RosterCard({
   adminCanRemove,
   showPriority,
 }: {
-  reg: Registration & { player?: Profile };
+  reg: Registration & {
+    player?: Profile;
+    registered_by_profile?: { display_name: string | null; first_name: string | null; last_name: string | null } | null;
+  };
   court: number | undefined;
   isMe: boolean;
   adminCanRemove: boolean;
@@ -540,6 +591,14 @@ function RosterCard({
   // roster management.
   showPriority: boolean;
 }) {
+  // "Signed up by …" appears whenever someone other than the player
+  // themselves added the registration — a proxy signup. Visible to
+  // every viewer, no admin gate, since everyone benefits from knowing
+  // who walked the player onto the sheet.
+  const proxyName =
+    reg.registered_by && reg.registered_by !== reg.player_id
+      ? formatProxyName(reg.registered_by_profile)
+      : null;
   return (
     <li
       className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-surface-overlay/50 ${
@@ -556,6 +615,11 @@ function RosterCard({
           {reg.player?.display_name ?? "Unknown"}
           {isMe && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-vivid">You</span>}
         </p>
+        {proxyName && (
+          <p className="text-[11px] italic text-surface-muted truncate">
+            Signed up by {proxyName}
+          </p>
+        )}
         <div className="mt-0.5 flex items-center gap-2 text-xs text-surface-muted">
           {reg.player?.skill_level && (
             <span>{reg.player.skill_level}</span>
