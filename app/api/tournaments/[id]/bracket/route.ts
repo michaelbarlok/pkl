@@ -6,6 +6,7 @@ import {
   generateRoundRobin,
 } from "@/lib/tournament-bracket";
 import { getTournamentManager } from "@/lib/tournament-auth";
+import { validateScore } from "@/lib/score-validation";
 import {
   runAssignmentPass,
   sendAssignmentPassNotifications,
@@ -293,42 +294,23 @@ export async function PUT(
     : divisionOverrides?.score_to_win_pool ?? tournament.score_to_win_pool;
   const winBy2 = (tournament as any).win_by_2 === true;
 
+  // Run each game through the shared validator so tournaments and
+  // ladder sessions enforce the same rules — exact ending score
+  // (e.g. 11-X for a 11-point game), win-by-2 caps, no ties. Without
+  // this, 19-6 in a "first to 11" game slipped through because the
+  // old inline check only verified "winner reached the limit" and
+  // didn't bound the winner's score from above.
   if (typeof targetScore === "number" && targetScore > 0) {
     for (let i = 0; i < s1.length; i++) {
-      const a = s1[i];
-      const b = s2[i];
-      const hi = Math.max(a, b);
-      const lo = Math.min(a, b);
-      if (hi < targetScore) {
+      const v = validateScore({
+        scoreA: s1[i],
+        scoreB: s2[i],
+        gameLimit: targetScore,
+        winBy2,
+      });
+      if (!v.ok) {
         return NextResponse.json(
-          {
-            error: winBy2
-              ? `Game ${i + 1}: at least one team must reach ${targetScore} (win by 2).`
-              : `Game ${i + 1}: at least one team must reach ${targetScore}.`,
-          },
-          { status: 400 }
-        );
-      }
-      if (winBy2) {
-        // Win-by-2: either the winner is exactly at the target and
-        // leads by 2+ (e.g. 11-9 to 11), or the game ran past the
-        // target and the winner leads by exactly 2 (12-10, 13-11).
-        if (hi === targetScore) {
-          if (hi - lo < 2) {
-            return NextResponse.json(
-              { error: `Game ${i + 1}: win by 2 — ${hi}-${lo} isn't a valid finish.` },
-              { status: 400 }
-            );
-          }
-        } else if (hi - lo !== 2) {
-          return NextResponse.json(
-            { error: `Game ${i + 1}: win by 2 — once past ${targetScore}, the winner must lead by exactly 2 (e.g. ${targetScore + 1}-${targetScore - 1}).` },
-            { status: 400 }
-          );
-        }
-      } else if (hi === lo) {
-        return NextResponse.json(
-          { error: `Game ${i + 1}: scores can't be tied.` },
+          { error: `Game ${i + 1}: ${v.error}` },
           { status: 400 }
         );
       }

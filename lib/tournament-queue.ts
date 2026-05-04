@@ -620,11 +620,14 @@ export async function sendAssignmentPassNotifications(
   }
 
   // ── Step 5: queue-position pushes. Fires once per transition.
+  // "Up next" only — the old "3rd in queue" alert was deemed noisy
+  // and removed. Players still see their queue position on the live
+  // page, just no proactive ping until they hit position 1.
   const nowStampIso = new Date().toISOString();
   const positionTargets: Array<{
     match: TournamentMatch | undefined;
-    column: "up_next_notified_at" | "in_3rd_notified_at";
-    type: "tournament_up_next" | "tournament_in_3rd";
+    column: "up_next_notified_at";
+    type: "tournament_up_next";
     title: string;
     body: (divLabel: string) => string;
   }> = [
@@ -637,16 +640,6 @@ export async function sendAssignmentPassNotifications(
         divLabel
           ? `${tournament.title} — ${divLabel}. Start warming up; a court will open soon.`
           : `${tournament.title}. Start warming up; a court will open soon.`,
-    },
-    {
-      match: stillQueued[2],
-      column: "in_3rd_notified_at",
-      type: "tournament_in_3rd",
-      title: "You're 3rd in the queue",
-      body: (divLabel) =>
-        divLabel
-          ? `${tournament.title} — ${divLabel}. Two matches ahead of you; be nearby.`
-          : `${tournament.title}. Two matches ahead of you; be nearby.`,
     },
   ];
 
